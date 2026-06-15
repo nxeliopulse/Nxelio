@@ -2,27 +2,16 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, MoreHorizontal, Mail, Rocket, Pause, Play, Copy, Trash2, Pencil, Search, LayoutTemplate, ChevronDown } from "lucide-react";
-import { Input, Select } from "@/components/ui/input";
+import { Plus, MoreHorizontal, Mail, Rocket, Pause, Play, Copy, Trash2, Pencil, Search, LayoutTemplate, ChevronDown, Megaphone } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { useFeedback } from "@/components/ui/feedback";
 import { setCampaignStatus, deleteCampaign, duplicateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { setSequenceStatus, deleteSequence, duplicateSequence, type OutreachSequenceRow } from "@/lib/queries/outreach";
 import { campaignTemplates } from "@/lib/campaign-templates";
-import { formatDate } from "@/lib/utils";
-
-const statusVariant: Record<string, "success" | "warning" | "default" | "blue"> = {
-  Active: "success",
-  Paused: "warning",
-  Draft: "default",
-  Completed: "blue",
-};
-
-const STATUS_FILTERS = ["All", "Active", "Paused", "Draft", "Completed"] as const;
-type StatusFilter = (typeof STATUS_FILTERS)[number];
+import { formatDate, cn } from "@/lib/utils";
 
 interface UnifiedRow {
   id: string;
@@ -53,7 +42,7 @@ export function CampaignsView({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<StatusFilter>("All");
+  const [activeOnly, setActiveOnly] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -69,7 +58,6 @@ export function CampaignsView({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [openId, templatesOpen]);
 
-  // Merge both campaign types into one normalized list (Dripify shows one list).
   const rows: UnifiedRow[] = [
     ...campaigns.map((c): UnifiedRow => ({
       id: c.id,
@@ -81,7 +69,7 @@ export function CampaignsView({
       openRate: Number(c.open_rate || 0),
       replyRate: Number(c.reply_rate || 0),
       updatedAt: c.updated_at,
-      href: `/campaigns/builder?id=${c.id}`,
+      href: `/campaigns/${c.id}`,
     })),
     ...sequences.map((s): UnifiedRow => ({
       id: s.id,
@@ -98,16 +86,19 @@ export function CampaignsView({
     })),
   ].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
-  const counts = STATUS_FILTERS.reduce((acc, f) => {
-    acc[f] = f === "All" ? rows.length : rows.filter((r) => r.status === f).length;
-    return acc;
-  }, {} as Record<StatusFilter, number>);
-
+  const hasAny = rows.length > 0;
   const filtered = rows.filter((r) => {
     const matchSearch = !search || r.name.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filter === "All" || r.status === filter;
-    return matchSearch && matchStatus;
+    const matchActive = !activeOnly || r.status === "Active";
+    return matchSearch && matchActive;
   });
+
+  function progressPct(r: UnifiedRow): number {
+    if (r.kind === "sequence" && r.leads) return Math.min(100, Math.round((r.sent / Math.max(1, r.leads)) * 100));
+    if (r.status === "Completed") return 100;
+    if (r.status === "Active") return 50;
+    return 0;
+  }
 
   function toggleStatus(r: UnifiedRow) {
     setOpenId(null);
@@ -146,18 +137,12 @@ export function CampaignsView({
         title="Campaigns"
         description="Create, launch and track your outreach — email or multichannel."
         actions={
-          <>
-            <Link href="/outreach/builder">
-              <Button variant="outline"><Rocket className="h-4 w-4" /> New sequence</Button>
-            </Link>
-            <Link href="/campaigns/builder">
-              <Button><Plus className="h-4 w-4" /> New Campaign</Button>
-            </Link>
-          </>
+          <Link href="/campaigns/builder">
+            <Button><Plus className="h-4 w-4" /> New Campaign</Button>
+          </Link>
         }
       />
 
-      {/* Stat row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {statCards.map((s) => (
           <Card key={s.label} className="p-4">
@@ -167,22 +152,29 @@ export function CampaignsView({
         ))}
       </div>
 
-      {/* Campaign list — one list, status select + templates dropdown */}
-      <Card className="overflow-hidden">
+      <Card className="overflow-visible">
+        {/* Toolbar */}
         <div className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
-          {/* Status select — pick a status to see Active / Completed / etc. */}
-          <Select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as StatusFilter)}
-            className="max-w-[200px]"
-          >
-            {STATUS_FILTERS.map((f) => (
-              <option key={f} value={f}>{f === "All" ? "All statuses" : f} ({counts[f]})</option>
-            ))}
-          </Select>
+          <div className="flex-1 min-w-[200px] max-w-sm">
+            <Input
+              leftIcon={<Search className="h-4 w-4" />}
+              placeholder="Search campaigns..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={activeOnly}
+              onChange={(e) => setActiveOnly(e.target.checked)}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            Active only
+          </label>
 
-          <div className="ml-auto flex items-center gap-2 w-full sm:w-auto">
-            {/* Templates button → dropdown of pre-built templates */}
+          <div className="ml-auto flex items-center gap-2">
+            {/* Templates dropdown */}
             <div className="relative" ref={tplRef}>
               <Button variant="outline" onClick={() => setTemplatesOpen((v) => !v)}>
                 <LayoutTemplate className="h-4 w-4" /> Templates <ChevronDown className={`h-3.5 w-3.5 transition-transform ${templatesOpen ? "rotate-180" : ""}`} />
@@ -216,89 +208,127 @@ export function CampaignsView({
                 </div>
               )}
             </div>
-
-            <div className="flex-1 sm:w-64">
-              <Input
-                leftIcon={<Search className="h-4 w-4" />}
-                placeholder="Search campaigns..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
-                <th className="px-4 py-3 font-semibold">Campaign</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Leads</th>
-                <th className="px-4 py-3 font-semibold">Sent</th>
-                <th className="px-4 py-3 font-semibold">Open</th>
-                <th className="px-4 py-3 font-semibold">Reply</th>
-                <th className="px-4 py-3 w-10"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+        {/* Empty state */}
+        {!hasAny ? (
+          <div className="px-4 py-20 text-center">
+            <div className="h-14 w-14 mx-auto rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+              <Megaphone className="h-7 w-7" />
+            </div>
+            <p className="text-slate-900 font-semibold">You currently have no campaigns</p>
+            <p className="text-sm text-slate-500 mt-1 mb-5">Create your first campaign or start from a template.</p>
+            <Link href="/campaigns/builder"><Button><Plus className="h-4 w-4" /> Create campaign</Button></Link>
+          </div>
+        ) : (
+          <>
+            {/* Column header (desktop) — Dripify layout: Overview · Leads · LinkedIn · Status */}
+            <div className="hidden lg:grid grid-cols-[2fr_1.2fr_1.2fr_auto] gap-4 px-5 py-3 bg-slate-50 border-b border-slate-100 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <span>Overview</span>
+              <span>Leads</span>
+              <span>Performance</span>
+              <span className="text-right pr-2">Status</span>
+            </div>
+
+            <ul className="divide-y divide-slate-100">
               {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-16 text-center text-slate-500">
-                    No campaigns {filter !== "All" ? `with status “${filter}”` : "yet"}. Click <strong>New Campaign</strong> or pick a template above.
-                  </td>
-                </tr>
+                <li className="px-5 py-12 text-center text-slate-500 text-sm">No campaigns match your filters.</li>
               )}
-              {filtered.map((r) => (
-                <tr key={`${r.kind}-${r.id}`} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <Link href={r.href} className="flex items-center gap-3 group">
-                      <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${r.kind === "email" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"}`}>
-                        {r.kind === "email" ? <Mail className="h-4.5 w-4.5" /> : <Rocket className="h-4.5 w-4.5" />}
-                      </div>
+              {filtered.map((r) => {
+                const isActive = r.status === "Active";
+                const pct = progressPct(r);
+                return (
+                  <li key={`${r.kind}-${r.id}`} className="px-5 py-4 hover:bg-slate-50/60 transition-colors">
+                    <div className="grid grid-cols-1 lg:grid-cols-[2fr_1.2fr_1.2fr_auto] gap-4 lg:items-center">
+                      {/* Overview */}
                       <div className="min-w-0">
-                        <p className="font-medium text-slate-900 group-hover:text-blue-600 truncate">{r.name}</p>
-                        <p className="text-xs text-slate-400">
-                          {r.kind === "email" ? "Email campaign" : `Sequence · ${r.channel}`} · {formatDate(r.updatedAt)}
-                        </p>
-                      </div>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3"><Badge variant={statusVariant[r.status] || "default"}>{r.status}</Badge></td>
-                  <td className="px-4 py-3 text-slate-600">{r.leads === null ? "—" : r.leads.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-slate-600">{r.sent.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-slate-600">{r.openRate === null ? "—" : `${r.openRate}%`}</td>
-                  <td className="px-4 py-3"><span className="text-emerald-700 font-medium">{r.replyRate}%</span></td>
-                  <td className="px-4 py-3 relative">
-                    <button
-                      onClick={() => setOpenId(openId === r.id ? null : r.id)}
-                      className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600"
-                      aria-label="Campaign actions"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
-                    {openId === r.id && (
-                      <div ref={menuRef} className="lp-anim-pop origin-top-right absolute right-2 top-full z-20 w-44 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden p-1">
-                        <Link href={r.href} onClick={() => setOpenId(null)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
-                          <Pencil className="h-4 w-4 text-slate-400" /> Edit
+                        <Link href={r.href} className="flex items-center gap-3 group">
+                          <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${r.kind === "email" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"}`}>
+                            {r.kind === "email" ? <Mail className="h-4.5 w-4.5" /> : <Rocket className="h-4.5 w-4.5" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900 group-hover:text-blue-600 truncate">{r.name}</p>
+                            <p className="text-xs text-slate-400">{r.kind === "email" ? "Email campaign" : `Sequence · ${r.channel}`} · {formatDate(r.updatedAt)}</p>
+                          </div>
                         </Link>
-                        <button onClick={() => toggleStatus(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
-                          {r.status === "Active" ? <><Pause className="h-4 w-4 text-slate-400" /> Pause</> : <><Play className="h-4 w-4 text-slate-400" /> Resume</>}
-                        </button>
-                        <button onClick={() => handleDuplicate(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
-                          <Copy className="h-4 w-4 text-slate-400" /> Duplicate
-                        </button>
-                        <button onClick={() => handleDelete(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50">
-                          <Trash2 className="h-4 w-4" /> Delete
-                        </button>
+                        <div className="mt-2.5 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${isActive ? "bg-blue-500" : r.status === "Completed" ? "bg-emerald-500" : "bg-slate-300"}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-slate-400 tabular-nums">{r.leads === null ? r.sent.toLocaleString() : r.leads.toLocaleString()}</span>
+                        </div>
                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+                      {/* Leads */}
+                      <div className="text-sm">
+                        <div className="flex items-center justify-between max-w-[160px]">
+                          <span className="text-slate-500">{r.kind === "sequence" ? "Enrolled" : "Recipients"}</span>
+                          <span className="font-semibold text-slate-900">{r.leads === null ? "—" : r.leads.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center justify-between max-w-[160px] mt-1">
+                          <span className="text-slate-500">Sent</span>
+                          <span className="font-semibold text-slate-900">{r.sent.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {/* Performance */}
+                      <div className="text-sm">
+                        <div className="flex items-center justify-between max-w-[160px]">
+                          <span className="text-slate-500">{r.kind === "email" ? "Open rate" : "Acceptance"}</span>
+                          <span className="font-semibold text-slate-900">{r.openRate === null ? "—" : `${r.openRate}%`}</span>
+                        </div>
+                        <div className="flex items-center justify-between max-w-[160px] mt-1">
+                          <span className="text-slate-500">Reply rate</span>
+                          <span className="font-semibold text-emerald-700">{r.replyRate}%</span>
+                        </div>
+                      </div>
+
+                      {/* Status */}
+                      <div className="flex items-center justify-between lg:justify-end gap-3 lg:flex-col lg:items-end lg:gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <button
+                            role="switch"
+                            aria-checked={isActive}
+                            aria-label={isActive ? "Pause campaign" : "Activate campaign"}
+                            onClick={() => toggleStatus(r)}
+                            disabled={pending}
+                            className={cn("relative h-6 w-11 rounded-full transition-colors flex-shrink-0", isActive ? "bg-blue-600" : "bg-slate-300")}
+                          >
+                            <span className={cn("absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", isActive ? "translate-x-5" : "translate-x-0")} />
+                          </button>
+                          <span className="text-xs text-slate-400 lg:hidden">{formatDate(r.updatedAt)}</span>
+                          <div className="relative" ref={openId === r.id ? menuRef : undefined}>
+                            <button onClick={() => setOpenId(openId === r.id ? null : r.id)} aria-label="Campaign actions" className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                            {openId === r.id && (
+                              <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-44 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden p-1">
+                                <Link href={r.href} onClick={() => setOpenId(null)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
+                                  <Pencil className="h-4 w-4 text-slate-400" /> Edit
+                                </Link>
+                                <button onClick={() => toggleStatus(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
+                                  {isActive ? <><Pause className="h-4 w-4 text-slate-400" /> Pause</> : <><Play className="h-4 w-4 text-slate-400" /> Resume</>}
+                                </button>
+                                <button onClick={() => handleDuplicate(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
+                                  <Copy className="h-4 w-4 text-slate-400" /> Duplicate
+                                </button>
+                                <button onClick={() => handleDelete(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50">
+                                  <Trash2 className="h-4 w-4" /> Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <span className="hidden lg:block text-xs text-slate-400">{formatDate(r.updatedAt)}</span>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
       </Card>
     </div>
   );

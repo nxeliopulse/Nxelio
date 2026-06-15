@@ -76,20 +76,28 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
     >
       {/* Fixed-width inner — the outer clips it, so nothing reflows on collapse */}
       <div className="w-64 flex flex-col h-full flex-shrink-0">
-        {/* Header — mark stays put, text fades out on collapse (no mid-word clip).
+        {/* Header — the logo doubles as the collapse / expand toggle.
             h-16 matches the topbar so their bottom borders align. */}
         <div className="h-16 flex items-center px-4 border-b border-slate-200 flex-shrink-0">
-          <Link href="/dashboard" aria-label="LeadPro" className="flex items-center gap-2.5">
-            <span className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 ring-1 ring-white/10 flex-shrink-0">
-              <LogoMark className="h-[22px] w-[22px] text-white" />
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="flex items-center gap-2.5 group"
+          >
+            <span className="relative h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 ring-1 ring-white/10 flex-shrink-0">
+              <LogoMark className="h-[22px] w-[22px] text-white transition-opacity group-hover:opacity-0" />
+              <PanelLeftClose className={cn("absolute h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity", collapsed && "hidden")} />
+              <PanelLeftOpen className={cn("absolute h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity", !collapsed && "hidden")} />
             </span>
-            <span className={cn("flex flex-col leading-none whitespace-nowrap transition-opacity duration-200", collapsed ? "opacity-0" : "opacity-100")}>
+            <span className={cn("flex flex-col leading-none whitespace-nowrap text-left transition-opacity duration-200", collapsed ? "opacity-0" : "opacity-100")}>
               <span className="font-bold text-slate-900 text-lg tracking-tight">
                 Lead<span className="text-blue-600">Pro</span>
               </span>
               <span className="text-[10px] text-slate-500 font-medium uppercase tracking-[0.12em]">AI Engagement</span>
             </span>
-          </Link>
+          </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-6">
@@ -140,17 +148,6 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             <HelpCircle className="h-4.5 w-4.5 text-slate-400 flex-shrink-0" />
             <span className={cn("whitespace-nowrap transition-opacity duration-200", collapsed ? "opacity-0" : "opacity-100")}>Help &amp; Support</span>
           </Link>
-
-          {/* Collapse / expand toggle — always reachable in the left strip */}
-          <button
-            onClick={toggleCollapsed}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-          >
-            {collapsed ? <PanelLeftOpen className="h-4.5 w-4.5 flex-shrink-0" /> : <PanelLeftClose className="h-4.5 w-4.5 flex-shrink-0" />}
-            <span className={cn("whitespace-nowrap transition-opacity duration-200", collapsed ? "opacity-0" : "opacity-100")}>Collapse</span>
-          </button>
         </div>
       </div>
     </aside>
