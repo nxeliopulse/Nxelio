@@ -111,7 +111,7 @@ export function CampaignDetailView({ campaign, audience, audienceLabel }: {
     if (!(await confirm({ title: "Send this campaign?", message: `Send the opener email to everyone in “${audienceLabel}” (${audience.toLocaleString()} leads).`, confirmLabel: "Send now" }))) return;
     start(async () => {
       const res = await sendCampaign(campaign.id);
-      if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
+      if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
       else toast(res.error || "No emails were sent.", "error");
     });
   }

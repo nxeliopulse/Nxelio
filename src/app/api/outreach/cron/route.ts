@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { processDueJobs } from "@/lib/outreach/processor";
+import { processDueCampaignJobs } from "@/lib/email/campaign-scheduler";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -16,8 +17,8 @@ async function run(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const result = await processDueJobs(50);
-    return NextResponse.json({ ok: true, ...result });
+    const [outreach, campaign] = await Promise.all([processDueJobs(50), processDueCampaignJobs(50)]);
+    return NextResponse.json({ ok: true, outreach, campaign });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : "Processing failed" },
