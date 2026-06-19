@@ -115,11 +115,15 @@ async function sendViaResend({ to, subject, html, text }: SendArgs): Promise<Sen
 }
 
 export async function sendEmail(args: SendArgs): Promise<SendResult> {
-  // 1. Brevo — free tier that reaches real recipients without a domain
+  // 1. Brevo — free tier that reaches real recipients without a domain.
   if (brevoConfigured) {
     const r = await sendViaBrevo(args);
-    // On hard provider failure, fall through to Resend if available
-    if (r.ok || !resendConfigured) return r;
+    if (r.ok) return r;
+    // Brevo failed. Only fall back to Resend when it can actually deliver to the
+    // REAL recipient (verified domain). Otherwise return Brevo's error — never
+    // silently redirect to the sandbox test inbox, which misdelivers every mail.
+    if (resendConfigured && DOMAIN_VERIFIED) return sendViaResend(args);
+    return r;
   }
 
   // 2. Resend
