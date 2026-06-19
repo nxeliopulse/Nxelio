@@ -12,9 +12,11 @@ import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
 import { createCampaign } from "@/lib/queries/campaigns";
+import { sendCampaign } from "@/lib/email/campaign-send";
 import { getSegments } from "@/lib/queries/segments";
 import { generateEmailSequence, type GeneratedEmail } from "@/lib/ai/actions";
 import { campaignTemplates, getCampaignTemplate, TEMPLATE_CATEGORIES } from "@/lib/campaign-templates";
+import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { SequenceFlow, MiniSequencePreview } from "@/components/campaigns/sequence-flow";
 
@@ -123,15 +125,25 @@ export default function CampaignBuilderPage() {
     const segmentId = lists.find((l) => l.segmentId)?.segmentId ?? null;
     start(async () => {
       try {
-        await createCampaign({
+        const created = await createCampaign({
           campaign_name: name.trim(),
-          status,
+          status: status === "Active" ? "Draft" : status, // sendCampaign flips it to Active on success
           campaign_type: "Email Sequence",
           segment_id: segmentId,
           subject: sequence[0]?.subject || null,
           content: sequence.map((s) => `${s.day} — ${s.subject}\n${s.body}`).join("\n\n---\n\n").slice(0, 5000),
         });
-        toast(status === "Active" ? "Campaign launched" : "Draft saved", "success");
+
+        if (status === "Active" && created?.id) {
+          const res = await sendCampaign(created.id);
+          if (res.ok) {
+            toast(`Launched — ${res.sent} email${res.sent === 1 ? "" : "s"} sent${res.simulated ? " (simulated — no email provider live)" : ""}.`, "success");
+          } else {
+            toast(res.error || "Saved, but no emails were sent.", "error");
+          }
+        } else {
+          toast("Draft saved", "success");
+        }
         router.push("/campaigns");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Save failed");
@@ -338,7 +350,30 @@ export default function CampaignBuilderPage() {
                     <div key={i}>
                       {i > 0 && (
                         <div className="flex items-center gap-2 pl-1 mb-3">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-500 text-xs px-2.5 py-1"><Clock className="h-3 w-3" /> {s.day}</span>
+                          <Clock className="h-3.5 w-3.5 text-slate-400" />
+                          <span className="text-xs text-slate-500">Wait</span>
+                          <input
+                            type="number" min={0}
+                            value={parseDelay(s.day).value}
+                            onChange={(e) => {
+                              const v = Math.max(0, parseInt(e.target.value || "0", 10));
+                              const u = parseDelay(s.day).unit;
+                              setSequence(sequence.map((x, j) => j === i ? { ...x, day: formatDelay(v, u) } : x));
+                            }}
+                            className="w-16 rounded-md border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-200"
+                          />
+                          <select
+                            value={parseDelay(s.day).unit}
+                            onChange={(e) => {
+                              const u = e.target.value as (typeof DELAY_UNITS)[number];
+                              const v = parseDelay(s.day).value;
+                              setSequence(sequence.map((x, j) => j === i ? { ...x, day: formatDelay(v, u) } : x));
+                            }}
+                            className="rounded-md border border-slate-200 px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-200"
+                          >
+                            {DELAY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                          <span className="text-xs text-slate-400">after previous step</span>
                         </div>
                       )}
                       <Card className="p-4 ml-0">
@@ -359,7 +394,7 @@ export default function CampaignBuilderPage() {
                     </div>
                   ))}
                 </div>
-                <Button variant="outline" className="ml-0 mt-3" onClick={() => setSequence([...sequence, { day: `Day ${sequence.length * 3}`, subject: "", body: "" }])}>
+                <Button variant="outline" className="ml-0 mt-3" onClick={() => setSequence([...sequence, { day: formatDelay(3, "days"), subject: "", body: "" }])}>
                   <Plus className="h-4 w-4" /> Add step
                 </Button>
               </div>

@@ -14,6 +14,8 @@ export interface DashboardStats {
   leadsDelta?: number;
   /** Real workspace totals for the snapshot card */
   snapshot: { emailsSent: number; repliesReceived: number; hotLeads: number; aiScored: number };
+  /** Pipeline revenue rollup from opportunities */
+  pipeline: { openValue: number; openCount: number; wonValue: number; wonCount: number; winRate: number };
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -21,7 +23,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 export async function getDashboardStats(): Promise<DashboardStats> {
   const supabase = await createClient();
 
-  const [{ data: leads }, { data: campaigns }, { data: activities }, { data: allCampaigns }, { count: replyCount }] = await Promise.all([
+  const [{ data: leads }, { data: campaigns }, { data: activities }, { data: allCampaigns }, { count: replyCount }, { data: opps }] = await Promise.all([
     supabase.from("leads").select("id, full_name, company_name, lead_score, status, created_at"),
     supabase.from("campaigns").select("campaign_name, sent_count, open_rate, reply_rate").order("sent_count", { ascending: false }).limit(5),
     supabase.from("lead_activities")
@@ -30,7 +32,22 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .limit(8),
     supabase.from("campaigns").select("sent_count"),
     supabase.from("inbox_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound"),
+    supabase.from("opportunities").select("deal_value, stage"),
   ]);
+
+  // Pipeline revenue rollup
+  const oppRows = (opps as { deal_value: number; stage: string }[]) || [];
+  const openOpps = oppRows.filter((o) => o.stage !== "won" && o.stage !== "lost");
+  const wonOpps = oppRows.filter((o) => o.stage === "won");
+  const lostCount = oppRows.filter((o) => o.stage === "lost").length;
+  const closedCount = wonOpps.length + lostCount;
+  const pipeline = {
+    openValue: openOpps.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+    openCount: openOpps.length,
+    wonValue: wonOpps.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+    wonCount: wonOpps.length,
+    winRate: closedCount ? Math.round((wonOpps.length / closedCount) * 1000) / 10 : 0,
+  };
 
   const totalLeads = leads?.length || 0;
   const hotLeads = leads?.filter((l) => l.status === "Hot").length || 0;
@@ -114,6 +131,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     hotLeadAlerts,
     leadsDelta,
     snapshot,
+    pipeline,
   };
 }
 

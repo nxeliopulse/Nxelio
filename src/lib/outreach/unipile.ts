@@ -156,6 +156,119 @@ export async function unipileSendLinkedInMessage(opts: {
   return { id: (data as { id?: string })?.id };
 }
 
+// ---------------------------------------------------------------------------
+// Lead collection — LinkedIn search + post engagers
+// ---------------------------------------------------------------------------
+export interface UnipileProfile {
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  headline: string | null;
+  location: string | null;
+  profileUrl: string | null;
+  identifier: string | null;
+}
+
+interface SearchItem {
+  name?: string; first_name?: string; last_name?: string;
+  headline?: string; location?: string;
+  public_profile_url?: string; public_identifier?: string;
+}
+
+function mapProfile(it: SearchItem): UnipileProfile {
+  const identifier = it.public_identifier || null;
+  return {
+    name: it.name || [it.first_name, it.last_name].filter(Boolean).join(" ") || null,
+    firstName: it.first_name || null,
+    lastName: it.last_name || null,
+    headline: it.headline || null,
+    location: it.location || null,
+    profileUrl: it.public_profile_url || (identifier ? `https://www.linkedin.com/in/${identifier}` : null),
+    identifier,
+  };
+}
+
+/**
+ * Runs a LinkedIn people search on the connected account (from a LinkedIn /
+ * Sales Navigator search URL) and returns up to `limit` profiles, paginating
+ * via the cursor. Respects LinkedIn's rate limits on Unipile's side.
+ */
+export async function unipileLinkedInSearch(opts: {
+  accountId: string;
+  url: string;
+  limit?: number;
+}): Promise<{ profiles: UnipileProfile[] }> {
+  const limit = Math.min(opts.limit ?? 50, 200);
+  const profiles: UnipileProfile[] = [];
+  let cursor: string | undefined;
+
+  for (let page = 0; page < 10 && profiles.length < limit; page++) {
+    const qs = `account_id=${encodeURIComponent(opts.accountId)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const data = (await unipileFetch(`/linkedin/search?${qs}`, {
+      method: "POST",
+      body: JSON.stringify({ url: opts.url }),
+    })) as { items?: SearchItem[]; cursor?: string };
+    const items = data.items || [];
+    for (const it of items) profiles.push(mapProfile(it));
+    cursor = data.cursor;
+    if (!cursor || items.length === 0) break;
+  }
+  return { profiles: profiles.slice(0, limit) };
+}
+
+/** Turns a LinkedIn post URL into the activity social id Unipile expects. */
+export function postUrlToSocialId(url: string): string | null {
+  const u = url.trim();
+  let m = u.match(/activity[:-](\d{15,25})/);
+  if (m) return `urn:li:activity:${m[1]}`;
+  m = u.match(/ugcPost[:-](\d{15,25})/i);
+  if (m) return `urn:li:ugcPost:${m[1]}`;
+  m = u.match(/share[:-](\d{15,25})/i);
+  if (m) return `urn:li:share:${m[1]}`;
+  m = u.match(/(\d{15,25})/); // bare numeric id fallback
+  return m ? `urn:li:activity:${m[1]}` : null;
+}
+
+/**
+ * Returns people who reacted to and/or commented on a LinkedIn post.
+ * Pulls up to `limit`, deduped by profile identifier.
+ */
+export async function unipilePostEngagers(opts: {
+  accountId: string;
+  postUrl: string;
+  limit?: number;
+}): Promise<{ profiles: UnipileProfile[] }> {
+  const parsed = postUrlToSocialId(opts.postUrl);
+  if (!parsed) return { profiles: [] };
+  const socialId: string = parsed;
+  const limit = Math.min(opts.limit ?? 50, 200);
+  const seen = new Set<string>();
+  const profiles: UnipileProfile[] = [];
+
+  async function pull(kind: "reactions" | "comments") {
+    let cursor: string | undefined;
+    for (let page = 0; page < 8 && profiles.length < limit; page++) {
+      const qs = `account_id=${encodeURIComponent(opts.accountId)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+      const data = (await unipileFetch(`/posts/${encodeURIComponent(socialId)}/${kind}?${qs}`, { method: "GET" })) as { items?: Record<string, SearchItem>[]; cursor?: string };
+      const items = data.items || [];
+      for (const raw of items) {
+        // engager profile may be nested under author/actor/user depending on kind
+        const it = (raw.author || raw.actor || raw.user || raw) as SearchItem;
+        const id = it.public_identifier || it.public_profile_url || it.name || "";
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        profiles.push(mapProfile(it));
+      }
+      cursor = data.cursor;
+      if (!cursor || items.length === 0) break;
+    }
+  }
+
+  try { await pull("reactions"); } catch {}
+  try { if (profiles.length < limit) await pull("comments"); } catch {}
+  return { profiles: profiles.slice(0, limit) };
+}
+
 /** Resolves a LinkedIn profile (from a public URL) to its provider id. */
 export async function unipileResolveProfile(opts: {
   accountId: string;

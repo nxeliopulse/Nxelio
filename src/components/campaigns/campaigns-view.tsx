@@ -2,7 +2,8 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, MoreHorizontal, Mail, Rocket, Pause, Play, Copy, Trash2, Pencil, Search, LayoutTemplate, ChevronDown, Megaphone } from "lucide-react";
+import { Plus, MoreHorizontal, Mail, Rocket, Pause, Play, Copy, Trash2, Pencil, Search, LayoutTemplate, ChevronDown, Megaphone, Link2 } from "lucide-react";
+import { ConnectionsModal } from "@/components/campaigns/connections-modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -45,6 +46,7 @@ export function CampaignsView({
   const [activeOnly, setActiveOnly] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const tplRef = useRef<HTMLDivElement | null>(null);
 
@@ -137,9 +139,14 @@ export function CampaignsView({
         title="Campaigns"
         description="Create, launch and track your outreach — email or multichannel."
         actions={
-          <Link href="/campaigns/builder">
-            <Button><Plus className="h-4 w-4" /> New Campaign</Button>
-          </Link>
+          <>
+            <Button variant="outline" onClick={() => setConnectionsOpen(true)}>
+              <Link2 className="h-4 w-4" /> Connections
+            </Button>
+            <Link href="/campaigns/builder">
+              <Button><Plus className="h-4 w-4" /> New Campaign</Button>
+            </Link>
+          </>
         }
       />
 
@@ -330,6 +337,8 @@ export function CampaignsView({
           </>
         )}
       </Card>
+
+      <ConnectionsModal open={connectionsOpen} onClose={() => setConnectionsOpen(false)} />
     </div>
   );
 }

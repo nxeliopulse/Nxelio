@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail, Phone, AtSign, Globe, Calendar, Star, Send, Building2, Target, Users, BarChart3, MoreHorizontal, MapPin, FileDown, MailOpen, Mouse } from "lucide-react";
+import { ArrowLeft, Mail, Phone, AtSign, Globe, Calendar, Star, Send, Building2, Target, Users, BarChart3, MoreHorizontal, MapPin, FileDown, MailOpen, Mouse, Briefcase } from "lucide-react";
 import { Tabs } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { ContactIntelTab } from "@/components/leads/tabs/contact-intel";
 import { OutreachTab } from "@/components/leads/tabs/outreach";
 import { NextStepsTab } from "@/components/leads/tabs/next-steps";
 import { SendEmailModal } from "@/components/leads/send-email-modal";
+import { ConvertOpportunityModal } from "@/components/leads/convert-opportunity-modal";
 import type { LeadRow } from "@/lib/queries/leads";
 import { formatDate } from "@/lib/utils";
 
@@ -48,6 +49,8 @@ function relativeTime(iso: string): string {
 export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities: Activity[] }) {
   const [tab, setTab] = useState("score");
   const [emailOpen, setEmailOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [converted, setConverted] = useState(lead.status === "Converted");
   const displayName = lead.full_name || lead.company_name || "—";
   const initials = displayName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
@@ -115,7 +118,11 @@ export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities
 
             <div className="flex flex-col gap-2">
               <Button onClick={() => setEmailOpen(true)}><Send className="h-4 w-4" /> Send Email</Button>
-              <Button variant="outline"><Calendar className="h-4 w-4" /> Schedule Call</Button>
+              {converted ? (
+                <Button variant="outline" disabled><Briefcase className="h-4 w-4" /> Converted</Button>
+              ) : (
+                <Button variant="outline" onClick={() => setConvertOpen(true)}><Briefcase className="h-4 w-4" /> Convert to Opportunity</Button>
+              )}
               <Button variant="ghost" size="icon" className="self-end"><MoreHorizontal className="h-4 w-4" /></Button>
             </div>
           </div>
@@ -204,6 +211,13 @@ export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities
         leadId={lead.id}
         leadEmail={lead.email}
         leadName={displayName}
+      />
+
+      <ConvertOpportunityModal
+        open={convertOpen}
+        onClose={() => setConvertOpen(false)}
+        lead={lead}
+        onConverted={() => { setConverted(true); setConvertOpen(false); }}
       />
     </div>
   );

@@ -1,17 +1,20 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  X, Search, Megaphone, Video, Camera, AtSign, FileSpreadsheet,
+  X, Search, Megaphone, Video, FileSpreadsheet, Pencil, ShoppingCart,
   ArrowLeft, ArrowRight, Loader2, CheckCircle2, AlertCircle, AlertTriangle,
-  Upload, Plus, Trash2, Users2,
+  Upload, Plus, Trash2, Users2, Link2, RefreshCw, ExternalLink, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
 import { bulkInsertLeads, type LeadRow } from "@/lib/queries/leads";
+import { importLinkedInLeads, hasLinkedInAccount } from "@/lib/leads/linkedin-import";
+import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outreach-accounts";
+import { generateSampleProspects, type GeneratedProspect } from "@/lib/leads/buy-leads";
 
-type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "instagram" | "twitter" | "csv";
+type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
 
 interface SourceDef {
   id: SourceId;
@@ -26,8 +29,8 @@ const SOURCES: SourceDef[] = [
   { id: "linkedin-search", label: "Basic LinkedIn Search", desc: "Add profiles from the free LinkedIn search page", icon: Search, color: "text-blue-600 bg-blue-50" },
   { id: "linkedin-post", label: "LinkedIn Post", desc: "Capture people who engaged with a post", icon: Megaphone, color: "text-sky-600 bg-sky-50", badge: "New" },
   { id: "youtube", label: "YouTube Post", desc: "Scrape engagers from a video or post", icon: Video, color: "text-red-600 bg-red-50" },
-  { id: "instagram", label: "Instagram Leads", desc: "Followers or post engagement", icon: Camera, color: "text-pink-600 bg-pink-50" },
-  { id: "twitter", label: "Twitter Leads", desc: "Followers or tweet engagement", icon: AtSign, color: "text-slate-700 bg-slate-100" },
+  { id: "manual", label: "Add Leads Manually", desc: "Type in leads one by one with full details", icon: Pencil, color: "text-indigo-600 bg-indigo-50" },
+  { id: "buy", label: "Buy Leads", desc: "Generate a targeted prospect list by criteria", icon: ShoppingCart, color: "text-amber-600 bg-amber-50", badge: "AI" },
   { id: "csv", label: "Upload CSV file", desc: "Import an existing prospect list in bulk", icon: FileSpreadsheet, color: "text-emerald-600 bg-emerald-50" },
 ];
 
@@ -35,12 +38,14 @@ const SOURCE_LABEL: Record<SourceId, string> = {
   "linkedin-search": "LinkedIn Search",
   "linkedin-post": "LinkedIn Post",
   youtube: "YouTube",
-  instagram: "Instagram",
-  twitter: "Twitter / X",
+  manual: "Manual Entry",
+  buy: "Buy Leads",
   csv: "CSV Upload",
 };
 
 type ManualLead = { id: string; name: string; title: string; url: string };
+// Full manual entry row (the "Add Leads Manually" source)
+type ManualEntry = { id: string; name: string; email: string; company: string; title: string };
 
 type CsvRow = {
   full_name: string | null;
@@ -109,6 +114,12 @@ let _mid = 0;
 const newManual = (): ManualLead => ({ id: `m${++_mid}`, name: "", title: "", url: "" });
 const manualInvalidCount = (rows: ManualLead[]) => rows.filter((m) => !m.url.trim() && (m.name.trim() || m.title.trim())).length;
 
+const newEntry = (): ManualEntry => ({ id: `e${++_mid}`, name: "", email: "", company: "", title: "" });
+// A manual entry imports if it has a name (or company) AND an email.
+const entryValid = (e: ManualEntry) => !!((e.name.trim() || e.company.trim()) && e.email.trim());
+const entryStarted = (e: ManualEntry) => !!(e.name.trim() || e.email.trim() || e.company.trim() || e.title.trim());
+const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
 export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const { confirm } = useFeedback();
@@ -116,38 +127,74 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
   const [source, setSource] = useState<SourceId | null>(null);
 
   // Step 2 — source input
-  const [inputMode, setInputMode] = useState<string>("");
   const [inputValue, setInputValue] = useState("");
   const [step2Error, setStep2Error] = useState<string | null>(null);
   const [step2Warning, setStep2Warning] = useState<string | null>(null);
 
   // Collected leads
   const [manual, setManual] = useState<ManualLead[]>([newManual()]);
+  const [entries, setEntries] = useState<ManualEntry[]>([newEntry()]);
   const [csvRows, setCsvRows] = useState<CsvRow[] | null>(null);
   const [csvName, setCsvName] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Buy leads (AI-generated sample prospects)
+  const [buy, setBuy] = useState({ industry: "", role: "", location: "", count: 10 });
+  const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
+  const [buyLoading, setBuyLoading] = useState(false);
 
   // Import
   const [pending, start] = useTransition();
   const [summary, setSummary] = useState<{ imported: number; skipped: number; duplicates: number } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
-  if (!open) return null;
+  // LinkedIn (Unipile) connection state
+  const [liConnected, setLiConnected] = useState<boolean | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
   const isCsv = source === "csv";
-  const isSocial = !!source && !isCsv;
+  const isLinkedIn = source === "linkedin-search" || source === "linkedin-post";
+  const isManualEntry = source === "manual";
+  const isBuy = source === "buy";
+
+  // Check LinkedIn connection when the wizard opens / a LinkedIn source is picked
+  useEffect(() => {
+    if (open && isLinkedIn && liConnected === null) {
+      hasLinkedInAccount().then(setLiConnected).catch(() => setLiConnected(false));
+    }
+  }, [open, isLinkedIn, liConnected]);
+
+  if (!open) return null;
+
+  function handleConnectLinkedIn() {
+    setConnecting(true);
+    connectOutreachAccount("linkedin")
+      .then((res) => { if (res.ok && res.url) window.open(res.url, "_blank", "noopener"); else setImportError(res.error || "Could not start LinkedIn connect"); })
+      .finally(() => setConnecting(false));
+  }
+  function recheckLinkedIn() {
+    setConnecting(true);
+    syncOutreachAccounts()
+      .then(() => hasLinkedInAccount())
+      .then(setLiConnected)
+      .catch(() => {})
+      .finally(() => setConnecting(false));
+  }
 
   function reset() {
-    setStep(1); setSource(null); setInputMode(""); setInputValue("");
+    setStep(1); setSource(null); setInputValue("");
     setStep2Error(null); setStep2Warning(null);
-    setManual([newManual()]); setCsvRows(null); setCsvName(""); setDragOver(false);
+    setManual([newManual()]); setEntries([newEntry()]); setCsvRows(null); setCsvName(""); setDragOver(false);
+    setBuy({ industry: "", role: "", location: "", count: 10 }); setBuyResults(null); setBuyLoading(false);
     setSummary(null); setImportError(null);
   }
 
   function hasProgress() {
     return source !== null || inputValue.trim() !== "" || csvRows !== null ||
-      manual.some((m) => m.name || m.title || m.url);
+      manual.some((m) => m.name || m.title || m.url) ||
+      entries.some(entryStarted) || buyResults !== null ||
+      buy.industry !== "" || buy.role !== "" || buy.location !== "";
   }
 
   async function attemptClose() {
@@ -162,7 +209,20 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     setStep2Error(null);
     setStep2Warning(null);
     setInputValue("");
-    setInputMode(id === "instagram" ? "account" : id === "twitter" ? "handle" : "");
+  }
+
+  // ---- Buy leads: generate sample prospects via AI ----
+  function runGenerate() {
+    setStep2Error(null);
+    setBuyLoading(true);
+    setBuyResults(null);
+    generateSampleProspects(buy)
+      .then((res) => {
+        if (!res.ok) { setStep2Error(res.error || "Could not generate prospects."); return; }
+        setBuyResults(res.prospects);
+      })
+      .catch((e) => setStep2Error(e instanceof Error ? e.message : "Generation failed"))
+      .finally(() => setBuyLoading(false));
   }
 
   // ---- CSV handling ----
@@ -188,6 +248,18 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
       if (!csvRows || csvRows.filter((r) => r._valid).length === 0) { setStep2Error("Upload a CSV with at least one valid row."); return false; }
       return true;
     }
+    if (isManualEntry) {
+      const started = entries.filter(entryStarted);
+      if (started.length === 0) { setStep2Error("Add at least one lead with a name and email."); return false; }
+      const badEmail = started.find((e) => e.email.trim() && !isEmail(e.email));
+      if (badEmail) { setStep2Error(`"${badEmail.email}" isn't a valid email address.`); return false; }
+      if (started.filter(entryValid).length === 0) { setStep2Error("Each lead needs a name (or company) and an email."); return false; }
+      return true;
+    }
+    if (isBuy) {
+      if (!buyResults || buyResults.length === 0) { setStep2Error("Generate a prospect list first."); return false; }
+      return true;
+    }
     const v = inputValue.trim();
     if (source === "linkedin-search") {
       if (!v) { setStep2Error("Paste a LinkedIn search URL to continue."); return false; }
@@ -200,14 +272,6 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     if (source === "youtube") {
       if (!v) { setStep2Error("Paste the YouTube video URL."); return false; }
       if (!/(youtube\.com|youtu\.be)/i.test(v)) { setStep2Error("Invalid or private video URL. Enter a public YouTube link."); return false; }
-    }
-    if (source === "instagram") {
-      if (!v) { setStep2Error(inputMode === "post" ? "Paste the Instagram post URL." : "Enter an Instagram account handle."); return false; }
-      setStep2Warning("Heads up: private accounts can't be accessed and will be skipped.");
-    }
-    if (source === "twitter") {
-      if (!v) { setStep2Error(inputMode === "tweet" ? "Paste the tweet URL." : "Enter a Twitter/X handle."); return false; }
-      setStep2Warning("If you hit a rate limit, wait a minute and retry.");
     }
     return true;
   }
@@ -226,10 +290,29 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
   // requires email/website/linkedin. Rows with text but no link are skipped.
   const manualValid = manual.filter((m) => m.url.trim());
   const manualInvalid = manual.filter((m) => !m.url.trim() && (m.name.trim() || m.title.trim()));
-  const reviewCount = isCsv ? csvValid.length : manualValid.length;
+  const entryValidRows = entries.filter(entryValid);
+  const entryInvalid = entries.filter((e) => entryStarted(e) && !entryValid(e));
+  const reviewCount = isCsv ? csvValid.length
+    : isManualEntry ? entryValidRows.length
+    : isBuy ? (buyResults?.length ?? 0)
+    : manualValid.length;
 
   function runImport() {
     setImportError(null);
+
+    // LinkedIn sources pull real profiles via Unipile, then import them.
+    if (isLinkedIn && (source === "linkedin-search" || source === "linkedin-post")) {
+      start(async () => {
+        const res = await importLinkedInLeads({ source, url: inputValue.trim() });
+        if (res.needsConnect) { setLiConnected(false); setImportError(res.error || "Connect your LinkedIn account first."); return; }
+        if (!res.ok) { setImportError(res.error || "LinkedIn import failed"); return; }
+        setSummary({ imported: res.inserted, duplicates: res.duplicates, skipped: Math.max(0, res.found - res.inserted - res.duplicates) });
+        setStep(4);
+        router.refresh();
+      });
+      return;
+    }
+
     const sourceLabel = source ? SOURCE_LABEL[source] : "Import";
     let payload: Array<Partial<LeadRow>>;
     let skipped: number;
@@ -241,14 +324,33 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
         company_name: r.company_name, industry: r.industry, interest_area: r.interest_area,
         linkedin: r.linkedin, website_url: r.website_url, source: "CSV Upload", status: "New",
       }));
+    } else if (isManualEntry) {
+      skipped = entryInvalid.length;
+      payload = entryValidRows.map((e) => ({
+        full_name: e.name.trim() || null,
+        email: e.email.trim() || null,
+        company_name: e.company.trim() || null,
+        interest_area: e.title.trim() || null,
+        source: "Manual Entry", status: "New",
+      }));
+    } else if (isBuy) {
+      skipped = 0;
+      // Sample prospects carry no email on purpose, so they're never auto-emailed.
+      payload = (buyResults ?? []).map((p) => ({
+        full_name: p.full_name || null,
+        company_name: p.company_name || null,
+        industry: p.industry || null,
+        interest_area: p.title || null,
+        website_url: p.website_url || null,
+        source: "Purchased Leads (sample)", status: "New",
+      }));
     } else {
+      // Non-LinkedIn social sources (YouTube/Instagram/Twitter) — manual entry.
       skipped = manualInvalid.length;
-      const linkField = source === "linkedin-search" || source === "linkedin-post";
       payload = manualValid.map((m) => ({
         full_name: m.name.trim() || null,
         message: m.title.trim() || null,
-        linkedin: linkField ? (m.url.trim() || null) : null,
-        website_url: !linkField ? (m.url.trim() || null) : null,
+        website_url: m.url.trim() || null,
         source: sourceLabel,
         status: "New",
       }));
@@ -313,27 +415,51 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
           )}
 
           {step === 2 && (
-            <Step2Input
-              source={source!}
-              inputMode={inputMode}
-              setInputMode={setInputMode}
-              inputValue={inputValue}
-              setInputValue={(v) => { setInputValue(v); setStep2Error(null); }}
-              error={step2Error}
-              warning={step2Warning}
-              csvRows={csvRows}
-              csvName={csvName}
-              dragOver={dragOver}
-              setDragOver={setDragOver}
-              fileRef={fileRef}
-              onFile={handleFile}
-              clearCsv={() => { setCsvRows(null); setCsvName(""); }}
-            />
+            isManualEntry ? (
+              <ManualEntryForm entries={entries} setEntries={setEntries} error={step2Error} />
+            ) : isBuy ? (
+              <BuyForm
+                buy={buy}
+                setBuy={(b) => { setBuy(b); setBuyResults(null); }}
+                results={buyResults}
+                loading={buyLoading}
+                onGenerate={runGenerate}
+                error={step2Error}
+              />
+            ) : (
+              <Step2Input
+                source={source!}
+                inputValue={inputValue}
+                setInputValue={(v) => { setInputValue(v); setStep2Error(null); }}
+                error={step2Error}
+                warning={step2Warning}
+                csvRows={csvRows}
+                csvName={csvName}
+                dragOver={dragOver}
+                setDragOver={setDragOver}
+                fileRef={fileRef}
+                onFile={handleFile}
+                clearCsv={() => { setCsvRows(null); setCsvName(""); }}
+              />
+            )
           )}
 
           {step === 3 && (
             isCsv ? (
               <CsvReview rows={csvRows ?? []} valid={csvValid.length} invalid={csvInvalid.length} />
+            ) : isLinkedIn ? (
+              <LinkedInReview
+                source={source as "linkedin-search" | "linkedin-post"}
+                url={inputValue}
+                connected={liConnected}
+                connecting={connecting}
+                onConnect={handleConnectLinkedIn}
+                onRecheck={recheckLinkedIn}
+              />
+            ) : isManualEntry ? (
+              <ManualEntryReview valid={entryValidRows.length} invalid={entryInvalid.length} rows={entries.filter(entryStarted)} />
+            ) : isBuy ? (
+              <BuyReview prospects={buyResults ?? []} criteria={buy} />
             ) : (
               <ManualReview source={source!} manual={manual} setManual={setManual} />
             )
@@ -373,9 +499,15 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
             </Button>
           )}
           {step === 3 && (
-            <Button onClick={runImport} disabled={pending || reviewCount === 0}>
-              {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Importing…</> : <>Import {reviewCount} lead{reviewCount === 1 ? "" : "s"}</>}
-            </Button>
+            isLinkedIn ? (
+              <Button onClick={runImport} disabled={pending || !liConnected || !inputValue.trim()}>
+                {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Fetching from LinkedIn…</> : <>Fetch &amp; import</>}
+              </Button>
+            ) : (
+              <Button onClick={runImport} disabled={pending || reviewCount === 0}>
+                {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Importing…</> : <>Import {reviewCount} lead{reviewCount === 1 ? "" : "s"}</>}
+              </Button>
+            )
           )}
           {step === 4 && (
             <Button onClick={() => { reset(); onClose(); }}>Done</Button>
@@ -389,8 +521,6 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
 // ============================================================================
 function Step2Input(props: {
   source: SourceId;
-  inputMode: string;
-  setInputMode: (m: string) => void;
   inputValue: string;
   setInputValue: (v: string) => void;
   error: string | null;
@@ -403,22 +533,22 @@ function Step2Input(props: {
   onFile: (f: File) => void;
   clearCsv: () => void;
 }) {
-  const { source, inputMode, setInputMode, inputValue, setInputValue, error, warning, csvRows, csvName, dragOver, setDragOver, fileRef, onFile, clearCsv } = props;
+  const { source, inputValue, setInputValue, error, warning, csvRows, csvName, dragOver, setDragOver, fileRef, onFile, clearCsv } = props;
 
   const fieldLabel: Record<SourceId, string> = {
     "linkedin-search": "LinkedIn search URL",
     "linkedin-post": "LinkedIn post URL",
     youtube: "YouTube video / post URL",
-    instagram: inputMode === "post" ? "Instagram post URL" : "Instagram account handle",
-    twitter: inputMode === "tweet" ? "Tweet URL" : "Twitter / X handle",
+    manual: "",
+    buy: "",
     csv: "",
   };
   const placeholder: Record<SourceId, string> = {
     "linkedin-search": "https://www.linkedin.com/search/results/people/?keywords=…",
     "linkedin-post": "https://www.linkedin.com/posts/…",
     youtube: "https://www.youtube.com/watch?v=…",
-    instagram: inputMode === "post" ? "https://www.instagram.com/p/…" : "@account",
-    twitter: inputMode === "tweet" ? "https://x.com/user/status/…" : "@handle",
+    manual: "",
+    buy: "",
     csv: "",
   };
 
@@ -464,9 +594,6 @@ function Step2Input(props: {
 
   return (
     <div className="space-y-4">
-      {source === "instagram" && <ModeToggle options={[["account", "Followers of an account"], ["post", "Post engagement"]]} value={inputMode} onChange={setInputMode} />}
-      {source === "twitter" && <ModeToggle options={[["handle", "Followers of a handle"], ["tweet", "Tweet engagement"]]} value={inputMode} onChange={setInputMode} />}
-
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1.5">{fieldLabel[source]}</label>
         <Input value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={placeholder[source]} />
@@ -486,19 +613,6 @@ function Step2Input(props: {
           <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{warning}</span>
         </div>
       )}
-    </div>
-  );
-}
-
-function ModeToggle({ options, value, onChange }: { options: [string, string][]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
-      {options.map(([val, label]) => (
-        <button key={val} onClick={() => onChange(val)}
-          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${value === val ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-          {label}
-        </button>
-      ))}
     </div>
   );
 }
@@ -541,7 +655,7 @@ function CsvReview({ rows, valid, invalid }: { rows: CsvRow[]; valid: number; in
 }
 
 function ManualReview({ source, manual, setManual }: { source: SourceId; manual: ManualLead[]; setManual: (m: ManualLead[]) => void }) {
-  const titleLabel = source === "youtube" ? "Comment / note" : source === "instagram" || source === "twitter" ? "Display name" : "Title / role";
+  const titleLabel = source === "youtube" ? "Comment / note" : "Title / role";
   const urlLabel = source === "linkedin-search" || source === "linkedin-post" ? "Profile URL" : source === "youtube" ? "Channel link" : "Profile link";
 
   function update(id: string, key: keyof ManualLead, value: string) {
@@ -587,6 +701,212 @@ function ManualReview({ source, manual, setManual }: { source: SourceId; manual:
           <AlertTriangle className="h-3.5 w-3.5" /> {manualInvalidCount(manual)} row{manualInvalidCount(manual) === 1 ? "" : "s"} without a link will be skipped.
         </p>
       )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Add Leads Manually — full-detail entry rows
+function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[]; setEntries: (e: ManualEntry[]) => void; error: string | null }) {
+  function update(id: string, key: keyof ManualEntry, value: string) {
+    setEntries(entries.map((e) => (e.id === id ? { ...e, [key]: value } : e)));
+  }
+  function add() { setEntries([...entries, newEntry()]); }
+  function remove(id: string) { setEntries(entries.length === 1 ? [newEntry()] : entries.filter((e) => e.id !== id)); }
+
+  const ready = entries.filter(entryValid).length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-600">Type your leads below. Each needs a <span className="font-medium text-slate-900">name</span> and an <span className="font-medium text-slate-900">email</span>.</p>
+        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap"><Users2 className="h-3.5 w-3.5" /> {ready} ready</span>
+      </div>
+      <div className="space-y-2">
+        <div className="hidden sm:grid grid-cols-[1.1fr_1.3fr_1.1fr_1fr_auto] gap-2 px-1 text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
+          <span>Name *</span><span>Email *</span><span>Company</span><span>Title / role</span><span></span>
+        </div>
+        {entries.map((e) => {
+          const bad = entryStarted(e) && !entryValid(e);
+          return (
+            <div key={e.id} className="grid grid-cols-1 sm:grid-cols-[1.1fr_1.3fr_1.1fr_1fr_auto] gap-2">
+              <Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Jane Doe" />
+              <Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="jane@company.com"
+                className={bad ? "border-amber-300 focus:ring-amber-200" : ""} />
+              <Input value={e.company} onChange={(ev) => update(e.id, "company", ev.target.value)} placeholder="Company" />
+              <Input value={e.title} onChange={(ev) => update(e.id, "title", ev.target.value)} placeholder="Head of Sales" />
+              <button onClick={() => remove(e.id)} aria-label="Remove row" className="justify-self-start sm:justify-self-center p-2 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <Button variant="outline" size="sm" onClick={add}><Plus className="h-4 w-4" /> Add another</Button>
+      {error && <ErrorNote text={error} />}
+    </div>
+  );
+}
+
+function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: number; rows: ManualEntry[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 text-center">
+        <div className="p-3 bg-emerald-50 rounded-lg"><p className="text-2xl font-bold text-emerald-700">{valid}</p><p className="text-xs text-emerald-600 mt-1">Ready to import</p></div>
+        <div className="p-3 bg-red-50 rounded-lg"><p className="text-2xl font-bold text-red-700">{invalid}</p><p className="text-xs text-red-600 mt-1">Will be skipped</p></div>
+      </div>
+      <div className="border border-slate-200 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Email</th><th className="px-3 py-2 text-left font-semibold">Company</th><th className="px-3 py-2 text-left font-semibold">Status</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.slice(0, 8).map((e) => (
+              <tr key={e.id} className={entryValid(e) ? "" : "bg-red-50/50"}>
+                <td className="px-3 py-2">{e.name || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2">{e.email || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2">{e.company || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2">{entryValid(e) ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <span className="inline-flex items-center gap-1 text-red-600 text-xs"><AlertCircle className="h-3.5 w-3.5" /> Needs name + email</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length > 8 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 border-t border-slate-100">Showing first 8 of {rows.length}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Buy Leads — AI-generated sample prospects by criteria
+function BuyForm({ buy, setBuy, results, loading, onGenerate, error }: {
+  buy: { industry: string; role: string; location: string; count: number };
+  setBuy: (b: { industry: string; role: string; location: string; count: number }) => void;
+  results: GeneratedProspect[] | null;
+  loading: boolean;
+  onGenerate: () => void;
+  error: string | null;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Industry</label>
+          <Input value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })} placeholder="e.g. SaaS, Healthcare" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Job title / role</label>
+          <Input value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })} placeholder="e.g. Head of Marketing" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
+          <Input value={buy.location} onChange={(e) => setBuy({ ...buy, location: e.target.value })} placeholder="e.g. United States" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">How many (max 25)</label>
+          <Input type="number" min={1} max={25} value={buy.count}
+            onChange={(e) => setBuy({ ...buy, count: Math.max(1, Math.min(25, parseInt(e.target.value) || 1)) })} />
+        </div>
+      </div>
+
+      <Button onClick={onGenerate} disabled={loading}>
+        {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</> : <><Sparkles className="h-4 w-4" /> {results ? "Regenerate list" : "Generate prospect list"}</>}
+      </Button>
+
+      {results && (
+        <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+          <CheckCircle2 className="h-4 w-4" /> {results.length} prospects generated — review them on the next step.
+        </div>
+      )}
+
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+        <span>These are <span className="font-semibold">AI-generated sample prospects</span> for demoing the feature — not verified contacts. They&apos;re imported without email addresses so they won&apos;t be emailed. Connect a real data provider for verified leads.</span>
+      </div>
+
+      {error && <ErrorNote text={error} />}
+    </div>
+  );
+}
+
+function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; location: string } }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
+        Sample list for <span className="font-medium text-slate-900">{criteria.role || "decision makers"}</span> in <span className="font-medium text-slate-900">{criteria.industry || "any industry"}</span>{criteria.location ? <> · {criteria.location}</> : null}
+      </div>
+      <div className="border border-slate-200 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Title</th><th className="px-3 py-2 text-left font-semibold">Company</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {prospects.slice(0, 8).map((p, i) => (
+              <tr key={i}>
+                <td className="px-3 py-2">{p.full_name || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2 text-slate-600">{p.title || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2 text-slate-600">{p.company_name || <span className="text-slate-400">—</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {prospects.length > 8 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 border-t border-slate-100">Showing first 8 of {prospects.length}</p>}
+      </div>
+    </div>
+  );
+}
+
+function LinkedInReview({ source, url, connected, connecting, onConnect, onRecheck }: {
+  source: "linkedin-search" | "linkedin-post";
+  url: string;
+  connected: boolean | null;
+  connecting: boolean;
+  onConnect: () => void;
+  onRecheck: () => void;
+}) {
+  const label = source === "linkedin-post" ? "post engagers" : "search results";
+
+  if (connected === null) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-10 text-slate-500 text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" /> Checking your LinkedIn connection…
+      </div>
+    );
+  }
+
+  if (!connected) {
+    return (
+      <div className="rounded-xl border border-slate-200 p-6 text-center">
+        <div className="h-12 w-12 mx-auto rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3">
+          <Link2 className="h-6 w-6" />
+        </div>
+        <p className="font-semibold text-slate-900">Connect your LinkedIn account</p>
+        <p className="text-sm text-slate-500 mt-1 mb-4 max-w-md mx-auto">
+          We pull {label} on your behalf through your own LinkedIn session (via Unipile). Connect once, then come back and import.
+        </p>
+        <div className="flex items-center justify-center gap-2">
+          <Button onClick={onConnect} disabled={connecting}>
+            {connecting ? <><Loader2 className="h-4 w-4 animate-spin" /> Opening…</> : <><ExternalLink className="h-4 w-4" /> Connect LinkedIn</>}
+          </Button>
+          <Button variant="outline" onClick={onRecheck} disabled={connecting}>
+            <RefreshCw className="h-4 w-4" /> I&apos;ve connected
+          </Button>
+        </div>
+        <p className="text-[11px] text-slate-400 mt-3">Uses your real LinkedIn account · daily limits apply to stay safe.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+        <CheckCircle2 className="h-4 w-4" /> LinkedIn connected — ready to import.
+      </div>
+      <div className="rounded-xl border border-slate-200 p-4">
+        <p className="text-sm text-slate-600">We&apos;ll pull up to <span className="font-medium text-slate-900">50</span> {label} from:</p>
+        <p className="text-sm text-blue-700 break-all mt-1">{url}</p>
+        <p className="text-xs text-slate-400 mt-3">Click <span className="font-medium">Fetch &amp; import</span> below. Larger pulls run in batches and respect LinkedIn limits.</p>
+      </div>
     </div>
   );
 }

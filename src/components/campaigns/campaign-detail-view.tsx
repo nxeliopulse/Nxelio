@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Users2, Send, MailOpen, Reply, AlertTriangle, Clock, Trash2,
-  Layers3, Plus, BarChart3,
+  Layers3, Plus, BarChart3, Sparkles,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
 import { setCampaignStatus, updateCampaign, deleteCampaign, type CampaignRow } from "@/lib/queries/campaigns";
+import { sendCampaign } from "@/lib/email/campaign-send";
+import { simulateCampaignEngagement } from "@/lib/email/campaign-stats";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { SequenceFlow, type FlowStep } from "@/components/campaigns/sequence-flow";
 import { FlowCanvas } from "@/components/campaigns/flow-canvas";
+import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
 import { formatDate, cn } from "@/lib/utils";
 
 /** Reconstruct sequence steps from the stored "Day N — Subject\nBody" blocks. */
@@ -23,12 +26,13 @@ function parseSequence(content: string | null): FlowStep[] {
   if (!content) return [];
   return content
     .split(/\n+\s*---\s*\n+/)
-    .map((block) => {
+    .map((block, i) => {
       const lines = block.trim().split("\n");
       const header = lines[0] || "";
-      const m = header.match(/^(Day\s*\d+)\s*[—-]\s*(.*)$/);
+      // Split on the first " — " into [delay label, subject]
+      const m = header.match(/^(.*?)\s+—\s+(.*)$/);
       return {
-        day: m ? m[1] : "Day 1",
+        day: m ? m[1] : (i === 0 ? "Day 1" : "No delay"),
         subject: m ? m[2] : header,
         body: lines.slice(1).join("\n").trim(),
       };
@@ -103,8 +107,23 @@ export function CampaignDetailView({ campaign, audience, audienceLabel }: {
     setStatusLocal(next);
     start(async () => { await setCampaignStatus(campaign.id, next); });
   }
+  async function handleSendNow() {
+    if (!(await confirm({ title: "Send this campaign?", message: `Send the opener email to everyone in “${audienceLabel}” (${audience.toLocaleString()} leads).`, confirmLabel: "Send now" }))) return;
+    start(async () => {
+      const res = await sendCampaign(campaign.id);
+      if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
+      else toast(res.error || "No emails were sent.", "error");
+    });
+  }
   function saveName() {
     start(async () => { await updateCampaign(campaign.id, { campaign_name: name.trim() || "Untitled Campaign" }); toast("Campaign updated", "success"); });
+  }
+  function handleSimulate() {
+    start(async () => {
+      const res = await simulateCampaignEngagement(campaign.id);
+      if (res.ok) { toast(`Simulated engagement: ${res.opened} opened, ${res.replied} replied, ${res.bounced} bounced.`, "success"); router.refresh(); }
+      else toast(res.error || "Nothing to simulate yet.", "error");
+    });
   }
   async function handleDelete() {
     if (!(await confirm({ title: "Delete campaign?", message: `Delete “${campaign.campaign_name}”? This can't be undone.`, confirmLabel: "Delete", danger: true }))) return;
@@ -137,15 +156,25 @@ export function CampaignDetailView({ campaign, audience, audienceLabel }: {
             <div className="flex items-center justify-between text-sm"><span className="text-slate-500">Reply rate</span><span className="font-semibold text-emerald-700">{replyRate}%</span></div>
           </div>
 
-          <div className="flex items-center gap-3 lg:flex-col lg:items-end lg:gap-1.5">
-            <button
-              role="switch" aria-checked={isActive} aria-label={isActive ? "Pause campaign" : "Activate campaign"}
-              onClick={toggleStatus} disabled={pending}
-              className={cn("relative h-6 w-11 rounded-full transition-colors flex-shrink-0", isActive ? "bg-blue-600" : "bg-slate-300")}
-            >
-              <span className={cn("absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", isActive ? "translate-x-5" : "translate-x-0")} />
-            </button>
-            <span className="text-xs text-slate-400">{formatDate(campaign.updated_at)}</span>
+          <div className="flex items-center gap-3 lg:flex-col lg:items-end lg:gap-2">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleSimulate} disabled={pending || sent === 0} title="Generate sample opens/replies/bounces for testing (dev/demo)">
+                <Sparkles className="h-4 w-4" /> Simulate
+              </Button>
+              <Button onClick={handleSendNow} disabled={pending}>
+                <Send className="h-4 w-4" /> Send now
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                role="switch" aria-checked={isActive} aria-label={isActive ? "Pause campaign" : "Activate campaign"}
+                onClick={toggleStatus} disabled={pending}
+                className={cn("relative h-6 w-11 rounded-full transition-colors flex-shrink-0", isActive ? "bg-blue-600" : "bg-slate-300")}
+              >
+                <span className={cn("absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", isActive ? "translate-x-5" : "translate-x-0")} />
+              </button>
+              <span className="text-xs text-slate-400">{formatDate(campaign.updated_at)}</span>
+            </div>
           </div>
         </div>
       </Card>
@@ -264,8 +293,23 @@ export function CampaignDetailView({ campaign, audience, audienceLabel }: {
       <Modal open={editIndex !== null} onClose={() => setEditIndex(null)} title={`Edit step ${editIndex !== null ? editIndex + 1 : ""}`} description="Modify this email in the sequence" size="lg">
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Delay</label>
-            <Input value={draft.day} onChange={(e) => setDraft({ ...draft, day: e.target.value })} placeholder="e.g. Day 3" />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Wait before this step</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number" min={0}
+                value={parseDelay(draft.day).value}
+                onChange={(e) => setDraft({ ...draft, day: formatDelay(Math.max(0, parseInt(e.target.value || "0", 10)), parseDelay(draft.day).unit) })}
+                className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+              <Select
+                value={parseDelay(draft.day).unit}
+                onChange={(e) => setDraft({ ...draft, day: formatDelay(parseDelay(draft.day).value, e.target.value as (typeof DELAY_UNITS)[number]) })}
+                className="max-w-[160px]"
+              >
+                {DELAY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </Select>
+              <span className="text-sm text-slate-400">after previous step</span>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Subject</label>
