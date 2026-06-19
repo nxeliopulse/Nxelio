@@ -145,9 +145,12 @@ export function CampaignDetailView({ campaign, audience, audienceLabel }: {
               <Badge variant={statusVariant[status] || "default"}>{status}</Badge>
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden max-w-md">
-              <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+              <div className={cn("h-full bg-blue-500 rounded-full transition-all", isActive && "lp-progress-active")} style={{ width: `${progress}%` }} />
             </div>
-            <p className="text-xs text-slate-500 mt-1.5">{sent.toLocaleString()} of {audience.toLocaleString()} sent · {progress}%</p>
+            <p className="text-xs text-slate-500 mt-1.5">
+              {sent.toLocaleString()} of {audience.toLocaleString()} sent · {progress}%
+              {isActive && <span className="ml-2 inline-flex items-center gap-1 text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> running</span>}
+            </p>
           </div>
 
           <div className="lg:w-64 lg:border-l lg:border-slate-100 lg:pl-5">
@@ -217,7 +220,7 @@ export function CampaignDetailView({ campaign, audience, audienceLabel }: {
                   <p className="text-xs text-slate-500">{audience.toLocaleString()} leads</p>
                 </div>
               </div>
-              <Link href={campaign.segment_id ? `/segments` : `/leads`} className="text-sm font-medium text-blue-600 hover:text-blue-700">View report →</Link>
+              <Link href={`/leads?campaign=${campaign.id}`} className="text-sm font-medium text-blue-600 hover:text-blue-700">View report →</Link>
             </div>
             <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-100 text-sm max-w-md">
               <div className="flex items-center justify-between"><span className="text-slate-500">Acceptance / open</span><span className="font-semibold text-slate-900">{openRate}%</span></div>

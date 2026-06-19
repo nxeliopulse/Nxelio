@@ -43,6 +43,17 @@ export async function getCampaignById(id: string): Promise<CampaignRow | null> {
   return data;
 }
 
+/** The leads this campaign was actually sent to (distinct outbound recipients), + its name. */
+export async function getCampaignRecipients(campaignId: string): Promise<{ name: string | null; leadIds: string[] }> {
+  const supabase = await createClient();
+  const [{ data: campaign }, { data: msgs }] = await Promise.all([
+    supabase.from("campaigns").select("campaign_name").eq("id", campaignId).single(),
+    supabase.from("inbox_messages").select("lead_id").eq("campaign_id", campaignId).eq("direction", "outbound"),
+  ]);
+  const leadIds = [...new Set((msgs || []).map((m) => m.lead_id).filter(Boolean))] as string[];
+  return { name: campaign?.campaign_name ?? null, leadIds };
+}
+
 export async function createCampaign(payload: Partial<CampaignRow>) {
   const supabase = await createClient();
   const { data, error } = await supabase

@@ -23,9 +23,11 @@ interface Props {
   leads: LeadRow[];
   /** Accepted for backwards-compat with the page; the stat strip was removed. */
   stats?: { total: number; hot: number; scored: number; converted: number };
+  /** When set, the list is scoped to one campaign's recipients (from "View report"). */
+  campaignFilter?: { id: string; name: string };
 }
 
-export function LeadsTable({ leads }: Props) {
+export function LeadsTable({ leads, campaignFilter }: Props) {
   const { confirm } = useFeedback();
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
@@ -103,6 +105,15 @@ export function LeadsTable({ leads }: Props) {
 
   return (
     <div className="max-w-[1600px] mx-auto">
+      {campaignFilter && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
+          <p className="text-sm text-blue-900">
+            Showing <span className="font-semibold">{leads.length}</span> lead{leads.length === 1 ? "" : "s"} in campaign <span className="font-semibold">{campaignFilter.name}</span>
+            <span className="text-blue-700/70"> · click a lead to see its email stages</span>
+          </p>
+          <Link href="/leads" className="text-sm font-medium text-blue-700 hover:text-blue-900">Clear filter ✕</Link>
+        </div>
+      )}
       {/* Tab navigation */}
       <div className="flex items-center justify-between border-b border-slate-200 mb-6">
         <div className="flex items-center gap-8">

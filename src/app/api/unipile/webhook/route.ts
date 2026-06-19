@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
+import { recomputeCampaignStats } from "@/lib/email/campaign-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -70,10 +71,34 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // Attribute the reply to the lead's most-recent campaign so the campaign's
+  // Reply rate counts it, stop that campaign's remaining follow-ups, and log it.
+  const { data: lastOutbound } = await db
+    .from("inbox_messages")
+    .select("campaign_id")
+    .eq("lead_id", lead.id)
+    .eq("direction", "outbound")
+    .not("campaign_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const replyCampaignId = (lastOutbound?.campaign_id as string | null) ?? null;
+
+  if (replyCampaignId) {
+    await db.from("lead_activities").insert({
+      lead_id: lead.id, workspace_id: lead.workspace_id,
+      activity_type: "EMAIL_REPLIED", metadata: { campaign_id: replyCampaignId, source: "reply" },
+    });
+    await db.from("campaign_jobs").update({ status: "canceled", last_error: "Lead replied", updated_at: new Date().toISOString() })
+      .eq("campaign_id", replyCampaignId).eq("lead_id", lead.id).eq("status", "pending");
+    await recomputeCampaignStats(replyCampaignId).catch(() => {});
+  }
+
   // Mirror the reply into the Inbox.
   await db.from("inbox_messages").insert({
     workspace_id: lead.workspace_id,
     lead_id: lead.id,
+    campaign_id: replyCampaignId,
     direction: "inbound",
     subject: pickString(payload, ["subject"]) || "Reply",
     body: bodyText.slice(0, 4000),

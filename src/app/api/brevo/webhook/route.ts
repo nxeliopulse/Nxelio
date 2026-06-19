@@ -26,8 +26,27 @@ function mapEvent(event: string): string | null {
 interface BrevoEvent {
   event?: string;
   email?: string;
-  tag?: string;
+  tag?: string | string[];
   tags?: string[];
+}
+
+/**
+ * Brevo echoes our tag back in a few shapes: a plain string, an array, or — most
+ * commonly for transactional events — the whole tags array serialized as a
+ * string like `["<uuid>"]`. Normalize all of them to the bare campaign id.
+ */
+function extractCampaignId(ev: BrevoEvent): string | null {
+  let raw: unknown = Array.isArray(ev.tags) && ev.tags.length ? ev.tags[0] : ev.tag;
+  if (Array.isArray(raw)) raw = raw[0];
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (s.startsWith("[")) {
+    try {
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr) && arr.length) return String(arr[0]);
+    } catch { /* fall through */ }
+  }
+  return s || null;
 }
 
 export async function POST(request: NextRequest) {
@@ -53,7 +72,7 @@ export async function POST(request: NextRequest) {
   for (const ev of events) {
     const activityType = mapEvent(ev.event || "");
     const email = (ev.email || "").trim().toLowerCase();
-    const campaignId = ev.tag || (Array.isArray(ev.tags) ? ev.tags[0] : undefined);
+    const campaignId = extractCampaignId(ev);
     if (!activityType || !email) continue;
 
     const { data: lead } = await db

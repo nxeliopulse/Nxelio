@@ -25,8 +25,12 @@ interface Activity {
 
 const activityMeta: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   PAGE_VISITED: { label: "Visited a page", color: "bg-blue-500", icon: <BarChart3 className="h-3 w-3" /> },
+  EMAIL_SENT: { label: "Email sent", color: "bg-blue-500", icon: <Send className="h-3 w-3" /> },
   EMAIL_OPENED: { label: "Opened email", color: "bg-emerald-500", icon: <MailOpen className="h-3 w-3" /> },
   EMAIL_CLICKED: { label: "Clicked link", color: "bg-cyan-500", icon: <Mouse className="h-3 w-3" /> },
+  EMAIL_REPLIED: { label: "Replied", color: "bg-teal-500", icon: <Send className="h-3 w-3" /> },
+  EMAIL_BOUNCED: { label: "Bounced", color: "bg-red-500", icon: <MailOpen className="h-3 w-3" /> },
+  CONVERTED_TO_OPPORTUNITY: { label: "Converted to opportunity", color: "bg-emerald-600", icon: <Target className="h-3 w-3" /> },
   GUIDE_DOWNLOADED: { label: "Downloaded guide", color: "bg-purple-500", icon: <FileDown className="h-3 w-3" /> },
   WEBINAR_ATTENDED: { label: "Attended webinar", color: "bg-amber-500", icon: <Calendar className="h-3 w-3" /> },
   CONSULTATION_REQUESTED: { label: "Requested consultation", color: "bg-pink-500", icon: <Calendar className="h-3 w-3" /> },

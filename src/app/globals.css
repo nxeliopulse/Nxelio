@@ -256,7 +256,25 @@ html, body {
 .lp-anim-fade  { animation: lp-fade-in 0.18s ease-out; }
 .lp-anim-scale { animation: lp-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
 
+/* Active-campaign progress bar — a moving barber-pole stripe so a running
+   campaign visibly animates instead of sitting still. */
+@keyframes lp-progress-stripes {
+  from { background-position: 0 0; }
+  to   { background-position: 32px 0; }
+}
+.lp-progress-active {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.28) 25%, transparent 25%,
+    transparent 50%, rgba(255, 255, 255, 0.28) 50%,
+    rgba(255, 255, 255, 0.28) 75%, transparent 75%, transparent
+  );
+  background-size: 32px 32px;
+  animation: lp-progress-stripes 0.9s linear infinite;
+}
+
 /* Respect users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .lp-anim-pop, .lp-anim-fade, .lp-anim-scale { animation: none; }
+  .lp-progress-active { animation: none; }
 }
