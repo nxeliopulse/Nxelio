@@ -1,15 +1,16 @@
 import { notFound } from "next/navigation";
-import { getCampaignById } from "@/lib/queries/campaigns";
+import { getCampaignById, getCampaignPendingCount } from "@/lib/queries/campaigns";
 import { getSegments } from "@/lib/queries/segments";
 import { getLeadStats } from "@/lib/queries/leads";
 import { CampaignDetailView } from "@/components/campaigns/campaign-detail-view";
 
 export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [campaign, segments, leadStats] = await Promise.all([
+  const [campaign, segments, leadStats, pending] = await Promise.all([
     getCampaignById(id),
     getSegments(),
     getLeadStats(),
+    getCampaignPendingCount(id),
   ]);
   if (!campaign) notFound();
 
@@ -17,5 +18,5 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const audience = seg ? seg.contacts : leadStats.total;
   const audienceLabel = seg ? seg.segment_name : "All leads";
 
-  return <CampaignDetailView campaign={campaign} audience={audience} audienceLabel={audienceLabel} />;
+  return <CampaignDetailView campaign={campaign} audience={audience} audienceLabel={audienceLabel} pendingJobs={pending} />;
 }

@@ -47,10 +47,11 @@ const statusVariant: Record<string, "success" | "warning" | "default" | "blue"> 
 const TABS = ["Audience", "Sequence", "Statistics", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
-export function CampaignDetailView({ campaign, audience, audienceLabel }: {
+export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJobs = 0 }: {
   campaign: CampaignRow;
   audience: number;
   audienceLabel: string;
+  pendingJobs?: number;
 }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
@@ -88,7 +89,9 @@ export function CampaignDetailView({ campaign, audience, audienceLabel }: {
   const opened = Math.round((openRate / 100) * sent);
   const replied = Math.round((replyRate / 100) * sent);
   const bounced = Math.round((bounceRate / 100) * sent);
-  const pending_ = Math.max(0, audience - sent);
+  // Real pending = follow-up steps queued but not yet sent (falls back to audience-sent
+  // for single-step campaigns that have no scheduled jobs).
+  const pending_ = pendingJobs > 0 ? pendingJobs : Math.max(0, audience - sent);
   const progress = audience > 0 ? Math.min(100, Math.round((sent / audience) * 100)) : 0;
   const isActive = status === "Active";
 

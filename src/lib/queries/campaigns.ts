@@ -43,6 +43,17 @@ export async function getCampaignById(id: string): Promise<CampaignRow | null> {
   return data;
 }
 
+/** Count of follow-up steps queued but not yet sent for this campaign. */
+export async function getCampaignPendingCount(campaignId: string): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("campaign_jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("campaign_id", campaignId)
+    .eq("status", "pending");
+  return count || 0;
+}
+
 /** The leads this campaign was actually sent to (distinct outbound recipients), + its name. */
 export async function getCampaignRecipients(campaignId: string): Promise<{ name: string | null; leadIds: string[] }> {
   const supabase = await createClient();
