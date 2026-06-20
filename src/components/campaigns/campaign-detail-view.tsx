@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -60,6 +60,15 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
   const [name, setName] = useState(campaign.campaign_name);
   const [status, setStatusLocal] = useState(campaign.status);
   const [showImport, setShowImport] = useState(false);
+
+  // While a campaign is Active, poll for fresh stats so sent/opened/replied/pending
+  // update on their own (follow-ups send via cron, opens arrive via webhook) without
+  // a manual refresh.
+  useEffect(() => {
+    if (status !== "Active") return;
+    const t = setInterval(() => router.refresh(), 15000);
+    return () => clearInterval(t);
+  }, [status, router]);
 
   // Editable sequence steps (parsed from saved content) + inline node editor
   const [steps, setSteps] = useState<FlowStep[]>(() => parseSequence(campaign.content));

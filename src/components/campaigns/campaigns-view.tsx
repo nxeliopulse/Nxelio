@@ -261,7 +261,7 @@ export function CampaignsView({
                         </Link>
                         <div className="mt-2.5 flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${isActive ? "bg-blue-500" : r.status === "Completed" ? "bg-emerald-500" : "bg-slate-300"}`} style={{ width: `${pct}%` }} />
+                            <div className={cn("h-full rounded-full", isActive ? "bg-blue-500 lp-progress-active" : r.status === "Completed" ? "bg-emerald-500" : "bg-slate-300")} style={{ width: `${pct}%` }} />
                           </div>
                           <span className="text-xs text-slate-400 tabular-nums">{r.leads === null ? r.sent.toLocaleString() : r.leads.toLocaleString()}</span>
                         </div>

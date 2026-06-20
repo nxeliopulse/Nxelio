@@ -17,6 +17,9 @@ import "server-only";
 const BREVO_KEY = process.env.BREVO_API_KEY;
 const BREVO_FROM_EMAIL = process.env.BREVO_FROM_EMAIL; // must be a verified sender in Brevo
 const BREVO_FROM_NAME = process.env.BREVO_FROM_NAME || "LeadPro";
+// Route replies to the mailbox connected to Unipile (so replies are captured),
+// even when we send from a different verified Brevo sender.
+const REPLY_TO_EMAIL = process.env.REPLY_TO_EMAIL;
 
 const RESEND_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM = process.env.EMAIL_FROM || "LeadPro <onboarding@resend.dev>";
@@ -69,6 +72,7 @@ async function sendViaBrevo({ to, subject, html, text, tags }: SendArgs): Promis
       to: [{ email: to }],
       subject,
       htmlContent: toHtml(html, text),
+      ...(REPLY_TO_EMAIL ? { replyTo: { email: REPLY_TO_EMAIL } } : {}),
       ...(tags && tags.length ? { tags } : {}),
     }),
   });
