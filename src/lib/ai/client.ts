@@ -41,8 +41,18 @@ export async function aiChat({ system, prompt, json = false, temperature = 0.7, 
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`AI request failed (${res.status}): ${text.slice(0, 200)}`);
+    // Log the real detail for debugging, but surface a calm, user-friendly message.
+    const text = await res.text().catch(() => "");
+    console.error(`AI request failed (${res.status}): ${text.slice(0, 300)}`);
+    const friendly =
+      res.status === 429
+        ? "The AI is busy right now. Please try again in a moment."
+        : res.status === 401 || res.status === 403
+          ? "The AI service isn't configured correctly. Please contact your admin."
+          : res.status === 404
+            ? "The AI service is temporarily unavailable. Please try again shortly."
+            : "Something went wrong with the AI. Please try again in a moment.";
+    throw new Error(friendly);
   }
 
   const data = await res.json();

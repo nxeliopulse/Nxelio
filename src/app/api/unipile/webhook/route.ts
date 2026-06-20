@@ -31,18 +31,42 @@ export async function POST(request: NextRequest) {
 
   const db = createAdminClient();
 
-  // Find a lead matching any candidate email / linkedin handle.
-  const emails = candidates.filter((c) => c.includes("@"));
+  // Resolve the connected account → its workspace + owner mailbox address, so we
+  // scope the lead match to the right tenant and ignore our OWN sent mail (the
+  // owner's address appearing as a "sender" means it's a message we sent).
+  const accountId = pickString(payload, ["account_id"]);
+  let scopeWorkspaceId: string | null = null;
+  let ownerEmail: string | null = null;
+  if (accountId) {
+    const { data: acct } = await db.from("outreach_accounts").select("workspace_id, name, identifier").eq("account_id", accountId).maybeSingle();
+    scopeWorkspaceId = (acct?.workspace_id as string | null) ?? null;
+    ownerEmail = ((acct?.name as string) || (acct?.identifier as string) || "").toLowerCase().trim() || null;
+  }
+
+  // Sender emails, excluding the mailbox owner's own address (that's our outbound).
+  const emails = candidates.filter((c) => c.includes("@") && c.toLowerCase() !== ownerEmail);
+  if (ownerEmail && emails.length === 0) {
+    return NextResponse.json({ ok: true, ignored: "own-outbound-mail" });
+  }
+
   let lead: { id: string; workspace_id: string; full_name: string | null; company_name: string | null; email: string | null } | null = null;
 
-  if (emails.length) {
-    const { data } = await db.from("leads").select("id, workspace_id, full_name, company_name, email").in("email", emails).limit(1);
-    lead = data?.[0] ?? null;
-  }
+  // Match the reply sender to a lead — prefer the connected account's workspace.
+  const matchEmail = async (ws: string | null) => {
+    if (!emails.length) return null;
+    let q = db.from("leads").select("id, workspace_id, full_name, company_name, email").in("email", emails);
+    if (ws) q = q.eq("workspace_id", ws);
+    const { data } = await q.limit(1);
+    return data?.[0] ?? null;
+  };
+  lead = (await matchEmail(scopeWorkspaceId)) || (await matchEmail(null));
+
   if (!lead) {
-    // try LinkedIn handle match
+    // try LinkedIn handle match (also workspace-scoped first)
     for (const c of candidates) {
-      const { data } = await db.from("leads").select("id, workspace_id, full_name, company_name, email").ilike("linkedin", `%${c}%`).limit(1);
+      let q = db.from("leads").select("id, workspace_id, full_name, company_name, email").ilike("linkedin", `%${c}%`);
+      if (scopeWorkspaceId) q = q.eq("workspace_id", scopeWorkspaceId);
+      const { data } = await q.limit(1);
       if (data?.[0]) { lead = data[0]; break; }
     }
   }

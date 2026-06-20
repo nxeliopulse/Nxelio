@@ -9,11 +9,32 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
-import { markRead, markUnread, sendReply, type InboxConversation } from "@/lib/queries/inbox";
+import { markRead, markUnread, sendReply, getInboxThread, type InboxConversation, type InboxMessage } from "@/lib/queries/inbox";
 import { addBlocklistEntry } from "@/lib/queries/blocklist";
 import { getEmailTemplates, type EmailTemplateRow } from "@/lib/queries/templates";
 
 const TAG_OPTIONS = ["Hot", "Needs Reply", "Follow Up", "Spam"] as const;
+
+/**
+ * Turns a raw email body (HTML, tracking pixels, quoted history) into clean,
+ * readable text showing just the new message.
+ */
+function cleanEmailText(raw: string | null | undefined): string {
+  if (!raw) return "";
+  let s = raw
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<img[^>]*>/gi, " ")
+    .replace(/<\/(p|div|br|tr|li)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ");                 // strip remaining tags
+  // decode the common entities
+  s = s.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<")
+       .replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
+  // cut the quoted reply history ("On <date> … wrote:" and everything after)
+  s = s.split(/\n?On .{0,80}wrote:/)[0];
+  s = s.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return s;
+}
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -33,6 +54,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
   const [archived, setArchived] = useState<Set<string>>(new Set());
   const visible = conversations.filter((c) => !archived.has(c.id));
   const [active, setActive] = useState<InboxConversation | null>(visible[0] || null);
+  const [thread, setThread] = useState<InboxMessage[]>([]);
   const [reply, setReply] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "replied">("all");
   const [search, setSearch] = useState("");
@@ -57,6 +79,19 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
   useEffect(() => {
     getEmailTemplates().then(setTemplates).catch(() => setTemplates([]));
   }, []);
+
+  // Load the full conversation thread (inbound + your sent replies) for the open lead.
+  function loadThread(leadId: string | null | undefined) {
+    if (!leadId) return;
+    getInboxThread(leadId).then(setThread).catch(() => setThread([]));
+  }
+  useEffect(() => {
+    const leadId = active?.lead_id;
+    if (!leadId) return;
+    let cancelled = false;
+    getInboxThread(leadId).then((t) => { if (!cancelled) setThread(t); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [active?.lead_id]);
 
   // Close popovers on outside click
   useEffect(() => {
@@ -89,6 +124,8 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
       }
       setReply("");
       setAttachment(null);
+      toast("Reply sent", "success");
+      loadThread(active.lead_id);   // show the sent message in the thread immediately
     });
   }
 
@@ -242,7 +279,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
                           <span className="text-xs text-slate-400 flex-shrink-0">{relativeTime(c.created_at)}</span>
                         </div>
                         <p className="text-xs text-slate-500 mb-1 truncate">{c.lead_company || "—"}</p>
-                        <p className={`text-xs line-clamp-2 ${!c.is_read ? "text-slate-700" : "text-slate-500"}`}>{c.body}</p>
+                        <p className={`text-xs line-clamp-2 ${!c.is_read ? "text-slate-700" : "text-slate-500"}`}>{cleanEmailText(c.body)}</p>
                         <div className="mt-1.5 flex items-center gap-1">
                           {c.campaign_name && <Badge variant="blue">{c.campaign_name}</Badge>}
                           {starred.has(c.id) && <Star className="h-3 w-3 text-yellow-500" fill="currentColor" />}
@@ -351,11 +388,18 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
                     ))}
                   </div>
                 )}
-                <div className="flex">
-                  <div className="max-w-[80%] bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-slate-100">
-                    <p className="text-sm text-slate-700 leading-relaxed">{active.body}</p>
-                    <p className="text-xs text-slate-400 mt-1.5">{active.lead_name} · {relativeTime(active.created_at)}</p>
-                  </div>
+                <div className="space-y-3">
+                  {(thread.length ? thread : [active]).map((m) => {
+                    const outbound = m.direction === "outbound";
+                    return (
+                      <div key={m.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm border ${outbound ? "bg-blue-50 border-blue-100 rounded-tr-sm" : "bg-white border-slate-100 rounded-tl-sm"}`}>
+                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{cleanEmailText(m.body)}</p>
+                          <p className="text-xs text-slate-400 mt-1.5">{outbound ? "You" : active.lead_name} · {relativeTime(m.created_at)}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
