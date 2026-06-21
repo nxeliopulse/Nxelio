@@ -203,12 +203,34 @@ function mapProfile(it: SearchItem): UnipileProfile {
  * Sales Navigator search URL) and returns up to `limit` profiles, paginating
  * via the cursor. Respects LinkedIn's rate limits on Unipile's side.
  */
+/**
+ * Unipile's LinkedIn search only accepts a PEOPLE search URL. Normalize whatever
+ * the user pastes — the "all results" page (/search/results/all/) or a typeahead
+ * URL — into /search/results/people/ and drop nav-only junk params.
+ */
+export function normalizeLinkedInSearchUrl(raw: string): string {
+  try {
+    const u = new URL(raw.trim());
+    u.pathname = u.pathname.replace(/\/search\/results\/[^/]+/i, "/search/results/people");
+    if (!/\/search\/results\/people/i.test(u.pathname)) {
+      // e.g. a Sales Navigator or bare URL — append the people results path
+      u.pathname = "/search/results/people/";
+    }
+    u.searchParams.delete("origin");
+    u.searchParams.delete("position");
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
 export async function unipileLinkedInSearch(opts: {
   accountId: string;
   url: string;
   limit?: number;
 }): Promise<{ profiles: UnipileProfile[] }> {
   const limit = Math.min(opts.limit ?? 50, 200);
+  const searchUrl = normalizeLinkedInSearchUrl(opts.url);
   const profiles: UnipileProfile[] = [];
   let cursor: string | undefined;
 
@@ -216,7 +238,7 @@ export async function unipileLinkedInSearch(opts: {
     const qs = `account_id=${encodeURIComponent(opts.accountId)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
     const data = (await unipileFetch(`/linkedin/search?${qs}`, {
       method: "POST",
-      body: JSON.stringify({ url: opts.url }),
+      body: JSON.stringify({ url: searchUrl }),
     })) as { items?: SearchItem[]; cursor?: string };
     const items = data.items || [];
     for (const it of items) profiles.push(mapProfile(it));
