@@ -178,17 +178,22 @@ interface SearchItem {
   name?: string; first_name?: string; last_name?: string;
   headline?: string; location?: string;
   public_profile_url?: string; public_identifier?: string;
+  // Post reaction/comment authors use these field names instead:
+  profile_url?: string; id?: string;
 }
 
 function mapProfile(it: SearchItem): UnipileProfile {
   const identifier = it.public_identifier || null;
+  // Engager authors expose `profile_url` (often an ACoAA…-style URL); search results
+  // expose `public_profile_url` / `public_identifier`. Accept whichever is present.
+  const url = it.public_profile_url || it.profile_url || (identifier ? `https://www.linkedin.com/in/${identifier}` : null);
   return {
     name: it.name || [it.first_name, it.last_name].filter(Boolean).join(" ") || null,
     firstName: it.first_name || null,
     lastName: it.last_name || null,
     headline: it.headline || null,
     location: it.location || null,
-    profileUrl: it.public_profile_url || (identifier ? `https://www.linkedin.com/in/${identifier}` : null),
+    profileUrl: url,
     identifier,
   };
 }
@@ -259,7 +264,7 @@ export async function unipilePostEngagers(opts: {
       for (const raw of items) {
         // engager profile may be nested under author/actor/user depending on kind
         const it = (raw.author || raw.actor || raw.user || raw) as SearchItem;
-        const id = it.public_identifier || it.public_profile_url || it.name || "";
+        const id = it.public_identifier || it.profile_url || it.public_profile_url || it.id || it.name || "";
         if (!id || seen.has(id)) continue;
         seen.add(id);
         profiles.push(mapProfile(it));
