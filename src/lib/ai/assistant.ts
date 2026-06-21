@@ -4,6 +4,8 @@ import { createLead, getLeads, updateLead, deleteLead } from "@/lib/queries/lead
 import { createCampaign, getCampaigns, getCampaignStats, updateCampaign, deleteCampaign } from "@/lib/queries/campaigns";
 import { createSegment, getSegments, deleteSegment } from "@/lib/queries/segments";
 import { createEmailTemplate, getEmailTemplates, deleteEmailTemplate } from "@/lib/queries/templates";
+import { getNewsletters, deleteNewsletter } from "@/lib/queries/newsletters";
+import { sendNewsletter } from "@/lib/email/newsletter-actions";
 import { getUsers } from "@/lib/queries/users";
 import { sendLeadEmail } from "@/lib/email/actions";
 
@@ -89,6 +91,14 @@ const TOOLS = [
     function: {
       name: "list_templates",
       description: "List email templates with id, name, subject.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_newsletters",
+      description: "List newsletters with id, title, status (Draft/Sent/etc.), recipients and sent count.",
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
@@ -269,6 +279,30 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "delete_newsletter",
+      description: "[Needs approval] Delete a newsletter. Use list_newsletters first; pass display = newsletter title.",
+      parameters: {
+        type: "object",
+        properties: { newsletter_id: { type: "string" }, display: { type: "string" } },
+        required: ["newsletter_id", "display"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_newsletter",
+      description: "[Needs approval] Send a newsletter to its subscribed audience now. Use list_newsletters first; pass display = newsletter title.",
+      parameters: {
+        type: "object",
+        properties: { newsletter_id: { type: "string" }, display: { type: "string" } },
+        required: ["newsletter_id", "display"],
+      },
+    },
+  },
 ];
 
 const WRITE_TOOLS = new Set([
@@ -277,6 +311,7 @@ const WRITE_TOOLS = new Set([
   "create_segment", "delete_segment",
   "create_email_template", "delete_template",
   "send_email_to_lead",
+  "delete_newsletter", "send_newsletter",
 ]);
 
 const SYSTEM_PROMPT = `You are the LeadPro AI assistant — an in-app agent for a lead-nurturing platform. You can read workspace data instantly and propose changes that run after the admin approves them.
@@ -342,6 +377,10 @@ async function executeReadTool(name: string, args: Record<string, unknown>): Pro
       case "list_templates": {
         const ts = await getEmailTemplates();
         return JSON.stringify(ts.map((t) => ({ id: t.id, name: t.template_name, subject: t.subject })));
+      }
+      case "list_newsletters": {
+        const ns = await getNewsletters();
+        return JSON.stringify(ns.map((n) => ({ id: n.id, title: n.title, status: n.status, recipients: n.recipient_count, sent: n.sent_count })));
       }
       default:
         return JSON.stringify({ error: `Unknown read tool ${name}` });
@@ -425,6 +464,14 @@ async function executeWriteTool(name: string, args: Record<string, unknown>): Pr
       if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
       return { ok: true, detail: `Sent “${args.subject}” to ${args.display}` };
     }
+    case "delete_newsletter":
+      await deleteNewsletter(String(args.newsletter_id));
+      return { ok: true, detail: `Deleted newsletter ${args.display}` };
+    case "send_newsletter": {
+      const res = await sendNewsletter(String(args.newsletter_id));
+      if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
+      return { ok: true, detail: `Sent newsletter ${args.display} to ${res.sent ?? 0} recipient${res.sent === 1 ? "" : "s"}${res.redirectedMessage ? ` (${res.redirectedMessage})` : ""}` };
+    }
     default:
       return { ok: false, detail: `Unknown write tool ${name}` };
   }
@@ -448,6 +495,8 @@ function summarizeAction(name: string, args: Record<string, unknown>): string {
     case "create_email_template": return `Save template “${args.template_name}”`;
     case "delete_template": return `Delete template ${args.display}`;
     case "send_email_to_lead": return `Send email to ${args.display} — “${args.subject}”`;
+    case "delete_newsletter": return `Delete newsletter ${args.display}`;
+    case "send_newsletter": return `Send newsletter ${args.display} to its subscribed audience`;
     default: return name;
   }
 }
@@ -456,9 +505,15 @@ function summarizeAction(name: string, args: Record<string, unknown>): string {
 // Rate-limit-aware completion call: retries 429/5xx with backoff instead of
 // surfacing raw provider errors.
 // ---------------------------------------------------------------------------
+// Known-good current Groq model. If the configured AI_MODEL has been
+// decommissioned (provider returns 400), we transparently retry on this one so
+// a stale deployment env var can't take the whole assistant offline.
+const FALLBACK_MODEL = "llama-3.3-70b-versatile";
+
 async function chatCompletion(body: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false; status: number; text: string }> {
   let lastStatus = 0;
   let lastText = "";
+  let triedFallback = false;
   for (let attempt = 0; attempt < 3; attempt++) {
     const res = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
@@ -469,6 +524,14 @@ async function chatCompletion(body: Record<string, unknown>): Promise<{ ok: true
 
     lastStatus = res.status;
     lastText = await res.text();
+
+    // Configured model is gone/invalid → switch to the fallback once and retry.
+    if (res.status === 400 && !triedFallback && body.model !== FALLBACK_MODEL
+        && /model|decommission|does not exist|not found/i.test(lastText)) {
+      triedFallback = true;
+      body = { ...body, model: FALLBACK_MODEL };
+      continue;
+    }
 
     if (res.status === 429 || res.status >= 500) {
       // Respect the provider's suggested wait when present, else backoff
