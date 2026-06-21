@@ -32,10 +32,19 @@ export async function getInboxConversations(): Promise<InboxConversation[]> {
     .eq("direction", "inbound")
     .order("created_at", { ascending: false });
   if (error || !data) return [];
-  return data.map((m) => {
+
+  // Group by lead so each person shows as ONE conversation card. Messages are
+  // newest-first, so the first per lead is the latest. A conversation is unread
+  // if ANY of that lead's inbound messages is unread.
+  const byLead = new Map<string, InboxConversation>();
+  const anyUnread = new Set<string>();
+  for (const m of data) {
     const leads = (m as { leads?: { full_name?: string; company_name?: string; email?: string } }).leads;
     const campaigns = (m as { campaigns?: { campaign_name?: string } }).campaigns;
-    return {
+    const key = (m.lead_id as string) || m.id;
+    if (!m.is_read) anyUnread.add(key);
+    if (byLead.has(key)) continue; // keep only the latest message as the card
+    byLead.set(key, {
       id: m.id,
       lead_id: m.lead_id,
       campaign_id: m.campaign_id,
@@ -48,8 +57,9 @@ export async function getInboxConversations(): Promise<InboxConversation[]> {
       lead_company: leads?.company_name || null,
       lead_email: leads?.email || null,
       campaign_name: campaigns?.campaign_name || null,
-    };
-  });
+    });
+  }
+  return [...byLead.values()].map((c) => ({ ...c, is_read: !anyUnread.has((c.lead_id as string) || c.id) }));
 }
 
 export async function getInboxThread(leadId: string): Promise<InboxMessage[]> {
