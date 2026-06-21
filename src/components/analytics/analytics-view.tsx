@@ -23,7 +23,7 @@ interface Stats {
 const funnelColors = ["#3b82f6", "#06b6d4", "#f59e0b", "#10b981", "#8b5cf6"];
 
 function todayStr() {
-  const d = new window.Date();
+  const d = new Date();
   return d.toISOString().slice(0, 10);
 }
 

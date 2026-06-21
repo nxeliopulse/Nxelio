@@ -103,6 +103,11 @@ export async function listUnipileAccounts(): Promise<UnipileAccount[]> {
   });
 }
 
+/** Disconnects (deletes) an account from Unipile so it won't be re-synced. */
+export async function unipileDeleteAccount(accountId: string): Promise<void> {
+  await unipileFetch(`/accounts/${encodeURIComponent(accountId)}`, { method: "DELETE" });
+}
+
 /** Sends an email from a connected mailbox. */
 export async function unipileSendEmail(opts: {
   accountId: string;

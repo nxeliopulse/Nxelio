@@ -71,6 +71,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
   const [templates, setTemplates] = useState<EmailTemplateRow[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const tagPopoverRef = useRef<HTMLDivElement>(null);
   const morePopoverRef = useRef<HTMLDivElement>(null);
   const templatesPopoverRef = useRef<HTMLDivElement>(null);
@@ -92,6 +93,11 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
     getInboxThread(leadId).then((t) => { if (!cancelled) setThread(t); }).catch(() => {});
     return () => { cancelled = true; };
   }, [active?.lead_id]);
+
+  // Jump to the newest message whenever the thread or active conversation changes.
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ block: "end" });
+  }, [thread, active?.id]);
 
   // Close popovers on outside click
   useEffect(() => {
@@ -295,7 +301,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
 
           {/* Conversation view */}
           {active ? (
-            <div className="flex flex-col">
+            <div className="flex flex-col h-full min-h-0">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-semibold flex items-center justify-center">
@@ -371,7 +377,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50">
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 bg-slate-50">
                 {activeTags.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">
                     {activeTags.map((t) => (
@@ -400,6 +406,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
                       </div>
                     );
                   })}
+                  <div ref={messagesEndRef} />
                 </div>
               </div>
 

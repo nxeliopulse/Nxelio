@@ -5,6 +5,7 @@ import {
   unipileConfigured,
   createHostedAuthLink,
   listUnipileAccounts,
+  unipileDeleteAccount,
 } from "@/lib/outreach/unipile";
 
 export interface OutreachAccountRow {
@@ -79,23 +80,27 @@ export async function syncOutreachAccounts(): Promise<{ ok: boolean; count: numb
     let count = 0;
     for (const a of accounts) {
       const channel: "email" | "linkedin" = a.type === "LINKEDIN" ? "linkedin" : "email";
-      const { error } = await supabase
+      const status = (a.status && a.status.toLowerCase().includes("ok")) || a.status === "CONNECTED" ? "connected" : (a.status || "connected");
+
+      // 1) If THIS workspace already owns the account, just refresh it (RLS scopes the update).
+      const { data: updated } = await supabase
         .from("outreach_accounts")
-        .upsert(
-          {
-            provider: "unipile",
-            channel,
-            account_id: a.id,
-            name: a.name ?? null,
-            identifier: a.identifier ?? null,
-            status: (a.status && a.status.toLowerCase().includes("ok")) || a.status === "CONNECTED" ? "connected" : (a.status || "connected"),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "workspace_id,account_id" }
-        );
+        .update({ name: a.name ?? null, identifier: a.identifier ?? null, status, updated_at: new Date().toISOString() })
+        .eq("account_id", a.id)
+        .select("id");
+      if (updated && updated.length) { count++; continue; }
+
+      // 2) Otherwise try to CLAIM it. The global UNIQUE(account_id) constraint makes
+      //    this fail (silently skipped) when another workspace already owns it — so a
+      //    shared Unipile key never leaks one workspace's accounts into another.
+      const { error } = await supabase.from("outreach_accounts").insert({
+        provider: "unipile", channel, account_id: a.id,
+        name: a.name ?? null, identifier: a.identifier ?? null, status,
+      });
       if (!error) count++;
     }
     revalidatePath("/outreach");
+    revalidatePath("/campaigns");
     return { ok: true, count };
   } catch (err) {
     return { ok: false, count: 0, error: err instanceof Error ? err.message : "Sync failed" };
@@ -104,7 +109,17 @@ export async function syncOutreachAccounts(): Promise<{ ok: boolean; count: numb
 
 export async function deleteOutreachAccount(id: string) {
   const supabase = await createClient();
+  // Look up the Unipile account_id (RLS guarantees it's one of THIS workspace's rows).
+  const { data: row } = await supabase.from("outreach_accounts").select("account_id").eq("id", id).maybeSingle();
+
+  // Disconnect from Unipile too, so it's truly gone and a Recheck can't re-add it.
+  const accountId = (row as { account_id?: string } | null)?.account_id;
+  if (accountId && unipileConfigured) {
+    await unipileDeleteAccount(accountId).catch(() => { /* already gone / network — still remove locally */ });
+  }
+
   const { error } = await supabase.from("outreach_accounts").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/outreach");
+  revalidatePath("/campaigns");
 }

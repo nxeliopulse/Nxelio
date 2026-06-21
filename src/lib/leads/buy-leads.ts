@@ -1,11 +1,14 @@
 "use server";
 import { aiJson } from "@/lib/ai/client";
+import { anysiteConfigured, anysiteSearchPeople } from "@/lib/leads/anysite";
 
 export interface BuyCriteria {
   industry: string;
   role: string;
   location: string;
   count: number;
+  /** Pull verified emails too (slower — ~35s/lead). Off by default. */
+  withEmail?: boolean;
 }
 
 export interface GeneratedProspect {
@@ -14,12 +17,56 @@ export interface GeneratedProspect {
   company_name: string;
   industry: string;
   website_url: string;
+  /** Real LinkedIn profile URL (from AnySite); empty for AI samples. */
+  linkedin?: string;
+  location?: string;
+  /** Verified email (from AnySite enrichment); empty when none found. */
+  email?: string;
 }
 
 export interface BuyLeadsResult {
   ok: boolean;
   prospects: GeneratedProspect[];
+  /** "anysite" = real prospects, "ai" = synthetic samples. */
+  source?: "anysite" | "ai";
   error?: string;
+}
+
+/**
+ * Fetches prospects for the "Buy Leads" flow. Prefers AnySite (real LinkedIn
+ * people search); falls back to AI-generated samples when AnySite isn't
+ * configured or returns nothing.
+ */
+export async function searchBuyLeads(criteria: BuyCriteria): Promise<BuyLeadsResult> {
+  if (anysiteConfigured) {
+    const r = await anysiteSearchPeople({ ...criteria, withEmail: !!criteria.withEmail });
+    if (r.ok && r.prospects.length) {
+      // When the user asked for verified emails, keep ONLY the ones that have one.
+      const rows = criteria.withEmail ? r.prospects.filter((p) => p.email) : r.prospects;
+      if (!rows.length) {
+        return { ok: false, prospects: [], error: "No verified emails found for these filters. Try broader criteria, or turn off the email option to keep LinkedIn-only leads." };
+      }
+      return {
+        ok: true,
+        source: "anysite",
+        prospects: rows.map((p) => ({
+          full_name: p.full_name,
+          title: p.title,
+          company_name: p.company_name,
+          industry: criteria.industry || "",
+          website_url: "",
+          linkedin: p.linkedin,
+          location: p.location,
+          email: p.email,
+        })),
+      };
+    }
+    // AnySite configured but failed → surface the error rather than silently faking data.
+    return { ok: false, prospects: [], error: r.error || "No prospects found." };
+  }
+  // No AnySite key → AI samples.
+  const ai = await generateSampleProspects(criteria);
+  return { ...ai, source: "ai" };
 }
 
 /**

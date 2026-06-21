@@ -12,7 +12,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { bulkInsertLeads, type LeadRow } from "@/lib/queries/leads";
 import { importLinkedInLeads, hasLinkedInAccount } from "@/lib/leads/linkedin-import";
 import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outreach-accounts";
-import { generateSampleProspects, type GeneratedProspect } from "@/lib/leads/buy-leads";
+import { searchBuyLeads, type GeneratedProspect } from "@/lib/leads/buy-leads";
 
 type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
 
@@ -30,7 +30,7 @@ const SOURCES: SourceDef[] = [
   { id: "linkedin-post", label: "LinkedIn Post", desc: "Capture people who engaged with a post", icon: Megaphone, color: "text-sky-600 bg-sky-50", badge: "New" },
   { id: "youtube", label: "YouTube Post", desc: "Scrape engagers from a video or post", icon: Video, color: "text-red-600 bg-red-50" },
   { id: "manual", label: "Add Leads Manually", desc: "Type in leads one by one with full details", icon: Pencil, color: "text-indigo-600 bg-indigo-50" },
-  { id: "buy", label: "Buy Leads", desc: "Generate a targeted prospect list by criteria", icon: ShoppingCart, color: "text-amber-600 bg-amber-50", badge: "AI" },
+  { id: "buy", label: "Buy Leads", desc: "Find real prospects by industry, role & location", icon: ShoppingCart, color: "text-amber-600 bg-amber-50" },
   { id: "csv", label: "Upload CSV file", desc: "Import an existing prospect list in bulk", icon: FileSpreadsheet, color: "text-emerald-600 bg-emerald-50" },
 ];
 
@@ -139,9 +139,10 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Buy leads (AI-generated sample prospects)
-  const [buy, setBuy] = useState({ industry: "", role: "", location: "", count: 10 });
+  // Buy leads (real prospects via AnySite, or AI samples as fallback)
+  const [buy, setBuy] = useState({ industry: "", role: "", location: "", count: 10, withEmail: false });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
+  const [buySource, setBuySource] = useState<"anysite" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
 
   // Import
@@ -186,7 +187,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     setStep(1); setSource(null); setInputValue("");
     setStep2Error(null); setStep2Warning(null);
     setManual([newManual()]); setEntries([newEntry()]); setCsvRows(null); setCsvName(""); setDragOver(false);
-    setBuy({ industry: "", role: "", location: "", count: 10 }); setBuyResults(null); setBuyLoading(false);
+    setBuy({ industry: "", role: "", location: "", count: 10, withEmail: false }); setBuyResults(null); setBuySource(null); setBuyLoading(false);
     setSummary(null); setImportError(null);
   }
 
@@ -216,12 +217,13 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     setStep2Error(null);
     setBuyLoading(true);
     setBuyResults(null);
-    generateSampleProspects(buy)
+    searchBuyLeads(buy)
       .then((res) => {
-        if (!res.ok) { setStep2Error(res.error || "Could not generate prospects."); return; }
+        if (!res.ok) { setStep2Error(res.error || "Could not find prospects."); return; }
         setBuyResults(res.prospects);
+        setBuySource(res.source ?? null);
       })
-      .catch((e) => setStep2Error(e instanceof Error ? e.message : "Generation failed"))
+      .catch((e) => setStep2Error(e instanceof Error ? e.message : "Search failed"))
       .finally(() => setBuyLoading(false));
   }
 
@@ -335,14 +337,18 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
       }));
     } else if (isBuy) {
       skipped = 0;
-      // Sample prospects carry no email on purpose, so they're never auto-emailed.
+      // Real (AnySite) prospects carry a LinkedIn URL; AI samples carry a placeholder
+      // website. Neither carries an email, so they're never accidentally auto-emailed.
+      const buyLabel = buySource === "anysite" ? "Purchased Leads (AnySite)" : "Purchased Leads (sample)";
       payload = (buyResults ?? []).map((p) => ({
-        full_name: p.full_name || null,
-        company_name: p.company_name || null,
-        industry: p.industry || null,
-        interest_area: p.title || null,
+        full_name: (p.full_name || "").slice(0, 150) || null,
+        company_name: (p.company_name || "").slice(0, 200) || null,
+        industry: (p.industry || "").slice(0, 100) || null,
+        interest_area: (p.title || "").slice(0, 150) || null,
+        email: p.email || null,
+        linkedin: p.linkedin || null,
         website_url: p.website_url || null,
-        source: "Purchased Leads (sample)", status: "New",
+        source: buyLabel, status: "New",
       }));
     } else {
       // Non-LinkedIn social sources (YouTube/Instagram/Twitter) — manual entry.
@@ -420,7 +426,8 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
             ) : isBuy ? (
               <BuyForm
                 buy={buy}
-                setBuy={(b) => { setBuy(b); setBuyResults(null); }}
+                setBuy={(b) => { setBuy(b); setBuyResults(null); setBuySource(null); }}
+                source={buySource}
                 results={buyResults}
                 loading={buyLoading}
                 onGenerate={runGenerate}
@@ -778,15 +785,18 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
 }
 
 // ============================================================================
-// Buy Leads — AI-generated sample prospects by criteria
-function BuyForm({ buy, setBuy, results, loading, onGenerate, error }: {
-  buy: { industry: string; role: string; location: string; count: number };
-  setBuy: (b: { industry: string; role: string; location: string; count: number }) => void;
+// Buy Leads — real LinkedIn prospects via AnySite (AI samples as fallback)
+type BuyState = { industry: string; role: string; location: string; count: number; withEmail: boolean };
+function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
+  buy: BuyState;
+  setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;
+  source: "anysite" | "ai" | null;
   loading: boolean;
   onGenerate: () => void;
   error: string | null;
 }) {
+  const isReal = source === "anysite";
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -809,20 +819,31 @@ function BuyForm({ buy, setBuy, results, loading, onGenerate, error }: {
         </div>
       </div>
 
+      <label className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer select-none">
+        <input type="checkbox" checked={buy.withEmail} onChange={(e) => setBuy({ ...buy, withEmail: e.target.checked })} className="mt-0.5 h-4 w-4 rounded border-slate-300" />
+        <span>Also find <span className="font-medium">verified emails</span> <span className="text-slate-400">— makes the leads emailable, but adds ~30–60s</span></span>
+      </label>
+
       <Button onClick={onGenerate} disabled={loading}>
-        {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</> : <><Sparkles className="h-4 w-4" /> {results ? "Regenerate list" : "Generate prospect list"}</>}
+        {loading
+          ? <><Loader2 className="h-4 w-4 animate-spin" /> {buy.withEmail ? "Finding prospects & emails…" : "Finding prospects…"}</>
+          : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
       </Button>
 
-      {results && (
+      {loading && buy.withEmail && <p className="text-xs text-slate-500">Verifying emails on LinkedIn — this can take up to a minute.</p>}
+
+      {results && isReal && (
         <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-          <CheckCircle2 className="h-4 w-4" /> {results.length} prospects generated — review them on the next step.
+          <CheckCircle2 className="h-4 w-4" /> {results.length} real prospects found — review them on the next step.
         </div>
       )}
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
-        <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-        <span>These are <span className="font-semibold">AI-generated sample prospects</span> for demoing the feature — not verified contacts. They&apos;re imported without email addresses so they won&apos;t be emailed. Connect a real data provider for verified leads.</span>
-      </div>
+      {results && source === "ai" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <span>Couldn&apos;t reach the data provider, so these are <span className="font-semibold">AI-generated samples</span> — not verified contacts.</span>
+        </div>
+      )}
 
       {error && <ErrorNote text={error} />}
     </div>
@@ -830,22 +851,24 @@ function BuyForm({ buy, setBuy, results, loading, onGenerate, error }: {
 }
 
 function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; location: string } }) {
+  const withEmail = prospects.filter((p) => p.email).length;
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
-        Sample list for <span className="font-medium text-slate-900">{criteria.role || "decision makers"}</span> in <span className="font-medium text-slate-900">{criteria.industry || "any industry"}</span>{criteria.location ? <> · {criteria.location}</> : null}
+        Prospects for <span className="font-medium text-slate-900">{criteria.role || "decision makers"}</span> in <span className="font-medium text-slate-900">{criteria.industry || "any industry"}</span>{criteria.location ? <> · {criteria.location}</> : null}
+        {prospects.length > 0 && <span className="text-slate-400"> · {withEmail} verified email{withEmail === 1 ? "" : "s"}</span>}
       </div>
       <div className="border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Title</th><th className="px-3 py-2 text-left font-semibold">Company</th></tr>
+            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Title</th><th className="px-3 py-2 text-left font-semibold">Email</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {prospects.slice(0, 8).map((p, i) => (
               <tr key={i}>
-                <td className="px-3 py-2">{p.full_name || <span className="text-slate-400">—</span>}</td>
-                <td className="px-3 py-2 text-slate-600">{p.title || <span className="text-slate-400">—</span>}</td>
-                <td className="px-3 py-2 text-slate-600">{p.company_name || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2 align-top">{p.full_name || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2 text-slate-600 align-top"><span className="line-clamp-2">{p.title || "—"}</span></td>
+                <td className="px-3 py-2 align-top">{p.email ? <span className="text-emerald-700">{p.email}</span> : <span className="text-slate-400">—</span>}</td>
               </tr>
             ))}
           </tbody>
