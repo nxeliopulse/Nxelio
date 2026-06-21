@@ -274,8 +274,12 @@ export async function unipilePostEngagers(opts: {
     }
   }
 
-  try { await pull("reactions"); } catch {}
-  try { if (profiles.length < limit) await pull("comments"); } catch {}
+  let firstErr: unknown = null;
+  try { await pull("reactions"); } catch (e) { firstErr = e; }
+  try { if (profiles.length < limit) await pull("comments"); } catch (e) { if (!firstErr) firstErr = e; }
+  // If we got nothing AND something errored, surface the real reason (e.g. a dead
+  // account) so the import can report it / try another account — don't hide it as "0".
+  if (profiles.length === 0 && firstErr) throw firstErr;
   return { profiles: profiles.slice(0, limit) };
 }
 

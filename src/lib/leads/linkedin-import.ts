@@ -1,7 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { bulkInsertLeads } from "@/lib/queries/leads";
-import { unipileConfigured, unipileLinkedInSearch, unipilePostEngagers, type UnipileProfile } from "@/lib/outreach/unipile";
+import { unipileConfigured, unipileLinkedInSearch, unipilePostEngagers, postUrlToSocialId, type UnipileProfile } from "@/lib/outreach/unipile";
 
 export interface LinkedInImportResult {
   ok: boolean;
@@ -72,6 +72,10 @@ export async function importLinkedInLeads(opts: {
   const url = opts.url.trim();
   if (!url) {
     return { ok: false, found: 0, inserted: 0, duplicates: 0, error: "Paste a LinkedIn URL." };
+  }
+  // For posts, make sure we can read a post id out of the URL before calling Unipile.
+  if (opts.source === "linkedin-post" && !postUrlToSocialId(url)) {
+    return { ok: false, found: 0, inserted: 0, duplicates: 0, error: "Couldn't read that post URL. Open the post on LinkedIn, use “Copy link to post”, and paste the full link (it should contain “activity-…”)." };
   }
 
   // Try each connected account in turn — a dead/expired one ("account not found")
