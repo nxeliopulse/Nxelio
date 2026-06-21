@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { useFeedback } from "@/components/ui/feedback";
 import { industries, interestAreas } from "@/lib/mock-data";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
-import { deleteLead, type LeadRow } from "@/lib/queries/leads";
+import { deleteLead, bulkDeleteLeads, type LeadRow } from "@/lib/queries/leads";
 
 const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | "success" | "purple"> = {
   New: "blue",
@@ -89,9 +89,9 @@ export function LeadsTable({ leads, campaignFilter }: Props) {
   async function handleBulkDelete() {
     if (!(await confirm({ title: "Delete leads?", message: `Delete ${selected.length} leads?`, confirmLabel: "Delete", danger: true }))) return;
     const ids = [...selected];
+    setSelected([]);
     start(async () => {
-      await Promise.all(ids.map((id) => deleteLead(id)));
-      setSelected([]);
+      await bulkDeleteLeads(ids); // single query instead of N round-trips
     });
   }
 
