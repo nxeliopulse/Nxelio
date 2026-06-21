@@ -272,7 +272,20 @@ export async function unipilePostEngagers(opts: {
 }): Promise<{ profiles: UnipileProfile[] }> {
   const parsed = postUrlToSocialId(opts.postUrl);
   if (!parsed) return { profiles: [] };
-  const socialId: string = parsed;
+
+  // A post URL carries an `activity` id, but reactions/comments live under the
+  // post's REAL social_id (often a different `ugcPost` id for reshares). Resolve
+  // it by fetching the post first; fall back to the parsed urn if that fails.
+  let socialId: string = parsed;
+  const numericId = parsed.match(/(\d{15,25})/)?.[1];
+  if (numericId) {
+    try {
+      const post = await unipileFetch(`/posts/${numericId}?account_id=${encodeURIComponent(opts.accountId)}`, { method: "GET" });
+      const real = (post as { social_id?: string })?.social_id;
+      if (real) socialId = real;
+    } catch { /* keep the parsed urn */ }
+  }
+
   const limit = Math.min(opts.limit ?? 50, 200);
   const seen = new Set<string>();
   const profiles: UnipileProfile[] = [];
