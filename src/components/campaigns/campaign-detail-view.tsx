@@ -29,15 +29,27 @@ function parseSequence(content: string | null): FlowStep[] {
     .map((block, i) => {
       const lines = block.trim().split("\n");
       const header = lines[0] || "";
-      // Split on the first " — " into [delay label, subject]
+      // Split on the first " — " into [delay label, subject-or-LinkedIn-marker]
       const m = header.match(/^(.*?)\s+—\s+(.*)$/);
-      return {
-        day: m ? m[1] : (i === 0 ? "Day 1" : "No delay"),
-        subject: m ? m[2] : header,
-        body: lines.slice(1).join("\n").trim(),
-      };
+      const day = m ? m[1] : (i === 0 ? "Day 1" : "No delay");
+      const headerSubject = m ? m[2] : header;
+      const body = lines.slice(1).join("\n").trim();
+      const li = headerSubject.match(/^\[li:(connection_request|linkedin_message|message)\]$/i);
+      if (li) {
+        const action = /connection/i.test(li[1]) ? "connection_request" as const : "linkedin_message" as const;
+        return { day, subject: "", body, channel: "linkedin" as const, action };
+      }
+      return { day, subject: headerSubject, body, channel: "email" as const, action: "email" as const };
     })
-    .filter((s) => s.subject || s.body);
+    .filter((s) => s.subject || s.body || s.channel === "linkedin");
+}
+
+/** Serialize a step back to stored text (channel-aware). */
+function serializeStep(s: FlowStep): string {
+  const header = s.channel === "linkedin"
+    ? `${s.day} — [li:${s.action === "linkedin_message" ? "linkedin_message" : "connection_request"}]`
+    : `${s.day} — ${s.subject}`;
+  return `${header}\n${s.body || ""}`;
 }
 
 const statusVariant: Record<string, "success" | "warning" | "default" | "blue"> = {
@@ -84,7 +96,7 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
     const next = steps.map((s, j) => (j === editIndex ? { ...draft } : s));
     setSteps(next);
     setEditIndex(null);
-    const content = next.map((s) => `${s.day} — ${s.subject}\n${s.body}`).join("\n\n---\n\n").slice(0, 5000);
+    const content = next.map(serializeStep).join("\n\n---\n\n").slice(0, 5000);
     start(async () => {
       await updateCampaign(campaign.id, { content, subject: next[0]?.subject || null });
       toast("Step updated", "success");

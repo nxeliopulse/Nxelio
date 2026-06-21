@@ -293,7 +293,9 @@ Reporting style — precise like a careful engineer:
 - Only claim what tool results confirm. If a tool errored, quote the error and say the step did NOT happen.
 - Multiple findings/actions → short bullets. Separate "Done" from "Needs approval" from "Not possible".
 - Ambiguous target (which lead?) → ask ONE precise clarifying question instead of guessing.
-- You only see this workspace's data; never invent numbers.`;
+- You only see this workspace's data; never invent numbers.
+
+Scope — IMPORTANT: You ONLY help with LeadPro and this workspace (leads, campaigns, inbox, opportunities, segments, newsletters, templates, analytics, settings). If the user asks about general knowledge, coding help, trivia, or anything unrelated to LeadPro, do NOT answer it — reply briefly: "I can only help with LeadPro — your leads, campaigns, inbox, opportunities, and analytics." Then suggest one relevant thing they could ask.`;
 
 // ---------------------------------------------------------------------------
 // Read-tool execution (auto). All queries run under the caller's session — RLS
@@ -486,12 +488,48 @@ async function chatCompletion(body: Record<string, unknown>): Promise<{ ok: true
 // ---------------------------------------------------------------------------
 // Main entry
 // ---------------------------------------------------------------------------
+// Words that mark a message as LeadPro-related. If a message has none of these
+// (and isn't a greeting/meta question), we treat it as off-topic and answer with
+// a canned reply WITHOUT calling the model — saving tokens.
+const DOMAIN_KEYWORDS = [
+  "lead", "campaign", "email", "mail", "inbox", "repl", "opportunit", "pipeline", "deal", "revenue",
+  "segment", "score", "scoring", "newsletter", "outreach", "sequence", "contact", "dashboard", "analytic",
+  "send", "sent", "bounce", "open rate", "click", "convert", "prospect", "workspace", "member",
+  "template", "capture", "blocklist", "unsubscrib", "linkedin", "brevo", "unipile", "follow up", "follow-up",
+  "stat", "hot", "warm", "cold", "import", "csv", "message", "subject", "schedul", "mailbox", "connect",
+  "user", "admin", "role", "permission", "settings", "report", "audience", "reply rate", "engage",
+];
+const META_ALLOW = [
+  /^\s*(hi|hello|hey|yo|hola|sup)\b/i,
+  /what\s+can\s+you\s+(do|help)/i,
+  /^\s*(help|menu|options)\b/i,
+  /who\s+are\s+you/i,
+  /^\s*(thanks?|thank you|ok|okay|cool|great|nice)\b/i,
+  /good\s+(morning|evening|afternoon)/i,
+];
+const OFF_TOPIC_REPLY =
+  "I can only help with LeadPro — your leads, campaigns, inbox, opportunities, and analytics. I can't answer general questions. Try asking me something like “How many hot leads do I have?” or “Create a follow-up campaign for new leads.”";
+
+function isOffTopic(history: AssistantMessage[]): boolean {
+  const lastUser = [...history].reverse().find((m) => m.role === "user");
+  const text = (lastUser?.content || "").toLowerCase().trim();
+  if (!text) return false;
+  if (META_ALLOW.some((r) => r.test(text))) return false;          // greetings / "what can you do"
+  if (DOMAIN_KEYWORDS.some((k) => text.includes(k))) return false; // mentions a LeadPro topic
+  return true;                                                     // nothing on-topic → skip the model
+}
+
 export async function runAssistant(history: AssistantMessage[]): Promise<AssistantResult> {
   if (!API_KEY) return { reply: "", actions: [], error: "AI isn't enabled on this environment. An admin needs to add the AI_API_KEY (and AI_MODEL) environment variables to the deployment, then redeploy." };
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { reply: "", actions: [], error: "Not authenticated." };
+
+  // Off-topic guard — answer without spending tokens on the model.
+  if (isOffTopic(history)) {
+    return { reply: OFF_TOPIC_REPLY, actions: [] };
+  }
 
   const trimmed = history.slice(-16);
 

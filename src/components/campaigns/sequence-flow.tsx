@@ -41,6 +41,10 @@ export interface FlowStep {
   day: string;
   subject: string;
   body?: string;
+  /** "email" (default) or "linkedin" */
+  channel?: "email" | "linkedin";
+  /** for LinkedIn: "connection_request" | "linkedin_message" */
+  action?: "email" | "connection_request" | "linkedin_message";
 }
 
 function VLine({ h = "h-5" }: { h?: string }) {

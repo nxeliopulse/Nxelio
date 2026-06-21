@@ -1,10 +1,14 @@
-import { Calendar, PartyPopper, RefreshCw, Presentation, Rocket, FlaskConical, Quote } from "lucide-react";
+import { Calendar, PartyPopper, RefreshCw, Presentation, Rocket, FlaskConical, Quote, UserPlus, Share2, Handshake } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export interface CampaignTemplateStep {
   day: string;
   subject: string;
   body: string;
+  /** "email" (default) or "linkedin" */
+  channel?: "email" | "linkedin";
+  /** for LinkedIn steps: "connection_request" | "linkedin_message" */
+  action?: "email" | "connection_request" | "linkedin_message";
 }
 
 export type TemplateCategory = "Generate leads" | "Recruit talents" | "Build connections" | "Engage with network";
@@ -130,6 +134,99 @@ export const campaignTemplates: CampaignTemplate[] = [
       { day: "Day 1", subject: "How a {{industry}} team hit [result]", body: "Hi {{firstName}},\n\nThought this might be relevant — a {{industry}} company much like {{companyName}} used us to reach [result] in [timeframe]. Here's the short story: [link].\n\nCould a similar result help your team?\n\n{{senderName}}" },
       { day: "Day 4", subject: "The exact playbook they used", body: "Hi {{firstName}},\n\nHappy to share the exact steps that team followed — it maps closely to where {{companyName}} is today.\n\nWant the breakdown on a quick call?\n\n{{senderName}}" },
       { day: "Day 8", subject: "Worth 15 minutes?", body: "Hi {{firstName}},\n\nIf hitting [result] is on your roadmap, a quick 15-minute call is the fastest way to see if we're a fit. Grab a time: [link].\n\n{{senderName}}" },
+    ],
+  },
+  {
+    id: "linkedin-connect-nurture",
+    name: "LinkedIn Connect & Nurture",
+    description: "Connect on LinkedIn, then warm up the relationship with two follow-up messages.",
+    icon: UserPlus,
+    accent: "bg-sky-50 text-sky-600",
+    goal: "Build new LinkedIn relationships with decision-makers and start a conversation.",
+    category: "Build connections",
+    channels: ["LinkedIn"],
+    steps: [
+      { day: "Day 1", channel: "linkedin", action: "connection_request", subject: "", body: "Hi {{firstName}}, I follow what {{companyName}} is doing in {{industry}} and would love to connect." },
+      { day: "Day 3", channel: "linkedin", action: "linkedin_message", subject: "", body: "Thanks for connecting, {{firstName}}! I work with {{industry}} teams on AI-assisted outreach — curious whether that's on your radar at {{companyName}}." },
+      { day: "Day 7", channel: "linkedin", action: "linkedin_message", subject: "", body: "No worries if the timing's off, {{firstName}} — if it ever helps, I'm happy to share how similar teams cut prospecting time by ~60%. Either way, glad to be connected." },
+    ],
+  },
+  {
+    id: "multichannel-outreach",
+    name: "Multichannel Outreach",
+    description: "Email + LinkedIn working together — the highest-reply combo for cold prospects.",
+    icon: Share2,
+    accent: "bg-violet-50 text-violet-600",
+    goal: "Reach cold prospects across email and LinkedIn to maximize replies and book meetings.",
+    category: "Generate leads",
+    channels: ["Email", "LinkedIn"],
+    steps: [
+      { day: "Day 1", channel: "email", action: "email", subject: "Quick question, {{firstName}}", body: "Hi {{firstName}},\n\nI noticed {{companyName}} is growing in {{industry}}. We help teams like yours book more qualified meetings with less manual work.\n\nWorth a quick look this week?\n\n{{senderName}}" },
+      { day: "Day 2", channel: "linkedin", action: "connection_request", subject: "", body: "Hi {{firstName}}, just sent you a note by email too — would love to connect here as well." },
+      { day: "Day 5", channel: "linkedin", action: "linkedin_message", subject: "", body: "Thanks for connecting, {{firstName}}! Did my email land? Happy to share a 2-minute overview of how {{industry}} teams use us." },
+      { day: "Day 9", channel: "email", action: "email", subject: "Last note from me", body: "Hi {{firstName}},\n\nI'll keep this short — if booking more meetings is a priority, just reply and I'll send a couple of times. If not, no worries at all.\n\n{{senderName}}" },
+    ],
+  },
+  {
+    id: "linkedin-recruit",
+    name: "Recruit Talent (LinkedIn)",
+    description: "Reach candidates on LinkedIn with a connection request and a role pitch.",
+    icon: Handshake,
+    accent: "bg-rose-50 text-rose-600",
+    goal: "Source and engage strong candidates on LinkedIn for an open role.",
+    category: "Recruit talents",
+    channels: ["LinkedIn"],
+    steps: [
+      { day: "Day 1", channel: "linkedin", action: "connection_request", subject: "", body: "Hi {{firstName}}, your background in {{industry}} caught my eye — I'd love to connect." },
+      { day: "Day 3", channel: "linkedin", action: "linkedin_message", subject: "", body: "Thanks for connecting, {{firstName}}! We're hiring for a role I think fits your experience at {{companyName}}. Open to hearing about it?" },
+      { day: "Day 8", channel: "linkedin", action: "linkedin_message", subject: "", body: "No pressure at all, {{firstName}} — if now isn't the right time, I'm glad to stay in touch for future openings." },
+    ],
+  },
+  {
+    id: "linkedin-first-outreach",
+    name: "LinkedIn-First Outreach",
+    description: "Open on LinkedIn, then back it up with email — connect, message, then two emails.",
+    icon: Share2,
+    accent: "bg-sky-50 text-sky-600",
+    goal: "Start the relationship on LinkedIn, then reinforce on email to book a meeting.",
+    category: "Generate leads",
+    channels: ["LinkedIn", "Email"],
+    steps: [
+      { day: "Day 1", channel: "linkedin", action: "connection_request", subject: "", body: "Hi {{firstName}}, I follow {{companyName}}'s work in {{industry}} — would love to connect." },
+      { day: "Day 3", channel: "linkedin", action: "linkedin_message", subject: "", body: "Thanks for connecting, {{firstName}}! Quick question — is improving how your team books meetings on the radar this quarter?" },
+      { day: "Day 6", channel: "email", action: "email", subject: "Following up from LinkedIn, {{firstName}}", body: "Hi {{firstName}},\n\nGreat to connect on LinkedIn. As mentioned, we help {{industry}} teams book more qualified meetings with less manual work.\n\nWorth a quick 15-minute look?\n\n{{senderName}}" },
+      { day: "Day 10", channel: "email", action: "email", subject: "Last note, {{firstName}}", body: "Hi {{firstName}},\n\nI'll keep this short — if it's useful, reply and I'll send a couple of times. If not, no worries at all.\n\n{{senderName}}" },
+    ],
+  },
+  {
+    id: "warm-intro-demo",
+    name: "Warm Intro → Demo",
+    description: "Interleaved: connect on LinkedIn, email value, LinkedIn nudge, then close on email.",
+    icon: Handshake,
+    accent: "bg-violet-50 text-violet-600",
+    goal: "Warm up a prospect across LinkedIn and email and land a demo.",
+    category: "Build connections",
+    channels: ["LinkedIn", "Email"],
+    steps: [
+      { day: "Day 1", channel: "linkedin", action: "connection_request", subject: "", body: "Hi {{firstName}}, would love to connect — I work with teams like {{companyName}} on AI-assisted outreach." },
+      { day: "Day 3", channel: "email", action: "email", subject: "A quick idea for {{companyName}}", body: "Hi {{firstName}},\n\nThanks for connecting on LinkedIn. One idea that's worked well for {{industry}} teams: [short tip]. Happy to walk you through how it applies to {{companyName}}.\n\nOpen to a quick call?\n\n{{senderName}}" },
+      { day: "Day 6", channel: "linkedin", action: "linkedin_message", subject: "", body: "Hey {{firstName}}, did my email land? Happy to keep it to 15 minutes if a demo would help." },
+      { day: "Day 10", channel: "email", action: "email", subject: "Worth 15 minutes?", body: "Hi {{firstName}},\n\nIf booking more meetings is a priority, a short demo is the fastest way to see if we fit. Grab a time: [link].\n\n{{senderName}}" },
+    ],
+  },
+  {
+    id: "reengage-linkedin",
+    name: "Re-engage on LinkedIn",
+    description: "Email went quiet? Reopen the conversation on LinkedIn with two soft messages.",
+    icon: RefreshCw,
+    accent: "bg-amber-50 text-amber-600",
+    goal: "Revive cold email leads by moving the conversation to LinkedIn.",
+    category: "Engage with network",
+    channels: ["Email", "LinkedIn"],
+    steps: [
+      { day: "Day 1", channel: "email", action: "email", subject: "Still worth exploring, {{firstName}}?", body: "Hi {{firstName}},\n\nReviving an old thread — is improving outreach at {{companyName}} still on your list? No worries if priorities shifted.\n\n{{senderName}}" },
+      { day: "Day 4", channel: "linkedin", action: "connection_request", subject: "", body: "Hi {{firstName}}, thought I'd reach out here too — would love to connect." },
+      { day: "Day 8", channel: "linkedin", action: "linkedin_message", subject: "", body: "Hey {{firstName}}, no pressure at all — if it's ever helpful, I'm happy to share how {{industry}} teams are getting more replies. Glad to be connected either way." },
     ],
   },
 ];

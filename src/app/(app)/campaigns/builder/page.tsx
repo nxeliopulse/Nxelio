@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, Save, Send, Sparkles, Mail, Plus, Clock, RefreshCw, AlertCircle,
-  Loader2, Users2, Layers3, Trash2, Filter, LayoutTemplate, Wand2, CheckCircle2, Eye,
+  Loader2, Users2, Layers3, Trash2, Filter, LayoutTemplate, Wand2, CheckCircle2, Eye, Share2,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -67,7 +67,7 @@ export default function CampaignBuilderPage() {
       setName(tpl.name);
       setPrompt(tpl.goal);
       setChosenTpl(tpl.id);
-      setSequence(tpl.steps.map((s) => ({ day: s.day, subject: s.subject, body: s.body })));
+      setSequence(tpl.steps.map((s) => ({ day: s.day, subject: s.subject, body: s.body, channel: s.channel, action: s.action })));
     }
   }, []);
 
@@ -88,7 +88,7 @@ export default function CampaignBuilderPage() {
     if (!tpl) return;
     setChosenTpl(id);
     setPrompt(tpl.goal);
-    setSequence(tpl.steps.map((s) => ({ day: s.day, subject: s.subject, body: s.body })));
+    setSequence(tpl.steps.map((s) => ({ day: s.day, subject: s.subject, body: s.body, channel: s.channel, action: s.action })));
     if (name === "Untitled Campaign") setName(tpl.name);
   }
 
@@ -131,7 +131,12 @@ export default function CampaignBuilderPage() {
           campaign_type: "Email Sequence",
           segment_id: segmentId,
           subject: sequence[0]?.subject || null,
-          content: sequence.map((s) => `${s.day} — ${s.subject}\n${s.body}`).join("\n\n---\n\n").slice(0, 5000),
+          content: sequence.map((s) => {
+            const header = (s.channel === "linkedin")
+              ? `${s.day} — [li:${s.action === "linkedin_message" ? "linkedin_message" : "connection_request"}]`
+              : `${s.day} — ${s.subject}`;
+            return `${header}\n${s.body || ""}`;
+          }).join("\n\n---\n\n").slice(0, 5000),
         });
 
         if (status === "Active" && created?.id) {
@@ -376,21 +381,53 @@ export default function CampaignBuilderPage() {
                           <span className="text-xs text-slate-400">after previous step</span>
                         </div>
                       )}
+                      {(() => {
+                        const ch = s.channel || "email";
+                        const isLi = ch === "linkedin";
+                        const setStep = (patch: Partial<typeof s>) => setSequence(sequence.map((x, j) => j === i ? { ...x, ...patch } : x));
+                        return (
                       <Card className="p-4 ml-0">
                         <div className="flex items-start gap-3">
-                          <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center flex-shrink-0 text-xs font-semibold relative z-10"><Mail className="h-4 w-4" /></div>
+                          <div className={`h-8 w-8 rounded-full text-white flex items-center justify-center flex-shrink-0 text-xs font-semibold relative z-10 ${isLi ? "bg-sky-600" : "bg-blue-600"}`}>
+                            {isLi ? <Share2 className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
                               <span className="text-xs font-semibold text-slate-500">Step {i + 1} · {s.day}</span>
-                              {sequence.length > 1 && (
-                                <button onClick={() => setSequence(sequence.filter((_, j) => j !== i))} className="text-slate-300 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {/* Channel toggle */}
+                                <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+                                  <button onClick={() => setStep({ channel: "email", action: "email" })} className={`px-2 py-0.5 text-xs rounded-md ${!isLi ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-500"}`}>Email</button>
+                                  <button onClick={() => setStep({ channel: "linkedin", action: s.action && s.action !== "email" ? s.action : "connection_request" })} className={`px-2 py-0.5 text-xs rounded-md ${isLi ? "bg-white shadow-sm text-sky-700 font-medium" : "text-slate-500"}`}>LinkedIn</button>
+                                </div>
+                                {sequence.length > 1 && (
+                                  <button onClick={() => setSequence(sequence.filter((_, j) => j !== i))} className="text-slate-300 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                                )}
+                              </div>
                             </div>
-                            <Input value={s.subject} onChange={(e) => setSequence(sequence.map((x, j) => j === i ? { ...x, subject: e.target.value } : x))} placeholder="Subject line" className="font-medium mb-2 bg-slate-50" />
-                            <Textarea value={s.body} onChange={(e) => setSequence(sequence.map((x, j) => j === i ? { ...x, body: e.target.value } : x))} rows={3} placeholder="Email body…" className="bg-slate-50 text-sm" />
+                            {isLi ? (
+                              <>
+                                <select
+                                  value={s.action === "linkedin_message" ? "linkedin_message" : "connection_request"}
+                                  onChange={(e) => setStep({ action: e.target.value as "connection_request" | "linkedin_message" })}
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm bg-slate-50 mb-2 focus:outline-none focus:ring-1 focus:ring-sky-200"
+                                >
+                                  <option value="connection_request">Connection request</option>
+                                  <option value="linkedin_message">LinkedIn message</option>
+                                </select>
+                                <Textarea value={s.body} onChange={(e) => setStep({ body: e.target.value })} rows={3} placeholder={s.action === "linkedin_message" ? "Message…" : "Note to include with the invite (optional)…"} className="bg-slate-50 text-sm" />
+                              </>
+                            ) : (
+                              <>
+                                <Input value={s.subject} onChange={(e) => setStep({ subject: e.target.value })} placeholder="Subject line" className="font-medium mb-2 bg-slate-50" />
+                                <Textarea value={s.body} onChange={(e) => setStep({ body: e.target.value })} rows={3} placeholder="Email body…" className="bg-slate-50 text-sm" />
+                              </>
+                            )}
                           </div>
                         </div>
                       </Card>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCampaignById } from "@/lib/queries/campaigns";
 import { getCurrentUserProfile } from "@/lib/queries/users";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
-import { parseCampaignSteps, sendCampaignStepToLead, scheduleCampaignFollowups, type StepLead } from "@/lib/email/campaign-scheduler";
+import { parseCampaignSteps, sendCampaignStepToLead, scheduleCampaignFollowups, AUDIENCE_COLS, type StepLead } from "@/lib/email/campaign-scheduler";
 import { revalidatePath } from "next/cache";
 
 const MAX_PER_SEND = 300;
@@ -38,23 +38,24 @@ export async function sendCampaign(campaignId: string): Promise<CampaignSendResu
     return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "This campaign has no email content yet." };
   }
 
-  // Resolve audience (segment members, or all workspace leads), email required
+  // Resolve audience (segment members, or all workspace leads). Email sequences
+  // need an email; LinkedIn-first sequences need a LinkedIn URL.
+  const reqCol = step1.channel === "linkedin" ? "linkedin" : "email";
   let leads: StepLead[] = [];
-  const cols = "id, full_name, company_name, industry, email, interest_area";
   if (campaign.segment_id) {
     const { data: members } = await supabase.from("segment_members").select("lead_id").eq("segment_id", campaign.segment_id);
     const ids = (members || []).map((m) => m.lead_id).filter(Boolean);
     if (ids.length) {
-      const { data } = await supabase.from("leads").select(cols).in("id", ids).not("email", "is", null);
-      leads = (data as StepLead[]) || [];
+      const { data } = await supabase.from("leads").select(AUDIENCE_COLS).in("id", ids).not(reqCol, "is", null);
+      leads = (data as unknown as StepLead[]) || [];
     }
   } else {
-    const { data } = await supabase.from("leads").select(cols).not("email", "is", null);
-    leads = (data as StepLead[]) || [];
+    const { data } = await supabase.from("leads").select(AUDIENCE_COLS).not(reqCol, "is", null);
+    leads = (data as unknown as StepLead[]) || [];
   }
 
   if (leads.length === 0) {
-    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "No recipients with an email address in this audience." };
+    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: `No recipients with a ${reqCol === "email" ? "email address" : "LinkedIn URL"} in this audience.` };
   }
 
   const profile = await getCurrentUserProfile().catch(() => null);
@@ -65,18 +66,15 @@ export async function sendCampaign(campaignId: string): Promise<CampaignSendResu
   const hasFollowups = steps.length > 1;
 
   for (const lead of leads.slice(0, MAX_PER_SEND)) {
-    const r = await sendCampaignStepToLead(supabase, { campaignId, workspaceId, lead, subject: step1.subject, body: step1.body, senderName });
-    if (r.ok) {
-      sent++;
-      if (r.simulated) simulated = true;
-      if (hasFollowups) {
-        await scheduleCampaignFollowups(supabase, { campaignId, workspaceId, leadId: lead.id, steps, launchMs });
-        scheduled += steps.length - 1;
-      }
-    } else if (r.skipped) {
-      skipped++;
-    } else {
-      failed++;
+    const r = await sendCampaignStepToLead(supabase, { campaignId, workspaceId, lead, subject: step1.subject, body: step1.body, senderName, channel: step1.channel, action: step1.action });
+    if (r.ok) { sent++; if (r.simulated) simulated = true; }
+    else if (r.skipped) skipped++;
+    else failed++;
+    // Schedule follow-ups regardless of step 1's outcome so one skipped step
+    // (e.g. a LinkedIn step with no connected account) never strands the sequence.
+    if (hasFollowups) {
+      await scheduleCampaignFollowups(supabase, { campaignId, workspaceId, leadId: lead.id, steps, launchMs });
+      scheduled += steps.length - 1;
     }
   }
 

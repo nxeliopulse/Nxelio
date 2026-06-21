@@ -13,6 +13,10 @@ export interface GeneratedEmail {
   day: string;
   subject: string;
   body: string;
+  /** "email" (default) or "linkedin" — for multichannel sequence steps. */
+  channel?: "email" | "linkedin";
+  /** for LinkedIn steps: "connection_request" | "linkedin_message" */
+  action?: "email" | "connection_request" | "linkedin_message";
 }
 
 export async function generateEmailSequence(goal: string, audience?: string): Promise<GeneratedEmail[]> {
