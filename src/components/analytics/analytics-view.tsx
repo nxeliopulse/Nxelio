@@ -176,10 +176,11 @@ export function AnalyticsView({ stats: initialStats }: { stats: Stats }) {
                     <span className="text-slate-700 font-medium">{s.stage}</span>
                     <span className="font-semibold text-slate-900">{s.value.toLocaleString()}</span>
                   </div>
-                  <div className="h-7 bg-slate-100 rounded-md overflow-hidden">
-                    <div className="h-full rounded-md flex items-center justify-end px-2" style={{ width: `${Math.max(pct, 5)}%`, backgroundColor: funnelColors[i % funnelColors.length] }}>
-                      <span className="text-xs font-semibold text-white">{pct.toFixed(1)}%</span>
+                  <div className="h-7 bg-slate-100 rounded-md overflow-hidden flex items-center">
+                    <div className="h-full rounded-md flex items-center justify-end px-2 flex-shrink-0" style={{ width: `${Math.max(pct, 5)}%`, backgroundColor: funnelColors[i % funnelColors.length] }}>
+                      {pct >= 12 && <span className="text-xs font-semibold text-white">{pct.toFixed(1)}%</span>}
                     </div>
+                    {pct < 12 && <span className="text-xs font-semibold text-slate-600 px-2">{pct.toFixed(1)}%</span>}
                   </div>
                   {conv && <p className="text-xs text-slate-500 mt-0.5">{conv}% from prev stage</p>}
                 </div>

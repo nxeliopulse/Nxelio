@@ -277,7 +277,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
                   <li
                     key={c.id}
                     onClick={() => handleSelect(c)}
-                    className={`p-3 cursor-pointer transition-colors ${active?.id === c.id ? "bg-blue-50" : "hover:bg-slate-50"}`}
+                    className={`p-3 cursor-pointer transition-colors ${active?.id === c.id ? "bg-blue-50 dark:bg-blue-500/15" : "hover:bg-slate-50"}`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">
@@ -405,9 +405,9 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
                     const outbound = m.direction === "outbound";
                     return (
                       <div key={m.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm border ${outbound ? "bg-blue-50 border-blue-100 rounded-tr-sm" : "bg-white border-slate-100 rounded-tl-sm"}`}>
-                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{cleanEmailText(m.body)}</p>
-                          <p className="text-xs text-slate-400 mt-1.5">{outbound ? "You" : active.lead_name} · {relativeTime(m.created_at)}</p>
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm border ${outbound ? "bg-blue-50 border-blue-100 dark:bg-blue-600 dark:border-blue-500 rounded-tr-sm" : "bg-white border-slate-100 rounded-tl-sm"}`}>
+                          <p className={`text-sm leading-relaxed whitespace-pre-wrap ${outbound ? "text-slate-700 dark:text-white" : "text-slate-700"}`}>{cleanEmailText(m.body)}</p>
+                          <p className={`text-xs mt-1.5 ${outbound ? "text-slate-400 dark:text-blue-100" : "text-slate-400"}`}>{outbound ? "You" : active.lead_name} · {relativeTime(m.created_at)}</p>
                         </div>
                       </div>
                     );

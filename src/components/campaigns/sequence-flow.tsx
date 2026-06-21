@@ -107,8 +107,8 @@ export function SequenceFlow({ steps, onStepClick }: { steps: FlowStep[]; onStep
 
   return (
     <div
-      className="w-full rounded-xl border border-slate-200 p-6 flex flex-col items-center overflow-x-auto"
-      style={{ backgroundColor: "#f8fafc", backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)", backgroundSize: "18px 18px" }}
+      className="flow-grid w-full rounded-xl border border-slate-200 p-6 flex flex-col items-center overflow-x-auto"
+      style={{ backgroundSize: "18px 18px" }}
     >
       <Terminator label="Start" />
       <VLine />

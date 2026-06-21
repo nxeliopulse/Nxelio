@@ -49,8 +49,8 @@ export function FlowCanvas({ children, height = 560 }: { children: React.ReactNo
   return (
     <div
       ref={wrapRef}
-      className="relative rounded-xl border border-slate-200 overflow-hidden select-none"
-      style={{ height, backgroundColor: "#f8fafc", backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+      className="flow-grid relative rounded-xl border border-slate-200 overflow-hidden select-none"
+      style={{ height, backgroundSize: "20px 20px" }}
     >
       <div
         className={grabbing ? "cursor-grabbing" : "cursor-grab"}
@@ -86,7 +86,7 @@ export function FlowCanvas({ children, height = 560 }: { children: React.ReactNo
       </div>
 
       {/* Zoom readout */}
-      <div className="absolute bottom-4 right-4 text-xs text-slate-400 bg-white/80 rounded px-2 py-1 border border-slate-200">{Math.round(scale * 100)}%</div>
+      <div className="absolute bottom-4 right-4 text-xs text-slate-400 bg-white/80 dark:bg-slate-800/80 rounded px-2 py-1 border border-slate-200">{Math.round(scale * 100)}%</div>
     </div>
   );
 }

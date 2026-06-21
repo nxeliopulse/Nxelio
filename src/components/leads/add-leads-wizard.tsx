@@ -404,7 +404,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
                   <button
                     key={s.id}
                     onClick={() => chooseSource(s.id)}
-                    className={`relative text-left rounded-xl border p-4 transition-all ${active ? "border-blue-500 ring-2 ring-blue-100 bg-blue-50/40" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
+                    className={`relative text-left rounded-xl border p-4 transition-all ${active ? "border-blue-500 ring-2 ring-blue-100 dark:ring-blue-500/20 bg-blue-50/40 dark:bg-blue-500/15" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
                   >
                     {s.badge && (
                       <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white rounded-full px-2 py-0.5">{s.badge}</span>
@@ -570,7 +570,7 @@ function Step2Input(props: {
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) onFile(f); }}
-              className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${dragOver ? "border-blue-400 bg-blue-50" : "border-slate-300 bg-slate-50"}`}
+              className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${dragOver ? "border-blue-400 bg-blue-50 dark:bg-blue-500/15" : "border-slate-300 bg-slate-50"}`}
             >
               <div className="h-12 w-12 mx-auto rounded-full bg-blue-50 flex items-center justify-center mb-3">
                 <Upload className="h-6 w-6 text-blue-600" />

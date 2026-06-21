@@ -34,6 +34,30 @@ const iconColor: Record<string, string> = {
   score: "bg-indigo-50 text-indigo-600",
 };
 
+/** Polished card-style tooltip shared by both dashboard charts. */
+function ChartTooltip({ active, payload, label, suffix = "" }: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number | string; color?: string }>;
+  label?: string;
+  suffix?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 px-3 py-2 shadow-lg shadow-slate-200/60 dark:shadow-black/30 backdrop-blur-sm">
+      {label && <p className="mb-1.5 text-xs font-semibold text-slate-900">{label}</p>}
+      <div className="space-y-1">
+        {payload.map((p, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+            <span className="text-slate-500">{p.name}</span>
+            <span className="ml-auto font-semibold text-slate-900">{p.value}{suffix}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function DashboardView({ stats }: { stats: DashboardStats }) {
   const router = useRouter();
   const { toast } = useFeedback();
@@ -109,23 +133,23 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
           <CardContent>
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.leadGrowth}>
+                <AreaChart data={stats.leadGrowth} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+                    <linearGradient id="gLeads" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.32} />
+                      <stop offset="85%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
+                    <linearGradient id="gHot" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.28} />
+                      <stop offset="85%" stopColor="#f59e0b" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
-                  <YAxis stroke="#94a3b8" fontSize={12} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0" }} />
-                  <Area type="monotone" dataKey="leads" stroke="#2563eb" strokeWidth={2.5} fill="url(#g1)" />
-                  <Area type="monotone" dataKey="hot" stroke="#f59e0b" strokeWidth={2.5} fill="url(#g2)" />
+                  <CartesianGrid vertical={false} stroke="#eef2f6" strokeDasharray="4 4" />
+                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} dy={8} />
+                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} width={34} allowDecimals={false} />
+                  <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#cbd5e1", strokeWidth: 1, strokeDasharray: "4 4" }} />
+                  <Area type="monotone" dataKey="leads" name="Leads" stroke="#3b82f6" strokeWidth={2.75} fill="url(#gLeads)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: "#fff" }} />
+                  <Area type="monotone" dataKey="hot" name="Hot leads" stroke="#f59e0b" strokeWidth={2.75} fill="url(#gHot)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: "#fff" }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -140,14 +164,24 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
           <CardContent>
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.campaignPerf} layout="vertical" margin={{ left: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                  <XAxis type="number" stroke="#94a3b8" fontSize={11} />
-                  <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} width={70} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0" }} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="openRate" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Open %" />
-                  <Bar dataKey="replyRate" fill="#10b981" radius={[0, 4, 4, 0]} name="Reply %" />
+                <BarChart data={stats.campaignPerf} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }} barGap={4} barCategoryGap={18}>
+                  <defs>
+                    <linearGradient id="bOpen" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#60a5fa" />
+                      <stop offset="100%" stopColor="#3b82f6" />
+                    </linearGradient>
+                    <linearGradient id="bReply" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#34d399" />
+                      <stop offset="100%" stopColor="#10b981" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid horizontal={false} stroke="#eef2f6" strokeDasharray="4 4" />
+                  <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} unit="%" />
+                  <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={76} />
+                  <Tooltip content={<ChartTooltip suffix="%" />} cursor={{ fill: "#f8fafc" }} />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} iconType="circle" iconSize={8} />
+                  <Bar dataKey="openRate" fill="url(#bOpen)" radius={[0, 6, 6, 0]} name="Open %" barSize={11} />
+                  <Bar dataKey="replyRate" fill="url(#bReply)" radius={[0, 6, 6, 0]} name="Reply %" barSize={11} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

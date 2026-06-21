@@ -462,7 +462,7 @@ export function NewsletterBuilder({ segments }: { segments: (SegmentRow & { cont
               <Users className="h-4 w-4 text-slate-400" /> Audience
             </h3>
             <div className="space-y-3 text-sm">
-              <label className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer ${data.audience_type === "all" ? "border-blue-500 bg-blue-50" : "border-slate-200"}`}>
+              <label className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer ${data.audience_type === "all" ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15" : "border-slate-200"}`}>
                 <input
                   type="radio"
                   checked={data.audience_type === "all"}
@@ -476,7 +476,7 @@ export function NewsletterBuilder({ segments }: { segments: (SegmentRow & { cont
                 </div>
               </label>
 
-              <label className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer ${data.audience_type === "segment" ? "border-blue-500 bg-blue-50" : "border-slate-200"}`}>
+              <label className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer ${data.audience_type === "segment" ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15" : "border-slate-200"}`}>
                 <input
                   type="radio"
                   checked={data.audience_type === "segment"}

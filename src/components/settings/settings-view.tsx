@@ -209,7 +209,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist }: 
                     key={opt.value}
                     onClick={() => selectTheme(opt.value)}
                     className={`text-left p-4 rounded-xl border-2 transition-colors ${
-                      theme === opt.value ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"
+                      theme === opt.value ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15" : "border-slate-200 hover:bg-slate-50"
                     }`}
                   >
                     <div className={`h-16 w-full rounded-lg border mb-3 ${opt.preview}`} />

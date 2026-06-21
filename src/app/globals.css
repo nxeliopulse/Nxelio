@@ -4,17 +4,25 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f8fafc;
+  /* Softened light theme — surfaces are a calm off-white/cool-gray instead of
+     pure #fff so the UI is easier on the eyes. Cards (bg-white, remapped below)
+     stay a step lighter than the canvas so they still lift off the page. */
+  --background: #e9edf3;
   --foreground: #0f172a;
-  --card: #ffffff;
-  --muted: #f1f5f9;
+  --card: #f5f8fc;
+  --muted: #e1e7ef;
   --muted-foreground: #64748b;
-  --border: #e2e8f0;
+  --border: #d7dde7;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
+
+  /* Dim the slate ramp that hardcoded utilities use for surfaces/hovers so the
+     whole canvas drops a notch in brightness (dark mode re-inverts these). */
+  --color-slate-50:  #e9edf3;
+  --color-slate-100: #dfe5ee;
 }
 
 /* ============================================================================
@@ -26,18 +34,19 @@
 .dark {
   color-scheme: dark;
 
-  /* semantic tokens (used by body + any bg-card/bg-background utilities) */
-  --background: #0b1120;
-  --foreground: #e2e8f0;
-  --card: #0f172a;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --border: #1e293b;
+  /* Softer, "natural" dark — a slate-blue charcoal with clear elevation tiers
+     (canvas → card → muted) instead of a near-black void. */
+  --background: #121620;      /* tier 0: page canvas / body */
+  --foreground: #e6eaf2;
+  --card: #1b212e;            /* tier 1: cards/surfaces — lifts off the canvas */
+  --muted: #242c3a;           /* tier 2: muted/hover surfaces */
+  --muted-foreground: #9aa6b8;
+  --border: #2b3444;          /* visible-but-subtle separators */
 
   /* invert the slate ramp: light shades become dark, dark shades become light */
-  --color-slate-50:  #0b1120;
-  --color-slate-100: #1e293b;
-  --color-slate-200: #334155;
+  --color-slate-50:  #121620;
+  --color-slate-100: #242c3a;
+  --color-slate-200: #313b4d;
   --color-slate-300: #475569;
   --color-slate-400: #64748b;
   --color-slate-500: #94a3b8;
@@ -49,18 +58,35 @@
 
 /* white surfaces → dark. Kept as an explicit rule (not via --color-white) so
    `text-white` on colored buttons/badges stays white. */
-.dark .bg-white { background-color: #0f172a; }
+.dark .bg-white { background-color: #1b212e; }
 
 /* slate shades used AS backgrounds must stay dark (the ramp inversion above
    would otherwise turn them light, e.g. the dark secondary button / overlays). */
 .dark .bg-slate-700 { background-color: #475569; }
-.dark .bg-slate-800 { background-color: #334155; }
-.dark .bg-slate-900 { background-color: #1e293b; }
-.dark .bg-slate-900\/40 { background-color: rgb(2 6 23 / 0.6); }
+.dark .bg-slate-800 { background-color: #313b4d; }
+.dark .bg-slate-900 { background-color: #242c3a; }
+.dark .bg-slate-900\/40 { background-color: rgb(7 10 18 / 0.6); }
+
+/* Flow/sequence canvas grid — themed via class (NOT inline style) so dark mode
+   can override it. Light = soft slate dots; dark = subtle dots on the canvas. */
+.flow-grid {
+  background-color: #f1f4f9;
+  background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+}
+.dark .flow-grid {
+  background-color: #161b26;
+  background-image: radial-gradient(circle, #2b3444 1px, transparent 1px);
+}
 
 /* dark scrollbar */
 .dark ::-webkit-scrollbar-thumb { background: #334155; }
 .dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* Light mode: soften pure-white surfaces (cards, sidebar, topbar, modals) to a
+   calm off-white so the UI isn't glaring. `text-white` is untouched (only the
+   bg utility is remapped). In dark mode `.dark .bg-white` (higher specificity)
+   still wins, so this has no effect there. */
+.bg-white { background-color: #f5f8fc; }
 
 @theme inline {
   --color-background: var(--background);

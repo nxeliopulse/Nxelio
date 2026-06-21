@@ -225,7 +225,7 @@ export function AssistantWidget({ open, onClose }: { open: boolean; onClose: () 
                   <li key={c.id} className="group flex items-center gap-1">
                     <button
                       onClick={() => loadChat(c.id)}
-                      className={`flex-1 min-w-0 text-left px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors ${c.id === chatId ? "bg-blue-50" : ""}`}
+                      className={`flex-1 min-w-0 text-left px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors ${c.id === chatId ? "bg-blue-50 dark:bg-blue-500/15" : ""}`}
                     >
                       <p className="text-sm font-medium text-slate-800 truncate">{c.title}</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">{formatRelative(c.updated_at)}</p>

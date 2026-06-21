@@ -99,7 +99,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
             className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-5"
           >
             <div className="flex items-start gap-3">
-              <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${confirmState.opts.danger ? "bg-red-50" : "bg-blue-50"}`}>
+              <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${confirmState.opts.danger ? "bg-red-50 dark:bg-red-500/15" : "bg-blue-50 dark:bg-blue-500/15"}`}>
                 <AlertTriangle className={`h-5 w-5 ${confirmState.opts.danger ? "text-red-600" : "text-blue-600"}`} />
               </div>
               <div className="flex-1 min-w-0">
