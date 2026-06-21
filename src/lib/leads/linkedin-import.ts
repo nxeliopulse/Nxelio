@@ -89,10 +89,12 @@ export async function importLinkedInLeads(opts: {
           ? await unipilePostEngagers({ accountId, postUrl: url, limit })
           : await unipileLinkedInSearch({ accountId, url, limit });
 
-      const usable = profiles.filter((p) => p.profileUrl || p.name);
+      // Every lead needs a LinkedIn URL (these have no email) — drop private
+      // "LinkedIn Member" results with no public profile so they can't break the insert.
+      const usable = profiles.filter((p) => p.profileUrl);
       if (usable.length === 0) {
-        // A working account that simply returned nothing — don't keep trying others.
-        return { ok: true, found: 0, inserted: 0, duplicates: 0, error: "No profiles returned. Check the URL is a valid LinkedIn search/post and your account has access." };
+        // A working account that simply returned nothing usable — don't keep trying others.
+        return { ok: true, found: 0, inserted: 0, duplicates: 0, error: "No public profiles to import (results were private or had no profile link). Try a different search/post." };
       }
 
       const label = opts.source === "linkedin-post" ? "LinkedIn Post" : "LinkedIn Search";

@@ -106,6 +106,9 @@ export async function bulkInsertLeads(
   let duplicates = 0;
   const rows: Array<Record<string, unknown>> = [];
   for (const l of leads) {
+    // A lead must have at least one contact (email / website / linkedin) or the DB
+    // rejects the whole batch. Drop contactless rows instead of failing the import.
+    if (!l.email && !l.website_url && !l.linkedin) continue;
     const eKey = l.email ? "e:" + norm(l.email) : null;
     const lKey = l.linkedin ? "l:" + norm(l.linkedin) : null;
     const isDup =
