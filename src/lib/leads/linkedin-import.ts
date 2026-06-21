@@ -12,6 +12,17 @@ export interface LinkedInImportResult {
   error?: string;
 }
 
+/** All of this workspace's connected LinkedIn account ids, newest first. */
+async function connectedLinkedInAccountIds(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("outreach_accounts")
+    .select("account_id")
+    .eq("channel", "linkedin")
+    .order("updated_at", { ascending: false });
+  return (data || []).map((d) => d.account_id as string).filter(Boolean);
+}
+
 /** Find this workspace's connected LinkedIn account id (via Unipile). */
 async function connectedLinkedInAccountId(): Promise<string | null> {
   const supabase = await createClient();
@@ -54,29 +65,41 @@ export async function importLinkedInLeads(opts: {
   if (!unipileConfigured) {
     return { ok: false, found: 0, inserted: 0, duplicates: 0, error: "LinkedIn (Unipile) isn't configured on this environment." };
   }
-  const accountId = await connectedLinkedInAccountId();
-  if (!accountId) {
+  const accountIds = await connectedLinkedInAccountIds();
+  if (accountIds.length === 0) {
     return { ok: false, needsConnect: true, found: 0, inserted: 0, duplicates: 0, error: "Connect your LinkedIn account first." };
   }
-  if (!opts.url.trim()) {
+  const url = opts.url.trim();
+  if (!url) {
     return { ok: false, found: 0, inserted: 0, duplicates: 0, error: "Paste a LinkedIn URL." };
   }
 
-  try {
-    const { profiles } =
-      opts.source === "linkedin-post"
-        ? await unipilePostEngagers({ accountId, postUrl: opts.url.trim(), limit: opts.limit ?? 50 })
-        : await unipileLinkedInSearch({ accountId, url: opts.url.trim(), limit: opts.limit ?? 50 });
+  // Try each connected account in turn — a dead/expired one ("account not found")
+  // is skipped so a stale connection never breaks the import.
+  const limit = opts.limit ?? 50;
+  let lastError = "";
+  for (const accountId of accountIds) {
+    try {
+      const { profiles } =
+        opts.source === "linkedin-post"
+          ? await unipilePostEngagers({ accountId, postUrl: url, limit })
+          : await unipileLinkedInSearch({ accountId, url, limit });
 
-    const usable = profiles.filter((p) => p.profileUrl || p.name);
-    if (usable.length === 0) {
-      return { ok: true, found: 0, inserted: 0, duplicates: 0, error: "No profiles returned. Check the URL is a valid LinkedIn search/post and your account has access." };
+      const usable = profiles.filter((p) => p.profileUrl || p.name);
+      if (usable.length === 0) {
+        // A working account that simply returned nothing — don't keep trying others.
+        return { ok: true, found: 0, inserted: 0, duplicates: 0, error: "No profiles returned. Check the URL is a valid LinkedIn search/post and your account has access." };
+      }
+
+      const label = opts.source === "linkedin-post" ? "LinkedIn Post" : "LinkedIn Search";
+      const res = await bulkInsertLeads(usable.map((p) => toLead(p, label)), { defaultSource: label });
+      return { ok: !res.error, found: usable.length, inserted: res.inserted, duplicates: res.duplicates, error: res.error };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : "LinkedIn import failed";
+      // "account not found" / auth errors → try the next connected account.
+      if (/not found|unauthor|credential|disconnect|session/i.test(lastError)) continue;
+      return { ok: false, found: 0, inserted: 0, duplicates: 0, error: lastError };
     }
-
-    const label = opts.source === "linkedin-post" ? "LinkedIn Post" : "LinkedIn Search";
-    const res = await bulkInsertLeads(usable.map((p) => toLead(p, label)), { defaultSource: label });
-    return { ok: !res.error, found: usable.length, inserted: res.inserted, duplicates: res.duplicates, error: res.error };
-  } catch (err) {
-    return { ok: false, found: 0, inserted: 0, duplicates: 0, error: err instanceof Error ? err.message : "LinkedIn import failed" };
   }
+  return { ok: false, found: 0, inserted: 0, duplicates: 0, error: lastError || "All connected LinkedIn accounts failed. Reconnect one in Connections." };
 }

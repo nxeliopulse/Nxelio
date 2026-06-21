@@ -99,6 +99,18 @@ export async function syncOutreachAccounts(): Promise<{ ok: boolean; count: numb
       });
       if (!error) count++;
     }
+
+    // Prune local accounts that no longer exist in Unipile (deleted/expired) so dead
+    // accounts can't be picked for sending. RLS scopes the delete to this workspace.
+    const liveIds = accounts.map((a) => a.id).filter(Boolean);
+    if (liveIds.length) {
+      await supabase
+        .from("outreach_accounts")
+        .delete()
+        .eq("provider", "unipile")
+        .not("account_id", "in", `(${liveIds.join(",")})`);
+    }
+
     revalidatePath("/outreach");
     revalidatePath("/campaigns");
     return { ok: true, count };

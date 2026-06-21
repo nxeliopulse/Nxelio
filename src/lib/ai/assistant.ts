@@ -507,16 +507,32 @@ const META_ALLOW = [
   /^\s*(thanks?|thank you|ok|okay|cool|great|nice)\b/i,
   /good\s+(morning|evening|afternoon)/i,
 ];
+// Action verbs that signal an app command — these always go to the model, even if
+// the noun is misspelled ("delete all the campigns").
+const ACTION_VERBS = /\b(create|add|delete|remove|send|update|edit|change|rename|mark|move|convert|draft|write|compose|schedul|launch|pause|resume|stop|start|score|enrich|import|export|show|list|find|get|fetch|count|search|set|assign|reply|how\s+many|how\s+much)\b/i;
+// Clear general-knowledge / off-topic patterns — only these short-circuit the model.
+const OFF_TOPIC_PATTERNS = [
+  /\b(capital of|weather|temperature|recipe|poem|joke|lyrics|population of|translate|president|prime minister|who\s+(is|was|won)|what year|distance between|meaning of|how to (cook|bake|make a)|movie|football|cricket|stock price|bitcoin|crypto|horoscope|news today|define\b)\b/i,
+  /^\s*\d+\s*[-+*/x]\s*\d+\s*=?\s*$/, // bare arithmetic
+];
 const OFF_TOPIC_REPLY =
   "I can only help with LeadPro — your leads, campaigns, inbox, opportunities, and analytics. I can't answer general questions. Try asking me something like “How many hot leads do I have?” or “Create a follow-up campaign for new leads.”";
 
+/**
+ * Token-saving guard. Lenient by design: anything that looks like an app command
+ * (a LeadPro keyword OR an action verb) goes to the model. Only messages that
+ * clearly match general-knowledge patterns — with no app signal — are answered
+ * with the canned reply. The system prompt is the real backstop for the rest.
+ */
 function isOffTopic(history: AssistantMessage[]): boolean {
   const lastUser = [...history].reverse().find((m) => m.role === "user");
   const text = (lastUser?.content || "").toLowerCase().trim();
   if (!text) return false;
   if (META_ALLOW.some((r) => r.test(text))) return false;          // greetings / "what can you do"
   if (DOMAIN_KEYWORDS.some((k) => text.includes(k))) return false; // mentions a LeadPro topic
-  return true;                                                     // nothing on-topic → skip the model
+  if (ACTION_VERBS.test(text)) return false;                       // an app command (handles typos like "campigns")
+  if (OFF_TOPIC_PATTERNS.some((r) => r.test(text))) return true;   // clearly general knowledge → skip the model
+  return false;                                                    // unsure → let the model (+ system prompt) decide
 }
 
 export async function runAssistant(history: AssistantMessage[]): Promise<AssistantResult> {
