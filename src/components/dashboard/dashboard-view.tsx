@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { Users2, Flame, MailOpen, Target, FileDown, Mouse, Calendar, Reply, BarChart3, MoreHorizontal, Download, Plus, DollarSign, Trophy, TrendingUp, ArrowRight } from "lucide-react";
+import { Users2, Flame, MailOpen, Target, FileDown, Mouse, Calendar, Reply, BarChart3, MoreHorizontal, Download, Plus } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -48,9 +48,6 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
     lines.push(`Emails sent,${stats.snapshot.emailsSent}`);
     lines.push(`Replies received,${stats.snapshot.repliesReceived}`);
     lines.push(`AI scored,${stats.snapshot.aiScored}`);
-    lines.push(`Open pipeline value,${Math.round(stats.pipeline.openValue)}`);
-    lines.push(`Won revenue,${Math.round(stats.pipeline.wonValue)}`);
-    lines.push(`Win rate,${stats.pipeline.winRate}%`);
     lines.push("");
     lines.push("Month,Leads,Hot leads");
     for (const m of stats.leadGrowth) lines.push(`${csvCell(m.date)},${m.leads},${m.hot}`);
@@ -95,41 +92,6 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
         <KpiCard label="Avg. Open Rate" value={`${stats.avgOpenRate}%`} icon={<MailOpen className="h-4.5 w-4.5" />} accent="emerald" />
         <KpiCard label="Conversion Rate" value={`${stats.conversionRate}%`} icon={<Target className="h-4.5 w-4.5" />} accent="purple" />
       </div>
-
-      {/* Revenue pipeline strip */}
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-emerald-600" />
-            <CardTitle className="text-sm">Revenue Pipeline</CardTitle>
-          </div>
-          <button onClick={() => router.push("/opportunities")} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700">
-            View pipeline <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-slate-100">
-          <div className="p-4">
-            <div className="flex items-center gap-2 text-slate-500 text-xs"><DollarSign className="h-3.5 w-3.5" /> Open pipeline</div>
-            <p className="text-xl font-bold text-slate-900 mt-1">${Math.round(stats.pipeline.openValue).toLocaleString()}</p>
-            <p className="text-xs text-slate-400">{stats.pipeline.openCount} open deal{stats.pipeline.openCount === 1 ? "" : "s"}</p>
-          </div>
-          <div className="p-4">
-            <div className="flex items-center gap-2 text-slate-500 text-xs"><Trophy className="h-3.5 w-3.5" /> Won revenue</div>
-            <p className="text-xl font-bold text-emerald-600 mt-1">${Math.round(stats.pipeline.wonValue).toLocaleString()}</p>
-            <p className="text-xs text-slate-400">{stats.pipeline.wonCount} won</p>
-          </div>
-          <div className="p-4">
-            <div className="flex items-center gap-2 text-slate-500 text-xs"><TrendingUp className="h-3.5 w-3.5" /> Win rate</div>
-            <p className="text-xl font-bold text-slate-900 mt-1">{stats.pipeline.winRate}%</p>
-            <p className="text-xs text-slate-400">of closed deals</p>
-          </div>
-          <div className="p-4">
-            <div className="flex items-center gap-2 text-slate-500 text-xs"><Target className="h-3.5 w-3.5" /> Total deals</div>
-            <p className="text-xl font-bold text-slate-900 mt-1">{stats.pipeline.openCount + stats.pipeline.wonCount}</p>
-            <p className="text-xs text-slate-400">active + won</p>
-          </div>
-        </div>
-      </Card>
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

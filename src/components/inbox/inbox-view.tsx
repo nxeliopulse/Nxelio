@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Forward, Archive, Star, Send, Paperclip, MoreHorizontal, Tag, X } from "lucide-react";
+import { Search, Filter, Forward, Star, Send, Paperclip, MoreHorizontal, Tag, X, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
-import { markRead, markUnread, sendReply, getInboxThread, type InboxConversation, type InboxMessage } from "@/lib/queries/inbox";
+import { markRead, markUnread, sendReply, getInboxThread, deleteInboxConversation, type InboxConversation, type InboxMessage } from "@/lib/queries/inbox";
 import { addBlocklistEntry } from "@/lib/queries/blocklist";
 import { getEmailTemplates, type EmailTemplateRow } from "@/lib/queries/templates";
 
@@ -49,10 +49,9 @@ function relativeTime(iso: string): string {
 
 export function InboxView({ conversations }: { conversations: InboxConversation[] }) {
   const router = useRouter();
-  const { toast } = useFeedback();
+  const { toast, confirm } = useFeedback();
   const [pending, start] = useTransition();
-  const [archived, setArchived] = useState<Set<string>>(new Set());
-  const visible = conversations.filter((c) => !archived.has(c.id));
+  const visible = conversations;
   const [active, setActive] = useState<InboxConversation | null>(visible[0] || null);
   const [thread, setThread] = useState<InboxMessage[]>([]);
   const [reply, setReply] = useState("");
@@ -166,16 +165,23 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
     });
   }
 
-  function handleArchive() {
-    if (!active) return;
-    const activeId = active.id;
-    const remaining = visible.filter((c) => c.id !== activeId);
-    setArchived((prev) => {
-      const next = new Set(prev);
-      next.add(activeId);
-      return next;
+  async function handleDeleteConversation() {
+    if (!active?.lead_id) return;
+    const ok = await confirm({
+      title: "Delete conversation?",
+      message: `Permanently delete all messages with ${active.lead_name}? This can't be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
     });
-    setActive(remaining[0] || null);
+    if (!ok) return;
+    const leadId = active.lead_id;
+    setActive(visible.filter((c) => c.lead_id !== leadId)[0] || null);
+    setThread([]);
+    start(async () => {
+      await deleteInboxConversation(leadId);
+      toast("Conversation deleted", "success");
+      router.refresh();
+    });
   }
 
   function handleMarkUnread() {
@@ -342,8 +348,8 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
                     )}
                   </div>
 
-                  <Button variant="ghost" size="icon" onClick={handleArchive} aria-label="Archive">
-                    <Archive className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={handleDeleteConversation} aria-label="Delete conversation" className="hover:text-red-600">
+                    <Trash2 className="h-4 w-4" />
                   </Button>
 
                   <div className="relative" ref={morePopoverRef}>

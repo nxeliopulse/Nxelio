@@ -94,6 +94,14 @@ export async function markUnread(id: string) {
   revalidatePath("/inbox");
 }
 
+/** Permanently deletes one lead's whole conversation (all their inbox messages). */
+export async function deleteInboxConversation(leadId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("inbox_messages").delete().eq("lead_id", leadId);
+  if (error) throw error;
+  revalidatePath("/inbox");
+}
+
 export async function sendReply(
   leadId: string,
   subject: string,
