@@ -1,6 +1,6 @@
 "use server";
 import { aiChat, aiJson, aiConfigured } from "./client";
-import { getLeadById } from "@/lib/queries/leads";
+import { getLeadById, updateLead } from "@/lib/queries/leads";
 
 export async function isAiConfigured() {
   return aiConfigured;
@@ -84,7 +84,17 @@ Return JSON in exactly this shape (all scores 0-100 integers):
   ]
 }`;
 
-  return aiJson<AiScoreResult>({ system, prompt, temperature: 0.5 });
+  const result = await aiJson<AiScoreResult>({ system, prompt, temperature: 0.5 });
+
+  // Persist the score so it actually sticks on the lead (previously the AI score
+  // was only shown on screen and never saved, leaving lead_score stuck at 0 —
+  // which made "Lead Score" segment rules and dashboard "AI scored" useless).
+  const score = Math.max(0, Math.min(100, Math.round(result.overallScore)));
+  if (Number.isFinite(score)) {
+    await updateLead(leadId, { lead_score: score });
+  }
+
+  return result;
 }
 
 // ============================================================================
