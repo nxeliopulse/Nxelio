@@ -29,6 +29,9 @@ export function NewslettersView({ newsletters, stats }: Props) {
   const [search, setSearch] = useState("");
   const [pending, start] = useTransition();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  // Fixed (viewport-relative) menu position so the dropdown isn't clipped by the
+  // card's overflow-hidden / the table's horizontal scroll container.
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
 
   const filtered = newsletters.filter(
     (n) => !search || n.title.toLowerCase().includes(search.toLowerCase()) || (n.subject || "").toLowerCase().includes(search.toLowerCase())
@@ -139,15 +142,20 @@ export function NewslettersView({ newsletters, stats }: Props) {
                       <td className="px-4 py-3 text-slate-500">{n.sent_at ? formatDate(n.sent_at) : "—"}</td>
                       <td className="px-4 py-3 relative">
                         <button
-                          onClick={() => setMenuOpen(menuOpen === n.id ? null : n.id)}
+                          onClick={(e) => {
+                            if (menuOpen === n.id) { setMenuOpen(null); return; }
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setMenuPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+                            setMenuOpen(n.id);
+                          }}
                           className="p-1.5 rounded-md hover:bg-slate-100"
                         >
                           <MoreHorizontal className="h-4 w-4 text-slate-400" />
                         </button>
-                        {menuOpen === n.id && (
+                        {menuOpen === n.id && menuPos && (
                           <>
-                            <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(null)} />
-                            <div className="absolute right-2 top-10 z-30 w-44 bg-white rounded-lg border border-slate-200 shadow-lg overflow-hidden">
+                            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(null)} />
+                            <div className="fixed z-50 w-44 bg-white rounded-lg border border-slate-200 shadow-lg overflow-hidden" style={{ top: menuPos.top, right: menuPos.right }}>
                               <Link
                                 href={`/newsletters/builder?id=${n.id}`}
                                 className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"

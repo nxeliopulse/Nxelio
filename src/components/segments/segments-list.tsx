@@ -62,6 +62,9 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  // Fixed (viewport-relative) menu position so the dropdown isn't clipped by the
+  // card's overflow-hidden / the table's horizontal scroll container.
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignRep, setAssignRep] = useState(SALES_REPS[0]);
   const [tagsOpen, setTagsOpen] = useState(false);
@@ -245,15 +248,20 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                         <Trash2 className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => setMenuOpenId(menuOpenId === s.id ? null : s.id)}
+                        onClick={(e) => {
+                          if (menuOpenId === s.id) { setMenuOpenId(null); return; }
+                          const r = e.currentTarget.getBoundingClientRect();
+                          setMenuPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+                          setMenuOpenId(s.id);
+                        }}
                         className="p-1.5 rounded-md hover:bg-slate-100"
                       >
                         <MoreHorizontal className="h-4 w-4 text-slate-400" />
                       </button>
-                      {menuOpenId === s.id && (
+                      {menuOpenId === s.id && menuPos && (
                         <>
-                          <div className="fixed inset-0 z-10" onClick={() => setMenuOpenId(null)} />
-                          <div className="absolute right-0 top-full mt-1 z-20 w-44 bg-white rounded-lg shadow-lg border border-slate-100 py-1 text-left">
+                          <div className="fixed inset-0 z-40" onClick={() => setMenuOpenId(null)} />
+                          <div className="fixed z-50 w-44 bg-white rounded-lg shadow-lg border border-slate-100 py-1 text-left" style={{ top: menuPos.top, right: menuPos.right }}>
                             <Link
                               href={`/segments/builder?id=${s.id}`}
                               onClick={() => setMenuOpenId(null)}
