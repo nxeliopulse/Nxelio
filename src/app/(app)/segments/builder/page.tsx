@@ -7,7 +7,7 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { createSegment, previewSegmentCount } from "@/lib/queries/segments";
+import { createSegment, updateSegment, getSegmentWithRules, previewSegmentCount } from "@/lib/queries/segments";
 import { SEGMENT_FIELDS, operatorsForField, fieldType, isRuleComplete } from "@/lib/segments";
 
 interface Rule {
@@ -17,9 +17,22 @@ interface Rule {
   value: string;
 }
 
+// Old segments stored display labels / spaced operators — map them to the
+// canonical keys the evaluator and dropdowns use so editing them works.
+const FIELD_ALIAS: Record<string, string> = {
+  Industry: "industry", "Interest Area": "interest_area", "Lead Score": "lead_score", Status: "status", Source: "source",
+};
+const OP_ALIAS: Record<string, string> = {
+  "not equals": "not_equals", "greater than": "gt", "less than": "lt", greater_than: "gt", less_than: "lt",
+};
+const normField = (f: string) => FIELD_ALIAS[f] || f;
+const normOp = (o: string) => OP_ALIAS[o] || o;
+
 export default function SegmentBuilderPage() {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [editId, setEditId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [name, setName] = useState("High Intent Tech Leads");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("Dynamic");
@@ -33,6 +46,41 @@ export default function SegmentBuilderPage() {
   // Live preview count — real query against leads, debounced as rules change.
   const [count, setCount] = useState<number | null>(null);
   const [counting, setCounting] = useState(false);
+
+  // Load an existing segment when opened via ?id= (Edit) so the form shows its
+  // real rules instead of the default template.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("id");
+    if (!id) return;
+    (async () => {
+      await Promise.resolve();
+      setLoading(true);
+      setEditId(id);
+      try {
+        const { segment, rules: saved } = await getSegmentWithRules(id);
+        if (segment) {
+          setName(segment.segment_name);
+          setDescription(segment.description || "");
+          setType(segment.segment_type || "Dynamic");
+          setLogic(segment.logic_type === "OR" ? "OR" : "AND");
+        }
+        setRules(
+          (saved && saved.length)
+            ? saved.map((r: { id: string; field: string; operator: string; value: string | null }, i: number) => ({
+                id: String(r.id ?? i),
+                field: normField(r.field),
+                operator: normOp(r.operator),
+                value: r.value ?? "",
+              }))
+            : []
+        );
+      } catch {
+        setError("Could not load this segment.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const ready = rules.filter(isRuleComplete);
@@ -73,15 +121,13 @@ export default function SegmentBuilderPage() {
     setError(null);
     if (!name.trim()) { setError("Segment name is required"); return; }
     if (!rules.filter(isRuleComplete).length) { setError("Add at least one complete rule (field, operator and value)."); return; }
+    const payloadRules = rules
+      .filter(isRuleComplete)
+      .map((r, i) => ({ field: r.field, operator: r.operator, value: r.value, rule_order: i }));
     start(async () => {
       try {
-        await createSegment(
-          name.trim(),
-          description,
-          type,
-          rules.filter(isRuleComplete).map((r, i) => ({ field: r.field, operator: r.operator, value: r.value, rule_order: i })),
-          logic
-        );
+        if (editId) await updateSegment(editId, name.trim(), description, type, payloadRules, logic);
+        else await createSegment(name.trim(), description, type, payloadRules, logic);
         router.push("/segments");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to save");
@@ -102,10 +148,10 @@ export default function SegmentBuilderPage() {
             onChange={(e) => setName(e.target.value)}
             className="text-2xl font-bold border-transparent bg-transparent !h-auto px-0 hover:bg-slate-50 focus:bg-white focus:px-3 transition-all w-fit min-w-[300px]"
           />
-          <p className="text-sm text-slate-500 mt-1">Define rules to dynamically group matching leads</p>
+          <p className="text-sm text-slate-500 mt-1">{editId ? "Editing an existing segment" : "Define rules to dynamically group matching leads"}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleSave} disabled={pending}><Save className="h-4 w-4" /> {pending ? "Saving..." : "Save segment"}</Button>
+          <Button onClick={handleSave} disabled={pending || loading}><Save className="h-4 w-4" /> {pending ? "Saving..." : editId ? "Update segment" : "Save segment"}</Button>
         </div>
       </div>
 
@@ -134,30 +180,36 @@ export default function SegmentBuilderPage() {
               <span className="text-sm text-slate-500">of the following match</span>
             </div>
 
-            <div className="space-y-2.5">
-              {rules.map((r, i) => {
-                const f = SEGMENT_FIELDS.find((sf) => sf.key === r.field);
-                return (
-                  <div key={r.id} className="flex items-center gap-2 group">
-                    <div className="w-10 text-xs font-semibold text-slate-400 text-right">{i === 0 ? "WHERE" : logic}</div>
-                    <Select className="max-w-[180px]" value={r.field} onChange={(e) => changeField(r.id, e.target.value)}>
-                      {SEGMENT_FIELDS.map((sf) => <option key={sf.key} value={sf.key}>{sf.label}</option>)}
-                    </Select>
-                    <Select className="max-w-[160px]" value={r.operator} onChange={(e) => updateRule(r.id, { operator: e.target.value })}>
-                      {operatorsForField(r.field).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-                    </Select>
-                    <Input
-                      type={fieldType(r.field) === "number" ? "number" : "text"}
-                      value={r.value}
-                      onChange={(e) => updateRule(r.id, { value: e.target.value })}
-                      placeholder={f?.hint || "Value..."}
-                      className="flex-1"
-                    />
-                    <button onClick={() => removeRule(r.id)} className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50"><X className="h-4 w-4" /></button>
-                  </div>
-                );
-              })}
-            </div>
+            {loading ? (
+              <p className="text-sm text-slate-500 py-4">Loading segment…</p>
+            ) : rules.length === 0 ? (
+              <p className="text-sm text-slate-500 py-4">No rules yet — add a condition below.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {rules.map((r, i) => {
+                  const f = SEGMENT_FIELDS.find((sf) => sf.key === r.field);
+                  return (
+                    <div key={r.id} className="flex items-center gap-2 group">
+                      <div className="w-10 text-xs font-semibold text-slate-400 text-right">{i === 0 ? "WHERE" : logic}</div>
+                      <Select className="max-w-[180px]" value={r.field} onChange={(e) => changeField(r.id, e.target.value)}>
+                        {SEGMENT_FIELDS.map((sf) => <option key={sf.key} value={sf.key}>{sf.label}</option>)}
+                      </Select>
+                      <Select className="max-w-[160px]" value={r.operator} onChange={(e) => updateRule(r.id, { operator: e.target.value })}>
+                        {operatorsForField(r.field).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                      </Select>
+                      <Input
+                        type={fieldType(r.field) === "number" ? "number" : "text"}
+                        value={r.value}
+                        onChange={(e) => updateRule(r.id, { value: e.target.value })}
+                        placeholder={f?.hint || "Value..."}
+                        className="flex-1"
+                      />
+                      <button onClick={() => removeRule(r.id)} className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50"><X className="h-4 w-4" /></button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100">
               <Button variant="outline" size="sm" onClick={addRule}><Plus className="h-3.5 w-3.5" /> Add condition</Button>

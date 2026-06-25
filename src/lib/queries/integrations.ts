@@ -48,8 +48,10 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatus[]> {
 }
 
 export async function getEmailDomainStatus() {
+  const { emailProvider, emailDomainVerified, emailFromAddress } = await import("@/lib/email/resend");
   return {
-    verified: process.env.EMAIL_DOMAIN_VERIFIED === "true",
-    from: process.env.EMAIL_FROM || "—",
+    provider: emailProvider, // "brevo" | "resend" | "none"
+    verified: emailDomainVerified, // Brevo configured, or Resend domain verified
+    from: emailFromAddress || process.env.EMAIL_FROM || "—",
   };
 }

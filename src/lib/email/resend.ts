@@ -33,6 +33,12 @@ const resendConfigured = Boolean(RESEND_KEY);
 export const emailConfigured = brevoConfigured || resendConfigured;
 /** Brevo's single-sender verification reaches real recipients without a domain. */
 export const emailDomainVerified = brevoConfigured || DOMAIN_VERIFIED;
+/** Which provider sends in practice (Brevo wins when configured). */
+export const emailProvider: "brevo" | "resend" | "none" =
+  brevoConfigured ? "brevo" : resendConfigured ? "resend" : "none";
+/** The verified "from" address real recipients will see. */
+export const emailFromAddress: string | null =
+  brevoConfigured ? BREVO_FROM_EMAIL! : resendConfigured ? RESEND_FROM : null;
 
 export interface SendResult {
   ok: boolean;

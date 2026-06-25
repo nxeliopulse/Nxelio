@@ -88,6 +88,33 @@ export async function createSegment(
   return segment;
 }
 
+/** Updates an existing segment's name/rules/logic and re-evaluates its members. */
+export async function updateSegment(
+  id: string,
+  name: string,
+  description: string,
+  type: string,
+  rules: Omit<SegmentRule, "id" | "segment_id">[],
+  logic: "AND" | "OR" = "AND"
+) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("segments")
+    .update({ segment_name: name, description, segment_type: type, logic_type: logic })
+    .eq("id", id);
+  if (error) throw error;
+
+  // Replace the rule set wholesale, then recompute membership.
+  await supabase.from("segment_rules").delete().eq("segment_id", id);
+  if (rules.length > 0) {
+    await supabase.from("segment_rules").insert(rules.map((r) => ({ segment_id: id, ...r })));
+  }
+  await materializeSegmentMembers(id);
+
+  revalidatePath("/segments");
+  return { id };
+}
+
 /**
  * Counts how many leads a draft rule set would match — used by the builder's
  * live preview (replaces the old Math.random() placeholder). Does not persist.
