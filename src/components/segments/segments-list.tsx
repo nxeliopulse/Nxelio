@@ -25,11 +25,12 @@ import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { useFeedback } from "@/components/ui/feedback";
-import { deleteSegment, exportSegmentCsv, type SegmentRow } from "@/lib/queries/segments";
+import { deleteSegment, exportSegmentCsv, refreshSegment, type SegmentRow } from "@/lib/queries/segments";
 import { formatDate } from "@/lib/utils";
 
 const typeColor: Record<string, "blue" | "purple" | "pink"> = {
   Dynamic: "blue",
+  Static: "purple",
   Behavioral: "purple",
   Engagement: "pink",
 };
@@ -85,6 +86,14 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
   async function exportOne(id: string) {
     const { filename, csv } = await exportSegmentCsv(id);
     downloadCsv(filename, csv);
+  }
+
+  function handleRefresh(id: string, name: string) {
+    start(async () => {
+      const n = await refreshSegment(id);
+      toast(`"${name}" refreshed — ${n.toLocaleString()} matching lead${n === 1 ? "" : "s"}`, "success");
+      router.refresh();
+    });
   }
 
   async function handleExportSelected() {
@@ -252,6 +261,16 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                             >
                               <Pencil className="h-3.5 w-3.5" /> Edit
                             </Link>
+                            <button
+                              onClick={() => {
+                                setMenuOpenId(null);
+                                handleRefresh(s.id, s.segment_name);
+                              }}
+                              disabled={pending}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" /> Refresh members
+                            </button>
                             <button
                               onClick={() => {
                                 toast(`Duplicated "${s.segment_name}" (cosmetic)`, "info");

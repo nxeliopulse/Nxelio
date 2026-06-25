@@ -1,6 +1,10 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { leadMatches, isRuleComplete, type EvalRule } from "@/lib/segments";
+
+// Only the columns a rule can match — keeps the membership scan lightweight.
+const LEAD_MATCH_FIELDS = "id, industry, interest_area, source, status, lead_score";
 
 export interface SegmentRow {
   id: string;
@@ -55,11 +59,17 @@ export async function getSegmentWithRules(id: string) {
   return { segment, rules: rules || [] };
 }
 
-export async function createSegment(name: string, description: string, type: string, rules: Omit<SegmentRule, "id" | "segment_id">[]) {
+export async function createSegment(
+  name: string,
+  description: string,
+  type: string,
+  rules: Omit<SegmentRule, "id" | "segment_id">[],
+  logic: "AND" | "OR" = "AND"
+) {
   const supabase = await createClient();
   const { data: segment, error } = await supabase
     .from("segments")
-    .insert({ segment_name: name, description, segment_type: type, status: "Active" })
+    .insert({ segment_name: name, description, segment_type: type, status: "Active", logic_type: logic })
     .select()
     .single();
   if (error) throw error;
@@ -70,8 +80,62 @@ export async function createSegment(name: string, description: string, type: str
     );
   }
 
+  // Evaluate the rules now so the segment actually has members (was previously
+  // never populated, leaving every segment empty).
+  await materializeSegmentMembers(segment.id);
+
   revalidatePath("/segments");
   return segment;
+}
+
+/**
+ * Counts how many leads a draft rule set would match — used by the builder's
+ * live preview (replaces the old Math.random() placeholder). Does not persist.
+ */
+export async function previewSegmentCount(rules: EvalRule[], logic: "AND" | "OR"): Promise<number> {
+  if (!rules.filter(isRuleComplete).length) return 0;
+  const supabase = await createClient();
+  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
+  if (!leads) return 0;
+  return leads.filter((l) => leadMatches(l as Record<string, unknown>, rules, logic)).length;
+}
+
+/**
+ * Recomputes a segment's membership from its stored rules: matches every lead in
+ * the workspace and rewrites segment_members. Returns the new member count.
+ */
+export async function materializeSegmentMembers(segmentId: string): Promise<number> {
+  const supabase = await createClient();
+
+  const { data: segment } = await supabase.from("segments").select("logic_type").eq("id", segmentId).single();
+  const logic: "AND" | "OR" = segment?.logic_type === "OR" ? "OR" : "AND";
+
+  const { data: rules } = await supabase
+    .from("segment_rules")
+    .select("field, operator, value")
+    .eq("segment_id", segmentId);
+  const active = (rules || []).filter((r) => isRuleComplete(r as EvalRule)) as EvalRule[];
+
+  // Always start clean so removed/edited rules don't leave stale members behind.
+  await supabase.from("segment_members").delete().eq("segment_id", segmentId);
+  if (!active.length) return 0;
+
+  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
+  const matchIds = (leads || [])
+    .filter((l) => leadMatches(l as Record<string, unknown>, active, logic))
+    .map((l) => (l as { id: string }).id);
+
+  if (matchIds.length) {
+    await supabase.from("segment_members").insert(matchIds.map((lead_id) => ({ segment_id: segmentId, lead_id })));
+  }
+  return matchIds.length;
+}
+
+/** Re-evaluates a dynamic segment on demand (the list's Refresh action). */
+export async function refreshSegment(segmentId: string): Promise<number> {
+  const n = await materializeSegmentMembers(segmentId);
+  revalidatePath("/segments");
+  return n;
 }
 
 export async function deleteSegment(id: string) {
