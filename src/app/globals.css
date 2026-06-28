@@ -7,22 +7,50 @@
   /* Softened light theme — surfaces are a calm off-white/cool-gray instead of
      pure #fff so the UI is easier on the eyes. Cards (bg-white, remapped below)
      stay a step lighter than the canvas so they still lift off the page. */
-  --background: #e9edf3;
+  --background: #f0f2f8;
   --foreground: #0f172a;
-  --card: #f5f8fc;
-  --muted: #e1e7ef;
+  --card: #ffffff;
+  --muted: #e8eaf2;
   --muted-foreground: #64748b;
-  --border: #d7dde7;
-  --primary: #2563eb;
+  --border: #e2e5f0;
+  --primary: #7c3aed;
   --primary-foreground: #ffffff;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
 
-  /* Dim the slate ramp that hardcoded utilities use for surfaces/hovers so the
-     whole canvas drops a notch in brightness (dark mode re-inverts these). */
-  --color-slate-50:  #e9edf3;
-  --color-slate-100: #dfe5ee;
+  /* Slightly purple-tinted slate ramp for the new violet theme */
+  --color-slate-50:  #f0f2f8;
+  --color-slate-100: #e8eaf2;
+
+  /* ----------------------------------------------------------------------
+     Theme recolor — remap the entire `blue` utility scale to violet and the
+     `indigo` scale to purple. Tailwind v4 utilities (bg-blue-600, text-blue-500,
+     from-indigo-600, …) resolve these CSS vars, so redefining them here turns
+     EVERY blue/indigo accent across all screens violet/purple at once — no
+     per-page edits needed.
+     ---------------------------------------------------------------------- */
+  --color-blue-50:  #f5f3ff;
+  --color-blue-100: #ede9fe;
+  --color-blue-200: #ddd6fe;
+  --color-blue-300: #c4b5fd;
+  --color-blue-400: #a78bfa;
+  --color-blue-500: #8b5cf6;
+  --color-blue-600: #7c3aed;
+  --color-blue-700: #6d28d9;
+  --color-blue-800: #5b21b6;
+  --color-blue-900: #4c1d95;
+
+  --color-indigo-50:  #faf5ff;
+  --color-indigo-100: #f3e8ff;
+  --color-indigo-200: #e9d5ff;
+  --color-indigo-300: #d8b4fe;
+  --color-indigo-400: #c084fc;
+  --color-indigo-500: #a855f7;
+  --color-indigo-600: #9333ea;
+  --color-indigo-700: #7e22ce;
+  --color-indigo-800: #6b21a8;
+  --color-indigo-900: #581c87;
 }
 
 /* ============================================================================
@@ -82,11 +110,9 @@
 .dark ::-webkit-scrollbar-thumb { background: #334155; }
 .dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-/* Light mode: soften pure-white surfaces (cards, sidebar, topbar, modals) to a
-   calm off-white so the UI isn't glaring. `text-white` is untouched (only the
-   bg utility is remapped). In dark mode `.dark .bg-white` (higher specificity)
-   still wins, so this has no effect there. */
-.bg-white { background-color: #f5f8fc; }
+/* Light mode: keep cards/sidebar/topbar pure white so they lift off the
+   purple-tinted canvas. `text-white` is untouched. */
+.bg-white { background-color: #ffffff; }
 
 @theme inline {
   --color-background: var(--background);

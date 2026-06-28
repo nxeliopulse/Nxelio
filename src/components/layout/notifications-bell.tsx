@@ -83,7 +83,7 @@ export function NotificationsBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative h-9 w-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600"
+        className="relative h-10 w-10 rounded-2xl bg-white border border-slate-100 shadow-[0_2px_8px_rgba(17,12,46,0.05)] hover:bg-slate-50 flex items-center justify-center text-slate-600"
       >
         <Bell className="h-4.5 w-4.5" />
         {unread > 0 && (
@@ -99,7 +99,7 @@ export function NotificationsBell() {
             <p className="text-sm font-semibold text-slate-900">Notifications</p>
             <button
               onClick={handleMarkAll}
-              className="text-xs font-medium text-blue-600 hover:text-blue-700"
+              className="text-xs font-medium text-violet-600 hover:text-violet-700"
             >
               Mark all read
             </button>
@@ -119,7 +119,7 @@ export function NotificationsBell() {
                     >
                       <div className="flex-shrink-0 pt-1.5">
                         {!n.is_read ? (
-                          <span className="block h-2 w-2 rounded-full bg-blue-500" />
+                          <span className="block h-2 w-2 rounded-full bg-violet-500" />
                         ) : (
                           <span className="block h-2 w-2" />
                         )}

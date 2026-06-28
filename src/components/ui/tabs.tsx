@@ -19,7 +19,7 @@ export function Tabs({ tabs, active, onChange, className }: TabsProps) {
           className={cn(
             "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors",
             active === tab.id
-              ? "border-blue-600 text-blue-600"
+              ? "border-violet-600 text-violet-600"
               : "border-transparent text-slate-500 hover:text-slate-700"
           )}
         >

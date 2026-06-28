@@ -1,10 +1,10 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
-import { createLead, getLeads, updateLead, deleteLead } from "@/lib/queries/leads";
-import { createCampaign, getCampaigns, getCampaignStats, updateCampaign, deleteCampaign } from "@/lib/queries/campaigns";
-import { createSegment, getSegments, deleteSegment } from "@/lib/queries/segments";
-import { createEmailTemplate, getEmailTemplates, deleteEmailTemplate } from "@/lib/queries/templates";
-import { getNewsletters, deleteNewsletter } from "@/lib/queries/newsletters";
+import { createLead, getLeads, updateLead } from "@/lib/queries/leads";
+import { createCampaign, getCampaigns, getCampaignStats, updateCampaign } from "@/lib/queries/campaigns";
+import { createSegment, getSegments } from "@/lib/queries/segments";
+import { createEmailTemplate, getEmailTemplates } from "@/lib/queries/templates";
+import { getNewsletters } from "@/lib/queries/newsletters";
 import { sendNewsletter } from "@/lib/email/newsletter-actions";
 import { getUsers } from "@/lib/queries/users";
 import { sendLeadEmail } from "@/lib/email/actions";
@@ -140,21 +140,6 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "delete_lead",
-      description: "[Needs approval] Permanently delete a lead. Use search_leads first; pass display = the lead's name.",
-      parameters: {
-        type: "object",
-        properties: {
-          lead_id: { type: "string" },
-          display: { type: "string", description: "Lead's name for the approval card" },
-        },
-        required: ["lead_id", "display"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "create_campaign",
       description: "[Needs approval] Create an email campaign (saved as Draft).",
       parameters: {
@@ -190,18 +175,6 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "delete_campaign",
-      description: "[Needs approval] Delete a campaign. Use list_campaigns first; pass display = campaign name.",
-      parameters: {
-        type: "object",
-        properties: { campaign_id: { type: "string" }, display: { type: "string" } },
-        required: ["campaign_id", "display"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "create_segment",
       description: "[Needs approval] Create an audience segment with simple rules.",
       parameters: {
@@ -229,36 +202,12 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "delete_segment",
-      description: "[Needs approval] Delete a segment. Use list_segments first; pass display = segment name.",
-      parameters: {
-        type: "object",
-        properties: { segment_id: { type: "string" }, display: { type: "string" } },
-        required: ["segment_id", "display"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "create_email_template",
       description: "[Needs approval] Save a reusable email template. Supports {{firstName}}, {{companyName}} variables.",
       parameters: {
         type: "object",
         properties: { template_name: { type: "string" }, subject: { type: "string" }, body: { type: "string" } },
         required: ["template_name", "subject", "body"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "delete_template",
-      description: "[Needs approval] Delete an email template. Use list_templates first; pass display = template name.",
-      parameters: {
-        type: "object",
-        properties: { template_id: { type: "string" }, display: { type: "string" } },
-        required: ["template_id", "display"],
       },
     },
   },
@@ -282,18 +231,6 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "delete_newsletter",
-      description: "[Needs approval] Delete a newsletter. Use list_newsletters first; pass display = newsletter title.",
-      parameters: {
-        type: "object",
-        properties: { newsletter_id: { type: "string" }, display: { type: "string" } },
-        required: ["newsletter_id", "display"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "send_newsletter",
       description: "[Needs approval] Send a newsletter to its subscribed audience now. Use list_newsletters first; pass display = newsletter title.",
       parameters: {
@@ -306,12 +243,12 @@ const TOOLS = [
 ];
 
 const WRITE_TOOLS = new Set([
-  "create_lead", "update_lead", "delete_lead",
-  "create_campaign", "update_campaign", "delete_campaign",
-  "create_segment", "delete_segment",
-  "create_email_template", "delete_template",
+  "create_lead", "update_lead",
+  "create_campaign", "update_campaign",
+  "create_segment",
+  "create_email_template",
   "send_email_to_lead",
-  "delete_newsletter", "send_newsletter",
+  "send_newsletter",
 ]);
 
 const SYSTEM_PROMPT = `You are the LeadPro AI assistant — an in-app agent for a lead-nurturing platform. You can read workspace data instantly and propose changes that run after the admin approves them.
@@ -320,8 +257,9 @@ App map: Dashboard → Leads (Add Leads wizard, capture form) → Campaigns (Seq
 
 How your tools work:
 - READ tools (stats, list_users, search_leads, list_*) run immediately — use them freely to answer questions.
-- WRITE tools (create/update/delete/send) do NOT run immediately. Calling one queues it on an approval card the admin must accept. So when the user asks for a change, call the tool right away with precise args and a clear "display" label — do not ask permission in text, the approval card handles that.
-- A QUESTION is never a reason to call a write tool. "How many admins are there?" → list_users. Only call write tools when the user explicitly asks to create, change, delete, or send something.
+- WRITE tools (create/update/send) do NOT run immediately. Calling one queues it on an approval card the admin must accept. So when the user asks for a change, call the tool right away with precise args and a clear "display" label — do not ask permission in text, the approval card handles that.
+- A QUESTION is never a reason to call a write tool. "How many admins are there?" → list_users. Only call write tools when the user explicitly asks to create, update, or send something.
+- You cannot delete any records. If the user asks to delete something, politely explain that deletion is not available through the assistant.
 
 Reporting style — precise like a careful engineer:
 - State exactly what you found or queued, with real values (names, emails, counts, statuses). Never a bare "Done!".
@@ -418,9 +356,6 @@ async function executeWriteTool(name: string, args: Record<string, unknown>): Pr
       await updateLead(String(args.lead_id), fields);
       return { ok: true, detail: `Updated ${args.display}: ${Object.entries(fields).map(([k, v]) => `${k} → ${v}`).join(", ")}` };
     }
-    case "delete_lead":
-      await deleteLead(String(args.lead_id));
-      return { ok: true, detail: `Deleted lead ${args.display}` };
     case "create_campaign": {
       const c = await createCampaign({
         campaign_name: String(args.campaign_name),
@@ -438,9 +373,6 @@ async function executeWriteTool(name: string, args: Record<string, unknown>): Pr
       await updateCampaign(String(args.campaign_id), fields);
       return { ok: true, detail: `Updated campaign ${args.display}: ${Object.keys(fields).join(", ")}` };
     }
-    case "delete_campaign":
-      await deleteCampaign(String(args.campaign_id));
-      return { ok: true, detail: `Deleted campaign ${args.display}` };
     case "create_segment": {
       const rules = Array.isArray(args.rules)
         ? (args.rules as Array<{ field: string; operator: string; value: string }>).map((r, i) => ({
@@ -450,23 +382,14 @@ async function executeWriteTool(name: string, args: Record<string, unknown>): Pr
       await createSegment(String(args.name), String(args.description || ""), "Dynamic", rules);
       return { ok: true, detail: `Created segment “${args.name}” with ${rules.length} rule${rules.length === 1 ? "" : "s"}` };
     }
-    case "delete_segment":
-      await deleteSegment(String(args.segment_id));
-      return { ok: true, detail: `Deleted segment ${args.display}` };
     case "create_email_template":
       await createEmailTemplate({ template_name: String(args.template_name), subject: String(args.subject), body: String(args.body) });
       return { ok: true, detail: `Saved template “${args.template_name}”` };
-    case "delete_template":
-      await deleteEmailTemplate(String(args.template_id));
-      return { ok: true, detail: `Deleted template ${args.display}` };
     case "send_email_to_lead": {
       const res = await sendLeadEmail(String(args.lead_id), String(args.subject), String(args.body));
       if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
       return { ok: true, detail: `Sent “${args.subject}” to ${args.display}` };
     }
-    case "delete_newsletter":
-      await deleteNewsletter(String(args.newsletter_id));
-      return { ok: true, detail: `Deleted newsletter ${args.display}` };
     case "send_newsletter": {
       const res = await sendNewsletter(String(args.newsletter_id));
       if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
@@ -486,16 +409,11 @@ function summarizeAction(name: string, args: Record<string, unknown>): string {
         .filter((k) => args[k] !== undefined).map((k) => `${k} → ${args[k]}`).join(", ");
       return `Update lead ${args.display}: ${changes || "no changes"}`;
     }
-    case "delete_lead": return `Delete lead ${args.display}`;
     case "create_campaign": return `Create draft campaign “${args.campaign_name}”`;
     case "update_campaign": return `Update campaign ${args.display}`;
-    case "delete_campaign": return `Delete campaign ${args.display}`;
     case "create_segment": return `Create segment “${args.name}”`;
-    case "delete_segment": return `Delete segment ${args.display}`;
     case "create_email_template": return `Save template “${args.template_name}”`;
-    case "delete_template": return `Delete template ${args.display}`;
     case "send_email_to_lead": return `Send email to ${args.display} — “${args.subject}”`;
-    case "delete_newsletter": return `Delete newsletter ${args.display}`;
     case "send_newsletter": return `Send newsletter ${args.display} to its subscribed audience`;
     default: return name;
   }
