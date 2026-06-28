@@ -310,8 +310,8 @@ export function BillingView({ credits, leadsCount, sentCount }: Props) {
             <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>
               Stripe integration coming soon. In the meantime, contact{" "}
-              <a href="mailto:sales@leadpro.ai" className="font-semibold underline">
-                sales@leadpro.ai
+              <a href="mailto:sales@nxelio.ai" className="font-semibold underline">
+                sales@nxelio.ai
               </a>{" "}
               to upgrade your workspace.
             </span>
@@ -320,7 +320,7 @@ export function BillingView({ credits, leadsCount, sentCount }: Props) {
             <Button variant="outline" onClick={() => setUpgradeOpen(false)}>
               Close
             </Button>
-            <a href="mailto:sales@leadpro.ai">
+            <a href="mailto:sales@nxelio.ai">
               <Button>Email sales</Button>
             </a>
           </div>
@@ -338,8 +338,8 @@ export function BillingView({ credits, leadsCount, sentCount }: Props) {
         <div className="p-5 space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
             Card capture via Stripe Elements is coming soon. Reach out to{" "}
-            <a href="mailto:sales@leadpro.ai" className="font-semibold underline">
-              sales@leadpro.ai
+            <a href="mailto:sales@nxelio.ai" className="font-semibold underline">
+              sales@nxelio.ai
             </a>{" "}
             to enable billing for your workspace today.
           </div>
@@ -363,8 +363,8 @@ export function BillingView({ credits, leadsCount, sentCount }: Props) {
           <p className="text-sm text-slate-600">
             You&apos;re currently on the Free plan, so there&apos;s nothing to cancel. If you
             previously upgraded, contact{" "}
-            <a href="mailto:support@leadpro.ai" className="font-semibold underline">
-              support@leadpro.ai
+            <a href="mailto:support@nxelio.ai" className="font-semibold underline">
+              support@nxelio.ai
             </a>{" "}
             and we&apos;ll process the cancellation right away.
           </p>

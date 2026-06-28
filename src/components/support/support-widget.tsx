@@ -87,7 +87,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                 </button>
               </div>
               <h2 className="mt-3 text-xl font-bold">Hi there 👋</h2>
-              <p className="text-blue-100 text-sm">How can we help you use LeadPro?</p>
+              <p className="text-blue-100 text-sm">How can we help you use Nxelio?</p>
             </div>
 
             {/* Body */}

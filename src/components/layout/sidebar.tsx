@@ -109,7 +109,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             {!collapsed && (
               <span className="flex flex-col leading-none whitespace-nowrap text-left">
                 <span className="font-bold text-white text-lg tracking-tight">
-                  Lead<span className="text-white/70">Pro</span>
+                  Nxelio
                 </span>
                 <span className="text-[10px] text-white/50 font-medium uppercase tracking-[0.12em]">AI Engagement</span>
               </span>

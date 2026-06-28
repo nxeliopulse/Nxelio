@@ -45,7 +45,7 @@ export function substituteMergeTags(
     industry: (lead.industry && lead.industry.trim()) || "",
     email: (lead.email && lead.email.trim()) || "",
     interest: (lead.interest_area && lead.interest_area.trim()) || "",
-    senderName: (senderName && senderName.trim()) || "The LeadPro team",
+    senderName: (senderName && senderName.trim()) || "The Nxelio team",
   };
 
   let out = text;

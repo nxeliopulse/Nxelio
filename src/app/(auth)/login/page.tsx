@@ -78,7 +78,7 @@ function LoginForm() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome back</h1>
-        <p className="text-slate-500">Log in to your LeadPro workspace.</p>
+        <p className="text-slate-500">Sign in to your Nxelio workspace.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

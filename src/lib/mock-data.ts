@@ -78,13 +78,13 @@ export const leads: Lead[] = [
 ];
 
 export const users: User[] = [
-  { id: "U-001", fullName: "Anuradha Ramachandran", email: "anu@leadpro.ai", role: "Admin", status: "Active", createdAt: "2026-01-15", lastLogin: "2026-05-29" },
-  { id: "U-002", fullName: "James Wilson", email: "james.w@leadpro.ai", role: "Manager", status: "Active", createdAt: "2026-02-10", lastLogin: "2026-05-28" },
-  { id: "U-003", fullName: "Sophie Turner", email: "sophie@leadpro.ai", role: "Manager", status: "Active", createdAt: "2026-02-22", lastLogin: "2026-05-29" },
-  { id: "U-004", fullName: "Ryan Park", email: "ryan@leadpro.ai", role: "Sales Rep", manager: "James Wilson", status: "Active", createdAt: "2026-03-05", lastLogin: "2026-05-29" },
-  { id: "U-005", fullName: "Aisha Khan", email: "aisha@leadpro.ai", role: "Sales Rep", manager: "James Wilson", status: "Active", createdAt: "2026-03-12", lastLogin: "2026-05-27" },
-  { id: "U-006", fullName: "Diego Silva", email: "diego@leadpro.ai", role: "Sales Rep", manager: "Sophie Turner", status: "Active", createdAt: "2026-04-01", lastLogin: "2026-05-28" },
-  { id: "U-007", fullName: "Hannah Lee", email: "hannah@leadpro.ai", role: "Sales Rep", manager: "Sophie Turner", status: "Inactive", createdAt: "2026-04-15", lastLogin: "2026-05-20" },
+  { id: "U-001", fullName: "Anuradha Ramachandran", email: "anu@nxelio.ai", role: "Admin", status: "Active", createdAt: "2026-01-15", lastLogin: "2026-05-29" },
+  { id: "U-002", fullName: "James Wilson", email: "james.w@nxelio.ai", role: "Manager", status: "Active", createdAt: "2026-02-10", lastLogin: "2026-05-28" },
+  { id: "U-003", fullName: "Sophie Turner", email: "sophie@nxelio.ai", role: "Manager", status: "Active", createdAt: "2026-02-22", lastLogin: "2026-05-29" },
+  { id: "U-004", fullName: "Ryan Park", email: "ryan@nxelio.ai", role: "Sales Rep", manager: "James Wilson", status: "Active", createdAt: "2026-03-05", lastLogin: "2026-05-29" },
+  { id: "U-005", fullName: "Aisha Khan", email: "aisha@nxelio.ai", role: "Sales Rep", manager: "James Wilson", status: "Active", createdAt: "2026-03-12", lastLogin: "2026-05-27" },
+  { id: "U-006", fullName: "Diego Silva", email: "diego@nxelio.ai", role: "Sales Rep", manager: "Sophie Turner", status: "Active", createdAt: "2026-04-01", lastLogin: "2026-05-28" },
+  { id: "U-007", fullName: "Hannah Lee", email: "hannah@nxelio.ai", role: "Sales Rep", manager: "Sophie Turner", status: "Inactive", createdAt: "2026-04-15", lastLogin: "2026-05-20" },
 ];
 
 export const segments: Segment[] = [

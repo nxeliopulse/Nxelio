@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { LegalShell } from "../legal-shell";
 
-export const metadata: Metadata = { title: "Privacy Policy — LeadPro" };
+export const metadata: Metadata = { title: "Privacy Policy — Nxelio" };
 
 export default function PrivacyPage() {
   return (
     <LegalShell title="Privacy Policy" updated="June 12, 2026">
       <p>
-        This Privacy Policy explains how LeadPro (&quot;we&quot;, &quot;us&quot;) collects, uses, and protects
-        information when you use our lead-nurturing platform. We designed LeadPro to be multi-tenant: your
+        This Privacy Policy explains how Nxelio (&quot;we&quot;, &quot;us&quot;) collects, uses, and protects
+        information when you use our lead-nurturing platform. We designed Nxelio to be multi-tenant: your
         data is isolated to your workspace and is never shared with other customers.
       </p>
 
@@ -28,7 +28,7 @@ export default function PrivacyPage() {
 
       <h2>3. Email &amp; communications</h2>
       <p>
-        When you send campaigns or newsletters through LeadPro, outbound email is delivered via our email
+        When you send campaigns or newsletters through Nxelio, outbound email is delivered via our email
         provider on your behalf. Recipients can unsubscribe at any time, and unsubscribed addresses are added
         to your workspace blocklist.
       </p>

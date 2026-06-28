@@ -20,6 +20,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const initials = userName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
@@ -55,7 +56,15 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <div className="hidden sm:flex flex-1 max-w-md">
           <Input
             leftIcon={<Search className="h-4 w-4" />}
-            placeholder="Search here..."
+            placeholder="Search leads, campaigns..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && searchQuery.trim()) {
+                router.push(`/leads?q=${encodeURIComponent(searchQuery.trim())}`);
+                setSearchQuery("");
+              }
+            }}
             className="h-11 rounded-full bg-white border border-slate-100 shadow-[0_2px_8px_rgba(17,12,46,0.04)] focus:ring-blue-200"
           />
         </div>

@@ -240,7 +240,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Email *</label>
-            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@leadpro.ai" />
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@nxelio.ai" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Role *</label>

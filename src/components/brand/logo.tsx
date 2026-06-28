@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * LeadPro brand mark — a unique linear "growth path" glyph:
+ * Nxelio brand mark — a unique linear "growth path" glyph:
  * three connected nodes ascending into an arrowhead, representing
  * lead → nurture → convert. Line-art style (instantly.ai / expandi.io vibe).
  */
@@ -50,7 +50,7 @@ export function Logo({ className, showText = true }: { className?: string; showT
       {showText && (
         <div className="flex flex-col leading-none">
           <span className="font-bold text-slate-900 text-lg tracking-tight">
-            Lead<span className="text-blue-600">Pro</span>
+            Nxelio
           </span>
           <span className="text-[10px] text-slate-500 font-medium uppercase tracking-[0.12em]">AI Engagement</span>
         </div>

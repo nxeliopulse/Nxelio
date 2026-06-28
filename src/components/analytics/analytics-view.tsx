@@ -89,7 +89,7 @@ export function AnalyticsView({ stats: initialStats }: { stats: Stats }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `leadpro-analytics-${todayStr()}.csv`;
+    a.download = `nxelio-analytics-${todayStr()}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
