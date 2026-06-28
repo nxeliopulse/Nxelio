@@ -139,10 +139,10 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Buy leads (real prospects via AnySite, or AI samples as fallback)
-  const [buy, setBuy] = useState({ industry: "", role: "", location: "", count: 10, withEmail: false });
+  // Buy leads (real prospects via Bright Data, or AI samples as fallback)
+  const [buy, setBuy] = useState({ industry: "", role: "", location: "", count: 10 });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
-  const [buySource, setBuySource] = useState<"anysite" | "ai" | null>(null);
+  const [buySource, setBuySource] = useState<"brightdata" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
 
   // Import
@@ -187,7 +187,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     setStep(1); setSource(null); setInputValue("");
     setStep2Error(null); setStep2Warning(null);
     setManual([newManual()]); setEntries([newEntry()]); setCsvRows(null); setCsvName(""); setDragOver(false);
-    setBuy({ industry: "", role: "", location: "", count: 10, withEmail: false }); setBuyResults(null); setBuySource(null); setBuyLoading(false);
+    setBuy({ industry: "", role: "", location: "", count: 10 }); setBuyResults(null); setBuySource(null); setBuyLoading(false);
     setSummary(null); setImportError(null);
   }
 
@@ -337,9 +337,9 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
       }));
     } else if (isBuy) {
       skipped = 0;
-      // Real (AnySite) prospects carry a LinkedIn URL; AI samples carry a placeholder
+      // Real (Bright Data) prospects carry a LinkedIn URL; AI samples carry a placeholder
       // website. Neither carries an email, so they're never accidentally auto-emailed.
-      const buyLabel = buySource === "anysite" ? "Purchased Leads (AnySite)" : "Purchased Leads (sample)";
+      const buyLabel = buySource === "brightdata" ? "Purchased Leads (Bright Data)" : "Purchased Leads (sample)";
       payload = (buyResults ?? []).map((p) => ({
         full_name: (p.full_name || "").slice(0, 150) || null,
         company_name: (p.company_name || "").slice(0, 200) || null,
@@ -785,18 +785,18 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
 }
 
 // ============================================================================
-// Buy Leads — real LinkedIn prospects via AnySite (AI samples as fallback)
-type BuyState = { industry: string; role: string; location: string; count: number; withEmail: boolean };
+// Buy Leads — real LinkedIn prospects via Bright Data (AI samples as fallback)
+type BuyState = { industry: string; role: string; location: string; count: number };
 function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;
-  source: "anysite" | "ai" | null;
+  source: "brightdata" | "ai" | null;
   loading: boolean;
   onGenerate: () => void;
   error: string | null;
 }) {
-  const isReal = source === "anysite";
+  const isReal = source === "brightdata";
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -819,18 +819,13 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
         </div>
       </div>
 
-      <label className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer select-none">
-        <input type="checkbox" checked={buy.withEmail} onChange={(e) => setBuy({ ...buy, withEmail: e.target.checked })} className="mt-0.5 h-4 w-4 rounded border-slate-300" />
-        <span>Also find <span className="font-medium">verified emails</span> <span className="text-slate-400">— makes the leads emailable, but adds ~30–60s</span></span>
-      </label>
-
       <Button onClick={onGenerate} disabled={loading}>
         {loading
-          ? <><Loader2 className="h-4 w-4 animate-spin" /> {buy.withEmail ? "Finding prospects & emails…" : "Finding prospects…"}</>
+          ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
           : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
       </Button>
 
-      {loading && buy.withEmail && <p className="text-xs text-slate-500">Verifying emails on LinkedIn — this can take up to a minute.</p>}
+      <p className="text-xs text-slate-500">Sourced from public LinkedIn profiles via Bright Data — each lead includes a LinkedIn URL (no email).</p>
 
       {results && isReal && (
         <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
@@ -851,24 +846,24 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
 }
 
 function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; location: string } }) {
-  const withEmail = prospects.filter((p) => p.email).length;
+  const withLinkedIn = prospects.filter((p) => p.linkedin).length;
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
         Prospects for <span className="font-medium text-slate-900">{criteria.role || "decision makers"}</span> in <span className="font-medium text-slate-900">{criteria.industry || "any industry"}</span>{criteria.location ? <> · {criteria.location}</> : null}
-        {prospects.length > 0 && <span className="text-slate-400"> · {withEmail} verified email{withEmail === 1 ? "" : "s"}</span>}
+        {prospects.length > 0 && <span className="text-slate-400"> · {withLinkedIn} with LinkedIn</span>}
       </div>
       <div className="border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Title</th><th className="px-3 py-2 text-left font-semibold">Email</th></tr>
+            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Title</th><th className="px-3 py-2 text-left font-semibold">LinkedIn</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {prospects.slice(0, 8).map((p, i) => (
               <tr key={i}>
                 <td className="px-3 py-2 align-top">{p.full_name || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2 text-slate-600 align-top"><span className="line-clamp-2">{p.title || "—"}</span></td>
-                <td className="px-3 py-2 align-top">{p.email ? <span className="text-emerald-700">{p.email}</span> : <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2 align-top">{p.linkedin ? <a href={p.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Profile</a> : <span className="text-slate-400">—</span>}</td>
               </tr>
             ))}
           </tbody>

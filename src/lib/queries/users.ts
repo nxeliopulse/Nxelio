@@ -117,18 +117,27 @@ export async function getUserPermissions(userId: string) {
 }
 
 export async function updateUserStatus(userId: string, status: string) {
+  const { workspaceId } = await requireSuperAdmin();
+  await assertTargetInWorkspace(userId, workspaceId);
   const supabase = await createClient();
   await supabase.from("users").update({ status }).eq("user_id", userId);
   revalidatePath("/users");
 }
 
 export async function updateUserRole(userId: string, roleId: number, managerId: string | null) {
+  const { userId: callerId, workspaceId } = await requireSuperAdmin();
+  await assertTargetInWorkspace(userId, workspaceId);
+  // A Super Admin can't strip their OWN super-admin role (avoids locking the
+  // workspace out of admin access by accident).
+  if (userId === callerId && roleId !== 1) throw new Error("You can't change your own role.");
   const supabase = await createClient();
   await supabase.from("users").update({ role_id: roleId, manager_id: managerId }).eq("user_id", userId);
   revalidatePath("/users");
 }
 
 export async function upsertPermission(userId: string, menuId: number, perms: { can_view?: boolean; can_create?: boolean; can_edit?: boolean; can_delete?: boolean; can_upload?: boolean }) {
+  const { workspaceId } = await requireSuperAdmin();
+  await assertTargetInWorkspace(userId, workspaceId);
   const supabase = await createClient();
   await supabase.from("user_permissions").upsert(
     { user_id: userId, menu_id: menuId, ...perms },

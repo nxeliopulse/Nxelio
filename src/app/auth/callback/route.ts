@@ -9,7 +9,10 @@ import { createServerClient } from "@supabase/ssr";
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") || "/dashboard";
+  // Only allow same-origin relative paths — an absolute or protocol-relative
+  // `next` (e.g. https://evil.com or //evil.com) would be an open redirect.
+  const rawNext = url.searchParams.get("next") || "/dashboard";
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
 
   if (!code) {
     // No code = invalid/expired link — bounce to login with a hint

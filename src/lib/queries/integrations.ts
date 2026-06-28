@@ -34,7 +34,9 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatus[]> {
       name: "Supabase",
       description: "Database + Auth + Storage",
       configured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-      maskedKey: mask(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      // Never expose any part of the service-role key to the browser — show a
+      // non-revealing indicator only.
+      maskedKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? "•••••••• (hidden)" : undefined,
       emoji: "🗄️",
     },
     {

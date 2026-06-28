@@ -149,7 +149,7 @@ export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities
             className="mb-6"
           />
 
-          {tab === "score" && <ProspectScoreTab leadId={lead.id} />}
+          {tab === "score" && <ProspectScoreTab leadId={lead.id} initialResult={lead.ai_score} />}
           {tab === "company" && <CompanyIntelTab leadId={lead.id} />}
           {tab === "contacts" && <ContactIntelTab leadId={lead.id} />}
           {tab === "outreach" && <OutreachTab leadId={lead.id} />}

@@ -91,7 +91,15 @@ Return JSON in exactly this shape (all scores 0-100 integers):
   // which made "Lead Score" segment rules and dashboard "AI scored" useless).
   const score = Math.max(0, Math.min(100, Math.round(result.overallScore)));
   if (Number.isFinite(score)) {
-    await updateLead(leadId, { lead_score: score });
+    // Persist BOTH the headline number (for sorting/segments) and the full
+    // breakdown (so the dimensions/insight/next-steps reload on the lead).
+    try {
+      await updateLead(leadId, { lead_score: score, ai_score: result });
+    } catch {
+      // ai_score column not present yet (migration 0027 not applied) — still
+      // save the headline score so scoring keeps working.
+      await updateLead(leadId, { lead_score: score });
+    }
   }
 
   return result;

@@ -19,9 +19,11 @@ function renderNewsletterHtml(content: NewsletterContent, opts: { subject?: stri
         case "paragraph":
           return `<p style="margin:0 0 16px;font-size:15px;color:#334155;line-height:1.7">${escape(b.text || "")}</p>`;
         case "cta":
-          return `<div style="margin:24px 0;text-align:center"><a href="${escape(b.url || "#")}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">${escape(b.text || "Learn more")}</a></div>`;
-        case "image":
-          return b.url ? `<img src="${escape(b.url)}" alt="${escape(b.alt || "")}" style="max-width:100%;height:auto;border-radius:8px;margin:16px 0" />` : "";
+          return `<div style="margin:24px 0;text-align:center"><a href="${escape(safeUrl(b.url))}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">${escape(b.text || "Learn more")}</a></div>`;
+        case "image": {
+          const src = safeUrl(b.url);
+          return src !== "#" ? `<img src="${escape(src)}" alt="${escape(b.alt || "")}" style="max-width:100%;height:auto;border-radius:8px;margin:16px 0" />` : "";
+        }
         case "divider":
           return `<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0" />`;
         default:
@@ -65,7 +67,13 @@ function renderNewsletterHtml(content: NewsletterContent, opts: { subject?: stri
 }
 
 function escape(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** Only allow safe link schemes — blocks javascript:/data: URLs in CTA/image blocks. */
+function safeUrl(u?: string): string {
+  const s = (u || "").trim();
+  return /^(https?:|mailto:)/i.test(s) ? s : "#";
 }
 
 interface SendResult {
@@ -96,10 +104,11 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
 
   const n = newsletter as NewsletterRow;
 
-  // 2. Resolve recipients (admin client bypasses RLS so we hit all leads)
-  let query = admin.from("leads").select("id, email, full_name, company_name, industry, interest_area").not("email", "is", null);
+  // 2. Resolve recipients with the RLS client so we ONLY ever reach the current
+  //    workspace's leads (the admin client would leak/mail every tenant's leads).
+  let query = supabase.from("leads").select("id, email, full_name, company_name, industry, interest_area").not("email", "is", null);
   if (n.audience_type === "segment" && n.segment_id) {
-    const { data: members } = await admin.from("segment_members").select("lead_id").eq("segment_id", n.segment_id);
+    const { data: members } = await supabase.from("segment_members").select("lead_id").eq("segment_id", n.segment_id);
     const ids = (members || []).map((m: { lead_id: string }) => m.lead_id);
     if (!ids.length) return { ok: false, error: "Segment has no members" };
     query = query.in("id", ids);

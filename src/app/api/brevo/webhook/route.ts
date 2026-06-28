@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { recomputeCampaignStats } from "@/lib/email/campaign-stats";
+import { webhookSecretValid } from "@/lib/webhook-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -50,8 +51,8 @@ function extractCampaignId(ev: BrevoEvent): string | null {
 }
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.BREVO_WEBHOOK_SECRET;
-  if (secret && request.nextUrl.searchParams.get("secret") !== secret) {
+  // Fail closed: an unset BREVO_WEBHOOK_SECRET rejects all calls (was fail-open).
+  if (!webhookSecretValid(request.nextUrl.searchParams.get("secret"), process.env.BREVO_WEBHOOK_SECRET)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

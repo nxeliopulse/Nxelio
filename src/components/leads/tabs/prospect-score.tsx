@@ -13,8 +13,10 @@ const dimMeta = [
   { key: "competitivePosition", label: "Competitive Position", icon: <Sparkles className="h-4 w-4" />, color: "bg-amber-500", desc: "Position vs. competing solutions" },
 ] as const;
 
-export function ProspectScoreTab({ leadId }: { leadId: string }) {
-  const [result, setResult] = useState<AiScoreResult | null>(null);
+export function ProspectScoreTab({ leadId, initialResult }: { leadId: string; initialResult?: AiScoreResult | null }) {
+  // Seed from the saved score so the breakdown shows immediately on open and
+  // only the empty state appears when the lead has never been scored.
+  const [result, setResult] = useState<AiScoreResult | null>(initialResult ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
