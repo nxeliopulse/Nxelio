@@ -31,7 +31,7 @@ const activityMeta: Record<string, { label: string; color: string; icon: React.R
   EMAIL_REPLIED: { label: "Replied", color: "bg-teal-500", icon: <Send className="h-3 w-3" /> },
   EMAIL_BOUNCED: { label: "Bounced", color: "bg-red-500", icon: <MailOpen className="h-3 w-3" /> },
   CONVERTED_TO_OPPORTUNITY: { label: "Converted to opportunity", color: "bg-emerald-600", icon: <Target className="h-3 w-3" /> },
-  GUIDE_DOWNLOADED: { label: "Downloaded guide", color: "bg-purple-500", icon: <FileDown className="h-3 w-3" /> },
+  GUIDE_DOWNLOADED: { label: "Downloaded guide", color: "bg-indigo-500", icon: <FileDown className="h-3 w-3" /> },
   WEBINAR_ATTENDED: { label: "Attended webinar", color: "bg-amber-500", icon: <Calendar className="h-3 w-3" /> },
   CONSULTATION_REQUESTED: { label: "Requested consultation", color: "bg-pink-500", icon: <Calendar className="h-3 w-3" /> },
   LEAD_SCORE_UPDATED: { label: "Score updated", color: "bg-indigo-500", icon: <Target className="h-3 w-3" /> },

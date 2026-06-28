@@ -129,7 +129,7 @@ export function AnalyticsView({ stats: initialStats }: { stats: Stats }) {
         {[
           { label: "Emails sent", value: stats.emailsSent.toLocaleString(), icon: <Mail className="h-4 w-4" />, color: "bg-blue-50 text-blue-600" },
           { label: "Open rate", value: `${stats.openRate}%`, icon: <Mail className="h-4 w-4" />, color: "bg-emerald-50 text-emerald-600" },
-          { label: "Click rate", value: `${stats.clickRate}%`, icon: <Mouse className="h-4 w-4" />, color: "bg-purple-50 text-purple-600" },
+          { label: "Click rate", value: `${stats.clickRate}%`, icon: <Mouse className="h-4 w-4" />, color: "bg-indigo-50 text-indigo-600" },
           { label: "Reply rate", value: `${stats.replyRate}%`, icon: <MessageCircle className="h-4 w-4" />, color: "bg-amber-50 text-amber-600" },
         ].map((s) => (
           <Card key={s.label} className="p-5">

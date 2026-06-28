@@ -99,7 +99,7 @@ export function NotificationsBell() {
             <p className="text-sm font-semibold text-slate-900">Notifications</p>
             <button
               onClick={handleMarkAll}
-              className="text-xs font-medium text-violet-600 hover:text-violet-700"
+              className="text-xs font-medium text-blue-600 hover:text-blue-700"
             >
               Mark all read
             </button>
@@ -119,7 +119,7 @@ export function NotificationsBell() {
                     >
                       <div className="flex-shrink-0 pt-1.5">
                         {!n.is_read ? (
-                          <span className="block h-2 w-2 rounded-full bg-violet-500" />
+                          <span className="block h-2 w-2 rounded-full bg-blue-500" />
                         ) : (
                           <span className="block h-2 w-2" />
                         )}

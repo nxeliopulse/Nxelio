@@ -7,50 +7,21 @@
   /* Softened light theme — surfaces are a calm off-white/cool-gray instead of
      pure #fff so the UI is easier on the eyes. Cards (bg-white, remapped below)
      stay a step lighter than the canvas so they still lift off the page. */
-  --background: #f0f2f8;
+  --background: #f0f4ff;
   --foreground: #0f172a;
   --card: #ffffff;
-  --muted: #e8eaf2;
+  --muted: #e8edf8;
   --muted-foreground: #64748b;
-  --border: #e2e5f0;
-  --primary: #7c3aed;
+  --border: #e2e8f0;
+  --primary: #2563eb;
   --primary-foreground: #ffffff;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
 
-  /* Slightly purple-tinted slate ramp for the new violet theme */
-  --color-slate-50:  #f0f2f8;
-  --color-slate-100: #e8eaf2;
-
-  /* ----------------------------------------------------------------------
-     Theme recolor — remap the entire `blue` utility scale to violet and the
-     `indigo` scale to purple. Tailwind v4 utilities (bg-blue-600, text-blue-500,
-     from-indigo-600, …) resolve these CSS vars, so redefining them here turns
-     EVERY blue/indigo accent across all screens violet/purple at once — no
-     per-page edits needed.
-     ---------------------------------------------------------------------- */
-  --color-blue-50:  #f5f3ff;
-  --color-blue-100: #ede9fe;
-  --color-blue-200: #ddd6fe;
-  --color-blue-300: #c4b5fd;
-  --color-blue-400: #a78bfa;
-  --color-blue-500: #8b5cf6;
-  --color-blue-600: #7c3aed;
-  --color-blue-700: #6d28d9;
-  --color-blue-800: #5b21b6;
-  --color-blue-900: #4c1d95;
-
-  --color-indigo-50:  #faf5ff;
-  --color-indigo-100: #f3e8ff;
-  --color-indigo-200: #e9d5ff;
-  --color-indigo-300: #d8b4fe;
-  --color-indigo-400: #c084fc;
-  --color-indigo-500: #a855f7;
-  --color-indigo-600: #9333ea;
-  --color-indigo-700: #7e22ce;
-  --color-indigo-800: #6b21a8;
-  --color-indigo-900: #581c87;
+  /* Slightly blue-tinted slate ramp */
+  --color-slate-50:  #f0f4ff;
+  --color-slate-100: #e8edf8;
 }
 
 /* ============================================================================

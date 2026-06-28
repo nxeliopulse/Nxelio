@@ -121,8 +121,8 @@ export function BillingView({ credits, leadsCount, sentCount }: Props) {
       icon: Send,
       used: sentCount,
       total: EMAILS_LIMIT,
-      color: "from-purple-500 to-pink-600",
-      barColor: "bg-purple-600",
+      color: "from-indigo-500 to-pink-600",
+      barColor: "bg-indigo-600",
     },
   ];
 
@@ -135,7 +135,7 @@ export function BillingView({ credits, leadsCount, sentCount }: Props) {
 
       {/* Hero current-plan card */}
       <Card className="overflow-hidden mb-6">
-        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8 text-white">
+        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 p-8 text-white">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">

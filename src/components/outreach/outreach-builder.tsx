@@ -170,9 +170,9 @@ export function OutreachBuilder({ initialSequence, initialSteps }: {
       <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6">
         {/* Left: AI + summary */}
         <div className="space-y-4">
-          <Card className="p-5 bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 border-purple-100">
+          <Card className="p-5 bg-gradient-to-br from-indigo-50 via-blue-50 to-indigo-50 border-indigo-100">
             <div className="flex items-center gap-2 mb-3">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center">
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
               <h3 className="font-semibold text-slate-900">AI Sequence Generator</h3>

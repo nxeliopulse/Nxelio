@@ -56,7 +56,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
           <Input
             leftIcon={<Search className="h-4 w-4" />}
             placeholder="Search here..."
-            className="h-11 rounded-full bg-white border border-slate-100 shadow-[0_2px_8px_rgba(17,12,46,0.04)] focus:ring-violet-200"
+            className="h-11 rounded-full bg-white border border-slate-100 shadow-[0_2px_8px_rgba(17,12,46,0.04)] focus:ring-blue-200"
           />
         </div>
       </div>
@@ -72,8 +72,8 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <button
           onClick={onToggleAssistant}
           aria-label={assistantOpen ? "Close AI assistant" : "Open AI assistant"}
-          className={`flex items-center gap-1.5 rounded-2xl font-semibold text-sm transition-all flex-shrink-0 px-3 sm:px-4 h-11 text-white bg-gradient-to-r from-violet-700 via-violet-600 to-purple-500 shadow-md shadow-violet-500/25 ${
-            assistantOpen ? "ring-2 ring-violet-300 shadow-lg" : "hover:shadow-lg hover:brightness-105 active:scale-[0.98]"
+          className={`flex items-center gap-1.5 rounded-2xl font-semibold text-sm transition-all flex-shrink-0 px-3 sm:px-4 h-11 text-white bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-500 shadow-md shadow-blue-500/25 ${
+            assistantOpen ? "ring-2 ring-blue-300 shadow-lg" : "hover:shadow-lg hover:brightness-105 active:scale-[0.98]"
           }`}
         >
           <Sparkles className="h-4 w-4 flex-shrink-0" />
@@ -89,7 +89,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
             onClick={() => setOpen(!open)}
             className="flex items-center gap-2 pl-1 pr-1 sm:pr-2 py-1 rounded-lg hover:bg-slate-50"
           >
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
               {initials}
             </div>
             <div className="hidden md:block text-left max-w-[140px]">

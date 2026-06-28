@@ -69,13 +69,13 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
                       onClick={onClose}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
-                        active ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                        active ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                       )}
                     >
-                      <Icon className={cn("h-4.5 w-4.5 flex-shrink-0", active ? "text-violet-600" : "text-slate-400")} strokeWidth={2} />
+                      <Icon className={cn("h-4.5 w-4.5 flex-shrink-0", active ? "text-blue-600" : "text-slate-400")} strokeWidth={2} />
                       <span className="flex-1">{item.label}</span>
                       {showBadge && (
-                        <span className="bg-violet-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
                           {inboxUnread > 9 ? "9+" : inboxUnread}
                         </span>
                       )}
@@ -100,10 +100,10 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
                         onClick={onClose}
                         className={cn(
                           "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
-                          active ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                          active ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                         )}
                       >
-                        <Icon className={cn("h-4.5 w-4.5", active ? "text-violet-600" : "text-slate-400")} strokeWidth={2} />
+                        <Icon className={cn("h-4.5 w-4.5", active ? "text-blue-600" : "text-slate-400")} strokeWidth={2} />
                         <span>{item.label}</span>
                       </Link>
                     </li>
@@ -115,12 +115,12 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
         </nav>
 
         <div className="p-3 border-t border-slate-100 space-y-2">
-          <div className="bg-gradient-to-br from-violet-600 to-purple-600 rounded-xl p-4 text-white">
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-4 text-white">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="h-4 w-4" />
               <p className="font-semibold text-sm">AI Credits</p>
             </div>
-            <p className="text-xs text-violet-100 mb-2">
+            <p className="text-xs text-blue-100 mb-2">
               {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} used` : "Loading..."}
             </p>
             <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">

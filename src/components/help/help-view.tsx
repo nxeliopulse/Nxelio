@@ -54,7 +54,7 @@ const categories = [
     title: "AI Features",
     description: "Generate emails, score leads, and surface insights",
     icon: Sparkles,
-    color: "from-purple-500 to-pink-600",
+    color: "from-indigo-500 to-pink-600",
     articles: [
       "Choosing the right AI model",
       "Tuning the AI tone and persona",

@@ -368,7 +368,7 @@ function BusinessDetails({ leads }: { leads: LeadRow[] }) {
   const cards = [
     { label: "Total leads", value: total, icon: <Users2 className="h-4 w-4" />, color: "text-blue-600 bg-blue-50" },
     { label: "Hot leads", value: hot, icon: <Flame className="h-4 w-4" />, color: "text-amber-600 bg-amber-50" },
-    { label: "AI scored", value: scored, icon: <Sparkles className="h-4 w-4" />, color: "text-purple-600 bg-purple-50" },
+    { label: "AI scored", value: scored, icon: <Sparkles className="h-4 w-4" />, color: "text-indigo-600 bg-indigo-50" },
     { label: "Converted", value: converted, icon: <Target className="h-4 w-4" />, color: "text-emerald-600 bg-emerald-50" },
   ];
 

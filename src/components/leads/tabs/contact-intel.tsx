@@ -26,7 +26,7 @@ export function ContactIntelTab({ leadId }: { leadId: string }) {
   if (!contacts) {
     return (
       <Card className="p-8 text-center">
-        <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center mb-4">
+        <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-indigo-600 to-pink-600 flex items-center justify-center mb-4">
           <Users className="h-6 w-6 text-white" />
         </div>
         <h3 className="font-semibold text-slate-900 mb-1">Contact Intelligence</h3>
@@ -55,7 +55,7 @@ export function ContactIntelTab({ leadId }: { leadId: string }) {
         {contacts.map((c, i) => (
           <Card key={i} className="p-5 hover:shadow-md transition-shadow">
             <div className="flex items-start gap-3 mb-3">
-              <div className="h-11 w-11 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">
+              <div className="h-11 w-11 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">
                 {c.name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">

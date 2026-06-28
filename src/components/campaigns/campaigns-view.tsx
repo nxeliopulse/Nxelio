@@ -251,7 +251,7 @@ export function CampaignsView({
                       {/* Overview */}
                       <div className="min-w-0">
                         <Link href={r.href} className="flex items-center gap-3 group">
-                          <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${r.kind === "email" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"}`}>
+                          <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${r.kind === "email" ? "bg-blue-50 text-blue-600" : "bg-indigo-50 text-indigo-600"}`}>
                             {r.kind === "email" ? <Mail className="h-4.5 w-4.5" /> : <Rocket className="h-4.5 w-4.5" />}
                           </div>
                           <div className="min-w-0">

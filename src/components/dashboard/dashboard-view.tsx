@@ -25,13 +25,13 @@ const iconForActivity: Record<string, React.ReactNode> = {
 };
 
 const iconColor: Record<string, string> = {
-  page: "bg-violet-50 text-violet-600",
+  page: "bg-blue-50 text-blue-600",
   email: "bg-emerald-50 text-emerald-600",
-  download: "bg-purple-50 text-purple-600",
+  download: "bg-indigo-50 text-indigo-600",
   meeting: "bg-amber-50 text-amber-600",
   click: "bg-cyan-50 text-cyan-600",
   webinar: "bg-pink-50 text-pink-600",
-  score: "bg-violet-50 text-violet-600",
+  score: "bg-blue-50 text-blue-600",
 };
 
 /** Polished card-style tooltip shared by both dashboard charts. */
@@ -136,8 +136,8 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
                 <AreaChart data={stats.leadGrowth} margin={{ top: 12, right: 8, left: -12, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gLeads" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#7c3aed" stopOpacity={0.28} />
-                      <stop offset="85%" stopColor="#7c3aed" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.28} />
+                      <stop offset="85%" stopColor="#2563eb" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="gHot" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.22} />
@@ -148,7 +148,7 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
                   <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} dy={8} />
                   <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} width={34} allowDecimals={false} />
                   <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#d8b4fe", strokeWidth: 1, strokeDasharray: "4 4" }} />
-                  <Area type="monotone" dataKey="leads" name="Leads" stroke="#7c3aed" strokeWidth={2.75} fill="url(#gLeads)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: "#fff" }} />
+                  <Area type="monotone" dataKey="leads" name="Leads" stroke="#2563eb" strokeWidth={2.75} fill="url(#gLeads)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: "#fff" }} />
                   <Area type="monotone" dataKey="hot" name="Hot leads" stroke="#f59e0b" strokeWidth={2.75} fill="url(#gHot)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: "#fff" }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -167,18 +167,18 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
                 <BarChart data={stats.campaignPerf} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }} barGap={4} barCategoryGap={18}>
                   <defs>
                     <linearGradient id="bOpen" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#a78bfa" />
-                      <stop offset="100%" stopColor="#7c3aed" />
+                      <stop offset="0%" stopColor="#60a5fa" />
+                      <stop offset="100%" stopColor="#2563eb" />
                     </linearGradient>
                     <linearGradient id="bReply" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#e9e3fb" />
-                      <stop offset="100%" stopColor="#c4b5fd" />
+                      <stop offset="0%" stopColor="#dbeafe" />
+                      <stop offset="100%" stopColor="#93c5fd" />
                     </linearGradient>
                   </defs>
                   <CartesianGrid horizontal={false} stroke="#f0f0f7" strokeDasharray="4 4" />
                   <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} unit="%" />
                   <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={76} />
-                  <Tooltip content={<ChartTooltip suffix="%" />} cursor={{ fill: "rgba(124,58,237,0.05)" }} />
+                  <Tooltip content={<ChartTooltip suffix="%" />} cursor={{ fill: "rgba(37,99,235,0.05)" }} />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} iconType="circle" iconSize={8} />
                   <Bar dataKey="openRate" fill="url(#bOpen)" radius={[0, 6, 6, 0]} name="Open %" barSize={12} />
                   <Bar dataKey="replyRate" fill="url(#bReply)" radius={[0, 6, 6, 0]} name="Reply %" barSize={12} />
@@ -229,10 +229,10 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
             </CardHeader>
             <CardContent className="space-y-4">
               {[
-                { label: "Emails sent", value: stats.snapshot.emailsSent.toLocaleString(), icon: <MailOpen className="h-4 w-4" />, color: "text-violet-600 bg-violet-50" },
+                { label: "Emails sent", value: stats.snapshot.emailsSent.toLocaleString(), icon: <MailOpen className="h-4 w-4" />, color: "text-blue-600 bg-blue-50" },
                 { label: "Replies received", value: stats.snapshot.repliesReceived.toLocaleString(), icon: <Reply className="h-4 w-4" />, color: "text-emerald-600 bg-emerald-50" },
                 { label: "Hot leads", value: stats.snapshot.hotLeads.toLocaleString(), icon: <Flame className="h-4 w-4" />, color: "text-amber-600 bg-amber-50" },
-                { label: "AI scored", value: stats.snapshot.aiScored.toLocaleString(), icon: <Target className="h-4 w-4" />, color: "text-purple-600 bg-purple-50" },
+                { label: "AI scored", value: stats.snapshot.aiScored.toLocaleString(), icon: <Target className="h-4 w-4" />, color: "text-indigo-600 bg-indigo-50" },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -255,7 +255,7 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
               ) : (
                 stats.hotLeadAlerts.map((l) => (
                   <div key={l.name} className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white text-xs font-semibold flex items-center justify-center">
+                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-semibold flex items-center justify-center">
                       {l.name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
