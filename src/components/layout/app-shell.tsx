@@ -19,8 +19,9 @@ interface Props {
 function Shell({ userName, userEmail, userRole, navAccess, children }: Props) {
   const { mobileOpen, setMobileOpen } = useSidebar();
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantExpanded, setAssistantExpanded] = useState(false);
   return (
-    <div className="flex min-h-screen bg-[#f0f2f8]">
+    <div className="flex min-h-screen bg-slate-50">
       <Sidebar role={userRole} navAccess={navAccess} />
       <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} role={userRole} navAccess={navAccess} />
       <div className="flex-1 flex flex-col min-w-0">
@@ -34,9 +35,9 @@ function Shell({ userName, userEmail, userRole, navAccess, children }: Props) {
         <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-hidden">{children}</main>
       </div>
       {/* Renders as a flex column on desktop — the content area shrinks to share the window */}
-      <AssistantWidget open={assistantOpen} onClose={() => setAssistantOpen(false)} userName={userName} />
+      <AssistantWidget open={assistantOpen} onClose={() => setAssistantOpen(false)} onExpandChange={setAssistantExpanded} />
       {/* Support help bot — floating FAB bottom-right; shifts left when the AI panel is open */}
-      <SupportWidget assistantOpen={assistantOpen} />
+      <SupportWidget assistantOpen={assistantOpen} assistantExpanded={assistantExpanded} />
     </div>
   );
 }

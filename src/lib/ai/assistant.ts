@@ -1,10 +1,10 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
-import { createLead, getLeads, updateLead } from "@/lib/queries/leads";
-import { createCampaign, getCampaigns, getCampaignStats, updateCampaign } from "@/lib/queries/campaigns";
-import { createSegment, getSegments } from "@/lib/queries/segments";
-import { createEmailTemplate, getEmailTemplates } from "@/lib/queries/templates";
-import { getNewsletters } from "@/lib/queries/newsletters";
+import { createLead, getLeads, updateLead, deleteLead } from "@/lib/queries/leads";
+import { createCampaign, getCampaigns, getCampaignStats, updateCampaign, deleteCampaign } from "@/lib/queries/campaigns";
+import { createSegment, getSegments, deleteSegment } from "@/lib/queries/segments";
+import { createEmailTemplate, getEmailTemplates, deleteEmailTemplate } from "@/lib/queries/templates";
+import { getNewsletters, deleteNewsletter } from "@/lib/queries/newsletters";
 import { sendNewsletter } from "@/lib/email/newsletter-actions";
 import { getUsers } from "@/lib/queries/users";
 import { sendLeadEmail } from "@/lib/email/actions";
@@ -102,7 +102,7 @@ const TOOLS = [
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
-  // ---------- WRITE (requires admin approval) ----------
+  // ---------- WRITE (requires admin approval — READ/CREATE/EDIT only, no deletes) ----------
   {
     type: "function",
     function: {
@@ -251,24 +251,32 @@ const WRITE_TOOLS = new Set([
   "send_newsletter",
 ]);
 
-const SYSTEM_PROMPT = `You are the LeadPro AI assistant — an in-app agent for a lead-nurturing platform. You can read workspace data instantly and propose changes that run after the admin approves them.
+const DELETE_TOOLS = new Set([
+  "delete_lead", "delete_campaign", "delete_segment",
+  "delete_template", "delete_newsletter",
+]);
 
-App map: Dashboard → Leads (Add Leads wizard, capture form) → Campaigns (Sequences + Email Campaigns) → Inbox → Segments → Newsletters → Templates → Workflows → Analytics. Admin: User Management, Capture Form, Settings.
+const SYSTEM_PROMPT = `You are the Nxelio AI Assistant — an intelligent in-app agent for the Nxelio sales engagement and lead-nurturing platform. You help users read workspace data instantly and propose approved changes through a secure approval workflow.
+
+Application modules you support: Dashboard, Leads, Contacts, Campaigns, Inbox, Segments, Newsletters, Templates, Workflows, Analytics, Reports, Users, Roles, Billing, Credits, and Settings.
+
+STRICT OPERATION RULES:
+1. You support ONLY three operations: Read (instant), Create (approval required), and Edit/Update (approval required).
+2. DELETE operations are COMPLETELY DISABLED. If a user asks to delete anything, respond: "Delete operations are not available through the AI assistant. Please use the application interface to delete records directly." Do not call any delete tool.
+3. You ONLY answer questions related to the Nxelio application. If a user asks any general question unrelated to the application (e.g. weather, math, general knowledge, coding help, recipes, jokes, current events), respond politely: "I'm the Nxelio Assistant and I can only help with application-related questions — such as your leads, campaigns, analytics, segments, billing, or settings. How can I help you with the platform today?"
 
 How your tools work:
-- READ tools (stats, list_users, search_leads, list_*) run immediately — use them freely to answer questions.
-- WRITE tools (create/update/send) do NOT run immediately. Calling one queues it on an approval card the admin must accept. So when the user asks for a change, call the tool right away with precise args and a clear "display" label — do not ask permission in text, the approval card handles that.
-- A QUESTION is never a reason to call a write tool. "How many admins are there?" → list_users. Only call write tools when the user explicitly asks to create, update, or send something.
-- You cannot delete any records. If the user asks to delete something, politely explain that deletion is not available through the assistant.
+- READ tools (stats, list_users, search_leads, list_*) execute immediately — use them freely to answer data questions.
+- WRITE tools (create/update/send) do NOT run immediately. They queue an approval card the admin must accept before anything changes.
+- Never call a write tool for a question — only for an explicit create/update/send request.
 
-Reporting style — precise like a careful engineer:
-- State exactly what you found or queued, with real values (names, emails, counts, statuses). Never a bare "Done!".
-- Only claim what tool results confirm. If a tool errored, quote the error and say the step did NOT happen.
-- Multiple findings/actions → short bullets. Separate "Done" from "Needs approval" from "Not possible".
-- Ambiguous target (which lead?) → ask ONE precise clarifying question instead of guessing.
-- You only see this workspace's data; never invent numbers.
+Reporting style:
+- Precise and factual — cite real values from tool results (names, emails, counts, statuses).
+- Never invent or estimate data. If a tool errors, quote the error and state the action did NOT complete.
+- Use short bullets for multiple items. Clearly separate Done / Needs Approval / Not Possible.
+- If the target is ambiguous, ask ONE specific clarifying question rather than guessing.
 
-Scope — IMPORTANT: You ONLY help with LeadPro and this workspace (leads, campaigns, inbox, opportunities, segments, newsletters, templates, analytics, settings). If the user asks about general knowledge, coding help, trivia, or anything unrelated to LeadPro, do NOT answer it — reply briefly: "I can only help with LeadPro — your leads, campaigns, inbox, opportunities, and analytics." Then suggest one relevant thing they could ask.`;
+Scope reminder: Only assist with Nxelio platform features. Politely decline everything else and redirect to a relevant platform question.`;
 
 // ---------------------------------------------------------------------------
 // Read-tool execution (auto). All queries run under the caller's session — RLS
@@ -345,7 +353,7 @@ async function executeWriteTool(name: string, args: Record<string, unknown>): Pr
         linkedin: (args.linkedin as string) || null, phone: (args.phone as string) || null,
         source: "AI Assistant", status: "New",
       });
-      return { ok: true, detail: `Created lead ${args.full_name || args.company_name} (id ${String(lead.id).slice(0, 8)}…)` };
+      return { ok: true, detail: `Created lead ${args.full_name || args.company_name} (id ${String(lead.id).slice(0, 8)}...)` };
     }
     case "update_lead": {
       const fields: Record<string, unknown> = {};
@@ -353,16 +361,26 @@ async function executeWriteTool(name: string, args: Record<string, unknown>): Pr
         if (args[k] !== undefined) fields[k] = args[k];
       }
       if (!Object.keys(fields).length) return { ok: false, detail: "No fields to update." };
-      await updateLead(String(args.lead_id), fields);
-      return { ok: true, detail: `Updated ${args.display}: ${Object.entries(fields).map(([k, v]) => `${k} → ${v}`).join(", ")}` };
+      // Resolve partial/truncated IDs the AI may have remembered from earlier messages
+      let leadId = String(args.lead_id);
+      if (leadId.length < 36) {
+        const all = await getLeads();
+        const found = all.find((l) => l.id.startsWith(leadId)) || all.find((l) => l.full_name === String(args.display || ""));
+        if (found) leadId = found.id;
+      }
+      await updateLead(leadId, fields);
+      return { ok: true, detail: `Updated ${args.display}: ${Object.entries(fields).map(([k, v]) => `${k} -> ${v}`).join(", ")}` };
     }
+    case "delete_lead":
+      await deleteLead(String(args.lead_id));
+      return { ok: true, detail: `Deleted lead ${args.display}` };
     case "create_campaign": {
       const c = await createCampaign({
         campaign_name: String(args.campaign_name),
         subject: args.subject ? String(args.subject) : null,
         content: args.body ? String(args.body) : null,
       });
-      return { ok: true, detail: `Created draft campaign “${args.campaign_name}” (id ${String(c?.id).slice(0, 8)}…)` };
+      return { ok: true, detail: `Created draft campaign "${args.campaign_name}" (id ${String(c?.id).slice(0, 8)}...)` };
     }
     case "update_campaign": {
       const fields: Record<string, unknown> = {};
@@ -370,9 +388,20 @@ async function executeWriteTool(name: string, args: Record<string, unknown>): Pr
         if (args[k] !== undefined) fields[k] = args[k];
       }
       if (!Object.keys(fields).length) return { ok: false, detail: "No fields to update." };
-      await updateCampaign(String(args.campaign_id), fields);
+      // Resolve partial/truncated IDs the AI may have remembered from earlier messages
+      let campaignId = String(args.campaign_id);
+      if (campaignId.length < 36) {
+        const all = await getCampaigns();
+        const found = all.find((c) => c.id.startsWith(campaignId)) || all.find((c) => c.campaign_name === String(args.display || ""));
+        if (!found) return { ok: false, detail: `Campaign "${args.display}" not found. Please use list_campaigns to confirm the ID.` };
+        campaignId = found.id;
+      }
+      await updateCampaign(campaignId, fields);
       return { ok: true, detail: `Updated campaign ${args.display}: ${Object.keys(fields).join(", ")}` };
     }
+    case "delete_campaign":
+      await deleteCampaign(String(args.campaign_id));
+      return { ok: true, detail: `Deleted campaign ${args.display}` };
     case "create_segment": {
       const rules = Array.isArray(args.rules)
         ? (args.rules as Array<{ field: string; operator: string; value: string }>).map((r, i) => ({
@@ -380,16 +409,25 @@ async function executeWriteTool(name: string, args: Record<string, unknown>): Pr
           }))
         : [];
       await createSegment(String(args.name), String(args.description || ""), "Dynamic", rules);
-      return { ok: true, detail: `Created segment “${args.name}” with ${rules.length} rule${rules.length === 1 ? "" : "s"}` };
+      return { ok: true, detail: `Created segment "${args.name}" with ${rules.length} rule${rules.length === 1 ? "" : "s"}` };
     }
+    case "delete_segment":
+      await deleteSegment(String(args.segment_id));
+      return { ok: true, detail: `Deleted segment ${args.display}` };
     case "create_email_template":
       await createEmailTemplate({ template_name: String(args.template_name), subject: String(args.subject), body: String(args.body) });
-      return { ok: true, detail: `Saved template “${args.template_name}”` };
+      return { ok: true, detail: `Saved template "${args.template_name}"` };
+    case "delete_template":
+      await deleteEmailTemplate(String(args.template_id));
+      return { ok: true, detail: `Deleted template ${args.display}` };
     case "send_email_to_lead": {
       const res = await sendLeadEmail(String(args.lead_id), String(args.subject), String(args.body));
       if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
-      return { ok: true, detail: `Sent “${args.subject}” to ${args.display}` };
+      return { ok: true, detail: `Sent "${args.subject}" to ${args.display}` };
     }
+    case "delete_newsletter":
+      await deleteNewsletter(String(args.newsletter_id));
+      return { ok: true, detail: `Deleted newsletter ${args.display}` };
     case "send_newsletter": {
       const res = await sendNewsletter(String(args.newsletter_id));
       if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
@@ -406,14 +444,19 @@ function summarizeAction(name: string, args: Record<string, unknown>): string {
     case "create_lead": return `Create lead ${args.full_name || args.company_name || "?"}${args.email ? ` (${args.email})` : ""}`;
     case "update_lead": {
       const changes = ["status", "full_name", "email", "company_name", "industry", "interest_area", "phone"]
-        .filter((k) => args[k] !== undefined).map((k) => `${k} → ${args[k]}`).join(", ");
+        .filter((k) => args[k] !== undefined).map((k) => `${k} -> ${args[k]}`).join(", ");
       return `Update lead ${args.display}: ${changes || "no changes"}`;
     }
-    case "create_campaign": return `Create draft campaign “${args.campaign_name}”`;
+    case "delete_lead": return `Delete lead ${args.display}`;
+    case "create_campaign": return `Create draft campaign "${args.campaign_name}"`;
     case "update_campaign": return `Update campaign ${args.display}`;
-    case "create_segment": return `Create segment “${args.name}”`;
-    case "create_email_template": return `Save template “${args.template_name}”`;
-    case "send_email_to_lead": return `Send email to ${args.display} — “${args.subject}”`;
+    case "delete_campaign": return `Delete campaign ${args.display}`;
+    case "create_segment": return `Create segment "${args.name}"`;
+    case "delete_segment": return `Delete segment ${args.display}`;
+    case "create_email_template": return `Save template "${args.template_name}"`;
+    case "delete_template": return `Delete template ${args.display}`;
+    case "send_email_to_lead": return `Send email to ${args.display} — "${args.subject}"`;
+    case "delete_newsletter": return `Delete newsletter ${args.display}`;
     case "send_newsletter": return `Send newsletter ${args.display} to its subscribed audience`;
     default: return name;
   }
@@ -423,9 +466,6 @@ function summarizeAction(name: string, args: Record<string, unknown>): string {
 // Rate-limit-aware completion call: retries 429/5xx with backoff instead of
 // surfacing raw provider errors.
 // ---------------------------------------------------------------------------
-// Known-good current Groq model. If the configured AI_MODEL has been
-// decommissioned (provider returns 400), we transparently retry on this one so
-// a stale deployment env var can't take the whole assistant offline.
 const FALLBACK_MODEL = "llama-3.3-70b-versatile";
 
 async function chatCompletion(body: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false; status: number; text: string }> {
@@ -443,16 +483,14 @@ async function chatCompletion(body: Record<string, unknown>): Promise<{ ok: true
     lastStatus = res.status;
     lastText = await res.text();
 
-    // Configured model is gone/invalid → switch to the fallback once and retry.
-    if (res.status === 400 && !triedFallback && body.model !== FALLBACK_MODEL
-        && /model|decommission|does not exist|not found/i.test(lastText)) {
+    // On any 400 from the primary model, retry once with the fallback model.
+    if (res.status === 400 && !triedFallback && body.model !== FALLBACK_MODEL) {
       triedFallback = true;
       body = { ...body, model: FALLBACK_MODEL };
       continue;
     }
 
     if (res.status === 429 || res.status >= 500) {
-      // Respect the provider's suggested wait when present, else backoff
       let waitMs = (attempt + 1) * 4000;
       const m = lastText.match(/try again in (\d+(?:\.\d+)?)s/i);
       if (m) waitMs = Math.ceil(parseFloat(m[1]) * 1000) + 500;
@@ -461,17 +499,14 @@ async function chatCompletion(body: Record<string, unknown>): Promise<{ ok: true
       await new Promise((r) => setTimeout(r, Math.min(waitMs, 20000)));
       continue;
     }
-    break; // non-retryable
+    break;
   }
   return { ok: false, status: lastStatus, text: lastText };
 }
 
 // ---------------------------------------------------------------------------
-// Main entry
+// Off-topic guard
 // ---------------------------------------------------------------------------
-// Words that mark a message as LeadPro-related. If a message has none of these
-// (and isn't a greeting/meta question), we treat it as off-topic and answer with
-// a canned reply WITHOUT calling the model — saving tokens.
 const DOMAIN_KEYWORDS = [
   "lead", "campaign", "email", "mail", "inbox", "repl", "opportunit", "pipeline", "deal", "revenue",
   "segment", "score", "scoring", "newsletter", "outreach", "sequence", "contact", "dashboard", "analytic",
@@ -488,34 +523,27 @@ const META_ALLOW = [
   /^\s*(thanks?|thank you|ok|okay|cool|great|nice)\b/i,
   /good\s+(morning|evening|afternoon)/i,
 ];
-// Action verbs that signal an app command — these always go to the model, even if
-// the noun is misspelled ("delete all the campigns").
 const ACTION_VERBS = /\b(create|add|delete|remove|send|update|edit|change|rename|mark|move|convert|draft|write|compose|schedul|launch|pause|resume|stop|start|score|enrich|import|export|show|list|find|get|fetch|count|search|set|assign|reply|how\s+many|how\s+much)\b/i;
-// Clear general-knowledge / off-topic patterns — only these short-circuit the model.
 const OFF_TOPIC_PATTERNS = [
   /\b(capital of|weather|temperature|recipe|poem|joke|lyrics|population of|translate|president|prime minister|who\s+(is|was|won)|what year|distance between|meaning of|how to (cook|bake|make a)|movie|football|cricket|stock price|bitcoin|crypto|horoscope|news today|define\b)\b/i,
-  /^\s*\d+\s*[-+*/x]\s*\d+\s*=?\s*$/, // bare arithmetic
+  /^\s*\d+\s*[-+*/x]\s*\d+\s*=?\s*$/,
 ];
-const OFF_TOPIC_REPLY =
-  "I can only help with LeadPro — your leads, campaigns, inbox, opportunities, and analytics. I can't answer general questions. Try asking me something like “How many hot leads do I have?” or “Create a follow-up campaign for new leads.”";
+const OFF_TOPIC_REPLY = "I'm the Nxelio Assistant and I can only help with application-related questions — such as your leads, campaigns, analytics, segments, billing, or settings. How can I help you with the platform today?";
 
-/**
- * Token-saving guard. Lenient by design: anything that looks like an app command
- * (a LeadPro keyword OR an action verb) goes to the model. Only messages that
- * clearly match general-knowledge patterns — with no app signal — are answered
- * with the canned reply. The system prompt is the real backstop for the rest.
- */
 function isOffTopic(history: AssistantMessage[]): boolean {
   const lastUser = [...history].reverse().find((m) => m.role === "user");
   const text = (lastUser?.content || "").toLowerCase().trim();
   if (!text) return false;
-  if (META_ALLOW.some((r) => r.test(text))) return false;          // greetings / "what can you do"
-  if (DOMAIN_KEYWORDS.some((k) => text.includes(k))) return false; // mentions a LeadPro topic
-  if (ACTION_VERBS.test(text)) return false;                       // an app command (handles typos like "campigns")
-  if (OFF_TOPIC_PATTERNS.some((r) => r.test(text))) return true;   // clearly general knowledge → skip the model
-  return false;                                                    // unsure → let the model (+ system prompt) decide
+  if (META_ALLOW.some((r) => r.test(text))) return false;
+  if (DOMAIN_KEYWORDS.some((k) => text.includes(k))) return false;
+  if (ACTION_VERBS.test(text)) return false;
+  if (OFF_TOPIC_PATTERNS.some((r) => r.test(text))) return true;
+  return false;
 }
 
+// ---------------------------------------------------------------------------
+// Main entry
+// ---------------------------------------------------------------------------
 export async function runAssistant(history: AssistantMessage[]): Promise<AssistantResult> {
   if (!API_KEY) return { reply: "", actions: [], error: "AI isn't enabled on this environment. An admin needs to add the AI_API_KEY (and AI_MODEL) environment variables to the deployment, then redeploy." };
 
@@ -523,7 +551,6 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { reply: "", actions: [], error: "Not authenticated." };
 
-  // Off-topic guard — answer without spending tokens on the model.
   if (isOffTopic(history)) {
     return { reply: OFF_TOPIC_REPLY, actions: [] };
   }
@@ -543,30 +570,62 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
 
   const actions: string[] = [];
 
+  // Some Groq/Llama models embed function calls as text instead of using tool_calls.
+  // Pattern: <function(name)\nJSON</function>
+  function parseLlamaFunctionCalls(text: string): ToolCall[] {
+    const calls: ToolCall[] = [];
+    const pattern = /<function\((\w+)\)\s*([\s\S]*?)<\/function>/g;
+    let m: RegExpExecArray | null;
+    let idx = 0;
+    while ((m = pattern.exec(text)) !== null) {
+      calls.push({ id: `embedded_${idx++}`, type: "function", function: { name: m[1], arguments: m[2].trim() } });
+    }
+    return calls;
+  }
+
+  function stripLlamaFunctionTags(text: string): string {
+    return text.replace(/<function\(\w+\)\s*[\s\S]*?<\/function>/g, "").trim();
+  }
+
   for (let turn = 0; turn < 6; turn++) {
     const res = await chatCompletion({
-      model: MODEL, messages, tools: TOOLS, tool_choice: "auto", temperature: 0.4, max_tokens: 1500,
+      model: MODEL, messages, tools: TOOLS, tool_choice: "auto",
+      parallel_tool_calls: false, temperature: 0.4, max_tokens: 1500,
     });
 
     if (!res.ok) {
+      let detail = "";
+      try {
+        const parsed = JSON.parse(res.text);
+        detail = parsed?.error?.message || parsed?.message || res.text.slice(0, 200);
+      } catch { detail = res.text.slice(0, 200); }
       const friendly = res.status === 429
-        ? "The AI provider is busy right now — I retried a few times but it's still rate-limited. Please try again in a minute; nothing was lost."
-        : `The AI provider returned an error (${res.status}). Please try again.`;
+        ? "The AI provider is busy — please try again in a moment."
+        : `AI error (${res.status}): ${detail || "unknown error"}`;
       return { reply: "", actions, error: friendly };
     }
 
     const msg = (res.data as { choices?: { message?: { content?: string; tool_calls?: ToolCall[] } }[] }).choices?.[0]?.message;
     if (!msg) return { reply: "", actions, error: "Empty AI response. Please try again." };
 
-    const toolCalls = msg.tool_calls;
-    if (toolCalls?.length) {
-      // Split this batch: writes become a proposal, reads execute now.
+    // Prefer proper tool_calls; fall back to embedded Llama-style function tags in text
+    const properCalls = msg.tool_calls ?? [];
+    const embeddedCalls = properCalls.length === 0 ? parseLlamaFunctionCalls(msg.content || "") : [];
+    const toolCalls: ToolCall[] = properCalls.length ? properCalls : embeddedCalls;
+    // When using embedded calls, strip the function markup from the displayed content
+    const displayContent = embeddedCalls.length > 0
+      ? stripLlamaFunctionTags(msg.content || "")
+      : (msg.content ?? null);
+
+    if (toolCalls.length) {
       const writes: ProposedAction[] = [];
       const reads: ToolCall[] = [];
       for (const tc of toolCalls) {
         let parsed: Record<string, unknown> = {};
         try { parsed = JSON.parse(tc.function.arguments || "{}"); } catch { /* empty */ }
-        if (WRITE_TOOLS.has(tc.function.name)) {
+        if (DELETE_TOOLS.has(tc.function.name)) {
+          // Delete operations disabled — skip silently
+        } else if (WRITE_TOOLS.has(tc.function.name)) {
           writes.push({ tool: tc.function.name, args: parsed, summary: summarizeAction(tc.function.name, parsed) });
         } else {
           reads.push(tc);
@@ -574,15 +633,15 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
       }
 
       if (writes.length) {
-        // Stop here — the admin must approve before anything mutates.
-        const intro = msg.content?.trim()
+        const intro = displayContent?.trim()
           || (writes.length === 1
             ? "I'm ready to make this change — approve it below to proceed."
             : `I'm ready to make ${writes.length} changes — approve them below to proceed.`);
         return { reply: intro, actions, proposal: writes };
       }
 
-      messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: toolCalls });
+      // For proper tool_calls use original content; for embedded calls use stripped content
+      messages.push({ role: "assistant", content: properCalls.length ? (msg.content ?? null) : (displayContent ?? null), tool_calls: toolCalls });
       for (const tc of reads) {
         let parsed: Record<string, unknown> = {};
         try { parsed = JSON.parse(tc.function.arguments || "{}"); } catch { /* empty */ }
@@ -599,9 +658,7 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
 }
 
 // ---------------------------------------------------------------------------
-// Approval execution — runs ONLY when the admin clicks Approve. Tool names are
-// validated against the whitelist; everything runs under the caller's session
-// so RLS keeps it inside their workspace.
+// Approval execution — runs ONLY when the admin clicks Approve.
 // ---------------------------------------------------------------------------
 export async function approveAssistantActions(
   proposal: ProposedAction[]
@@ -614,8 +671,12 @@ export async function approveAssistantActions(
   const errors: string[] = [];
 
   for (const action of proposal.slice(0, 10)) {
+    if (DELETE_TOOLS.has(action.tool)) {
+      errors.push(`Delete operations are disabled in the AI assistant. Use the application interface instead.`);
+      continue;
+    }
     if (!WRITE_TOOLS.has(action.tool)) {
-      errors.push(`Blocked unknown action “${action.tool}”.`);
+      errors.push(`Blocked unknown action "${action.tool}".`);
       continue;
     }
     try {

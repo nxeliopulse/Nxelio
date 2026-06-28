@@ -44,12 +44,17 @@ function LoginForm() {
     }
   }, [params]);
 
-  const valid = form.email.includes("@") && form.password.length >= 6;
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!valid) return;
     setError(null);
+    if (!form.email.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
     setLoading(true);
 
     const supabase = createClient();
@@ -132,7 +137,7 @@ function LoginForm() {
           Remember me for 30 days
         </label>
 
-        <Button type="submit" size="lg" className="w-full" disabled={!valid || loading}>
+        <Button type="submit" size="lg" className="w-full" disabled={loading}>
           {loading ? "Signing in..." : "Continue"}
         </Button>
 
