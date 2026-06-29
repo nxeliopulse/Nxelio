@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { signUpDirect } from "@/lib/queries/auth";
+import { SocialAuthButtons } from "@/components/auth/social-auth-buttons";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -60,14 +61,16 @@ export default function SignupPage() {
         <p className="text-slate-500">Start nurturing leads with AI in minutes.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+      {error && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-4">
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
+      <SocialAuthButtons next="/onboarding" disabled={loading} onError={(m) => setError(m || null)} />
+
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Full name</label>
           <Input

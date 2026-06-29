@@ -348,6 +348,7 @@ export function AssistantWidget({
       <div
         className={cn(
           "flex flex-col flex-shrink-0 m-2.5 rounded-2xl overflow-hidden h-[calc(100vh-20px)]",
+          "transition-[width] duration-300 ease-in-out",
           innerWidth,
           "max-sm:w-[calc(100vw-20px)] max-sm:h-[calc(100%-20px)]"
         )}

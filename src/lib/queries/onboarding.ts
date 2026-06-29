@@ -1,5 +1,5 @@
 "use server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 
@@ -54,11 +54,21 @@ export async function saveOnboarding(data: OnboardingData): Promise<{ ok: boolea
   const supabase = await createClient();
   const wsId = await currentWorkspaceId(supabase);
   if (!wsId) return { ok: false, error: "No workspace found for this account." };
-  const { error } = await supabase
+  // The workspaces UPDATE policy is owner-only ("Owner updates workspace"), so a
+  // non-owner member's save would silently affect 0 rows and look successful while
+  // persisting nothing. wsId is already scoped to THIS authenticated user's
+  // workspace, and onboarding fields are non-sensitive workspace config, so we
+  // write with the admin client and then verify a row was actually updated.
+  const admin = createAdminClient();
+  const { data: updated, error } = await admin
     .from("workspaces")
     .update({ onboarding: data, onboarding_completed: true })
-    .eq("id", wsId);
+    .eq("id", wsId)
+    .select("id");
   if (error) return { ok: false, error: error.message };
+  if (!updated || updated.length === 0) {
+    return { ok: false, error: "Couldn't save your details — workspace not found. Please refresh and try again." };
+  }
   revalidatePath("/dashboard");
   revalidatePath("/onboarding");
   return { ok: true };

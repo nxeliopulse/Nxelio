@@ -12,7 +12,8 @@ export default async function DashboardPage() {
 
   const { count: outreachCount } = await supabase
     .from("outreach_accounts")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .eq("status", "connected");
 
   const onboardingStatus = {
     essentialsDone,

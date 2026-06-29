@@ -48,10 +48,10 @@ function Field({ label, required, icon, children }: { label: string; required?: 
   );
 }
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ initial, isEdit }: { initial?: OnboardingData | null; isEdit?: boolean } = {}) {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<OnboardingData>(emptyForm);
+  const [form, setForm] = useState<OnboardingData>(initial ?? emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -308,9 +308,11 @@ export function OnboardingWizard() {
             </Button>
           ) : (
             <>
-              <Button variant="ghost" onClick={finish} disabled={saving}>Skip for now</Button>
+              <Button variant="ghost" onClick={() => (isEdit ? router.push("/dashboard") : finish())} disabled={saving}>{isEdit ? "Cancel" : "Skip for now"}</Button>
               <Button onClick={finish} disabled={saving}>
-                {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Finishing…</> : <><Sparkles className="h-4 w-4" /> Finish setup</>}
+                {saving
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> {isEdit ? "Saving…" : "Finishing…"}</>
+                  : <><Sparkles className="h-4 w-4" /> {isEdit ? "Save changes" : "Finish setup"}</>}
               </Button>
             </>
           )}

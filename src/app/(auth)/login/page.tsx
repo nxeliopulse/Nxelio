@@ -6,6 +6,7 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { SocialAuthButtons } from "@/components/auth/social-auth-buttons";
 
 function LoginForm() {
   const router = useRouter();
@@ -81,13 +82,16 @@ function LoginForm() {
         <p className="text-slate-500">Sign in to your Nxelio workspace.</p>
       </div>
 
+      {error && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-4">
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <SocialAuthButtons next="/dashboard" disabled={loading} onError={(m) => setError(m || null)} />
+
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
         {notice && (
           <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-700">
             <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
