@@ -1,11 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
+import { getOnboarding } from "@/lib/queries/onboarding";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Onboarding is required before the app is usable — route new (and existing)
+  // users to /onboarding until the workspace setup is complete.
+  const { completed } = await getOnboarding();
+  if (!completed) redirect("/onboarding");
 
   const { data: profile } = await supabase
     .from("users")

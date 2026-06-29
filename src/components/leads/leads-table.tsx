@@ -146,15 +146,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
           </Button>
 
           <div className="ml-auto flex items-center gap-2">
-            {selected.length > 0 && (
-              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
-                <span className="text-sm text-blue-700 font-medium">{selected.length} selected</span>
-                <button onClick={handleBulkDelete} disabled={pending} className="text-red-600 hover:text-red-700 inline-flex items-center gap-1 text-sm disabled:opacity-50">
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
-                </button>
-              </div>
-            )}
-
             {/* Sort */}
             <div className="relative inline-flex items-center">
               <ArrowUpDown className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
@@ -311,6 +302,31 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
       </Card>
 
       <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
+
+      {/* LP-15 — floating selection action bar */}
+      {selected.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lp-anim-pop max-w-[calc(100vw-2rem)]">
+          <div className="flex items-center gap-3 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/30 pl-5 pr-3 py-2.5">
+            <span className="text-sm font-medium whitespace-nowrap">
+              <span className="font-semibold">{selected.length}</span> selected
+            </span>
+            <span className="h-5 w-px bg-white/20" />
+            <button
+              onClick={handleBulkDelete}
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white text-red-600 hover:bg-red-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+            <button
+              onClick={() => setSelected([])}
+              className="rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

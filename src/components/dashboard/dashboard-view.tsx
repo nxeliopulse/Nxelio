@@ -27,6 +27,10 @@ const WIDGET_DEFS = [
   { id: "audience_growth",  label: "Audience Growth",       desc: "Monthly lead volume bar chart" },
   { id: "recent_campaigns", label: "Recent Campaigns",      desc: "Campaign activity table" },
   { id: "ai_insights",      label: "AI Insights",           desc: "Smart recommendations" },
+  { id: "hot_leads",        label: "Hot Leads Trend",       desc: "Hot lead conversions over time" },
+  { id: "reply_rates",      label: "Reply Rates",           desc: "Reply rate per campaign" },
+  { id: "conversion",       label: "Conversion Rate",       desc: "Overall lead conversion gauge" },
+  { id: "snapshot",         label: "Workspace Snapshot",    desc: "Key workspace totals" },
 ] as const;
 
 type WidgetId = (typeof WIDGET_DEFS)[number]["id"];
@@ -35,6 +39,7 @@ type Visibility = Record<WidgetId, boolean>;
 const DEFAULT_VIS: Visibility = {
   kpi: true, campaign_perf: true, campaign_types: true,
   top_automations: true, audience_growth: true, recent_campaigns: true, ai_insights: true,
+  hot_leads: false, reply_rates: false, conversion: false, snapshot: false,
 };
 const STORAGE_KEY = "lp_dashboard_widgets";
 
@@ -149,6 +154,21 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
     { label: "Replies",          value: stats.snapshot.repliesReceived.toLocaleString(), Icon: TrendingUp, color: "bg-violet-50 text-violet-600", delta: undefined },
   ];
 
+  // ── New-widget derived data ───────────────────────────────────────────────
+  const hotTrend = stats.leadGrowth.map((m) => ({ date: m.date, Hot: m.hot }));
+  const replyData = stats.campaignPerf.map((c) => ({ name: c.name, replyRate: c.replyRate }));
+  const convPct = Math.min(100, Math.max(0, stats.conversionRate));
+  const convData = [
+    { name: "Converted", value: convPct, color: BLUE },
+    { name: "Rest", value: 100 - convPct, color: "#e2e8f0" },
+  ];
+  const snapshotStats = [
+    { label: "Emails sent", value: stats.snapshot.emailsSent.toLocaleString(), Icon: Mail, color: "bg-blue-50 text-blue-600" },
+    { label: "Replies received", value: stats.snapshot.repliesReceived.toLocaleString(), Icon: TrendingUp, color: "bg-emerald-50 text-emerald-600" },
+    { label: "Hot leads", value: stats.snapshot.hotLeads.toLocaleString(), Icon: Flame, color: "bg-amber-50 text-amber-600" },
+    { label: "AI scored", value: stats.snapshot.aiScored.toLocaleString(), Icon: Sparkles, color: "bg-indigo-50 text-indigo-600" },
+  ];
+
   const visibleCount = WIDGET_DEFS.filter((w) => vis[w.id]).length;
 
   return (
@@ -190,9 +210,9 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
         </div>
       )}
 
-      {/* ── Row 1 ── */}
-      {(vis.campaign_perf || vis.campaign_types || vis.top_automations) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* ── Widgets — single responsive grid; auto-fills & reflows for any toggle combo ── */}
+      {(vis.campaign_perf || vis.campaign_types || vis.top_automations || vis.audience_growth || vis.recent_campaigns || vis.ai_insights || vis.hot_leads || vis.reply_rates || vis.conversion || vis.snapshot) && (
+        <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(330px,1fr))] [&>*]:min-w-0">
           {vis.campaign_perf && (
             <Card>
               <CardHeader className="pb-1">
@@ -296,12 +316,6 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
               </CardContent>
             </Card>
           )}
-        </div>
-      )}
-
-      {/* ── Row 2 ── */}
-      {(vis.audience_growth || vis.recent_campaigns || vis.ai_insights) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {vis.audience_growth && (
             <Card>
               <CardHeader className="pb-1">
@@ -394,6 +408,104 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
                     Open AI Assistant
                   </button>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+          {vis.hot_leads && (
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-base font-semibold">Hot Leads Trend</CardTitle>
+                <p className="text-xs text-slate-400 mt-0.5">Hot conversions over time</p>
+              </CardHeader>
+              <CardContent className="pt-1">
+                <div className="h-[210px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={hotTrend} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gHot" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={ORANGE} stopOpacity={0.2} />
+                          <stop offset="100%" stopColor={ORANGE} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} dy={6} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+                      <Tooltip content={<ChartTooltip />} cursor={{ stroke: ORANGE, strokeWidth: 1, strokeDasharray: "4 4" }} />
+                      <Area type="monotone" dataKey="Hot" stroke={ORANGE} strokeWidth={2.5} fill="url(#gHot)" dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "#fff" }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {vis.reply_rates && (
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-base font-semibold">Reply Rates</CardTitle>
+                <p className="text-xs text-slate-400 mt-0.5">Reply rate per campaign</p>
+              </CardHeader>
+              <CardContent className="pt-1">
+                <div className="h-[210px]">
+                  {replyData.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-sm text-slate-400">No campaigns yet.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={replyData} margin={{ top: 8, right: 4, left: -16, bottom: 0 }} barSize={26}>
+                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} dy={6} />
+                        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={36} />
+                        <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(37,99,235,0.04)" }} />
+                        <Bar dataKey="replyRate" name="Reply %" fill={INDIGO} radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {vis.conversion && (
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-base font-semibold">Conversion Rate</CardTitle>
+                <p className="text-xs text-slate-400 mt-0.5">Leads converted overall</p>
+              </CardHeader>
+              <CardContent className="pt-1 flex flex-col items-center">
+                <div className="h-[190px] w-full relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={convData} cx="50%" cy="50%" innerRadius={62} outerRadius={84} paddingAngle={0} dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
+                        {convData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-bold text-slate-900">{stats.conversionRate}%</span>
+                    <span className="text-xs text-slate-400">converted</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {stats.hotLeads.toLocaleString()} hot of {stats.totalLeads.toLocaleString()} leads
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {vis.snapshot && (
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-base font-semibold">Workspace Snapshot</CardTitle>
+                <p className="text-xs text-slate-400 mt-0.5">Key totals</p>
+              </CardHeader>
+              <CardContent className="pt-2 space-y-2.5">
+                {snapshotStats.map((s) => (
+                  <div key={s.label} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50">
+                    <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0", s.color)}>
+                      <s.Icon className="h-4 w-4" strokeWidth={2} />
+                    </div>
+                    <span className="text-sm text-slate-600">{s.label}</span>
+                    <span className="ml-auto text-base font-bold text-slate-900 tabular-nums">{s.value}</span>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}
