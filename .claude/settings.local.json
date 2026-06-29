@@ -16,7 +16,14 @@
       "Bash(python3 -c ' *)",
       "Read(//Users/apple/Desktop/hundo/**)",
       "Bash(flutter analyze *)",
-      "Bash(flutter test *)"
+      "Bash(flutter test *)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(taskkill /PID 27208 /F)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(xargs grep -l \"export.*interface\\\\|export.*type\")",
+      "Bash(node -e \"const cb = require\\('chargebee-typescript'\\); console.log\\(typeof cb\\); console.log\\(Object.keys\\(cb\\)\\)\")",
+      "Bash(node -e \"const { ChargeBee } = require\\('chargebee-typescript'\\); const cb = new ChargeBee\\(\\); console.log\\(typeof cb\\); console.log\\(typeof cb.configure\\);\")"
     ]
   }
 }
