@@ -7,22 +7,21 @@
   /* Softened light theme — surfaces are a calm off-white/cool-gray instead of
      pure #fff so the UI is easier on the eyes. Cards (bg-white, remapped below)
      stay a step lighter than the canvas so they still lift off the page. */
-  --background: #e9edf3;
+  --background: #f0f4ff;
   --foreground: #0f172a;
-  --card: #f5f8fc;
-  --muted: #e1e7ef;
+  --card: #ffffff;
+  --muted: #e8edf8;
   --muted-foreground: #64748b;
-  --border: #d7dde7;
+  --border: #e2e8f0;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
 
-  /* Dim the slate ramp that hardcoded utilities use for surfaces/hovers so the
-     whole canvas drops a notch in brightness (dark mode re-inverts these). */
-  --color-slate-50:  #e9edf3;
-  --color-slate-100: #dfe5ee;
+  /* Slightly blue-tinted slate ramp */
+  --color-slate-50:  #f0f4ff;
+  --color-slate-100: #e8edf8;
 }
 
 /* ============================================================================
@@ -82,11 +81,9 @@
 .dark ::-webkit-scrollbar-thumb { background: #334155; }
 .dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-/* Light mode: soften pure-white surfaces (cards, sidebar, topbar, modals) to a
-   calm off-white so the UI isn't glaring. `text-white` is untouched (only the
-   bg utility is remapped). In dark mode `.dark .bg-white` (higher specificity)
-   still wins, so this has no effect there. */
-.bg-white { background-color: #f5f8fc; }
+/* Light mode: keep cards/sidebar/topbar pure white so they lift off the
+   purple-tinted canvas. `text-white` is untouched. */
+.bg-white { background-color: #ffffff; }
 
 @theme inline {
   --color-background: var(--background);

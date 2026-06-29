@@ -208,7 +208,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
     });
   }
 
-  function handleOpenLeadProfile() {
+  function handleOpenNxeliofile() {
     if (!active?.lead_id) return;
     setMoreOpen(false);
     router.push(`/leads/${active.lead_id}`);
@@ -371,7 +371,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
                           Block sender
                         </button>
                         <button
-                          onClick={handleOpenLeadProfile}
+                          onClick={handleOpenNxeliofile}
                           disabled={!active.lead_id}
                           className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >

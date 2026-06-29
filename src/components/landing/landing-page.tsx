@@ -77,7 +77,7 @@ export function LandingPage() {
           </h1>
 
           <p className="mt-6 text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            LeadPro scores your leads with AI, drafts personalized outreach, sends polished newsletters,
+            Nxelio scores your leads with AI, drafts personalized outreach, sends polished newsletters,
             and automates follow-ups — so your team focuses on closing, not typing.
           </p>
 
@@ -133,7 +133,7 @@ export function LandingPage() {
                   <div className="h-3 w-3 rounded-full bg-emerald-400" />
                 </div>
                 <div className="ml-4 flex-1 max-w-md mx-auto bg-white border border-slate-200 rounded-md px-3 py-1 text-xs text-slate-500 text-center">
-                  app.leadpro.ai/dashboard
+                  app.nxelio.ai/dashboard
                 </div>
               </div>
 
@@ -141,7 +141,7 @@ export function LandingPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/dashboard-preview.png"
-                alt="LeadPro dashboard showing KPIs, lead growth chart, and campaign performance"
+                alt="Nxelio dashboard showing KPIs, lead growth chart, and campaign performance"
                 className="w-full h-auto block"
               />
             </div>
@@ -191,7 +191,7 @@ export function LandingPage() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold mb-4">
               From zero to revenue in 3 steps
             </div>
-            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight">How LeadPro works</h2>
+            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight">How Nxelio works</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -308,7 +308,7 @@ export function LandingPage() {
               <div className="mt-4 flex items-center gap-2">
                 <a href="mailto:harirajanncse@gmail.com" className="p-2 rounded-lg hover:bg-slate-200 text-slate-600" title="Email us"><AtSign className="h-4 w-4" /></a>
                 <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-slate-200 text-slate-600" title="LinkedIn"><Globe className="h-4 w-4" /></a>
-                <a href="https://github.com/Harirajan06/leadpro" target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-slate-200 text-slate-600" title="GitHub"><Code2 className="h-4 w-4" /></a>
+                <a href="https://github.com/Harirajan06/nxelio" target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-slate-200 text-slate-600" title="GitHub"><Code2 className="h-4 w-4" /></a>
               </div>
             </div>
             <div>
@@ -336,7 +336,7 @@ export function LandingPage() {
             </div>
           </div>
           <div className="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
-            <p>© 2026 LeadPro. All rights reserved.</p>
+            <p>© 2026 Nxelio. All rights reserved.</p>
             <p>Built with AI · Powered by Supabase, Groq & Resend</p>
           </div>
         </div>

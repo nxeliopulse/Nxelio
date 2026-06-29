@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { generateLeadOutreach, type GeneratedEmail } from "@/lib/ai/actions";
 
-const colors = ["bg-blue-500", "bg-purple-500", "bg-emerald-500", "bg-amber-500", "bg-pink-500"];
+const colors = ["bg-blue-500", "bg-indigo-500", "bg-emerald-500", "bg-amber-500", "bg-pink-500"];
 
 export function OutreachTab({ leadId }: { leadId: string }) {
   const [emails, setEmails] = useState<GeneratedEmail[] | null>(null);
@@ -29,7 +29,7 @@ export function OutreachTab({ leadId }: { leadId: string }) {
   if (!emails) {
     return (
       <Card className="p-8 text-center">
-        <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center mb-4">
+        <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-indigo-600 to-pink-600 flex items-center justify-center mb-4">
           <Send className="h-6 w-6 text-white" />
         </div>
         <h3 className="font-semibold text-slate-900 mb-1">AI Outreach Sequence</h3>
@@ -46,10 +46,10 @@ export function OutreachTab({ leadId }: { leadId: string }) {
 
   return (
     <div className="space-y-4">
-      <Card className="p-5 bg-gradient-to-br from-purple-50 to-pink-50 border-purple-100">
+      <Card className="p-5 bg-gradient-to-br from-indigo-50 to-pink-50 border-indigo-100">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0">
+            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-600 to-pink-600 flex items-center justify-center flex-shrink-0">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div>

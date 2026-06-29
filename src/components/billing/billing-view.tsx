@@ -210,7 +210,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
 
       {/* ── Current plan hero ─────────────────────────────────── */}
       <Card className="overflow-hidden mb-6">
-        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8 text-white">
+        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 p-8 text-white">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
               <div className="flex items-center gap-2 mb-3 flex-wrap">

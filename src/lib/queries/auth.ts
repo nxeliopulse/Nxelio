@@ -44,10 +44,10 @@ export async function signUpDirect(args: { email: string; password: string; full
   try {
     await sendEmail({
       to: ownerEmail,
-      subject: `New LeadPro signup — ${args.fullName}`,
+      subject: `New Nxelio signup — ${args.fullName}`,
       html: `<div style="font-family:sans-serif;line-height:1.6;color:#0f172a;padding:24px;background:#f8fafc">
         <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;padding:24px;border:1px solid #e2e8f0">
-          <h2 style="margin:0 0 16px;color:#0f172a">New LeadPro signup</h2>
+          <h2 style="margin:0 0 16px;color:#0f172a">New Nxelio signup</h2>
           <p style="margin:0 0 4px"><strong>Name:</strong> ${escapeHtml(args.fullName)}</p>
           <p style="margin:0 0 4px"><strong>Email:</strong> ${escapeHtml(args.email)}</p>
           <p style="margin:0 0 4px"><strong>User ID:</strong> <code style="font-size:12px">${newUserId}</code></p>

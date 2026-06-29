@@ -21,7 +21,7 @@ const STAGE_ACCENT: Record<OpportunityStage, string> = {
   new: "bg-slate-400",
   qualified: "bg-blue-500",
   meeting_scheduled: "bg-indigo-500",
-  proposal_sent: "bg-purple-500",
+  proposal_sent: "bg-indigo-500",
   negotiation: "bg-amber-500",
   won: "bg-emerald-500",
   lost: "bg-red-400",
@@ -92,7 +92,7 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
   const tiles = [
     { label: "Open pipeline", value: money(live.openValue), sub: `${live.openCount} open deal${live.openCount === 1 ? "" : "s"}`, icon: <DollarSign className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
     { label: "Won revenue", value: money(live.wonValue), sub: `${live.wonCount} won`, icon: <Trophy className="h-5 w-5" />, color: "bg-emerald-50 text-emerald-600" },
-    { label: "Win rate", value: `${live.winRate}%`, sub: `${live.wonCount} won · ${live.lostCount} lost`, icon: <TrendingUp className="h-5 w-5" />, color: "bg-purple-50 text-purple-600" },
+    { label: "Win rate", value: `${live.winRate}%`, sub: `${live.wonCount} won · ${live.lostCount} lost`, icon: <TrendingUp className="h-5 w-5" />, color: "bg-indigo-50 text-indigo-600" },
     { label: "Total deals", value: String(rows.length), sub: "in pipeline", icon: <Target className="h-5 w-5" />, color: "bg-amber-50 text-amber-600" },
   ];
 

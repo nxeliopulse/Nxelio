@@ -17,12 +17,15 @@ const STORAGE_KEY = "lp-sidebar-collapsed";
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsedState] = useState(false);
+  // Default to collapsed (icon-only rail). First-time users start collapsed;
+  // the rail expands only if they've previously chosen to expand it.
+  const [collapsed, setCollapsedState] = useState(true);
 
-  // Restore the persisted collapse preference on mount
+  // Restore the persisted collapse preference on mount. Only an explicit
+  // "expanded" choice ("0") overrides the collapsed default.
   useEffect(() => {
     try {
-      if (localStorage.getItem(STORAGE_KEY) === "1") setCollapsedState(true);
+      if (localStorage.getItem(STORAGE_KEY) === "0") setCollapsedState(false);
     } catch {}
   }, []);
 

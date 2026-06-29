@@ -65,7 +65,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
         {[
           { label: "Total newsletters", value: stats.total, color: "text-blue-600 bg-blue-50" },
           { label: "Sent", value: stats.sent, color: "text-emerald-600 bg-emerald-50" },
-          { label: "Avg. open rate", value: `${stats.avgOpenRate}%`, color: "text-purple-600 bg-purple-50" },
+          { label: "Avg. open rate", value: `${stats.avgOpenRate}%`, color: "text-indigo-600 bg-indigo-50" },
           { label: "Avg. click rate", value: `${stats.avgClickRate}%`, color: "text-amber-600 bg-amber-50" },
         ].map((s) => (
           <Card key={s.label} className="p-4">
@@ -130,7 +130,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                         {n.sent_count > 0 ? (
                           <div className="flex items-center gap-2">
                             <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-purple-500 rounded-full" style={{ width: `${openRate}%` }} />
+                              <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${openRate}%` }} />
                             </div>
                             <span className="text-slate-700 font-medium">{openRate}%</span>
                           </div>

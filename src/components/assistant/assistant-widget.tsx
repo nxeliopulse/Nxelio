@@ -23,21 +23,21 @@ interface ChatItem extends AssistantMessage {
 }
 
 const SUGGESTIONS = [
-  { icon: "📊", text: "What's my workspace overview?" },
-  { icon: "🔥", text: "Show me my hot leads" },
-  { icon: "📧", text: "Create a new email campaign" },
-  { icon: "👥", text: "List my team members and roles" },
+  { Icon: BarChart2, text: "What's my workspace overview?" },
+  { Icon: Users, text: "Show me my hot leads" },
+  { Icon: Mail, text: "Create a new email campaign" },
+  { Icon: Settings, text: "List my team members and roles" },
 ];
 
 const MENTION_ITEMS = [
-  { label: "Leads", emoji: "👤", value: "leads" },
-  { label: "Campaigns", emoji: "📧", value: "campaigns" },
-  { label: "Segments", emoji: "🎯", value: "segments" },
-  { label: "Templates", emoji: "📄", value: "templates" },
-  { label: "Newsletters", emoji: "📰", value: "newsletters" },
-  { label: "Users", emoji: "👥", value: "users" },
-  { label: "Analytics", emoji: "📊", value: "analytics" },
-  { label: "Inbox", emoji: "📥", value: "inbox" },
+  { label: "Leads", Icon: Users, value: "leads" },
+  { label: "Campaigns", Icon: Mail, value: "campaigns" },
+  { label: "Segments", Icon: Layers, value: "segments" },
+  { label: "Templates", Icon: FileText, value: "templates" },
+  { label: "Newsletters", Icon: Newspaper, value: "newsletters" },
+  { label: "Users", Icon: Users, value: "users" },
+  { label: "Analytics", Icon: BarChart2, value: "analytics" },
+  { label: "Inbox", Icon: Inbox, value: "inbox" },
 ];
 
 const APP_NAV = [
@@ -75,23 +75,23 @@ const TOKENS = {
     hoverBg: "#F1F5F9",
     suggBg: "#F8FAFC",
     suggBorder: "#E2E8F0",
-    suggHoverBg: "#EFF9FA",
-    suggHoverBorder: "#1FA8B8",
+    suggHoverBg: "#eff6ff",
+    suggHoverBorder: "#2563eb",
     textPrimary: "#0F172A",
     textSecondary: "#64748B",
     textMuted: "#94A3B8",
     iconColor: "#64748B",
-    appsPillBg: "#F5F3FF",
-    appsPillBorder: "#DDD6FE",
-    appsPillActiveBg: "#EDE9FE",
-    appsPillActiveBorder: "#7C3AED",
+    appsPillBg: "#eff6ff",
+    appsPillBorder: "#bfdbfe",
+    appsPillActiveBg: "#dbeafe",
+    appsPillActiveBorder: "#2563eb",
     historyActiveBg: "#F1F5F9",
     historyHoverBg: "#F8FAFC",
   },
   dark: {
     panel: "#0F172A",
-    panelBorder: "rgba(31,168,184,0.2)",
-    headerBorder: "rgba(31,168,184,0.2)",
+    panelBorder: "rgba(37,99,235,0.2)",
+    headerBorder: "rgba(37,99,235,0.2)",
     msgAi: "#1E293B",
     msgAiBorder: "rgba(255,255,255,0.1)",
     msgAiText: "#f1f5f9",
@@ -102,29 +102,29 @@ const TOKENS = {
     approvalBorder: "rgba(245,158,11,0.3)",
     approvalText: "#fde68a",
     inputBg: "rgba(255,255,255,0.04)",
-    inputBorder: "rgba(31,168,184,0.3)",
+    inputBorder: "rgba(37,99,235,0.3)",
     dropdownBg: "#1E293B",
-    dropdownBorder: "rgba(31,168,184,0.3)",
+    dropdownBorder: "rgba(37,99,235,0.3)",
     hoverBg: "rgba(255,255,255,0.06)",
-    suggBg: "rgba(31,168,184,0.05)",
-    suggBorder: "rgba(31,168,184,0.25)",
-    suggHoverBg: "rgba(31,168,184,0.12)",
-    suggHoverBorder: "rgba(31,168,184,0.6)",
+    suggBg: "rgba(37,99,235,0.05)",
+    suggBorder: "rgba(37,99,235,0.25)",
+    suggHoverBg: "rgba(37,99,235,0.12)",
+    suggHoverBorder: "rgba(37,99,235,0.6)",
     textPrimary: "#ffffff",
     textSecondary: "#94a3b8",
     textMuted: "#64748B",
     iconColor: "#94a3b8",
-    appsPillBg: "rgba(124,58,237,0.1)",
-    appsPillBorder: "rgba(124,58,237,0.4)",
-    appsPillActiveBg: "rgba(124,58,237,0.2)",
-    appsPillActiveBorder: "rgba(124,58,237,0.8)",
+    appsPillBg: "rgba(37,99,235,0.1)",
+    appsPillBorder: "rgba(37,99,235,0.4)",
+    appsPillActiveBg: "rgba(37,99,235,0.2)",
+    appsPillActiveBorder: "rgba(37,99,235,0.8)",
     historyActiveBg: "rgba(255,255,255,0.1)",
     historyHoverBg: "rgba(255,255,255,0.04)",
   },
 };
 
-const PRIMARY = "#1FA8B8";
-const PURPLE = "#7C3AED";
+const PRIMARY = "#2563eb";
+const PURPLE = "#4f46e5";
 const AMBER = "#F59E0B";
 
 export function AssistantWidget({
@@ -346,7 +346,7 @@ export function AssistantWidget({
           innerWidth,
           "max-sm:w-[calc(100vw-20px)] max-sm:h-[calc(100%-20px)]"
         )}
-        style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, ${PURPLE} 60%, ${AMBER} 100%)`, padding: "1.5px" }}
+        style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, ${PURPLE} 100%)`, padding: "1.5px" }}
       >
         {/* Inner panel */}
         <div className="flex flex-col h-full rounded-[13px] overflow-hidden" style={{ background: T.panel }}>
@@ -452,7 +452,9 @@ export function AssistantWidget({
                             (e.currentTarget as HTMLButtonElement).style.background = T.suggBg;
                           }}
                         >
-                          <span className="text-lg leading-none">{s.icon}</span>
+                          <span className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${PRIMARY}, ${PURPLE})` }}>
+                            <s.Icon className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                          </span>
                           <span className="text-sm" style={{ color: T.textPrimary }}>{s.text}</span>
                         </button>
                       ))}
@@ -570,7 +572,9 @@ export function AssistantWidget({
                             onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.background = T.hoverBg}
                             onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}
                           >
-                            <span className="text-base leading-none">{item.emoji}</span>
+                            <span className="h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${PRIMARY}, ${PURPLE})` }}>
+                              <item.Icon className="h-3 w-3 text-white" strokeWidth={2} />
+                            </span>
                             <span className="text-sm">{item.label}</span>
                             <ChevronRight className="h-3.5 w-3.5 ml-auto" style={{ color: T.textMuted }} />
                           </button>
@@ -581,7 +585,7 @@ export function AssistantWidget({
 
                   {/* NXL Apps panel */}
                   {showApps && (
-                    <div ref={appsRef} className="absolute bottom-full mb-2 left-0 w-56 rounded-xl overflow-hidden shadow-lg z-20 border" style={{ background: T.dropdownBg, borderColor: isDark ? "rgba(124,58,237,0.4)" : T.panelBorder }}>
+                    <div ref={appsRef} className="absolute bottom-full mb-2 left-0 w-56 rounded-xl overflow-hidden shadow-lg z-20 border" style={{ background: T.dropdownBg, borderColor: isDark ? "rgba(37,99,235,0.4)" : T.panelBorder }}>
                       <div className="px-3 py-2 border-b" style={{ borderColor: T.panelBorder }}>
                         <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: PURPLE }}>Quick Navigate</p>
                       </div>
@@ -608,7 +612,7 @@ export function AssistantWidget({
                   {attachments.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {attachments.map((f, i) => (
-                        <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs border" style={{ background: isDark ? "rgba(31,168,184,0.12)" : "#EFF9FA", borderColor: isDark ? "rgba(31,168,184,0.3)" : "#A5F0F9", color: T.textPrimary }}>
+                        <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs border" style={{ background: isDark ? "rgba(37,99,235,0.12)" : "#eff6ff", borderColor: isDark ? "rgba(37,99,235,0.3)" : "#bfdbfe", color: T.textPrimary }}>
                           <Paperclip className="h-3 w-3 flex-shrink-0" style={{ color: PRIMARY }} />
                           <span className="max-w-[100px] truncate">{f.name}</span>
                           <button onMouseDown={(e) => { e.preventDefault(); setAttachments((p) => p.filter((_, idx) => idx !== i)); }} className="ml-0.5 hover:text-red-400 transition-colors" style={{ color: T.textMuted }}>
@@ -654,7 +658,7 @@ export function AssistantWidget({
                           <span className="flex gap-px text-[9px] font-black leading-none">
                             <span style={{ color: PRIMARY }}>N</span>
                             <span style={{ color: PURPLE }}>X</span>
-                            <span style={{ color: AMBER }}>L</span>
+                            <span style={{ color: PRIMARY }}>L</span>
                           </span>
                           <span className="text-xs font-medium" style={{ color: T.textSecondary }}>Apps</span>
                         </button>

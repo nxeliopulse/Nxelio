@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface KpiCardProps {
@@ -10,32 +10,39 @@ interface KpiCardProps {
 }
 
 const accents = {
-  blue: "from-blue-500/10 to-blue-500/5 text-blue-600 ring-blue-100",
-  emerald: "from-emerald-500/10 to-emerald-500/5 text-emerald-600 ring-emerald-100",
-  amber: "from-amber-500/10 to-amber-500/5 text-amber-600 ring-amber-100",
-  purple: "from-purple-500/10 to-purple-500/5 text-purple-600 ring-purple-100",
+  blue: "bg-blue-50 text-blue-600",
+  emerald: "bg-emerald-50 text-emerald-600",
+  amber: "bg-amber-50 text-amber-600",
+  purple: "bg-indigo-50 text-indigo-600",
 };
 
 export function KpiCard({ label, value, delta, icon, accent = "blue" }: KpiCardProps) {
   const positive = (delta ?? 0) >= 0;
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-4">
-        <p className="text-sm font-medium text-slate-500">{label}</p>
-        <div className={cn("h-9 w-9 rounded-lg bg-gradient-to-br flex items-center justify-center ring-1", accents[accent])}>
-          {icon}
+    <div className="bg-white rounded-3xl p-5 shadow-[0_4px_24px_rgba(17,12,46,0.06)] hover:shadow-[0_8px_30px_rgba(17,12,46,0.10)] transition-shadow">
+      {/* top row: icon + label, with a muted menu glyph to match the reference */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={cn("h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0", accents[accent])}>
+            {icon}
+          </div>
+          <p className="text-sm font-medium text-slate-500 truncate">{label}</p>
         </div>
+        <MoreHorizontal className="h-4 w-4 text-slate-300 flex-shrink-0" />
       </div>
-      <div className="flex items-end justify-between">
+      {/* value + inline delta pill */}
+      <div className="flex items-end justify-between gap-2">
         <p className="text-3xl font-bold text-slate-900 tracking-tight">{value}</p>
         {delta !== undefined && (
-          <div className={cn("flex items-center gap-0.5 text-sm font-semibold", positive ? "text-emerald-600" : "text-red-600")}>
-            {positive ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
-            {Math.abs(delta)}%
-          </div>
+          <span className={cn(
+            "inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-1 rounded-lg mb-1",
+            positive ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"
+          )}>
+            {positive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+            {positive ? "+" : "-"}{Math.abs(delta)}%
+          </span>
         )}
       </div>
-      {delta !== undefined && <p className="text-xs text-slate-400 mt-1">vs. last month</p>}
     </div>
   );
 }

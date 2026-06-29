@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition, useRef } from "react";
 import Link from "next/link";
-import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Flame, Sparkles, Target } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2 } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,19 +25,20 @@ interface Props {
   stats?: { total: number; hot: number; scored: number; converted: number };
   /** When set, the list is scoped to one campaign's recipients (from "View report"). */
   campaignFilter?: { id: string; name: string };
+  /** Pre-populate the search box (from global search). */
+  initialSearch?: string;
 }
 
-export function LeadsTable({ leads, campaignFilter }: Props) {
+export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
   const { confirm } = useFeedback();
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch ?? "");
   const [industryFilter, setIndustryFilter] = useState("");
   const [showWizard, setShowWizard] = useState(false);
   const [page, setPage] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [sort, setSort] = useState<"none" | "name" | "score" | "newest">("none");
-  const [tab, setTab] = useState<"leads" | "business">("leads");
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 25;
 
@@ -114,36 +115,6 @@ export function LeadsTable({ leads, campaignFilter }: Props) {
           <Link href="/leads" className="text-sm font-medium text-blue-700 hover:text-blue-900">Clear filter ✕</Link>
         </div>
       )}
-      {/* Tab navigation */}
-      <div className="flex items-center justify-between border-b border-slate-200 mb-6">
-        <div className="flex items-center gap-8">
-          <button
-            onClick={() => setTab("leads")}
-            className={`relative pb-3 text-sm font-semibold transition-colors ${
-              tab === "leads" ? "text-blue-600" : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            Leads
-            {tab === "leads" && <span className="absolute -bottom-px left-0 right-0 h-0.5 rounded-full bg-blue-600" />}
-          </button>
-          <button
-            onClick={() => setTab("business")}
-            className={`relative pb-3 text-sm font-semibold transition-colors ${
-              tab === "business" ? "text-blue-600" : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            Business Details
-            {tab === "business" && <span className="absolute -bottom-px left-0 right-0 h-0.5 rounded-full bg-blue-600" />}
-          </button>
-        </div>
-        <Link href="/settings" className="pb-3 text-sm font-semibold text-slate-500 hover:text-slate-800">
-          Settings
-        </Link>
-      </div>
-
-      {tab === "business" ? (
-        <BusinessDetails leads={leads} />
-      ) : (
       <Card className="overflow-hidden">
         {/* Toolbar — instantly-style */}
         <div className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
@@ -175,15 +146,6 @@ export function LeadsTable({ leads, campaignFilter }: Props) {
           </Button>
 
           <div className="ml-auto flex items-center gap-2">
-            {selected.length > 0 && (
-              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
-                <span className="text-sm text-blue-700 font-medium">{selected.length} selected</span>
-                <button onClick={handleBulkDelete} disabled={pending} className="text-red-600 hover:text-red-700 inline-flex items-center gap-1 text-sm disabled:opacity-50">
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
-                </button>
-              </div>
-            )}
-
             {/* Sort */}
             <div className="relative inline-flex items-center">
               <ArrowUpDown className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
@@ -338,84 +300,33 @@ export function LeadsTable({ leads, campaignFilter }: Props) {
           </div>
         </div>
       </Card>
-      )}
 
       <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
-    </div>
-  );
-}
 
-function BusinessDetails({ leads }: { leads: LeadRow[] }) {
-  const total = leads.length;
-  const hot = leads.filter((l) => l.status === "Hot").length;
-  const scored = leads.filter((l) => (l.lead_score || 0) > 0).length;
-  const converted = leads.filter((l) => l.status === "Converted").length;
-
-  function groupBy(getter: (l: LeadRow) => string | null | undefined) {
-    const map = new Map<string, number>();
-    for (const l of leads) {
-      const key = (getter(l) || "Unknown").trim() || "Unknown";
-      map.set(key, (map.get(key) || 0) + 1);
-    }
-    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
-  }
-
-  const byStatus = groupBy((l) => l.status);
-  const byIndustry = groupBy((l) => l.industry);
-  const bySource = groupBy((l) => l.source);
-  const max = (rows: [string, number][]) => Math.max(1, ...rows.map((r) => r[1]));
-
-  const cards = [
-    { label: "Total leads", value: total, icon: <Users2 className="h-4 w-4" />, color: "text-blue-600 bg-blue-50" },
-    { label: "Hot leads", value: hot, icon: <Flame className="h-4 w-4" />, color: "text-amber-600 bg-amber-50" },
-    { label: "AI scored", value: scored, icon: <Sparkles className="h-4 w-4" />, color: "text-purple-600 bg-purple-50" },
-    { label: "Converted", value: converted, icon: <Target className="h-4 w-4" />, color: "text-emerald-600 bg-emerald-50" },
-  ];
-
-  function Breakdown({ title, rows }: { title: string; rows: [string, number][] }) {
-    const m = max(rows);
-    return (
-      <Card className="p-5">
-        <h3 className="text-sm font-semibold text-slate-900 mb-4">{title}</h3>
-        {rows.length === 0 ? (
-          <p className="text-sm text-slate-400">No data yet.</p>
-        ) : (
-          <ul className="space-y-3">
-            {rows.map(([label, count]) => (
-              <li key={label}>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-slate-600 truncate pr-2">{label}</span>
-                  <span className="font-semibold text-slate-900 tabular-nums">{count}</span>
-                </div>
-                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(count / m) * 100}%` }} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {cards.map((s) => (
-          <Card key={s.label} className="p-4 flex items-center gap-3">
-            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${s.color}`}>{s.icon}</div>
-            <div>
-              <p className="text-xs text-slate-500">{s.label}</p>
-              <p className="text-xl font-bold text-slate-900">{s.value.toLocaleString()}</p>
-            </div>
-          </Card>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Breakdown title="Leads by status" rows={byStatus} />
-        <Breakdown title="Leads by industry" rows={byIndustry} />
-        <Breakdown title="Leads by source" rows={bySource} />
-      </div>
+      {/* LP-15 — floating selection action bar */}
+      {selected.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lp-anim-pop max-w-[calc(100vw-2rem)]">
+          <div className="flex items-center gap-3 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/30 pl-5 pr-3 py-2.5">
+            <span className="text-sm font-medium whitespace-nowrap">
+              <span className="font-semibold">{selected.length}</span> selected
+            </span>
+            <span className="h-5 w-px bg-white/20" />
+            <button
+              onClick={handleBulkDelete}
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white text-red-600 hover:bg-red-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+            <button
+              onClick={() => setSelected([])}
+              className="rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

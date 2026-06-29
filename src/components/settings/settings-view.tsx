@@ -198,7 +198,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist }: 
           {active === "appearance" && (
             <Card className="p-6">
               <h3 className="font-semibold text-slate-900 mb-1">Appearance</h3>
-              <p className="text-sm text-slate-500 mb-5">Choose how LeadPro looks. &ldquo;System&rdquo; follows your device setting.</p>
+              <p className="text-sm text-slate-500 mb-5">Choose how Nxelio looks. &ldquo;System&rdquo; follows your device setting.</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
                 {([
                   { value: "light", label: "Light", icon: <Sun className="h-5 w-5" />, preview: "bg-white border-slate-200" },
@@ -312,7 +312,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist }: 
               <p className="text-sm text-slate-500 mb-3">Connected services — keys are stored as server-only env vars</p>
 
               <p className="text-sm text-slate-600 leading-relaxed mb-5 bg-slate-50 border border-slate-100 rounded-lg p-3">
-                LeadPro connects with these services to power AI, send emails, store data, and sync with your CRM. Keys are stored as server-only env vars and never exposed to the browser. Connect or rotate keys here, or in your hosting platform (Vercel) for production.
+                Nxelio connects with these services to power AI, send emails, store data, and sync with your CRM. Keys are stored as server-only env vars and never exposed to the browser. Connect or rotate keys here, or in your hosting platform (Vercel) for production.
               </p>
 
               <div className="space-y-3">
