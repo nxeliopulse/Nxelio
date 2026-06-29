@@ -1,12 +1,13 @@
 "use client";
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2 } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, Tag, Share2, type LucideIcon } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useFeedback } from "@/components/ui/feedback";
+import { cn } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { deleteLead, bulkDeleteLeads, type LeadRow } from "@/lib/queries/leads";
@@ -18,6 +19,38 @@ const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | 
   Converted: "success",
   Scored: "purple",
 };
+
+// Customizable columns. Users toggle these via the gear menu in the header; the
+// choice persists in localStorage so it survives reloads. `index`, the checkbox,
+// and the delete/actions column are always shown and not part of this list logic.
+type ColKey =
+  | "index" | "first_name" | "last_name" | "email" | "company" | "industry"
+  | "email_provider" | "score" | "status" | "phone" | "interest_area"
+  | "source" | "linkedin" | "website" | "verified" | "created_at";
+
+interface ColumnDef { key: ColKey; label: string; icon?: LucideIcon; defaultOn: boolean }
+
+const COLUMNS: ColumnDef[] = [
+  { key: "index", label: "Row #", icon: Hash, defaultOn: true },
+  { key: "first_name", label: "First name", icon: User, defaultOn: true },
+  { key: "last_name", label: "Last name", icon: User, defaultOn: true },
+  { key: "email", label: "Email", icon: Mail, defaultOn: true },
+  { key: "company", label: "Company", icon: Building2, defaultOn: true },
+  { key: "industry", label: "Industry", icon: Briefcase, defaultOn: true },
+  { key: "email_provider", label: "Email provider", icon: Mail, defaultOn: true },
+  { key: "score", label: "Score", defaultOn: true },
+  { key: "status", label: "Status", defaultOn: true },
+  { key: "phone", label: "Phone", icon: Phone, defaultOn: false },
+  { key: "interest_area", label: "Interest area", icon: Tag, defaultOn: false },
+  { key: "source", label: "Source", icon: Globe, defaultOn: false },
+  { key: "linkedin", label: "LinkedIn", icon: Share2, defaultOn: false },
+  { key: "website", label: "Website", icon: Link2, defaultOn: false },
+  { key: "verified", label: "Verified", icon: CheckCircle2, defaultOn: false },
+  { key: "created_at", label: "Added", icon: Calendar, defaultOn: false },
+];
+
+const DEFAULT_COLS = COLUMNS.reduce((acc, c) => { acc[c.key] = c.defaultOn; return acc; }, {} as Record<ColKey, boolean>);
+const COLS_STORAGE_KEY = "lp_leads_columns";
 
 interface Props {
   leads: LeadRow[];
@@ -41,6 +74,37 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
   const [sort, setSort] = useState<"none" | "name" | "score" | "newest">("none");
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 25;
+
+  // Column visibility (persisted). Hydrate from localStorage after mount to avoid SSR mismatch.
+  const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
+  const [showCols, setShowCols] = useState(false);
+  const [colsPos, setColsPos] = useState<{ top: number; right: number } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COLS_STORAGE_KEY);
+      if (raw) setCols({ ...DEFAULT_COLS, ...JSON.parse(raw) });
+    } catch { /* ignore malformed storage */ }
+  }, []);
+
+  function toggleCol(k: ColKey) {
+    setCols((c) => {
+      const next = { ...c, [k]: !c[k] };
+      try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+  function resetCols() {
+    setCols(DEFAULT_COLS);
+    try { localStorage.removeItem(COLS_STORAGE_KEY); } catch { /* ignore */ }
+  }
+  function openColsMenu(e: React.MouseEvent<HTMLButtonElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    setColsPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+    setShowCols(true);
+  }
+
+  const visibleCols = COLUMNS.filter((c) => cols[c.key]);
 
   const filtered = leads.filter((l) => {
     const name = l.full_name || l.company_name || "";
@@ -102,6 +166,61 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
       await deleteLead(id);
       setSelected((s) => s.filter((x) => x !== id));
     });
+  }
+
+  function renderCell(key: ColKey, l: LeadRow, rowNumber: number) {
+    switch (key) {
+      case "index":
+        return <span className="text-slate-400 tabular-nums">{rowNumber}</span>;
+      case "first_name":
+        return <Link href={`/leads/${l.id}`} className="font-medium text-slate-900 hover:text-blue-600">{splitName(l).first || "—"}</Link>;
+      case "last_name":
+        return <span className="text-slate-700">{splitName(l).last || "—"}</span>;
+      case "email":
+        return <span className="block max-w-[220px] truncate text-slate-600" title={l.email || ""}>{l.email || "—"}</span>;
+      case "company":
+        return <span className="text-slate-700">{l.company_name || "—"}</span>;
+      case "industry":
+        return <span className="text-slate-600">{l.industry || "—"}</span>;
+      case "email_provider":
+        return <EmailProviderCell provider={emailProvider(l.email)} />;
+      case "score":
+        return (
+          <div className="flex items-center gap-2">
+            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${l.lead_score >= 80 ? "bg-red-500" : l.lead_score >= 60 ? "bg-amber-500" : "bg-blue-500"}`}
+                style={{ width: `${l.lead_score}%` }}
+              />
+            </div>
+            <span className="text-sm font-semibold text-slate-700">{l.lead_score}</span>
+          </div>
+        );
+      case "status":
+        return <Badge variant={statusVariant[l.status] || "default"}>{l.status}</Badge>;
+      case "phone":
+        return <span className="text-slate-600">{l.phone || "—"}</span>;
+      case "interest_area":
+        return <span className="text-slate-600">{l.interest_area || "—"}</span>;
+      case "source":
+        return <span className="text-slate-600">{l.source || "—"}</span>;
+      case "linkedin":
+        return l.linkedin
+          ? <a href={l.linkedin} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:underline"><Share2 className="h-3.5 w-3.5" /> Profile</a>
+          : <span className="text-slate-400">—</span>;
+      case "website":
+        return l.website_url
+          ? <a href={l.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 hover:underline"><Link2 className="h-3.5 w-3.5 flex-shrink-0" />{l.website_url.replace(/^https?:\/\//, "")}</a>
+          : <span className="text-slate-400">—</span>;
+      case "verified":
+        return l.verified
+          ? <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
+          : <span className="text-xs text-slate-400">No</span>;
+      case "created_at":
+        return <span className="text-slate-500">{new Date(l.created_at).toLocaleDateString()}</span>;
+      default:
+        return null;
+    }
   }
 
   return (
@@ -197,7 +316,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
         {/* Table with horizontal scroll */}
         <div className="relative">
           <div ref={scrollRef} className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1100px]">
+            <table className="w-full text-sm min-w-[760px]">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
                   <th className="px-4 py-3 w-10">
@@ -208,75 +327,57 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
                       className="rounded border-slate-300"
                     />
                   </th>
-                  <th className="px-4 py-3 font-semibold w-12 text-slate-400">#</th>
-                  <th className="px-4 py-3 font-semibold"><span className="inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-slate-400" /> First name</span></th>
-                  <th className="px-4 py-3 font-semibold"><span className="inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-slate-400" /> Last name</span></th>
-                  <th className="px-4 py-3 font-semibold"><span className="inline-flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-slate-400" /> Email</span></th>
-                  <th className="px-4 py-3 font-semibold"><span className="inline-flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-slate-400" /> Company</span></th>
-                  <th className="px-4 py-3 font-semibold"><span className="inline-flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5 text-slate-400" /> Industry</span></th>
-                  <th className="px-4 py-3 font-semibold"><span className="inline-flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-slate-400" /> Email provider</span></th>
-                  <th className="px-4 py-3 font-semibold">Score</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 w-10"></th>
+                  {visibleCols.map((c) => (
+                    <th key={c.key} className={cn("px-4 py-3 font-semibold", c.key === "index" && "w-12")}>
+                      {c.icon ? (
+                        <span className="inline-flex items-center gap-1.5"><c.icon className="h-3.5 w-3.5 text-slate-400" /> {c.label === "Row #" ? "#" : c.label}</span>
+                      ) : c.label}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 w-10 text-right">
+                    <button
+                      onClick={openColsMenu}
+                      title="Customize columns"
+                      className="p-1 rounded-md hover:bg-slate-200/70"
+                    >
+                      <Settings2 className="h-4 w-4 text-slate-400 hover:text-slate-700" />
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
                       No leads yet. Click <strong>Add Leads</strong> to import from LinkedIn, social, or a CSV.
                     </td>
                   </tr>
                 )}
-                {paged.map((l, i) => {
-                  const { first, last } = splitName(l);
-                  const provider = emailProvider(l.email);
-                  return (
-                    <tr key={l.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(l.id)}
-                          onChange={() => toggle(l.id)}
-                          className="rounded border-slate-300"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-slate-400 tabular-nums">{safePage * PAGE_SIZE + i + 1}</td>
-                      <td className="px-4 py-3">
-                        <Link href={`/leads/${l.id}`} className="font-medium text-slate-900 hover:text-blue-600">{first || "—"}</Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-700">{last || "—"}</td>
-                      <td className="px-4 py-3 text-slate-600 max-w-[220px] truncate" title={l.email || ""}>{l.email || "—"}</td>
-                      <td className="px-4 py-3 text-slate-700">{l.company_name || "—"}</td>
-                      <td className="px-4 py-3 text-slate-600">{l.industry || "—"}</td>
-                      <td className="px-4 py-3"><EmailProviderCell provider={provider} /></td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${l.lead_score >= 80 ? "bg-red-500" : l.lead_score >= 60 ? "bg-amber-500" : "bg-blue-500"}`}
-                              style={{ width: `${l.lead_score}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-semibold text-slate-700">{l.lead_score}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={statusVariant[l.status] || "default"}>{l.status}</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleDelete(l.id)}
-                          disabled={pending}
-                          title="Delete lead"
-                          className="p-1 rounded-md hover:bg-red-50 disabled:opacity-50"
-                        >
-                          <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {paged.map((l, i) => (
+                  <tr key={l.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(l.id)}
+                        onChange={() => toggle(l.id)}
+                        className="rounded border-slate-300"
+                      />
+                    </td>
+                    {visibleCols.map((c) => (
+                      <td key={c.key} className="px-4 py-3">{renderCell(c.key, l, safePage * PAGE_SIZE + i + 1)}</td>
+                    ))}
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleDelete(l.id)}
+                        disabled={pending}
+                        title="Delete lead"
+                        className="p-1 rounded-md hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -302,6 +403,40 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
       </Card>
 
       <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
+
+      {/* Column picker — fixed-position so the table's horizontal scroll never clips it */}
+      {showCols && colsPos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowCols(false)} />
+          <div
+            className="fixed z-50 w-60 rounded-xl border border-slate-200 bg-white shadow-xl p-2"
+            style={{ top: colsPos.top, right: colsPos.right }}
+          >
+            <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
+            <div className="max-h-80 overflow-y-auto">
+              {COLUMNS.map((c) => (
+                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={cols[c.key]}
+                    onChange={() => toggleCol(c.key)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="inline-flex items-center gap-1.5">
+                    {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}
+                    {c.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="border-t border-slate-100 mt-1 pt-1">
+              <button onClick={resetCols} className="w-full text-left px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-50">
+                Reset to default
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* LP-15 — floating selection action bar */}
       {selected.length > 0 && (

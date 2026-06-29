@@ -75,7 +75,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: result.hosted_page.url });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = err instanceof Error
+      ? err.message
+      : typeof err === "object" && err !== null
+        ? JSON.stringify(err)
+        : String(err);
     console.error("[billing/checkout]", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
