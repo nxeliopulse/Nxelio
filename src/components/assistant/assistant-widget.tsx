@@ -14,6 +14,7 @@ import {
 } from "@/lib/ai/assistant-history";
 import { formatRelative, cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { useAssistant } from "@/components/layout/assistant-context";
 
 interface ChatItem extends AssistantMessage {
   actions?: string[];
@@ -22,7 +23,8 @@ interface ChatItem extends AssistantMessage {
   proposalStatus?: "pending" | "approved" | "rejected";
 }
 
-const SUGGESTIONS = [
+// Static fallback — replaced at runtime by dynamic suggestions from AssistantContext
+const STATIC_SUGGESTIONS = [
   { Icon: BarChart2, text: "What's my workspace overview?" },
   { Icon: Users, text: "Show me my hot leads" },
   { Icon: Mail, text: "Create a new email campaign" },
@@ -136,6 +138,9 @@ export function AssistantWidget({
   onClose: () => void;
   onExpandChange?: (expanded: boolean) => void;
 }) {
+  const { suggestions: ctxSuggestions } = useAssistant();
+  const activeSuggestions = ctxSuggestions.length > 0 ? ctxSuggestions : STATIC_SUGGESTIONS;
+
   const [view, setView] = useState<"chat" | "history">("chat");
   const [input, setInput] = useState("");
   const [chat, setChat] = useState<ChatItem[]>([]);
@@ -437,7 +442,7 @@ export function AssistantWidget({
                       Ask me anything about your Nxelio workspace — leads, campaigns, analytics, and more.
                     </p>
                     <div className="w-full space-y-2">
-                      {SUGGESTIONS.map((s) => (
+                      {activeSuggestions.map((s) => (
                         <button
                           key={s.text}
                           onClick={() => send(s.text)}

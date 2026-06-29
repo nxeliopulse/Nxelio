@@ -8,10 +8,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Onboarding is required before the app is usable — route new (and existing)
-  // users to /onboarding until the workspace setup is complete.
-  const { completed } = await getOnboarding();
-  if (!completed) redirect("/onboarding");
+  // Soft onboarding: new signups are sent to /onboarding from signup, and anyone
+  // who hasn't finished sees a banner (below) — no hard lockout.
+  const { completed: onboardingCompleted } = await getOnboarding();
 
   const { data: profile } = await supabase
     .from("users")
@@ -32,6 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       userEmail={userEmail}
       userRole={userRole}
       navAccess={navAccess}
+      onboardingCompleted={onboardingCompleted}
     >
       {children}
     </AppShell>

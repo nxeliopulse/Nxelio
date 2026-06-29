@@ -2,9 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Clock, Flame, LayoutGrid, Lightbulb, Mail, MailOpen, MoreHorizontal,
-  Sliders, Sparkles, Target, TrendingUp, Users2, X,
+  BookOpen, CheckCircle2, Circle, Clock, Flame, LayoutGrid, Lightbulb,
+  Mail, MailOpen, MoreHorizontal, Sliders, Sparkles, Target, TrendingUp,
+  Users2, Zap, X,
 } from "lucide-react";
+import { useAssistant, DEFAULT_SUGGESTIONS } from "@/components/layout/assistant-context";
 import {
   Area, AreaChart, Bar, BarChart, Cell,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -27,6 +29,7 @@ const WIDGET_DEFS = [
   { id: "audience_growth",  label: "Audience Growth",       desc: "Monthly lead volume bar chart" },
   { id: "recent_campaigns", label: "Recent Campaigns",      desc: "Campaign activity table" },
   { id: "ai_insights",      label: "AI Insights",           desc: "Smart recommendations" },
+  { id: "getting_started",  label: "Getting Started",       desc: "Setup checklist & playbooks" },
   { id: "hot_leads",        label: "Hot Leads Trend",       desc: "Hot lead conversions over time" },
   { id: "reply_rates",      label: "Reply Rates",           desc: "Reply rate per campaign" },
   { id: "conversion",       label: "Conversion Rate",       desc: "Overall lead conversion gauge" },
@@ -38,7 +41,8 @@ type Visibility = Record<WidgetId, boolean>;
 
 const DEFAULT_VIS: Visibility = {
   kpi: true, campaign_perf: true, campaign_types: true,
-  top_automations: true, audience_growth: true, recent_campaigns: true, ai_insights: true,
+  top_automations: true, audience_growth: true, recent_campaigns: true,
+  ai_insights: true, getting_started: true,
   hot_leads: false, reply_rates: false, conversion: false, snapshot: false,
 };
 const STORAGE_KEY = "lp_dashboard_widgets";
@@ -79,14 +83,45 @@ const statusColor: Record<string, string> = {
   Paused:    "bg-amber-50 text-amber-700 border-amber-200",
 };
 
+interface OnboardingStatus {
+  essentialsDone: boolean;
+  inboxConnected: boolean;
+  goals: string[];
+  userName: string;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
-export function DashboardView({ stats }: { stats: DashboardStats }) {
+export function DashboardView({
+  stats,
+  onboardingStatus,
+}: {
+  stats: DashboardStats;
+  onboardingStatus?: OnboardingStatus;
+}) {
   const router = useRouter();
+  const { toggle: toggleAssistant, setSuggestions } = useAssistant();
   const [vis, setVis] = useState<Visibility>(DEFAULT_VIS);
   const [customizing, setCustomizing] = useState(false);
+  const [gettingStartedTab, setGettingStartedTab] = useState<"setup" | "playbooks">("setup");
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setVis(loadVis()); }, []);
+
+  // Build dynamic AI suggestions from real stats
+  useEffect(() => {
+    const s = stats;
+    const suggs = [...DEFAULT_SUGGESTIONS];
+    if (s.hotLeads > 0)
+      suggs.unshift({ Icon: Flame, text: `You have ${s.hotLeads} hot lead${s.hotLeads > 1 ? "s" : ""} — follow up now` });
+    if (s.avgOpenRate > 0 && s.avgOpenRate < 25)
+      suggs.splice(1, 0, { Icon: Lightbulb, text: `Open rate is ${s.avgOpenRate}% — try optimizing subject lines` });
+    if (s.campaignPerf.length === 0)
+      suggs.splice(1, 0, { Icon: Zap, text: "Launch your first campaign to start tracking performance" });
+    if (s.totalLeads > 50)
+      suggs.splice(2, 0, { Icon: Users2, text: `${s.totalLeads} leads in your workspace — build a segment` });
+    setSuggestions(suggs.slice(0, 4));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function toggleWidget(id: WidgetId) {
     setVis((prev) => {
@@ -113,13 +148,20 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
     Conversions: m.hot || Math.round(m.leads * 0.18),
   }));
 
-  const totalSent = Math.max(stats.snapshot.emailsSent, 100);
-  const donutData = [
-    { name: "Newsletter",  value: Math.round(totalSent * 0.35), color: BLUE },
-    { name: "Promotional", value: Math.round(totalSent * 0.28), color: INDIGO },
-    { name: "Automated",   value: Math.round(totalSent * 0.22), color: "#818cf8" },
-    { name: "Other",       value: Math.round(totalSent * 0.15), color: "#e2e8f0" },
-  ];
+  // Real campaign type counts — fall back to a single placeholder if everything is 0
+  const ct = stats.campaignTypes;
+  const ctTotal = ct.campaigns + ct.newsletters + ct.segments + ct.workflows;
+  const donutData = ctTotal > 0
+    ? [
+        { name: "Campaigns",    value: ct.campaigns,   color: BLUE },
+        { name: "Newsletters",  value: ct.newsletters, color: INDIGO },
+        { name: "Segments",     value: ct.segments,    color: "#818cf8" },
+        { name: "Workflows",    value: ct.workflows,   color: ORANGE },
+      ].filter((d) => d.value > 0)
+    : [{ name: "No data yet", value: 1, color: "#e2e8f0" }];
+  const donutTotal = ctTotal > 0 ? ctTotal : 1;
+  const donutCenter = donutData[0]?.name ?? "—";
+  const donutCenterPct = ctTotal > 0 ? Math.round((donutData[0].value / ctTotal) * 100) : 0;
 
   const topAutomations = stats.campaignPerf.slice(0, 2).map((c) => ({
     name: c.name,
@@ -211,7 +253,7 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
       )}
 
       {/* ── Widgets — single responsive grid; auto-fills & reflows for any toggle combo ── */}
-      {(vis.campaign_perf || vis.campaign_types || vis.top_automations || vis.audience_growth || vis.recent_campaigns || vis.ai_insights || vis.hot_leads || vis.reply_rates || vis.conversion || vis.snapshot) && (
+      {(vis.campaign_perf || vis.campaign_types || vis.top_automations || vis.audience_growth || vis.recent_campaigns || vis.ai_insights || vis.getting_started || vis.hot_leads || vis.reply_rates || vis.conversion || vis.snapshot) && (
         <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(330px,1fr))] [&>*]:min-w-0">
           {vis.campaign_perf && (
             <Card>
@@ -266,15 +308,17 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
                         active && payload?.length ? (
                           <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-lg text-xs">
                             <span className="font-semibold text-slate-800">{payload[0].name}</span>
-                            <span className="ml-2 text-slate-500">{Math.round(((payload[0].value as number) / totalSent) * 100)}%</span>
+                            <span className="ml-2 text-slate-500">
+                              {ctTotal > 0 ? Math.round(((payload[0].value as number) / donutTotal) * 100) : 0}%
+                            </span>
                           </div>
                         ) : null
                       } />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-sm font-semibold text-slate-800">Newsletter</span>
-                    <span className="text-xs text-slate-400">35%</span>
+                    <span className="text-sm font-semibold text-slate-800">{donutCenter}</span>
+                    <span className="text-xs text-slate-400">{ctTotal > 0 ? `${donutCenterPct}%` : "Empty"}</span>
                   </div>
                 </div>
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-1">
@@ -401,16 +445,117 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
                 ))}
                 <div className="mt-auto pt-1">
                   <button
+                    onClick={toggleAssistant}
                     className="w-full rounded-xl h-11 text-sm font-medium text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
                     style={{ background: "linear-gradient(to right, #1d4ed8, #2563eb, #4f46e5)" }}
                   >
                     <Sparkles className="h-4 w-4" />
-                    Open AI Assistant
+                    AI Assistant
                   </button>
                 </div>
               </CardContent>
             </Card>
           )}
+          {vis.getting_started && (
+            <Card className="flex flex-col">
+              <CardHeader className="pb-1">
+                <CardTitle className="text-base font-semibold">
+                  {onboardingStatus?.userName
+                    ? `Welcome, ${onboardingStatus.userName} 👋`
+                    : "Getting Started"}
+                </CardTitle>
+                <div className="flex gap-1 mt-2">
+                  {(["setup", "playbooks"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setGettingStartedTab(tab)}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-xs font-medium capitalize transition-colors",
+                        gettingStartedTab === tab
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      )}
+                    >
+                      {tab === "setup" ? "Setup" : "Playbooks"}
+                    </button>
+                  ))}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-2 flex flex-col flex-1 gap-2">
+                {gettingStartedTab === "setup" ? (
+                  <>
+                    {[
+                      {
+                        label: "Company essentials",
+                        done: onboardingStatus?.essentialsDone ?? false,
+                        href: "/onboarding",
+                      },
+                      {
+                        label: "Connect your inbox",
+                        done: onboardingStatus?.inboxConnected ?? false,
+                        href: "/settings",
+                      },
+                      {
+                        label: "Explore playbooks",
+                        done: false,
+                        href: "/playbooks",
+                      },
+                    ].map((task) => (
+                      <div
+                        key={task.label}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+                      >
+                        {task.done ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-slate-300 flex-shrink-0" />
+                        )}
+                        <span className={cn("flex-1 text-sm", task.done ? "line-through text-slate-400" : "text-slate-700")}>
+                          {task.label}
+                        </span>
+                        {!task.done && (
+                          <button
+                            onClick={() => router.push(task.href)}
+                            className="text-xs font-medium text-blue-600 hover:underline flex-shrink-0"
+                          >
+                            Start →
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <p className="text-[11px] text-slate-400 text-center mt-1">
+                      {[onboardingStatus?.essentialsDone, onboardingStatus?.inboxConnected].filter(Boolean).length} of 2 steps done
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    {[
+                      { key: "linkedin-cold-outreach", label: "LinkedIn Cold Outreach", channel: "LinkedIn", replyRate: "28%" },
+                      { key: "cold-email-sequence",    label: "Cold Email Sequence",    channel: "Email",    replyRate: "18%" },
+                      { key: "warm-lead-nurture",      label: "Warm Lead Nurture",      channel: "Email",    replyRate: "34%" },
+                    ].map((pb) => (
+                      <div key={pb.key} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+                        <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                          <BookOpen className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-800 truncate">{pb.label}</p>
+                          <p className="text-xs text-slate-400">{pb.channel} · {pb.replyRate} reply rate</p>
+                        </div>
+                        <button
+                          onClick={() => router.push("/playbooks")}
+                          className="text-xs font-medium text-blue-600 hover:underline flex-shrink-0"
+                        >
+                          View →
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {vis.hot_leads && (
             <Card>
               <CardHeader className="pb-1">
