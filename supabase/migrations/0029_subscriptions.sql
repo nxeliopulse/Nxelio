@@ -253,15 +253,15 @@ CREATE POLICY "plans_public_read"
 
 CREATE POLICY "subscriptions_workspace_read"
   ON subscriptions FOR SELECT USING (
-    workspace_id IN (SELECT workspace_id FROM users WHERE id = auth.uid())
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
   );
 
 CREATE POLICY "credit_ledger_workspace_read"
   ON credit_ledger FOR SELECT USING (
-    workspace_id IN (SELECT workspace_id FROM users WHERE id = auth.uid())
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
   );
 
 CREATE POLICY "credit_top_ups_workspace_read"
   ON credit_top_ups FOR SELECT USING (
-    workspace_id IN (SELECT workspace_id FROM users WHERE id = auth.uid())
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
   );
