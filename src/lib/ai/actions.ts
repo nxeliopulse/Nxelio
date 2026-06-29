@@ -1,6 +1,7 @@
 "use server";
 import { aiChat, aiJson, aiConfigured } from "./client";
 import { getLeadById, updateLead } from "@/lib/queries/leads";
+import { getOnboarding } from "@/lib/queries/onboarding";
 
 export async function isAiConfigured() {
   return aiConfigured;
@@ -55,12 +56,37 @@ export interface AiScoreResult {
 }
 
 export async function scoreLeadWithAi(leadId: string): Promise<AiScoreResult> {
-  const lead = await getLeadById(leadId);
+  const [lead, { data: onboarding }] = await Promise.all([
+    getLeadById(leadId),
+    getOnboarding(),
+  ]);
   if (!lead) throw new Error("Lead not found");
 
-  const system = `You are an AI sales-intelligence engine. You evaluate B2B sales leads and return a structured score. Be realistic and concise. Return ONLY valid JSON. Do NOT invent specific facts (exact revenue, funding, employee counts) — reason only from the data provided and clearly general industry knowledge.`;
+  // Build seller context from onboarding — makes companyFit & competitivePosition meaningful
+  const sellerCtx = onboarding
+    ? [
+        `Seller (the company using this tool): ${onboarding.company_name}`,
+        `  Industry: ${onboarding.industry}`,
+        `  Target customer type: ${onboarding.target_customer_type}`,
+        `  Primary product/service: ${onboarding.primary_product}`,
+        onboarding.goals?.length ? `  Business goals: ${onboarding.goals.join(", ")}` : null,
+        onboarding.key_competitors ? `  Key competitors: ${onboarding.key_competitors}` : null,
+        onboarding.avg_deal_size ? `  Average deal size: ${onboarding.avg_deal_size}` : null,
+        onboarding.sales_cycle ? `  Typical sales cycle: ${onboarding.sales_cycle}` : null,
+        "",
+        `Scoring guidance:`,
+        `- companyFit: How well does this lead's industry/profile match ${onboarding.company_name}'s ideal customer (${onboarding.target_customer_type}, ${onboarding.industry} focus)?`,
+        onboarding.key_competitors
+          ? `- competitivePosition: Does anything about this lead suggest they are evaluating ${onboarding.key_competitors}? Higher displacement risk = lower score.`
+          : `- competitivePosition: Is there any indication of competing vendors or low switching likelihood?`,
+      ].filter(Boolean).join("\n")
+    : `Seller context: a B2B sales team.`;
 
-  const prompt = `Score this lead for a B2B AI/SaaS sales team.
+  const system = `You are an AI sales-intelligence engine. You evaluate B2B sales leads and return a structured score tailored to the seller's business profile. Be realistic and concise. Return ONLY valid JSON. Do NOT invent specific facts (exact revenue, funding, employee counts) — reason only from the data provided and general industry knowledge.`;
+
+  const prompt = `Score this lead for the following seller.
+
+${sellerCtx}
 
 Lead data:
 - Name: ${lead.full_name || "(company lead)"}
@@ -76,7 +102,7 @@ Return JSON in exactly this shape (all scores 0-100 integers):
 {
   "overallScore": 0,
   "dimensions": { "companyFit": 0, "contactAccess": 0, "opportunityQuality": 0, "competitivePosition": 0 },
-  "insight": "2-3 sentence analysis of buying intent and fit",
+  "insight": "2-3 sentence analysis of buying intent and fit for this specific seller",
   "outreachReadiness": "High|Medium|Low",
   "expectedSalesCycle": "e.g. 30-45 days",
   "nextSteps": [

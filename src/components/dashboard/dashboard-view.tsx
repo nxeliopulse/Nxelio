@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BookOpen, CheckCircle2, Circle, Clock, Flame, LayoutGrid, Lightbulb,
+  CheckCircle2, Circle, Clock, Flame, LayoutGrid, Lightbulb,
   Mail, MailOpen, MoreHorizontal, Sliders, Sparkles, Target, TrendingUp,
   Users2, Zap, X,
 } from "lucide-react";
@@ -102,7 +102,6 @@ export function DashboardView({
   const { toggle: toggleAssistant, setSuggestions } = useAssistant();
   const [vis, setVis] = useState<Visibility>(DEFAULT_VIS);
   const [customizing, setCustomizing] = useState(false);
-  const [gettingStartedTab, setGettingStartedTab] = useState<"setup" | "playbooks">("setup");
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setVis(loadVis()); }, []);
@@ -464,94 +463,46 @@ export function DashboardView({
                     ? `Welcome, ${onboardingStatus.userName} 👋`
                     : "Getting Started"}
                 </CardTitle>
-                <div className="flex gap-1 mt-2">
-                  {(["setup", "playbooks"] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setGettingStartedTab(tab)}
-                      className={cn(
-                        "px-3 py-1 rounded-lg text-xs font-medium capitalize transition-colors",
-                        gettingStartedTab === tab
-                          ? "bg-blue-600 text-white"
-                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                      )}
-                    >
-                      {tab === "setup" ? "Setup" : "Playbooks"}
-                    </button>
-                  ))}
-                </div>
+                <p className="text-xs text-slate-400 mt-0.5">Your setup checklist</p>
               </CardHeader>
               <CardContent className="pt-2 flex flex-col flex-1 gap-2">
-                {gettingStartedTab === "setup" ? (
-                  <>
-                    {[
-                      {
-                        label: "Company essentials",
-                        done: onboardingStatus?.essentialsDone ?? false,
-                        href: "/onboarding",
-                      },
-                      {
-                        label: "Connect your inbox",
-                        done: onboardingStatus?.inboxConnected ?? false,
-                        href: "/settings",
-                      },
-                      {
-                        label: "Explore playbooks",
-                        done: false,
-                        href: "/playbooks",
-                      },
-                    ].map((task) => (
-                      <div
-                        key={task.label}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+                {[
+                  {
+                    label: "Company essentials",
+                    done: onboardingStatus?.essentialsDone ?? false,
+                    href: "/onboarding",
+                  },
+                  {
+                    label: "Connect your inbox",
+                    done: onboardingStatus?.inboxConnected ?? false,
+                    href: "/settings",
+                  },
+                ].map((task) => (
+                  <div
+                    key={task.label}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+                  >
+                    {task.done ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-slate-300 flex-shrink-0" />
+                    )}
+                    <span className={cn("flex-1 text-sm", task.done ? "line-through text-slate-400" : "text-slate-700")}>
+                      {task.label}
+                    </span>
+                    {!task.done && (
+                      <button
+                        onClick={() => router.push(task.href)}
+                        className="text-xs font-medium text-blue-600 hover:underline flex-shrink-0"
                       >
-                        {task.done ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                        ) : (
-                          <Circle className="h-5 w-5 text-slate-300 flex-shrink-0" />
-                        )}
-                        <span className={cn("flex-1 text-sm", task.done ? "line-through text-slate-400" : "text-slate-700")}>
-                          {task.label}
-                        </span>
-                        {!task.done && (
-                          <button
-                            onClick={() => router.push(task.href)}
-                            className="text-xs font-medium text-blue-600 hover:underline flex-shrink-0"
-                          >
-                            Start →
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <p className="text-[11px] text-slate-400 text-center mt-1">
-                      {[onboardingStatus?.essentialsDone, onboardingStatus?.inboxConnected].filter(Boolean).length} of 2 steps done
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    {[
-                      { key: "linkedin-cold-outreach", label: "LinkedIn Cold Outreach", channel: "LinkedIn", replyRate: "28%" },
-                      { key: "cold-email-sequence",    label: "Cold Email Sequence",    channel: "Email",    replyRate: "18%" },
-                      { key: "warm-lead-nurture",      label: "Warm Lead Nurture",      channel: "Email",    replyRate: "34%" },
-                    ].map((pb) => (
-                      <div key={pb.key} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
-                        <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                          <BookOpen className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-800 truncate">{pb.label}</p>
-                          <p className="text-xs text-slate-400">{pb.channel} · {pb.replyRate} reply rate</p>
-                        </div>
-                        <button
-                          onClick={() => router.push("/playbooks")}
-                          className="text-xs font-medium text-blue-600 hover:underline flex-shrink-0"
-                        >
-                          View →
-                        </button>
-                      </div>
-                    ))}
-                  </>
-                )}
+                        Start →
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <p className="text-[11px] text-slate-400 text-center mt-1">
+                  {[onboardingStatus?.essentialsDone, onboardingStatus?.inboxConnected].filter(Boolean).length} of 2 steps done
+                </p>
               </CardContent>
             </Card>
           )}

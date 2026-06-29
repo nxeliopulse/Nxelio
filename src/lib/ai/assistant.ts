@@ -8,6 +8,7 @@ import { getNewsletters, deleteNewsletter } from "@/lib/queries/newsletters";
 import { sendNewsletter } from "@/lib/email/newsletter-actions";
 import { getUsers } from "@/lib/queries/users";
 import { sendLeadEmail } from "@/lib/email/actions";
+import { getOnboarding } from "@/lib/queries/onboarding";
 
 const API_KEY = process.env.AI_API_KEY;
 const BASE_URL = process.env.AI_BASE_URL || "https://api.groq.com/openai/v1";
@@ -256,7 +257,7 @@ const DELETE_TOOLS = new Set([
   "delete_template", "delete_newsletter",
 ]);
 
-const SYSTEM_PROMPT = `You are the Nxelio AI Assistant — an intelligent in-app agent for the Nxelio sales engagement and lead-nurturing platform. You help users read workspace data instantly and propose approved changes through a secure approval workflow.
+const BASE_SYSTEM_PROMPT = `You are the Nxelio AI Assistant — an intelligent in-app agent for the Nxelio sales engagement and lead-nurturing platform. You help users read workspace data instantly and propose approved changes through a secure approval workflow.
 
 Application modules you support: Dashboard, Leads, Contacts, Campaigns, Inbox, Segments, Newsletters, Templates, Workflows, Analytics, Reports, Users, Roles, Billing, Credits, and Settings.
 
@@ -277,6 +278,39 @@ Reporting style:
 - If the target is ambiguous, ask ONE specific clarifying question rather than guessing.
 
 Scope reminder: Only assist with Nxelio platform features. Politely decline everything else and redirect to a relevant platform question.`;
+
+/** Builds the system prompt, appending real workspace context from onboarding when available. */
+async function buildSystemPrompt(): Promise<string> {
+  try {
+    const { data } = await getOnboarding();
+    if (!data) return BASE_SYSTEM_PROMPT;
+
+    const lines: string[] = [
+      "",
+      "--- WORKSPACE BUSINESS CONTEXT (from onboarding) ---",
+      `Company: ${data.company_name}`,
+      `Industry: ${data.industry}`,
+    ];
+    if (data.company_size)        lines.push(`Company size: ${data.company_size} employees`);
+    if (data.hq_location)         lines.push(`HQ: ${data.hq_location}`);
+    if (data.target_customer_type) lines.push(`Target customers: ${data.target_customer_type}`);
+    if (data.primary_product)     lines.push(`Primary product/service: ${data.primary_product}`);
+    if (data.goals?.length)       lines.push(`Business goals: ${data.goals.join(", ")}`);
+    if (data.key_competitors)     lines.push(`Key competitors: ${data.key_competitors}`);
+    if (data.avg_deal_size)       lines.push(`Average deal size: ${data.avg_deal_size}`);
+    if (data.sales_cycle)         lines.push(`Typical sales cycle: ${data.sales_cycle}`);
+    if (data.company_description) lines.push(`About: ${data.company_description}`);
+    lines.push(
+      "",
+      `Use this context in every response. When advising on leads, campaigns, or analytics, tailor your recommendations specifically to ${data.company_name}'s goals (${data.goals?.join(", ") || "growth"}), their ${data.target_customer_type} customer focus, and their competitive landscape. Make advice feel personal to this workspace, not generic.`,
+      "---",
+    );
+
+    return BASE_SYSTEM_PROMPT + "\n" + lines.join("\n");
+  } catch {
+    return BASE_SYSTEM_PROMPT;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Read-tool execution (auto). All queries run under the caller's session — RLS
@@ -556,6 +590,7 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
   }
 
   const trimmed = history.slice(-16);
+  const systemPrompt = await buildSystemPrompt();
 
   interface ToolCall { id: string; type: "function"; function: { name: string; arguments: string } }
   type ApiMessage =
@@ -564,7 +599,7 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
     | { role: "tool"; tool_call_id: string; content: string };
 
   const messages: ApiMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemPrompt },
     ...trimmed.map((m) => ({ role: m.role, content: m.content })),
   ];
 

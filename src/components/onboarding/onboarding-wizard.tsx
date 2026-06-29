@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, AlertCircle, Building2, Boxes, Users, Calendar, MapPin,
   DollarSign, Target, Receipt, Clock, Package, Swords, Mail, ExternalLink, Loader2,
-  Check, Sparkles, Share2, CheckCircle2,
+  Check, Sparkles, CheckCircle2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,15 +21,9 @@ const DEAL_SIZES = ["< $1K", "$1K – $10K", "$10K – $50K", "$50K – $250K", 
 const CYCLES = ["< 1 week", "1–4 weeks", "1–3 months", "3–6 months", "6+ months"];
 const CUSTOMER_TYPES = ["B2B", "B2C", "Both"];
 
-const PLAYBOOKS = [
-  { key: "linkedin_cold", title: "LinkedIn cold outreach", Icon: Share2, tone: "bg-green-50 text-green-600", tags: ["LinkedIn", "Cold outreach"], steps: 5, days: 14, reply: 38, recommended: true, desc: "Connect and convert prospects with a 5-step LinkedIn sequence — connection request, intro, value, follow-up, and close." },
-  { key: "cold_email", title: "Cold email sequence", Icon: Mail, tone: "bg-blue-50 text-blue-600", tags: ["Email", "Cold outreach"], steps: 4, days: 10, reply: 24, recommended: false, desc: "A 4-email sequence designed to break through inbox noise — personalised opener, value prop, social proof, and final nudge." },
-];
-
 const STEP_TITLES = [
   { title: "Essentials setup", desc: "Tell us about your business so Nxelio can tailor your workflow" },
   { title: "Connect your inbox", desc: "Send and track campaigns from your own mailbox (optional)" },
-  { title: "Pick a playbook", desc: "Start with a ready-made sequence tuned to your goals (optional)" },
 ];
 
 const emptyForm: OnboardingData = {
@@ -62,7 +56,6 @@ export function OnboardingWizard() {
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [inboxStarted, setInboxStarted] = useState(false);
-  const [picked, setPicked] = useState<string | null>(null);
 
   function set<K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -85,7 +78,7 @@ export function OnboardingWizard() {
   function next() {
     if (step === 1 && !validateStep1()) return;
     setError(null);
-    setStep((s) => Math.min(3, s + 1));
+    setStep((s) => Math.min(2, s + 1));
   }
   function back() {
     setError(null);
@@ -140,11 +133,11 @@ export function OnboardingWizard() {
       {/* Progress */}
       <div className="flex items-center gap-3 mb-6">
         <div className="flex gap-1.5 flex-1">
-          {[1, 2, 3].map((n) => (
+          {[1, 2].map((n) => (
             <div key={n} className={cn("h-1.5 flex-1 rounded-full transition-colors", n <= step ? "bg-blue-600" : "bg-slate-200")} />
           ))}
         </div>
-        <span className="text-sm font-medium text-slate-400 whitespace-nowrap">Step {step} of 3</span>
+        <span className="text-sm font-medium text-slate-400 whitespace-nowrap">Step {step} of 2</span>
       </div>
 
       {error && (
@@ -299,38 +292,6 @@ export function OnboardingWizard() {
         </Card>
       )}
 
-      {/* ── Step 3: Pick a playbook ── */}
-      {step === 3 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {PLAYBOOKS.map((p) => {
-            const on = picked === p.key;
-            return (
-              <Card key={p.key} className={cn("p-5 transition-all", on ? "ring-2 ring-blue-500" : "hover:border-slate-300")}>
-                <div className="flex items-start gap-3 mb-3">
-                  <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0", p.tone)}>
-                    <p.Icon className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-slate-900">{p.title}</h3>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      {p.tags.map((t) => <span key={t} className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">{t}</span>)}
-                      {p.recommended && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700">Recommended</span>}
-                    </div>
-                  </div>
-                </div>
-                <p className="text-sm text-slate-500 leading-relaxed mb-3">{p.desc}</p>
-                <div className="flex items-center gap-4 text-xs text-slate-400 mb-4">
-                  <span>{p.steps} steps</span><span>{p.days} days</span><span>{p.reply}% reply rate</span>
-                </div>
-                <Button variant={on ? "primary" : "outline"} size="sm" className="w-full" onClick={() => setPicked(on ? null : p.key)}>
-                  {on ? <><Check className="h-4 w-4" /> Selected</> : "Use playbook"}
-                </Button>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
       {/* Footer nav */}
       <div className="flex items-center justify-between mt-6">
         <div>
@@ -341,15 +302,10 @@ export function OnboardingWizard() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {step < 3 ? (
-            <>
-              {step === 2 && (
-                <Button variant="ghost" onClick={next} disabled={saving}>Skip for now</Button>
-              )}
-              <Button onClick={next} disabled={saving}>
-                {step === 2 ? "Continue" : "Save and continue"} <ArrowRight className="h-4 w-4" />
-              </Button>
-            </>
+          {step === 1 ? (
+            <Button onClick={next} disabled={saving}>
+              Save and continue <ArrowRight className="h-4 w-4" />
+            </Button>
           ) : (
             <>
               <Button variant="ghost" onClick={finish} disabled={saving}>Skip for now</Button>
