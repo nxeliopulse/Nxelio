@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   // Get workspace + current subscription
   const [{ data: profile }, { data: sub }] = await Promise.all([
-    supabase.from("users").select("workspace_id, full_name").eq("id", user.id).single(),
+    supabase.from("users").select("workspace_id, full_name").eq("user_id", user.id).single(),
     supabase.from("subscriptions")
       .select("chargebee_customer_id, chargebee_subscription_id, plan_id")
       .single(),
