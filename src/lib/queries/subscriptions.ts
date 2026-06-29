@@ -1,81 +1,18 @@
 "use server";
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import type {
+  PlanId, BillingInterval, SubscriptionStatus,
+  SubscriptionPlan, SubscriptionWithPlan, DeductResult,
+} from "@/lib/queries/subscription-types";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Re-export types so existing imports of subscriptions.ts keep working
+export type {
+  PlanId, BillingInterval, SubscriptionStatus, PlanFeatures,
+  SubscriptionPlan, Subscription, SubscriptionWithPlan, DeductResult,
+} from "@/lib/queries/subscription-types";
 
-export type PlanId = "basic" | "starter" | "pro";
-export type BillingInterval = "monthly" | "annual";
-export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
-
-export interface PlanFeatures {
-  discovery: boolean;
-  reply_tracking: boolean;
-  csv_import: boolean;
-  enrichment: boolean;
-  scoring: boolean;
-  linkedin_outreach: boolean;
-  core_workflows: boolean;
-  crm_export: boolean;
-  priority_support: boolean;
-}
-
-export interface SubscriptionPlan {
-  id: PlanId;
-  name: string;
-  monthly_price_cents: number;
-  annual_price_cents: number;
-  credits_per_cycle: number;
-  trial_days: number;
-  features: PlanFeatures;
-  sort_order: number;
-}
-
-export interface Subscription {
-  id: string;
-  workspace_id: string;
-  plan_id: PlanId;
-  billing_interval: BillingInterval;
-  status: SubscriptionStatus;
-  trial_ends_at: string | null;
-  current_period_start: string;
-  current_period_end: string;
-  credits_remaining: number;
-  credits_total: number;
-  low_balance_notified_at: string | null;
-  chargebee_customer_id: string | null;
-  chargebee_subscription_id: string | null;
-  chargebee_plan_id: string | null;
-  created_at: string;
-}
-
-export interface SubscriptionWithPlan extends Subscription {
-  plan: SubscriptionPlan;
-}
-
-export interface DeductResult {
-  ok: boolean;
-  remaining?: number;
-  deducted?: number;
-  error?: string;
-}
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-export const LOW_BALANCE_THRESHOLD = 0.1; // 10%
-
-export function isLowBalance(sub: Subscription): boolean {
-  if (sub.credits_total === 0) return false;
-  return sub.credits_remaining / sub.credits_total <= LOW_BALANCE_THRESHOLD;
-}
-
-export function trialDaysLeft(sub: Subscription): number {
-  if (sub.status !== "trialing" || !sub.trial_ends_at) return 0;
-  const ms = new Date(sub.trial_ends_at).getTime() - Date.now();
-  return Math.max(0, Math.ceil(ms / 86_400_000));
-}
-
-// ── Read queries (user-scoped) ────────────────────────────────────────────────
+// ── Read queries ──────────────────────────────────────────────────────────────
 
 export async function getSubscription(): Promise<SubscriptionWithPlan | null> {
   const supabase = await createClient();
@@ -96,7 +33,7 @@ export async function getPlans(): Promise<SubscriptionPlan[]> {
   return (data ?? []) as SubscriptionPlan[];
 }
 
-export async function hasFeature(feature: keyof PlanFeatures): Promise<boolean> {
+export async function hasFeature(feature: keyof import("./subscription-types").PlanFeatures): Promise<boolean> {
   const sub = await getSubscription();
   if (!sub) return false;
   if (sub.status !== "active" && sub.status !== "trialing") return false;
@@ -120,7 +57,7 @@ export async function getCreditHistory(limit = 50) {
   return data ?? [];
 }
 
-// ── Credit deduction (calls SECURITY DEFINER DB function) ────────────────────
+// ── Credit deduction ──────────────────────────────────────────────────────────
 
 export async function deductCredits(
   operationType: string,
@@ -139,16 +76,16 @@ export async function deductCredits(
     p_workspace_id:   profile.workspace_id,
     p_operation_type: operationType,
     p_amount:         amount,
-    p_lead_id:        options.leadId    ?? null,
+    p_lead_id:        options.leadId     ?? null,
     p_campaign_id:    options.campaignId ?? null,
-    p_metadata:       options.metadata  ?? {},
+    p_metadata:       options.metadata   ?? {},
   });
 
   if (error) return { ok: false, error: error.message };
   return data as DeductResult;
 }
 
-// ── Admin helpers (called from webhook handler with service role) ──────────────
+// ── Admin helpers (webhook handler) ──────────────────────────────────────────
 
 export interface SyncPayload {
   workspaceId: string;
@@ -164,21 +101,15 @@ export interface SyncPayload {
   chargebeePlanId: string;
 }
 
-/**
- * Upsert a subscription row from a Chargebee webhook event.
- * Uses the service-role client so it bypasses RLS.
- */
 export async function syncSubscriptionFromChargebee(payload: SyncPayload): Promise<void> {
   const admin = createAdminClient();
 
-  // Fetch current credits_remaining so we don't reset if only status changed
   const { data: existing } = await admin
     .from("subscriptions")
     .select("credits_remaining, credits_total, plan_id")
     .eq("workspace_id", payload.workspaceId)
     .single();
 
-  // If plan changed, grant the new plan's credit allowance; otherwise keep current balance
   const planChanged = existing && existing.plan_id !== payload.planId;
   const creditsRemaining = planChanged || !existing
     ? payload.creditsTotal
@@ -202,7 +133,6 @@ export async function syncSubscriptionFromChargebee(payload: SyncPayload): Promi
     { onConflict: "workspace_id" }
   );
 
-  // Log plan change in ledger
   if (planChanged) {
     const { data: sub } = await admin
       .from("subscriptions")
@@ -223,17 +153,11 @@ export async function syncSubscriptionFromChargebee(payload: SyncPayload): Promi
   }
 }
 
-/**
- * Reset credits at cycle renewal (called from subscription_renewed webhook).
- */
 export async function resetCycleCredits(workspaceId: string): Promise<void> {
   const admin = createAdminClient();
   await admin.rpc("reset_subscription_cycle", { p_workspace_id: workspaceId });
 }
 
-/**
- * Look up workspace_id from a Chargebee customer/subscription ID.
- */
 export async function workspaceByChargebeeCustomer(
   chargebeeCustomerId: string
 ): Promise<string | null> {

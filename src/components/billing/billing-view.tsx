@@ -14,7 +14,7 @@ import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import type {
   SubscriptionWithPlan, SubscriptionPlan, BillingInterval,
-} from "@/lib/queries/subscriptions";
+} from "@/lib/queries/subscription-types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
