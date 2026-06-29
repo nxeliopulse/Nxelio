@@ -40,7 +40,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   }
 
   return (
-    <header className="h-16 bg-[#f0f2f8] px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sticky top-0 z-30">
+    <header className="h-16 bg-slate-50 px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sticky top-0 z-30">
       {/* Left side: hamburger (mobile) + search */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {/* Hamburger — mobile/tablet only */}

@@ -6,7 +6,7 @@ import {
   Sliders, Sparkles, Target, TrendingUp, Users2, X,
 } from "lucide-react";
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell,
+  Area, AreaChart, Bar, BarChart, Cell,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -216,7 +216,6 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
                           <stop offset="100%" stopColor={BLUE} stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="4 4" />
                       <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} dy={6} />
                       <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
                       <Tooltip content={<ChartTooltip />} cursor={{ stroke: BLUE, strokeWidth: 1, strokeDasharray: "4 4" }} />
@@ -312,7 +311,6 @@ export function DashboardView({ stats }: { stats: DashboardStats }) {
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={audienceData} margin={{ top: 24, right: 4, left: -16, bottom: 0 }} barSize={28}>
-                      <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="4 4" />
                       <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} dy={6} />
                       <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
                       <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(37,99,235,0.04)" }} />
