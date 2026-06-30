@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Check, X, Sparkles, CreditCard, Users2, Send,
   Zap, Crown, Rocket, Lock, AlertTriangle, Clock,
-  TrendingUp, RefreshCw, ExternalLink, Loader2,
+  TrendingUp, RefreshCw, ExternalLink, Loader2, PartyPopper,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -104,6 +104,56 @@ interface Props {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+// Tiny component that reads search params — isolated in Suspense so the rest
+// of the page renders immediately without waiting for this hook.
+function CheckoutSuccessWatcher({
+  plans,
+  onSuccess,
+}: {
+  plans: SubscriptionPlan[];
+  onSuccess: (planName: string, credits: number) => void;
+}) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  useEffect(() => {
+    if (searchParams.get("checkout") !== "success") return;
+
+    const hostedPageId = searchParams.get("id");
+
+    // Read the plan the user clicked before redirect (stored in goCheckout)
+    const pendingPlanId = sessionStorage.getItem("cb_pending_plan") ?? "";
+    sessionStorage.removeItem("cb_pending_plan");
+
+    const plan = plans.find((p) => p.id === pendingPlanId);
+    const planName = plan?.name ?? (pendingPlanId ? pendingPlanId.charAt(0).toUpperCase() + pendingPlanId.slice(1) : "new");
+    const credits = plan?.credits_per_cycle ?? 0;
+
+    // Sync DB from Chargebee (also works on localhost — no webhook needed)
+    if (hostedPageId) {
+      fetch("/api/billing/sync-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostedPageId }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          // Use API-confirmed values if available
+          const confirmedName = data.planName ?? planName;
+          const confirmedCredits = data.creditsTotal ?? credits;
+          onSuccess(confirmedName, confirmedCredits);
+        })
+        .catch(() => onSuccess(planName, credits));
+    } else {
+      onSuccess(planName, credits);
+    }
+
+    router.replace("/billing");
+    router.refresh();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+  return null;
+}
+
 export function BillingView({ subscription: sub, plans, leadsCount, sentCount }: Props) {
   const router = useRouter();
   const [interval, setInterval] = useState<BillingInterval>("monthly");
@@ -112,6 +162,9 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
   const [checkoutPending, startCheckout] = useTransition();
   const [portalPending, startPortal] = useTransition();
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successPlanName, setSuccessPlanName] = useState("");
+  const [successCredits, setSuccessCredits] = useState(0);
 
   const currentPlanId = sub?.plan_id ?? "basic";
   const status        = sub?.status  ?? "trialing";
@@ -137,6 +190,8 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
       });
       const json = await res.json();
       if (!res.ok || json.error) { setCheckoutError(json.error ?? "Checkout failed"); return; }
+      // Store the selected plan so the success popup shows the correct name
+      sessionStorage.setItem("cb_pending_plan", planId);
       window.location.href = json.url;
     });
   }
@@ -154,6 +209,16 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
 
   return (
     <div className="max-w-[1200px] mx-auto">
+      <Suspense fallback={null}>
+        <CheckoutSuccessWatcher
+          plans={plans}
+          onSuccess={(planName, credits) => {
+            setSuccessPlanName(planName);
+            setSuccessCredits(credits);
+            setSuccessOpen(true);
+          }}
+        />
+      </Suspense>
       <PageHeader
         title="Billing & subscription"
         description="Manage your plan, usage, and payment methods"
@@ -497,6 +562,30 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
           <div className="flex justify-end">
             <Button variant="outline" onClick={() => setTopUpOpen(false)}>Close</Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* ── Success modal ─────────────────────────────────────── */}
+      <Modal open={successOpen} onClose={() => setSuccessOpen(false)} title="" size="sm">
+        <div className="p-8 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center">
+              <PartyPopper className="h-8 w-8 text-emerald-600" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Congratulations!</h2>
+          <p className="text-slate-600 mb-1">
+            Welcome to the <span className="font-semibold text-blue-600 capitalize">{successPlanName} Plan</span>!
+          </p>
+          <p className="text-sm text-slate-500 mb-6">
+            Your subscription is now active. You have <span className="font-semibold">{successCredits.toLocaleString()} AI credits</span> ready to use this cycle.
+          </p>
+          <Button className="w-full" onClick={() => { setSuccessOpen(false); router.push("/dashboard"); }}>
+            Go to Dashboard
+          </Button>
+          <button onClick={() => setSuccessOpen(false)} className="mt-3 text-sm text-slate-400 hover:text-slate-600 w-full">
+            Stay on billing page
+          </button>
         </div>
       </Modal>
 

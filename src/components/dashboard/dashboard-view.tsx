@@ -268,8 +268,7 @@ export function DashboardView({
                 </div>
               </CardHeader>
               <CardContent className="pt-1">
-                <div className="h-[210px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={210}>
                     <AreaChart data={perfData} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
                       <defs>
                         <linearGradient id="gOpens" x1="0" y1="0" x2="0" y2="1">
@@ -285,7 +284,6 @@ export function DashboardView({
                       <Area type="monotone" dataKey="Conversions" stroke={ORANGE} strokeWidth={2}   fill="none"          dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "#fff" }} />
                     </AreaChart>
                   </ResponsiveContainer>
-                </div>
               </CardContent>
             </Card>
           )}
@@ -298,7 +296,7 @@ export function DashboardView({
               </CardHeader>
               <CardContent className="pt-1 flex flex-col items-center">
                 <div className="h-[190px] w-full relative">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={190}>
                     <PieChart>
                       <Pie data={donutData} cx="50%" cy="50%" innerRadius={60} outerRadius={84} paddingAngle={3} dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
                         {donutData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
@@ -338,7 +336,7 @@ export function DashboardView({
                   <CardTitle className="text-base font-semibold">Top Automations</CardTitle>
                   <p className="text-xs text-slate-400 mt-0.5">Best performers</p>
                 </div>
-                <button onClick={() => router.push("/campaigns")} className="text-xs font-medium text-blue-600 hover:underline mt-1">View All</button>
+                <button suppressHydrationWarning onClick={() => router.push("/campaigns")} className="text-xs font-medium text-blue-600 hover:underline mt-1">View All</button>
               </CardHeader>
               <CardContent className="pt-2 space-y-4">
                 {topAutomations.length === 0 ? (
@@ -365,8 +363,7 @@ export function DashboardView({
                 <CardTitle className="text-base font-semibold">Audience Growth</CardTitle>
               </CardHeader>
               <CardContent className="pt-1">
-                <div className="h-[220px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={audienceData} margin={{ top: 24, right: 4, left: -16, bottom: 0 }} barSize={28}>
                       <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} dy={6} />
                       <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
@@ -376,7 +373,6 @@ export function DashboardView({
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
               </CardContent>
             </Card>
           )}
@@ -514,8 +510,7 @@ export function DashboardView({
                 <p className="text-xs text-slate-400 mt-0.5">Hot conversions over time</p>
               </CardHeader>
               <CardContent className="pt-1">
-                <div className="h-[210px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={210}>
                     <AreaChart data={hotTrend} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
                       <defs>
                         <linearGradient id="gHot" x1="0" y1="0" x2="0" y2="1">
@@ -529,7 +524,6 @@ export function DashboardView({
                       <Area type="monotone" dataKey="Hot" stroke={ORANGE} strokeWidth={2.5} fill="url(#gHot)" dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "#fff" }} />
                     </AreaChart>
                   </ResponsiveContainer>
-                </div>
               </CardContent>
             </Card>
           )}
@@ -545,7 +539,7 @@ export function DashboardView({
                   {replyData.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-sm text-slate-400">No campaigns yet.</div>
                   ) : (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height={210}>
                       <BarChart data={replyData} margin={{ top: 8, right: 4, left: -16, bottom: 0 }} barSize={26}>
                         <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} dy={6} />
                         <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={36} />
@@ -567,7 +561,7 @@ export function DashboardView({
               </CardHeader>
               <CardContent className="pt-1 flex flex-col items-center">
                 <div className="h-[190px] w-full relative">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={190}>
                     <PieChart>
                       <Pie data={convData} cx="50%" cy="50%" innerRadius={62} outerRadius={84} paddingAngle={0} dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
                         {convData.map((entry, i) => <Cell key={i} fill={entry.color} />)}

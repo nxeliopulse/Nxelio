@@ -81,6 +81,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <button
           onClick={onToggleAssistant}
           aria-label={assistantOpen ? "Close AI assistant" : "Open AI assistant"}
+          suppressHydrationWarning
           className={`flex items-center gap-1.5 rounded-2xl font-semibold text-sm transition-all flex-shrink-0 px-3 sm:px-4 h-11 text-white bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-500 shadow-md shadow-blue-500/25 ${
             assistantOpen ? "ring-2 ring-blue-300 shadow-lg" : "hover:shadow-lg hover:brightness-105 active:scale-[0.98]"
           }`}
