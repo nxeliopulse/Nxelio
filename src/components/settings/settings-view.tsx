@@ -42,9 +42,10 @@ interface Props {
   calendarProviderStatus: { google: boolean; microsoft: boolean };
   mailboxAccounts: OutreachAccountRow[];
   unipileConfigured: boolean;
+  bookingSlug?: string | null;
 }
 
-export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, unipileConfigured }: Props) {
+export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, unipileConfigured, bookingSlug }: Props) {
   const [active, setActive] = useState("profile");
   // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar.
   useEffect(() => {
@@ -295,7 +296,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
 
           {active === "calendar" && (
             <Card className="p-6">
-              <CalendarConnections accounts={calendarAccounts} providerStatus={calendarProviderStatus} />
+              <CalendarConnections accounts={calendarAccounts} providerStatus={calendarProviderStatus} bookingSlug={bookingSlug} />
             </Card>
           )}
 

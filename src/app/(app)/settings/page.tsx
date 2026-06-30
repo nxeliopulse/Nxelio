@@ -3,10 +3,11 @@ import { getIntegrationStatuses, getEmailDomainStatus } from "@/lib/queries/inte
 import { getBlocklist } from "@/lib/queries/blocklist";
 import { getCalendarAccounts, getCalendarProviderStatus } from "@/lib/queries/calendar-accounts";
 import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach-accounts";
+import { getCurrentWorkspace } from "@/lib/queries/workspaces";
 import { SettingsView } from "@/components/settings/settings-view";
 
 export default async function SettingsPage() {
-  const [profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, outreachAccounts, unipileConfigured] = await Promise.all([
+  const [profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, outreachAccounts, unipileConfigured, workspace] = await Promise.all([
     getCurrentUserProfile(),
     getIntegrationStatuses(),
     getEmailDomainStatus(),
@@ -15,6 +16,7 @@ export default async function SettingsPage() {
     getCalendarProviderStatus(),
     getOutreachAccounts(),
     isUnipileConfigured(),
+    getCurrentWorkspace(),
   ]);
   const mailboxAccounts = outreachAccounts.filter((a) => a.channel === "email");
   return (
@@ -27,6 +29,7 @@ export default async function SettingsPage() {
       calendarProviderStatus={calendarProviderStatus}
       mailboxAccounts={mailboxAccounts}
       unipileConfigured={unipileConfigured}
+      bookingSlug={workspace?.capture_slug ?? null}
     />
   );
 }

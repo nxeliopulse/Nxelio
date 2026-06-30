@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useTransition } from "react";
-import { Calendar, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { Calendar, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw, Link2, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,14 +14,25 @@ const PROVIDER_LABEL: Record<string, string> = { google: "Google Calendar", micr
 export function CalendarConnections({
   accounts,
   providerStatus,
+  bookingSlug,
 }: {
   accounts: CalendarAccountRow[];
   providerStatus: { google: boolean; microsoft: boolean };
+  bookingSlug?: string | null;
 }) {
   const [pending, start] = useTransition();
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
   const [availability, setAvailability] = useState<{ count: number; errors: string[] } | null>(null);
   const [checking, setChecking] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [bookingUrl, setBookingUrl] = useState("");
+  useEffect(() => {
+    if (bookingSlug) setBookingUrl(`${window.location.origin}/book/${bookingSlug}`);
+  }, [bookingSlug]);
+  function copyBooking() {
+    if (!bookingUrl) return;
+    navigator.clipboard?.writeText(bookingUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  }
 
   // Surface the OAuth redirect result (?connected=calendar / ?calendar_error=...).
   useEffect(() => {
@@ -123,6 +134,21 @@ export function CalendarConnections({
                 {availability.errors.length > 0 && <span className="text-red-600"> ({availability.errors.join("; ")})</span>}
               </span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* LP-20 — public booking link */}
+      {bookingSlug && (
+        <div className="border-t border-slate-100 pt-4">
+          <p className="text-sm font-medium text-slate-700 flex items-center gap-1.5"><Link2 className="h-4 w-4 text-slate-400" /> Your booking link</p>
+          <p className="text-xs text-slate-500 mb-2">Share this so leads can pick an open time on your calendar and self-schedule.</p>
+          <div className="flex gap-2">
+            <input readOnly value={bookingUrl} className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600" />
+            <Button variant="outline" onClick={copyBooking} className="flex-shrink-0">
+              {copied ? <><Check className="h-4 w-4" /> Copied</> : <><Copy className="h-4 w-4" /> Copy</>}
+            </Button>
+            <a href={bookingUrl} target="_blank" rel="noopener noreferrer"><Button variant="outline">Open</Button></a>
           </div>
         </div>
       )}

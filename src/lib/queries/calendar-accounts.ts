@@ -91,3 +91,25 @@ export async function getCalendarBusy(startIso: string, endIso: string): Promise
   busy.sort((a, b) => a.start.localeCompare(b.start));
   return { busy, errors };
 }
+
+/**
+ * Like getCalendarBusy but for a specific workspace via the admin client — used
+ * by the PUBLIC booking page (LP-20), where there's no logged-in session.
+ */
+export async function getWorkspaceBusy(workspaceId: string, startIso: string, endIso: string): Promise<BusyInterval[]> {
+  const admin = createAdminClient();
+  const { data: accounts } = await admin
+    .from("calendar_accounts")
+    .select("id, provider, email, access_token, refresh_token, token_expires_at")
+    .eq("workspace_id", workspaceId)
+    .eq("status", "connected");
+
+  const busy: BusyInterval[] = [];
+  for (const acc of (accounts as AccountWithTokens[]) || []) {
+    try {
+      const token = await ensureToken(acc);
+      busy.push(...(await fetchBusy(acc.provider, token, acc.email, startIso, endIso)));
+    } catch { /* skip a failing calendar; a booking page should still show slots */ }
+  }
+  return busy;
+}
