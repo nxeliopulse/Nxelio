@@ -1,7 +1,8 @@
 "use client";
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Forward, Star, Send, Paperclip, MoreHorizontal, Tag, X, Trash2 } from "lucide-react";
+import { Search, Filter, Forward, Star, Send, Paperclip, MoreHorizontal, Tag, X, Trash2, Video } from "lucide-react";
+import { generateConferenceLink, CONFERENCE_PROVIDERS, type ConferenceProvider } from "@/lib/meetings/conference-link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -64,6 +65,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
   const [tagOpen, setTagOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [meetOpen, setMeetOpen] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(false);
   const [forwardTo, setForwardTo] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
@@ -74,6 +76,7 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
   const tagPopoverRef = useRef<HTMLDivElement>(null);
   const morePopoverRef = useRef<HTMLDivElement>(null);
   const templatesPopoverRef = useRef<HTMLDivElement>(null);
+  const meetPopoverRef = useRef<HTMLDivElement>(null);
 
   // Load templates on mount
   useEffect(() => {
@@ -105,10 +108,18 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
       if (tagOpen && tagPopoverRef.current && !tagPopoverRef.current.contains(target)) setTagOpen(false);
       if (moreOpen && morePopoverRef.current && !morePopoverRef.current.contains(target)) setMoreOpen(false);
       if (templatesOpen && templatesPopoverRef.current && !templatesPopoverRef.current.contains(target)) setTemplatesOpen(false);
+      if (meetOpen && meetPopoverRef.current && !meetPopoverRef.current.contains(target)) setMeetOpen(false);
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
-  }, [tagOpen, moreOpen, templatesOpen]);
+  }, [tagOpen, moreOpen, templatesOpen, meetOpen]);
+
+  // Insert a generated meeting link into the reply (LP — conferencing link from inbox).
+  function insertMeetingLink(provider: ConferenceProvider) {
+    const link = generateConferenceLink(provider, active?.subject || "Meeting");
+    setReply((r) => (r.trim() ? `${r.replace(/\s*$/, "")}\n\nJoin the meeting: ${link}` : `Join the meeting: ${link}`));
+    setMeetOpen(false);
+  }
 
   const filtered = visible
     .filter((c) => filter === "all" || (filter === "unread" && !c.is_read) || (filter === "replied" && c.is_read))
@@ -473,6 +484,25 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
                                 </button>
                               ))
                             )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="relative" ref={meetPopoverRef}>
+                        <Button variant="ghost" size="sm" onClick={() => setMeetOpen((v) => !v)}>
+                          <Video className="h-4 w-4" /> Meet link
+                        </Button>
+                        {meetOpen && (
+                          <div className="absolute left-0 bottom-full mb-1 z-20 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400 px-3 py-1.5">Insert meeting link</p>
+                            {CONFERENCE_PROVIDERS.map((p) => (
+                              <button
+                                key={p.value}
+                                onClick={() => insertMeetingLink(p.value)}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-slate-700"
+                              >
+                                {p.label}
+                              </button>
+                            ))}
                           </div>
                         )}
                       </div>

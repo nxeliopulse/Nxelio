@@ -1,6 +1,10 @@
 "use client";
 import { useState, useTransition, useEffect, type ReactNode } from "react";
-import { User, Mail, Bell, Key, ShieldCheck, Ban, CreditCard, Plus, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor } from "lucide-react";
+import { User, Mail, Bell, Key, ShieldCheck, Ban, CreditCard, Plus, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor, Calendar } from "lucide-react";
+import { CalendarConnections } from "@/components/settings/calendar-connections";
+import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
+import { MailboxConnections } from "@/components/settings/mailbox-connections";
+import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +19,7 @@ const sections = [
   { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
   { id: "appearance", label: "Appearance", icon: <Palette className="h-4 w-4" /> },
   { id: "email", label: "Email Accounts", icon: <Mail className="h-4 w-4" /> },
+  { id: "calendar", label: "Calendar", icon: <Calendar className="h-4 w-4" /> },
   { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
   { id: "api", label: "API Keys", icon: <Key className="h-4 w-4" /> },
   { id: "blocklist", label: "Blocklist", icon: <Ban className="h-4 w-4" /> },
@@ -33,10 +38,19 @@ interface Props {
   integrations: IntegrationStatus[];
   emailDomain: { verified: boolean; from: string; provider?: "brevo" | "resend" | "none" };
   blocklist: BlocklistEntry[];
+  calendarAccounts: CalendarAccountRow[];
+  calendarProviderStatus: { google: boolean; microsoft: boolean };
+  mailboxAccounts: OutreachAccountRow[];
+  unipileConfigured: boolean;
 }
 
-export function SettingsView({ profile, integrations, emailDomain, blocklist }: Props) {
+export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, unipileConfigured }: Props) {
   const [active, setActive] = useState("profile");
+  // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar.
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get("section");
+    if (s && sections.some((sec) => sec.id === s)) setActive(s);
+  }, []);
   const [pending, start] = useTransition();
   const [name, setName] = useState(profile?.full_name || "");
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
@@ -269,8 +283,19 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist }: 
                   </div>
                   {emailDomain.verified ? <Badge variant="success"><Check className="h-2.5 w-2.5" /> Verified</Badge> : <Badge variant="warning">Sandbox</Badge>}
                 </div>
-                <Button variant="outline" className="w-full" disabled><Plus className="h-4 w-4" /> Connect additional email account (coming soon)</Button>
               </div>
+
+              <div className="mt-6 border-t border-slate-100 pt-5">
+                <h4 className="font-semibold text-slate-900 mb-1">Connected mailboxes</h4>
+                <p className="text-sm text-slate-500 mb-4">Link Gmail/Outlook to send from your own inbox and capture replies. Disconnect or switch anytime.</p>
+                <MailboxConnections accounts={mailboxAccounts} unipileConfigured={unipileConfigured} />
+              </div>
+            </Card>
+          )}
+
+          {active === "calendar" && (
+            <Card className="p-6">
+              <CalendarConnections accounts={calendarAccounts} providerStatus={calendarProviderStatus} />
             </Card>
           )}
 

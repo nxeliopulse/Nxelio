@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users2, Send, Layers3, Briefcase, BarChart3, Inbox, Newspaper, UserCog, Settings, Link2 } from "lucide-react";
+import { LayoutDashboard, Users2, Send, Layers3, Briefcase, BarChart3, Inbox, Newspaper, UserCog, Settings, Link2, CalendarDays } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type Role = "Super Admin" | "Sales Admin" | "Marketing Admin" | string;
@@ -28,6 +28,7 @@ export const navMainItems: NavItem[] = [
   { label: "Campaigns", href: "/campaigns", icon: Send, roles: SALES },
   { label: "Inbox", href: "/inbox", icon: Inbox, roles: SALES },
   { label: "Opportunities", href: "/opportunities", icon: Briefcase, roles: SALES },
+  { label: "Meetings", href: "/meetings", icon: CalendarDays, roles: SALES },
   { label: "Segments", href: "/segments", icon: Layers3, roles: MARKETING },
   { label: "Newsletters", href: "/newsletters", icon: Newspaper, roles: MARKETING },
   { label: "Analytics", href: "/analytics", icon: BarChart3, roles: ALL },

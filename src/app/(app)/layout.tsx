@@ -12,6 +12,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // who hasn't finished sees a banner (below) — no hard lockout.
   const { completed: onboardingCompleted } = await getOnboarding();
 
+  // LP-2 — a "no mailbox connected" banner shows until at least one email
+  // mailbox is connected for the workspace.
+  const { count: mailboxCount } = await supabase
+    .from("outreach_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("channel", "email")
+    .eq("status", "connected");
+  const mailboxConnected = (mailboxCount || 0) > 0;
+
   const { data: profile } = await supabase
     .from("users")
     .select("full_name, email, role_id, nav_access, roles(role_name)")
@@ -32,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       userRole={userRole}
       navAccess={navAccess}
       onboardingCompleted={onboardingCompleted}
+      mailboxConnected={mailboxConnected}
     >
       {children}
     </AppShell>

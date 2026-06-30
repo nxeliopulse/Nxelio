@@ -8,6 +8,7 @@ import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { SupportWidget } from "@/components/support/support-widget";
 import { FeedbackProvider } from "@/components/ui/feedback";
 import { OnboardingBanner } from "@/components/layout/onboarding-banner";
+import { NoMailboxBanner } from "@/components/layout/no-mailbox-banner";
 import { AssistantProvider } from "@/components/layout/assistant-context";
 
 interface Props {
@@ -16,10 +17,11 @@ interface Props {
   userRole: string;
   navAccess?: Record<string, boolean> | null;
   onboardingCompleted?: boolean;
+  mailboxConnected?: boolean;
   children: React.ReactNode;
 }
 
-function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted = true, children }: Props) {
+function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted = true, mailboxConnected = true, children }: Props) {
   const { mobileOpen, setMobileOpen } = useSidebar();
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantExpanded, setAssistantExpanded] = useState(false);
@@ -36,7 +38,7 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
             onToggleAssistant={() => setAssistantOpen((v) => !v)}
             assistantOpen={assistantOpen}
           />
-          {!onboardingCompleted && <OnboardingBanner />}
+          {!onboardingCompleted ? <OnboardingBanner /> : !mailboxConnected && <NoMailboxBanner />}
           <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-hidden">{children}</main>
         </div>
         {/* Renders as a flex column on desktop — the content area shrinks to share the window */}
