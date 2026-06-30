@@ -56,6 +56,9 @@ interface SendArgs {
   text?: string;
   /** Brevo tags — used to attribute open/click/bounce webhook events back to a campaign. */
   tags?: string[];
+  /** Sender display name recipients see. Per-workspace (e.g. the customer's company
+   *  name); falls back to BREVO_FROM_NAME ("Nxelio") when not provided. */
+  fromName?: string;
 }
 
 function toHtml(html?: string, text?: string): string {
@@ -65,7 +68,7 @@ function toHtml(html?: string, text?: string): string {
   );
 }
 
-async function sendViaBrevo({ to, subject, html, text, tags }: SendArgs): Promise<SendResult> {
+async function sendViaBrevo({ to, subject, html, text, tags, fromName }: SendArgs): Promise<SendResult> {
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
@@ -74,7 +77,7 @@ async function sendViaBrevo({ to, subject, html, text, tags }: SendArgs): Promis
       Accept: "application/json",
     },
     body: JSON.stringify({
-      sender: { name: BREVO_FROM_NAME, email: BREVO_FROM_EMAIL },
+      sender: { name: (fromName && fromName.trim()) || BREVO_FROM_NAME, email: BREVO_FROM_EMAIL },
       to: [{ email: to }],
       subject,
       htmlContent: toHtml(html, text),

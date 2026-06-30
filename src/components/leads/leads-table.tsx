@@ -1,7 +1,8 @@
 "use client";
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, Tag, Share2, type LucideIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, Tag, Share2, CalendarPlus, type LucideIcon } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +65,7 @@ interface Props {
 
 export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
   const { confirm } = useFeedback();
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState(initialSearch ?? "");
@@ -446,6 +448,12 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
               <span className="font-semibold">{selected.length}</span> selected
             </span>
             <span className="h-5 w-px bg-white/20" />
+            <button
+              onClick={() => router.push(`/meetings?leads=${selected.join(",")}`)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+            >
+              <CalendarPlus className="h-3.5 w-3.5" /> Schedule meeting
+            </button>
             <button
               onClick={handleBulkDelete}
               disabled={pending}

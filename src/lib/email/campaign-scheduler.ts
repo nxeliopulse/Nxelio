@@ -103,7 +103,7 @@ export interface StepSendResult { ok: boolean; simulated?: boolean; skipped?: bo
  */
 export async function sendCampaignStepToLead(
   db: Db,
-  opts: { campaignId: string; workspaceId: string; lead: StepLead; subject: string; body: string; senderName?: string; channel?: StepChannel; action?: StepAction }
+  opts: { campaignId: string; workspaceId: string; lead: StepLead; subject: string; body: string; senderName?: string; fromName?: string; channel?: StepChannel; action?: StepAction }
 ): Promise<StepSendResult> {
   const { campaignId, workspaceId, lead, senderName } = opts;
   const channel: StepChannel = opts.channel || "email";
@@ -119,7 +119,7 @@ export async function sendCampaignStepToLead(
   const subject = substituteMergeTags(opts.subject, lead, senderName);
   const body = substituteMergeTags(opts.body, lead, senderName);
 
-  const r = await sendEmail({ to: lead.email, subject, text: body, tags: [campaignId] });
+  const r = await sendEmail({ to: lead.email, subject, text: body, tags: [campaignId], fromName: opts.fromName });
   if (!r.ok) return { ok: false, error: r.error };
 
   await db.from("inbox_messages").insert({
@@ -205,6 +205,19 @@ export async function scheduleCampaignFollowups(
   await db.from("campaign_jobs").insert(rows);
 }
 
+/** The "From Name" recipients see for a workspace: its company name (from
+ *  onboarding) or "Nxelio" if not set. Used so campaign emails send under the
+ *  customer's brand. */
+export async function fromNameForWorkspace(db: Db, workspaceId: string): Promise<string> {
+  try {
+    const { data } = await db.from("workspaces").select("onboarding").eq("id", workspaceId).single();
+    const name = (data?.onboarding as { company_name?: string } | null)?.company_name;
+    return (name && name.trim()) || "Nxelio";
+  } catch {
+    return "Nxelio";
+  }
+}
+
 export interface CampaignProcessResult { processed: number; sent: number; failed: number; skipped: number }
 
 /**
@@ -225,6 +238,13 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
     .order("run_at", { ascending: true })
     .limit(limit);
   if (!jobs?.length) return result;
+
+  // Resolve each workspace's "From Name" once and reuse across its jobs.
+  const fromNameCache = new Map<string, string>();
+  const getFromName = async (wsId: string) => {
+    if (!fromNameCache.has(wsId)) fromNameCache.set(wsId, await fromNameForWorkspace(db, wsId));
+    return fromNameCache.get(wsId)!;
+  };
 
   for (const job of jobs as Record<string, string>[]) {
     result.processed++;
@@ -268,14 +288,16 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
       continue;
     }
 
+    const wsId = (campaign.workspace_id as string) || (job.workspace_id as string);
     const r = await sendCampaignStepToLead(db, {
       campaignId: job.campaign_id,
-      workspaceId: (campaign.workspace_id as string) || (job.workspace_id as string),
+      workspaceId: wsId,
       lead: lead as unknown as StepLead,
       subject: job.subject || "",
       body: job.body || "",
       channel: (job.channel as StepChannel) || "email",
       action: (job.action as StepAction) || "email",
+      fromName: await getFromName(wsId),
     });
 
     if (r.ok) {

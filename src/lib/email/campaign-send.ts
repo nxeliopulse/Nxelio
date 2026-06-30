@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCampaignById } from "@/lib/queries/campaigns";
 import { getCurrentUserProfile } from "@/lib/queries/users";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
-import { parseCampaignSteps, sendCampaignStepToLead, scheduleCampaignFollowups, AUDIENCE_COLS, type StepLead } from "@/lib/email/campaign-scheduler";
+import { parseCampaignSteps, sendCampaignStepToLead, scheduleCampaignFollowups, fromNameForWorkspace, AUDIENCE_COLS, type StepLead } from "@/lib/email/campaign-scheduler";
 import { revalidatePath } from "next/cache";
 
 const MAX_PER_SEND = 300;
@@ -60,13 +60,15 @@ export async function sendCampaign(campaignId: string): Promise<CampaignSendResu
 
   const profile = await getCurrentUserProfile().catch(() => null);
   const senderName = (profile as { full_name?: string | null } | null)?.full_name || undefined;
+  // From Name recipients see = the workspace's company name (or "Nxelio").
+  const fromName = await fromNameForWorkspace(supabase, workspaceId);
 
   let sent = 0, failed = 0, skipped = 0, scheduled = 0, simulated = false;
   const launchMs = Date.now();
   const hasFollowups = steps.length > 1;
 
   for (const lead of leads.slice(0, MAX_PER_SEND)) {
-    const r = await sendCampaignStepToLead(supabase, { campaignId, workspaceId, lead, subject: step1.subject, body: step1.body, senderName, channel: step1.channel, action: step1.action });
+    const r = await sendCampaignStepToLead(supabase, { campaignId, workspaceId, lead, subject: step1.subject, body: step1.body, senderName, fromName, channel: step1.channel, action: step1.action });
     if (r.ok) { sent++; if (r.simulated) simulated = true; }
     else if (r.skipped) skipped++;
     else failed++;

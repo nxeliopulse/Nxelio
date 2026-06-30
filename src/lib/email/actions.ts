@@ -5,6 +5,7 @@ import { getLeadById } from "@/lib/queries/leads";
 import { isBlocked } from "@/lib/queries/blocklist";
 import { substituteMergeTags } from "@/lib/email/merge-tags";
 import { getCurrentUserProfile } from "@/lib/queries/users";
+import { getOnboarding } from "@/lib/queries/onboarding";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
 
@@ -36,10 +37,15 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
   const finalSubject = substituteMergeTags(subject, lead, senderName);
   const finalBody = substituteMergeTags(body, lead, senderName);
 
+  // From Name recipients see = the workspace's company name (or "Nxelio").
+  const { data: onboarding } = await getOnboarding();
+  const fromName = onboarding?.company_name?.trim() || "Nxelio";
+
   const result = await sendEmail({
     to: lead.email,
     subject: finalSubject,
     text: finalBody,
+    fromName,
   });
 
   if (!result.ok) {

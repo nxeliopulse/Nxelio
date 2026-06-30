@@ -1,9 +1,10 @@
 "use client";
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect } from "react";
 import Link from "next/link";
 import {
   CalendarDays, Clock, Users, ExternalLink, Pencil, X, Plus, Link2, FileText,
   PlayCircle, Video, MapPin, CalendarClock, AlertCircle, Loader2, Wand2,
+  Send, Check, ChevronLeft, UserPlus, CalendarCheck,
 } from "lucide-react";
 import { generateConferenceLink, type ConferenceProvider } from "@/lib/meetings/conference-link";
 import { Card } from "@/components/ui/card";
@@ -13,9 +14,10 @@ import { Input, Select, Textarea } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { useFeedback } from "@/components/ui/feedback";
 import {
-  createMeeting, updateMeeting, cancelMeeting, deleteMeeting,
+  updateMeeting, cancelMeeting, deleteMeeting, scheduleMeeting,
   type MeetingRow, type MeetingInput,
 } from "@/lib/queries/meetings";
+import { getCalendarBusy } from "@/lib/queries/calendar-accounts";
 
 interface LeadOption { id: string; full_name: string | null; company_name: string | null; email: string | null }
 
@@ -63,6 +65,15 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [detail, setDetail] = useState<MeetingRow | null>(null);
   const [editing, setEditing] = useState<MeetingRow | "new" | null>(null);
+  // LP-16 — arriving from Leads with ?leads=id1,id2 pre-opens the scheduler with those attendees.
+  const [presetLeadIds, setPresetLeadIds] = useState<string[]>([]);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("leads");
+    if (p) {
+      setPresetLeadIds(p.split(",").map((s) => s.trim()).filter(Boolean));
+      setEditing("new");
+    }
+  }, []);
 
   const now = Date.now();
   const { upcoming, past } = useMemo(() => {
@@ -169,7 +180,8 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
         <MeetingFormModal
           meeting={editing === "new" ? null : editing}
           leads={leads}
-          onClose={() => setEditing(null)}
+          initialLeadIds={editing === "new" ? presetLeadIds : []}
+          onClose={() => { setEditing(null); setPresetLeadIds([]); }}
         />
       )}
     </div>
@@ -275,17 +287,19 @@ function Row({ icon, label, children }: { icon: React.ReactNode; label: string; 
   );
 }
 
-function MeetingFormModal({ meeting, leads, onClose }: { meeting: MeetingRow | null; leads: LeadOption[]; onClose: () => void }) {
+interface Attendee { leadId?: string; name: string; email: string }
+
+function MeetingFormModal({ meeting, leads, initialLeadIds = [], onClose }: { meeting: MeetingRow | null; leads: LeadOption[]; initialLeadIds?: string[]; onClose: () => void }) {
   const isEdit = !!meeting;
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const defaultStart = meeting ? toLocalInput(meeting.start_at) : "";
-  const defaultEnd = meeting ? toLocalInput(meeting.end_at) : "";
+  const [step, setStep] = useState<"details" | "review">("details");
+  const [sendInvites, setSendInvites] = useState(true);
+
   const [form, setForm] = useState({
     title: meeting?.title ?? "",
-    lead_id: meeting?.lead_id ?? "",
-    startLocal: defaultStart,
-    endLocal: defaultEnd,
+    startLocal: meeting ? toLocalInput(meeting.start_at) : "",
+    endLocal: meeting ? toLocalInput(meeting.end_at) : "",
     provider: meeting?.provider ?? "google_meet",
     location: meeting?.location ?? "",
     join_url: meeting?.join_url ?? "",
@@ -293,29 +307,107 @@ function MeetingFormModal({ meeting, leads, onClose }: { meeting: MeetingRow | n
   });
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) { setForm((f) => ({ ...f, [k]: v })); }
 
-  function save() {
+  // ── Attendees (LP-16/LP-17) ──
+  const [attendees, setAttendees] = useState<Attendee[]>(() => {
+    if (meeting && Array.isArray(meeting.attendees) && meeting.attendees.length) {
+      return meeting.attendees.map((a) => ({ name: a.name || "", email: a.email || "" }));
+    }
+    return initialLeadIds
+      .map((id) => leads.find((l) => l.id === id))
+      .filter((l): l is LeadOption => Boolean(l))
+      .map((l) => ({ leadId: l.id, name: leadLabel(l) || "", email: l.email || "" }));
+  });
+  const [manualEmail, setManualEmail] = useState("");
+
+  function addLeadAttendee(id: string) {
+    const l = leads.find((x) => x.id === id);
+    if (!l) return;
+    setAttendees((a) => a.some((x) => x.leadId === id) ? a : [...a, { leadId: l.id, name: leadLabel(l) || "", email: l.email || "" }]);
+  }
+  function addManualEmail() {
+    const e = manualEmail.trim();
+    if (!e.includes("@")) return;
+    setAttendees((a) => a.some((x) => x.email.toLowerCase() === e.toLowerCase()) ? a : [...a, { name: "", email: e }]);
+    setManualEmail("");
+  }
+  const removeAttendee = (i: number) => setAttendees((a) => a.filter((_, idx) => idx !== i));
+  const invitableCount = attendees.filter((a) => a.email).length;
+
+  // ── Availability (uses connected calendar, LP-3) ──
+  const [avail, setAvail] = useState<{ busy: { start: string; end: string }[]; checked: boolean; loading: boolean; error?: string }>({ busy: [], checked: false, loading: false });
+
+  async function checkAvailability() {
+    if (!form.startLocal) { setError("Pick a start date first to check availability."); return; }
     setError(null);
-    if (!form.title.trim()) return setError("Give the meeting a title.");
-    if (!form.startLocal || !form.endLocal) return setError("Set a start and end time.");
+    const day = new Date(form.startLocal);
+    const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
+    setAvail((s) => ({ ...s, loading: true }));
+    try {
+      const res = await getCalendarBusy(dayStart.toISOString(), dayEnd.toISOString());
+      setAvail({ busy: res.busy, checked: true, loading: false, error: res.errors[0] });
+    } catch {
+      setAvail({ busy: [], checked: true, loading: false, error: "Couldn't read your calendar" });
+    }
+  }
+
+  const freeSlots = useMemo(() => {
+    if (!avail.checked || !form.startLocal) return [];
+    const day = new Date(form.startLocal); day.setHours(0, 0, 0, 0);
+    const out: { startLocal: string; endLocal: string; label: string }[] = [];
+    for (let h = 9; h < 18; h++) {
+      for (const m of [0, 30]) {
+        const s = new Date(day); s.setHours(h, m, 0, 0);
+        const e = new Date(s.getTime() + 30 * 60000);
+        if (s.getTime() < Date.now()) continue;
+        if (avail.busy.some((b) => new Date(b.start) < e && new Date(b.end) > s)) continue;
+        out.push({ startLocal: toLocalInput(s.toISOString()), endLocal: toLocalInput(e.toISOString()), label: s.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) });
+      }
+    }
+    return out;
+  }, [avail, form.startLocal]);
+
+  const conflict = useMemo(() => {
+    if (!avail.checked || !form.startLocal || !form.endLocal) return false;
+    const s = new Date(form.startLocal), e = new Date(form.endLocal);
+    return avail.busy.some((b) => new Date(b.start) < e && new Date(b.end) > s);
+  }, [avail, form.startLocal, form.endLocal]);
+
+  function build(): MeetingInput | null {
+    setError(null);
+    if (!form.title.trim()) { setError("Give the meeting a title."); return null; }
+    if (!form.startLocal || !form.endLocal) { setError("Set a start and end time."); return null; }
     const startIso = new Date(form.startLocal).toISOString();
     const endIso = new Date(form.endLocal).toISOString();
-    if (new Date(endIso) <= new Date(startIso)) return setError("End time must be after the start time.");
-    const payload: MeetingInput = {
+    if (new Date(endIso) <= new Date(startIso)) { setError("End time must be after the start time."); return null; }
+    return {
       title: form.title.trim(),
       start_at: startIso,
       end_at: endIso,
       provider: form.provider,
       location: form.location.trim() || null,
       join_url: form.join_url.trim() || null,
-      lead_id: form.lead_id || null,
+      lead_id: attendees.find((a) => a.leadId)?.leadId || null,
       description: form.description.trim() || null,
+      attendees: attendees.map((a) => ({ name: a.name || undefined, email: a.email || undefined })),
     };
+  }
+
+  function goReview() { if (build()) setStep("review"); }
+
+  function confirmSave() {
+    const payload = build();
+    if (!payload) { setStep("details"); return; }
     start(async () => {
-      const res = isEdit ? await updateMeeting(meeting!.id, payload) : await createMeeting(payload);
-      if (!res.ok) { setError(res.error || "Couldn't save the meeting."); return; }
+      const res = isEdit ? await updateMeeting(meeting!.id, payload) : await scheduleMeeting(payload, { sendInvites });
+      if (!res.ok) { setError(res.error || "Couldn't save the meeting."); setStep("details"); return; }
       onClose();
     });
   }
+
+  const whenText = form.startLocal && form.endLocal
+    ? `${new Date(form.startLocal).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} – ${new Date(form.endLocal).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    : "—";
 
   return (
     <>
@@ -323,7 +415,9 @@ function MeetingFormModal({ meeting, leads, onClose }: { meeting: MeetingRow | n
       <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto pointer-events-none">
         <Card className="w-full max-w-lg p-6 mt-12 pointer-events-auto">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">{isEdit ? "Edit / reschedule meeting" : "New meeting"}</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {isEdit ? "Edit / reschedule meeting" : step === "review" ? "Review & schedule" : "Schedule a meeting"}
+            </h2>
             <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
           </div>
 
@@ -333,58 +427,148 @@ function MeetingFormModal({ meeting, leads, onClose }: { meeting: MeetingRow | n
             </div>
           )}
 
-          <div className="space-y-4">
-            <Field label="Title" required>
-              <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Discovery call" />
-            </Field>
-            <Field label="Contact">
-              <Select value={form.lead_id} onChange={(e) => set("lead_id", e.target.value)}>
-                <option value="">No contact linked</option>
-                {leads.map((l) => <option key={l.id} value={l.id}>{leadLabel(l)}</option>)}
-              </Select>
-            </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Start" required><Input type="datetime-local" value={form.startLocal} onChange={(e) => set("startLocal", e.target.value)} /></Field>
-              <Field label="End" required><Input type="datetime-local" value={form.endLocal} onChange={(e) => set("endLocal", e.target.value)} /></Field>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Conferencing">
-                <Select value={form.provider} onChange={(e) => set("provider", e.target.value)}>
-                  {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </Select>
+          {step === "details" ? (
+            <div className="space-y-4">
+              <Field label="Title" required>
+                <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Discovery call" />
               </Field>
-              <Field label="Location"><Input value={form.location} onChange={(e) => set("location", e.target.value)} placeholder="Room or address (optional)" /></Field>
-            </div>
-            <Field label="Join link">
-              <div className="flex gap-2">
-                <Input className="flex-1" value={form.join_url} onChange={(e) => set("join_url", e.target.value)} placeholder="https://… (optional)" />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => set("join_url", generateConferenceLink(form.provider as ConferenceProvider, form.title))}
-                  disabled={form.provider === "manual"}
-                  title={form.provider === "manual" ? "Pick a conferencing app above to generate a link" : "Generate a link for the selected app"}
-                  className="flex-shrink-0"
-                >
-                  <Wand2 className="h-4 w-4" /> Generate
-                </Button>
-              </div>
-              {form.provider !== "manual" && (
-                <p className="text-xs text-slate-400 mt-1.5">Generates a {PROVIDERS.find((p) => p.value === form.provider)?.label} link.</p>
-              )}
-            </Field>
-            <Field label="Notes"><Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Agenda or context (optional)" /></Field>
-          </div>
 
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button>
-            <Button onClick={save} disabled={pending}>
-              {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</> : isEdit ? "Save changes" : "Create meeting"}
-            </Button>
+              {/* Attendees */}
+              <Field label={`Attendees${invitableCount ? ` (${invitableCount} will be invited)` : ""}`}>
+                {attendees.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {attendees.map((a, i) => (
+                      <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
+                        {a.name || a.email}{!a.email && <span className="text-amber-600" title="No email — won't get an invite">⚠</span>}
+                        <button onClick={() => removeAttendee(i)} className="text-slate-400 hover:text-red-600"><X className="h-3 w-3" /></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Select value="" onChange={(e) => { if (e.target.value) addLeadAttendee(e.target.value); }} className="flex-1">
+                    <option value="">+ Add a lead…</option>
+                    {leads.filter((l) => !attendees.some((a) => a.leadId === l.id)).map((l) => (
+                      <option key={l.id} value={l.id}>{leadLabel(l)}{l.email ? "" : " (no email)"}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Input className="flex-1" placeholder="or add an email…" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addManualEmail(); } }} />
+                  <Button type="button" variant="outline" onClick={addManualEmail} className="flex-shrink-0"><UserPlus className="h-4 w-4" /> Add</Button>
+                </div>
+              </Field>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Start" required><Input type="datetime-local" value={form.startLocal} onChange={(e) => set("startLocal", e.target.value)} /></Field>
+                <Field label="End" required><Input type="datetime-local" value={form.endLocal} onChange={(e) => set("endLocal", e.target.value)} /></Field>
+              </div>
+
+              {/* Availability (LP-3 powered) */}
+              <div className="rounded-lg border border-slate-200 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-700 inline-flex items-center gap-1.5"><CalendarCheck className="h-4 w-4 text-slate-400" /> Availability</span>
+                  <Button type="button" variant="outline" size="sm" onClick={checkAvailability} disabled={avail.loading}>
+                    {avail.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />} Check my calendar
+                  </Button>
+                </div>
+                {avail.checked && (
+                  <div className="mt-2 text-xs">
+                    {avail.error ? (
+                      <p className="text-slate-400">Calendar not connected — connect it in Settings → Calendar to see free times.</p>
+                    ) : (
+                      <>
+                        {conflict && <p className="text-red-600 mb-1.5 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> This time overlaps a busy event on your calendar.</p>}
+                        {!conflict && form.startLocal && <p className="text-emerald-600 mb-1.5 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> You&apos;re free at the selected time.</p>}
+                        {freeSlots.length > 0 && (
+                          <>
+                            <p className="text-slate-500 mb-1">Free 30-min slots that day — click to use:</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {freeSlots.slice(0, 12).map((s) => (
+                                <button key={s.startLocal} onClick={() => { set("startLocal", s.startLocal); set("endLocal", s.endLocal); }}
+                                  className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:border-blue-300 hover:bg-blue-50">
+                                  {s.label}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Conferencing">
+                  <Select value={form.provider} onChange={(e) => set("provider", e.target.value)}>
+                    {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Location"><Input value={form.location} onChange={(e) => set("location", e.target.value)} placeholder="Room or address (optional)" /></Field>
+              </div>
+              <Field label="Join link">
+                <div className="flex gap-2">
+                  <Input className="flex-1" value={form.join_url} onChange={(e) => set("join_url", e.target.value)} placeholder="https://… (optional)" />
+                  <Button type="button" variant="outline" onClick={() => set("join_url", generateConferenceLink(form.provider as ConferenceProvider, form.title))} disabled={form.provider === "manual"} className="flex-shrink-0">
+                    <Wand2 className="h-4 w-4" /> Generate
+                  </Button>
+                </div>
+              </Field>
+              <Field label="Notes"><Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Agenda or context (optional)" /></Field>
+            </div>
+          ) : (
+            /* ── Review step (LP-18) ── */
+            <div className="space-y-3 text-sm">
+              <ReviewRow label="Title">{form.title}</ReviewRow>
+              <ReviewRow label="When">{whenText}</ReviewRow>
+              <ReviewRow label="Attendees">
+                {attendees.length === 0 ? <span className="text-slate-400">None</span> : (
+                  <ul className="space-y-0.5">{attendees.map((a, i) => <li key={i}>{a.name || a.email}{a.name && a.email ? ` · ${a.email}` : ""}{!a.email && <span className="text-amber-600"> · no email</span>}</li>)}</ul>
+                )}
+              </ReviewRow>
+              <ReviewRow label="Conferencing">{PROVIDERS.find((p) => p.value === form.provider)?.label}{form.join_url ? ` · ${form.join_url}` : ""}</ReviewRow>
+              {form.location && <ReviewRow label="Location">{form.location}</ReviewRow>}
+              {form.description && <ReviewRow label="Notes">{form.description}</ReviewRow>}
+
+              {!isEdit && (
+                <label className="flex items-center gap-2 pt-2 text-slate-700">
+                  <input type="checkbox" checked={sendInvites} onChange={(e) => setSendInvites(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                  Email an invite (with the join link) to the {invitableCount} attendee{invitableCount === 1 ? "" : "s"} with an email
+                </label>
+              )}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="flex justify-between gap-2 mt-6">
+            {step === "review"
+              ? <Button variant="ghost" onClick={() => setStep("details")} disabled={pending}><ChevronLeft className="h-4 w-4" /> Back</Button>
+              : <Button variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button>}
+            {isEdit ? (
+              <Button onClick={confirmSave} disabled={pending}>
+                {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</> : "Save changes"}
+              </Button>
+            ) : step === "details" ? (
+              <Button onClick={goReview} disabled={pending}>Review →</Button>
+            ) : (
+              <Button onClick={confirmSave} disabled={pending}>
+                {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</> : <><Send className="h-4 w-4" /> {sendInvites && invitableCount ? "Schedule & send invites" : "Schedule meeting"}</>}
+              </Button>
+            )}
           </div>
         </Card>
       </div>
     </>
+  );
+}
+
+function ReviewRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3">
+      <span className="w-24 flex-shrink-0 text-xs font-medium uppercase tracking-wider text-slate-400 pt-0.5">{label}</span>
+      <div className="flex-1 text-slate-700">{children}</div>
+    </div>
   );
 }
 

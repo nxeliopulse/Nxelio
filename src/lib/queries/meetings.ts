@@ -1,5 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { sendEmail } from "@/lib/email/resend";
+import { getOnboarding } from "@/lib/queries/onboarding";
 import { revalidatePath } from "next/cache";
 
 export interface MeetingAttendee { name?: string; email?: string }
@@ -81,6 +83,58 @@ export async function updateMeeting(id: string, input: Partial<MeetingInput> & {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/meetings");
   return { ok: true };
+}
+
+function formatWhen(startIso: string, endIso: string): string {
+  const s = new Date(startIso);
+  const e = new Date(endIso);
+  const date = s.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  const t = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${date}, ${t(s)} – ${t(e)}`;
+}
+
+/**
+ * Epic 4 (LP-19): creates a meeting AND emails an invite (with the join link) to
+ * every attendee that has an email. Falls back to "Nxelio" as the From Name when
+ * the workspace hasn't set a company name. Returns how many invites went out.
+ */
+export async function scheduleMeeting(
+  input: MeetingInput,
+  opts?: { sendInvites?: boolean }
+): Promise<{ ok: boolean; error?: string; invitesSent?: number }> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("meetings").insert({
+    title: input.title,
+    description: input.description ?? null,
+    start_at: input.start_at,
+    end_at: input.end_at,
+    location: input.location ?? null,
+    join_url: input.join_url ?? null,
+    provider: input.provider ?? "manual",
+    lead_id: input.lead_id || null,
+    attendees: input.attendees ?? [],
+  });
+  if (error) return { ok: false, error: error.message };
+
+  let invitesSent = 0;
+  if (opts?.sendInvites !== false) {
+    const { data: onboarding } = await getOnboarding();
+    const fromName = onboarding?.company_name?.trim() || "Nxelio";
+    const when = formatWhen(input.start_at, input.end_at);
+    const whereLine = input.join_url
+      ? `\n\nJoin: ${input.join_url}`
+      : input.location ? `\n\nLocation: ${input.location}` : "";
+    for (const a of input.attendees ?? []) {
+      if (!a.email) continue;
+      const hi = a.name ? ` ${a.name.split(" ")[0]}` : "";
+      const text = `Hi${hi},\n\nYou're invited to "${input.title}".\n\nWhen: ${when}${whereLine}${input.description ? `\n\n${input.description}` : ""}\n\nSee you there,\n${fromName}`;
+      const r = await sendEmail({ to: a.email, subject: `Invitation: ${input.title} — ${when}`, text, fromName });
+      if (r.ok) invitesSent++;
+    }
+  }
+
+  revalidatePath("/meetings");
+  return { ok: true, invitesSent };
 }
 
 export async function cancelMeeting(id: string): Promise<{ ok: boolean; error?: string }> {

@@ -2,6 +2,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendEmail } from "./resend";
 import { substituteMergeTags } from "./merge-tags";
+import { getOnboarding } from "@/lib/queries/onboarding";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
 import type { NewsletterBlock, NewsletterContent, NewsletterRow } from "@/lib/queries/newsletters";
@@ -126,6 +127,8 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
   }).eq("id", n.id);
 
   // 4. Render and send
+  const { data: onboarding } = await getOnboarding();
+  const fromName = onboarding?.company_name?.trim() || "Nxelio";
   let sent = 0;
   let failed = 0;
   let redirectedNote: string | undefined;
@@ -150,6 +153,7 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
       to: lead.email,
       subject: finalSubject,
       html,
+      fromName,
     });
 
     if (result.ok) {
@@ -221,10 +225,12 @@ export async function sendTestNewsletter(newsletterId: string, testEmail: string
     preheader: n.preheader || undefined,
   });
 
+  const { data: onboarding } = await getOnboarding();
   const result = await sendEmail({
     to: testEmail,
     subject: `[TEST] ${substituteMergeTags(n.subject || n.title, fakeLead)}`,
     html,
+    fromName: onboarding?.company_name?.trim() || "Nxelio",
   });
 
   return result.ok
