@@ -24,7 +24,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
     getAiCreditsUsage().then((c) => { if (!cancelled) setCredits(c); }).catch(() => {});
     getUnreadInboxCount().then((n) => { if (!cancelled) setInboxUnread(n); }).catch(() => {});
     return () => { cancelled = true; };
-  }, []);
+  }, [pathname]);
 
   const main = filterNavByRoleAndOverrides(navMainItems, role, navAccess);
   const admin = filterNavByRoleAndOverrides(navAdminItems, role, navAccess);
@@ -99,6 +99,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            suppressHydrationWarning
             className="flex items-center gap-2.5 group"
           >
             <span className="relative h-11 w-11 rounded-2xl bg-white/15 flex items-center justify-center ring-1 ring-white/20 flex-shrink-0 group-hover:bg-white/20 transition-colors">
