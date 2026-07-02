@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, Tag, Share2, CalendarPlus, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, Tag, Share2, CalendarPlus, X, type LucideIcon } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,21 +70,39 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState(initialSearch ?? "");
   const [industryFilter, setIndustryFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [showWizard, setShowWizard] = useState(false);
   const [page, setPage] = useState(0);
-  const [showFilters, setShowFilters] = useState(false);
   const [sort, setSort] = useState<"none" | "name" | "score" | "newest">("none");
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 25;
+
+  // Per-column header search (click a header to filter by that column's value).
+  const [columnFilters, setColumnFilters] = useState<Partial<Record<ColKey, string>>>({});
+  const [filterPopover, setFilterPopover] = useState<{ key: ColKey; top: number; left: number } | null>(null);
+  const [filterDraft, setFilterDraft] = useState("");
+
+  // Industry/interest/date filters — opened as a popover next to the count chip.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersPos, setFiltersPos] = useState<{ top: number; left: number } | null>(null);
+  const hasActiveFilters = Boolean(industryFilter || dateFrom || dateTo);
+  function openFiltersPopover(e: React.MouseEvent<HTMLButtonElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    setFiltersPos({ top: r.bottom + 6, left: r.left });
+    setFiltersOpen(true);
+  }
 
   // Column visibility (persisted). Hydrate from localStorage after mount to avoid SSR mismatch.
   const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
   const [showCols, setShowCols] = useState(false);
   const [colsPos, setColsPos] = useState<{ top: number; right: number } | null>(null);
 
+  // Hydrate saved column choices after mount (localStorage is client-only).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COLS_STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setCols({ ...DEFAULT_COLS, ...JSON.parse(raw) });
     } catch { /* ignore malformed storage */ }
   }, []);
@@ -108,6 +126,8 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
 
   const visibleCols = COLUMNS.filter((c) => cols[c.key]);
 
+  const activeColumnFilterKeys = (Object.keys(columnFilters) as ColKey[]).filter((k) => columnFilters[k]);
+
   const filtered = leads.filter((l) => {
     const name = l.full_name || l.company_name || "";
     const q = search.toLowerCase();
@@ -118,7 +138,17 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
       (l.email?.toLowerCase().includes(q) ?? false) ||
       (l.website_url?.toLowerCase().includes(q) ?? false);
     const matchIndustry = !industryFilter || l.industry === industryFilter;
-    return matchSearch && matchIndustry;
+
+    const created = new Date(l.created_at);
+    const matchDateFrom = !dateFrom || created >= new Date(`${dateFrom}T00:00:00`);
+    const matchDateTo = !dateTo || created <= new Date(`${dateTo}T23:59:59`);
+
+    const matchColumns = activeColumnFilterKeys.every((k) => {
+      const v = (columnFilters[k] || "").toLowerCase();
+      return getColumnText(k, l).toLowerCase().includes(v);
+    });
+
+    return matchSearch && matchIndustry && matchDateFrom && matchDateTo && matchColumns;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -146,6 +176,54 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
     if (/(outlook|hotmail|live|msn|office365|microsoft)\./.test(domain) || ["outlook.com", "hotmail.com", "live.com"].includes(domain)) return { label: "Microsoft", kind: "microsoft" };
     if (/yahoo\./.test(domain) || domain === "yahoo.com") return { label: "Yahoo", kind: "yahoo" };
     return { label: "Other", kind: "other" };
+  }
+
+  /** Plain-text value of a column, for the header click-to-search filter. */
+  function getColumnText(key: ColKey, l: LeadRow): string {
+    switch (key) {
+      case "first_name": return splitName(l).first;
+      case "last_name": return splitName(l).last;
+      case "email": return l.email || "";
+      case "company": return l.company_name || "";
+      case "industry": return l.industry || "";
+      case "email_provider": return emailProvider(l.email).label;
+      case "score": return String(l.lead_score ?? "");
+      case "status": return l.status || "";
+      case "phone": return l.phone || "";
+      case "interest_area": return l.interest_area || "";
+      case "source": return l.source || "";
+      case "linkedin": return l.linkedin || "";
+      case "website": return l.website_url || "";
+      case "verified": return l.verified ? "Verified" : "No";
+      case "created_at": return new Date(l.created_at).toLocaleDateString();
+      default: return "";
+    }
+  }
+
+  function openColumnFilter(e: React.MouseEvent<HTMLElement>, key: ColKey) {
+    if (key === "index") return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setFilterDraft(columnFilters[key] || "");
+    setFilterPopover({ key, top: r.bottom + 6, left: r.left });
+  }
+  function applyColumnFilter() {
+    if (!filterPopover) return;
+    const key = filterPopover.key;
+    setColumnFilters((f) => {
+      const next = { ...f };
+      if (filterDraft.trim()) next[key] = filterDraft.trim();
+      else delete next[key];
+      return next;
+    });
+    setFilterPopover(null);
+  }
+  function clearColumnFilter(key: ColKey, e?: React.MouseEvent) {
+    e?.stopPropagation();
+    setColumnFilters((f) => {
+      const next = { ...f };
+      delete next[key];
+      return next;
+    });
   }
 
   const toggle = (id: string) =>
@@ -256,14 +334,15 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
             {filtered.length}
           </div>
 
-          {/* Filters toggle */}
+          {/* Filters — click opens a popover anchored right next to the count chip */}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowFilters((v) => !v)}
-            className={showFilters ? "ring-1 ring-blue-200 border-blue-300 text-blue-700" : ""}
+            onClick={openFiltersPopover}
+            className={hasActiveFilters ? "ring-1 ring-blue-200 border-blue-300 text-blue-700" : ""}
           >
-            <Filter className="h-4 w-4" /> Filters <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showFilters ? "rotate-180" : ""}`} />
+            <Filter className="h-4 w-4" /> Filters
+            {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
           </Button>
 
           <div className="ml-auto flex items-center gap-2">
@@ -289,31 +368,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
           </div>
         </div>
 
-        {/* Collapsible filter row */}
-        {showFilters && (
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/60 flex flex-wrap items-center gap-3">
-            <Select value={industryFilter} onChange={(e) => setIndustryFilter(e.target.value)} className="max-w-[200px]">
-              <option value="">All industries</option>
-              {industries.map((i) => (
-                <option key={i}>{i}</option>
-              ))}
-            </Select>
-            <Select className="max-w-[200px]">
-              <option>All interest areas</option>
-              {interestAreas.map((a) => (
-                <option key={a}>{a}</option>
-              ))}
-            </Select>
-            {(industryFilter || search) && (
-              <button
-                onClick={() => { setIndustryFilter(""); setSearch(""); }}
-                className="text-sm text-slate-500 hover:text-slate-700 underline"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Table with horizontal scroll */}
         <div className="relative">
@@ -329,13 +383,37 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
                       className="rounded border-slate-300"
                     />
                   </th>
-                  {visibleCols.map((c) => (
-                    <th key={c.key} className={cn("px-4 py-3 font-semibold", c.key === "index" && "w-12")}>
-                      {c.icon ? (
-                        <span className="inline-flex items-center gap-1.5"><c.icon className="h-3.5 w-3.5 text-slate-400" /> {c.label === "Row #" ? "#" : c.label}</span>
-                      ) : c.label}
-                    </th>
-                  ))}
+                  {visibleCols.map((c) => {
+                    const filterable = c.key !== "index";
+                    const active = Boolean(columnFilters[c.key]);
+                    return (
+                      <th key={c.key} className={cn("px-4 py-3 font-semibold", c.key === "index" && "w-12")}>
+                        <span
+                          role={filterable ? "button" : undefined}
+                          title={filterable ? `Click to search ${c.label}` : undefined}
+                          onClick={filterable ? (e) => openColumnFilter(e, c.key) : undefined}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 -mx-1",
+                            filterable && "cursor-pointer hover:bg-slate-200/60",
+                            active && "text-blue-700 bg-blue-50"
+                          )}
+                        >
+                          {c.icon && <c.icon className={cn("h-3.5 w-3.5", active ? "text-blue-500" : "text-slate-400")} />}
+                          {c.label === "Row #" ? "#" : c.label}
+                          {active && (
+                            <span
+                              role="button"
+                              title="Clear filter"
+                              onClick={(e) => clearColumnFilter(c.key, e)}
+                              className="text-blue-400 hover:text-blue-700"
+                            >
+                              <X className="h-3 w-3" />
+                            </span>
+                          )}
+                        </span>
+                      </th>
+                    );
+                  })}
                   <th className="px-4 py-3 w-10 text-right">
                     <button
                       onClick={openColsMenu}
@@ -435,6 +513,99 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
               <button onClick={resetCols} className="w-full text-left px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-50">
                 Reset to default
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Filters popover — anchored near the count chip */}
+      {filtersOpen && filtersPos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setFiltersOpen(false)} />
+          <div
+            className="fixed z-50 w-72 rounded-xl border border-slate-200 bg-white shadow-xl p-3 space-y-3"
+            style={{ top: filtersPos.top, left: filtersPos.left }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Industry</label>
+              <Select value={industryFilter} onChange={(e) => setIndustryFilter(e.target.value)}>
+                <option value="">All industries</option>
+                {industries.map((i) => (
+                  <option key={i}>{i}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Interest area</label>
+              <Select>
+                <option>All interest areas</option>
+                {interestAreas.map((a) => (
+                  <option key={a}>{a}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Added between</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                  aria-label="From date"
+                />
+                <span className="text-xs text-slate-400">to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                  aria-label="To date"
+                />
+              </div>
+            </div>
+            {hasActiveFilters && (
+              <button
+                onClick={() => { setIndustryFilter(""); setDateFrom(""); setDateTo(""); }}
+                className="text-xs text-slate-500 hover:text-slate-700 underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Per-column header search popover */}
+      {filterPopover && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setFilterPopover(null)} />
+          <div
+            className="fixed z-50 w-64 rounded-xl border border-slate-200 bg-white shadow-xl p-3"
+            style={{ top: filterPopover.top, left: filterPopover.left }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+              Search {COLUMNS.find((c) => c.key === filterPopover.key)?.label}
+            </p>
+            <Input
+              autoFocus
+              leftIcon={<Search className="h-4 w-4" />}
+              placeholder="Type a value…"
+              value={filterDraft}
+              onChange={(e) => setFilterDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") applyColumnFilter(); if (e.key === "Escape") setFilterPopover(null); }}
+            />
+            <div className="flex items-center justify-between mt-2.5">
+              <button
+                onClick={() => { clearColumnFilter(filterPopover.key); setFilterPopover(null); }}
+                className="text-xs text-slate-500 hover:text-slate-700"
+              >
+                Clear
+              </button>
+              <Button size="sm" onClick={applyColumnFilter}>Apply</Button>
             </div>
           </div>
         </>

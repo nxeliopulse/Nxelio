@@ -119,7 +119,14 @@ export async function sendCampaignStepToLead(
   const subject = substituteMergeTags(opts.subject, lead, senderName);
   const body = substituteMergeTags(opts.body, lead, senderName);
 
-  const r = await sendEmail({ to: lead.email, subject, text: body, tags: [campaignId], fromName: opts.fromName });
+  // Step bodies written in the rich-text sequence editor are stored as HTML —
+  // send them as html so formatting/links/images render; older plain-text
+  // drafts have no tags and keep going through the text→<br> path.
+  const isHtml = /<[a-z][\s\S]*>/i.test(body);
+  const r = await sendEmail({
+    to: lead.email, subject, tags: [campaignId], fromName: opts.fromName,
+    ...(isHtml ? { html: body } : { text: body }),
+  });
   if (!r.ok) return { ok: false, error: r.error };
 
   await db.from("inbox_messages").insert({
@@ -246,12 +253,35 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
     return fromNameCache.get(wsId)!;
   };
 
+  // For campaigns with "pause same company on reply": the set of email domains
+  // that have replied to that campaign, computed once per run and reused across
+  // that campaign's jobs.
+  const repliedDomainsCache = new Map<string, Promise<Set<string>>>();
+  async function repliedDomainsForCampaign(campaignId: string): Promise<Set<string>> {
+    let p = repliedDomainsCache.get(campaignId);
+    if (!p) {
+      p = (async () => {
+        const { data: replies } = await db
+          .from("inbox_messages")
+          .select("lead_id")
+          .eq("campaign_id", campaignId)
+          .eq("direction", "inbound");
+        const leadIds = [...new Set((replies || []).map((r: { lead_id: string }) => r.lead_id).filter(Boolean))];
+        if (!leadIds.length) return new Set<string>();
+        const { data: repliedLeads } = await db.from("leads").select("email").in("id", leadIds);
+        return new Set((repliedLeads || []).map((l: { email: string | null }) => l.email?.split("@")[1]?.toLowerCase()).filter(Boolean) as string[]);
+      })();
+      repliedDomainsCache.set(campaignId, p);
+    }
+    return p;
+  }
+
   for (const job of jobs as Record<string, string>[]) {
     result.processed++;
 
     const { data: campaign } = await db
       .from("campaigns")
-      .select("id, status, sent_count, workspace_id")
+      .select("id, status, sent_count, workspace_id, pause_same_company_on_reply")
       .eq("id", job.campaign_id)
       .single();
 
@@ -262,6 +292,17 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
       continue;
     }
     if (campaign.status !== "Active") { result.skipped++; continue; }
+
+    const { data: lead } = await db
+      .from("leads")
+      .select(AUDIENCE_COLS)
+      .eq("id", job.lead_id)
+      .single();
+    if (!lead) {
+      await db.from("campaign_jobs").update({ status: "skipped", last_error: "Lead not found", updated_at: nowIso }).eq("id", job.id);
+      result.skipped++;
+      continue;
+    }
 
     // Reply-stop: if the lead has replied to this campaign, cancel their remaining steps.
     const { count: replyCount } = await db
@@ -277,15 +318,16 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
       continue;
     }
 
-    const { data: lead } = await db
-      .from("leads")
-      .select(AUDIENCE_COLS)
-      .eq("id", job.lead_id)
-      .single();
-    if (!lead) {
-      await db.from("campaign_jobs").update({ status: "skipped", last_error: "Lead not found", updated_at: nowIso }).eq("id", job.id);
-      result.skipped++;
-      continue;
+    // Same-company pause: someone else at this lead's email domain already replied.
+    if (campaign.pause_same_company_on_reply && lead.email?.includes("@")) {
+      const domain = lead.email.split("@")[1]?.toLowerCase();
+      const repliedDomains = await repliedDomainsForCampaign(job.campaign_id);
+      if (domain && repliedDomains.has(domain)) {
+        await db.from("campaign_jobs").update({ status: "canceled", last_error: "Colleague replied", updated_at: nowIso })
+          .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
+        result.skipped++;
+        continue;
+      }
     }
 
     const wsId = (campaign.workspace_id as string) || (job.workspace_id as string);

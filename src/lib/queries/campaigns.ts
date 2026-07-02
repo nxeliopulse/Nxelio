@@ -14,6 +14,8 @@ export interface CampaignRow {
   open_rate: number;
   reply_rate: number;
   bounce_rate: number;
+  content_is_html: boolean;
+  pause_same_company_on_reply: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
