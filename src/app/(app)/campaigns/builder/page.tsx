@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Save, Send, Mail, Plus, Clock, AlertCircle,
   Loader2, Users2, Layers3, Trash2, Filter, LayoutTemplate, Wand2, CheckCircle2, Eye, Share2,
-  X, BarChart3, Inbox as InboxIcon,
+  X,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,9 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { createCampaign, updateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { sendCampaign } from "@/lib/email/campaign-send";
-import { getSegments } from "@/lib/queries/segments";
+import { getSegments, getSegmentMemberLeads } from "@/lib/queries/segments";
+import { getLeads, type LeadRow } from "@/lib/queries/leads";
+import { LeadsTable } from "@/components/leads/leads-table";
 import { getOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import { getEmailStatus } from "@/lib/email/actions";
 import { generateEmailSequence, type GeneratedEmail } from "@/lib/ai/actions";
@@ -28,27 +30,39 @@ import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { SequenceFlow, MiniSequencePreview } from "@/components/campaigns/sequence-flow";
 
-type TabId = "sequence" | "sender" | "settings" | "leads" | "analytics" | "replies";
+// Analytics and Replies live on the campaign details page, not the builder —
+// there's nothing to show for either until the campaign exists and has run.
+type TabId = "leads" | "sequence" | "sender" | "settings";
+// Ordered to match the intended flow: add leads first, then everything else unlocks.
 const PAGE_TABS: { id: TabId; label: string }[] = [
+  { id: "leads", label: "Leads" },
   { id: "sequence", label: "Sequence" },
   { id: "sender", label: "Sender accounts" },
   { id: "settings", label: "Settings" },
-  { id: "leads", label: "Leads" },
-  { id: "analytics", label: "Analytics" },
-  { id: "replies", label: "Replies" },
 ];
+const LEADS_GATE_MESSAGE = "Add at least one list of leads first.";
 
 interface LeadList { id: string; label: string; source: string; count: number; segmentId: string | null }
 interface SegmentLite { id: string; segment_name: string; contacts: number }
+
+/** Raw DB/driver error text (column not found, constraint violations, PGRST
+ *  codes, etc.) isn't meaningful to a non-technical user — swap it for a
+ *  plain-English message instead of showing the internals. */
+function humanizeError(message: string): string {
+  if (/column|schema cache|relation .* does not exist|PGRST|violates|constraint|duplicate key/i.test(message)) {
+    return "Something went wrong saving your campaign. Please try again, or contact support if it keeps happening.";
+  }
+  return message;
+}
 
 /** Server actions can throw plain objects (e.g. a raw Postgrest error) that lose
  *  their `.message` crossing back from the server — this defends against that
  *  showing up as a blank/"null" error in the UI. */
 function getErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof Error && err.message) return err.message;
+  if (err instanceof Error && err.message) return humanizeError(err.message);
   if (err && typeof err === "object" && "message" in err) {
     const m = (err as { message?: unknown }).message;
-    if (typeof m === "string" && m) return m;
+    if (typeof m === "string" && m) return humanizeError(m);
   }
   return fallback;
 }
@@ -69,7 +83,7 @@ export default function CampaignBuilderPage() {
   const { toast } = useFeedback();
   const [pending, start] = useTransition();
 
-  const [tab, setTab] = useState<TabId>("sequence");
+  const [tab, setTab] = useState<TabId>("leads");
   const [name, setName] = useState("Untitled Campaign");
   const [error, setError] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<CampaignRow | null>(null);
@@ -80,6 +94,10 @@ export default function CampaignBuilderPage() {
   const [lists, setLists] = useState<LeadList[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [viewingList, setViewingList] = useState<LeadList | null>(null);
+  const [viewingLeads, setViewingLeads] = useState<LeadRow[] | null>(null);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const listLeadsCache = useRef<Record<string, LeadRow[]>>({});
 
   // Sequence
   const [tplTab, setTplTab] = useState<"prebuilt" | "custom">("prebuilt");
@@ -102,6 +120,8 @@ export default function CampaignBuilderPage() {
 
   // Settings tab
   const [schedule, setSchedule] = useState("Send immediately");
+  const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string, only used when schedule === "Schedule for later"
+  const [minScheduleAt] = useState(() => new Date(Date.now() + 5 * 60000).toISOString().slice(0, 16));
 
   // Sender accounts tab
   const [senderAccounts, setSenderAccounts] = useState<OutreachAccountRow[]>([]);
@@ -114,7 +134,11 @@ export default function CampaignBuilderPage() {
       setSegments(mapped);
       const segParam = new URLSearchParams(window.location.search).get("segment");
       const seg = segParam ? mapped.find((m) => m.id === segParam) : null;
-      if (seg) setLists((prev) => (prev.some((l) => l.segmentId === seg.id) ? prev : [...prev, { id: `seg-${seg.id}`, label: seg.segment_name, source: "Segment", count: seg.contacts, segmentId: seg.id }]));
+      if (seg) {
+        setLists((prev) => (prev.some((l) => l.segmentId === seg.id) ? prev : [...prev, { id: `seg-${seg.id}`, label: seg.segment_name, source: "Segment", count: seg.contacts, segmentId: seg.id }]));
+        // A segment was pre-selected via deep link — leads are effectively already added.
+        setTab("sequence");
+      }
     }).catch(() => {});
     getOutreachAccounts().then(setSenderAccounts).catch(() => {});
     getEmailStatus().then(setEmailStatus).catch(() => {});
@@ -137,7 +161,7 @@ export default function CampaignBuilderPage() {
   useEffect(() => {
     if (mountedRef.current) setDirty(true);
     else mountedRef.current = true;
-  }, [name, lists, sequence, enableHtml, pauseSameCompany, schedule]);
+  }, [name, lists, sequence, enableHtml, pauseSameCompany, schedule, scheduledAt]);
 
   function patchStep(i: number, patch: Partial<GeneratedEmail>) {
     setSequence((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -145,6 +169,7 @@ export default function CampaignBuilderPage() {
 
   function addList(segmentId: string | null) {
     setAddOpen(false);
+    const wasEmpty = lists.length === 0;
     if (segmentId === null) {
       if (lists.some((l) => l.segmentId === null)) return;
       setLists([...lists, { id: `all-${Date.now()}`, label: "All leads", source: "Workspace", count: 0, segmentId: null }]);
@@ -152,6 +177,26 @@ export default function CampaignBuilderPage() {
       const seg = segments.find((s) => s.id === segmentId);
       if (!seg || lists.some((l) => l.segmentId === segmentId)) return;
       setLists([...lists, { id: `seg-${segmentId}`, label: seg.segment_name, source: "Segment", count: seg.contacts, segmentId }]);
+    }
+    // First list added → move straight into building the sequence.
+    if (wasEmpty) setTab("sequence");
+  }
+
+  /** Opens a full leads table for one list — cached per list so repeat clicks are instant. */
+  async function viewList(l: LeadList) {
+    setViewingList(l);
+    const cached = listLeadsCache.current[l.id];
+    if (cached) { setViewingLeads(cached); return; }
+    setViewingLeads(null);
+    setLoadingLeads(true);
+    try {
+      const rows = l.segmentId ? await getSegmentMemberLeads(l.segmentId) : await getLeads();
+      listLeadsCache.current[l.id] = rows;
+      setViewingLeads(rows);
+    } catch {
+      setViewingLeads([]);
+    } finally {
+      setLoadingLeads(false);
     }
   }
 
@@ -197,6 +242,11 @@ export default function CampaignBuilderPage() {
   const linkedinAccounts = senderAccounts.filter((a) => a.channel === "linkedin");
   const totalLeadsCount = lists.reduce((sum, l) => sum + (l.segmentId ? l.count : 0), 0) || (lists.length ? undefined : 0);
 
+  // Hard gate: every tab except Leads is locked until at least one lead list is added.
+  const leadsGate = lists.length > 0;
+  const visibleTabs = PAGE_TABS
+    .map((t) => ({ ...t, disabled: t.id !== "leads" && !leadsGate, disabledReason: LEADS_GATE_MESSAGE }));
+
   function buildContent(): string {
     return sequence.map((s) => {
       const isLi = s.channel === "linkedin";
@@ -207,8 +257,9 @@ export default function CampaignBuilderPage() {
   }
 
   /** Creates the campaign on first save, updates it on every save after that. */
-  async function persist(status: "Draft" | "Active"): Promise<CampaignRow> {
+  async function persist(status: "Draft" | "Active" | "Scheduled"): Promise<CampaignRow> {
     const segmentId = lists.find((l) => l.segmentId)?.segmentId ?? null;
+    const isScheduled = status === "Scheduled";
     const payload: Partial<CampaignRow> = {
       campaign_name: name.trim(),
       status: status === "Active" ? "Draft" : status, // sendCampaign flips it to Active on success
@@ -218,6 +269,7 @@ export default function CampaignBuilderPage() {
       content: buildContent(),
       content_is_html: enableHtml,
       pause_same_company_on_reply: pauseSameCompany,
+      scheduled_at: isScheduled && scheduledAt ? new Date(scheduledAt).toISOString() : null,
     };
     if (campaign) {
       await updateCampaign(campaign.id, payload);
@@ -249,8 +301,21 @@ export default function CampaignBuilderPage() {
     if (lists.length === 0) { setError("Add at least one list of leads before launching."); setTab("leads"); return; }
     if (!chosenTpl || sequence.length === 0 || !sequence.some((s) => s.subject || s.body)) { setError("Build a sequence first."); setTab("sequence"); return; }
     if (!name.trim()) { setError("Campaign name required"); setTab("settings"); return; }
+    const isScheduled = schedule === "Schedule for later";
+    if (isScheduled && (!scheduledAt || new Date(scheduledAt).getTime() <= Date.now())) {
+      setError("Pick a send time in the future first.");
+      setTab("settings");
+      return;
+    }
     start(async () => {
       try {
+        if (isScheduled) {
+          await persist("Scheduled");
+          setDirty(false);
+          toast(`Scheduled for ${new Date(scheduledAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`, "success");
+          router.push("/campaigns");
+          return;
+        }
         const saved = await persist("Draft");
         setDirty(false);
         const res = await sendCampaign(saved.id);
@@ -277,18 +342,24 @@ export default function CampaignBuilderPage() {
           <Input value={name} onChange={(e) => setName(e.target.value)} className="max-w-[280px] font-medium" />
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant={campaign?.status === "Active" ? "success" : "default"}>{campaign?.status === "Active" ? "Active" : "Draft"}</Badge>
-          <Button onClick={launch} disabled={pending}>
+          <Badge variant={campaign?.status === "Active" ? "success" : campaign?.status === "Scheduled" ? "warning" : "default"}>
+            {campaign?.status || "Draft"}
+          </Badge>
+          <Button onClick={launch} disabled={pending || !leadsGate} title={!leadsGate ? LEADS_GATE_MESSAGE : undefined}>
             {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Launching…</> : <><Send className="h-4 w-4" /> Launch campaign</>}
           </Button>
         </div>
       </div>
 
-      <Tabs tabs={PAGE_TABS} active={tab} onChange={(id) => setTab(id as TabId)} className="mb-6" />
+      <Tabs tabs={visibleTabs} active={tab} onChange={(id) => setTab(id as TabId)} className="mb-6" />
 
       {error && (
         <div className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{error}</span>
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button type="button" onClick={() => setError(null)} aria-label="Dismiss" className="text-red-400 hover:text-red-600 flex-shrink-0">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
@@ -331,17 +402,17 @@ export default function CampaignBuilderPage() {
           ) : (
             <div className="space-y-3">
               {lists.map((l) => (
-                <Card key={l.id} className="p-4 flex items-center justify-between">
+                <Card key={l.id} className="p-4 flex items-center justify-between cursor-pointer hover:border-blue-300 hover:shadow-sm transition-all" onClick={() => viewList(l)}>
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                       {l.segmentId ? <Layers3 className="h-4.5 w-4.5" /> : <Users2 className="h-4.5 w-4.5" />}
                     </div>
                     <div>
                       <p className="font-medium text-slate-900">{l.label}</p>
-                      <p className="text-xs text-slate-500">Added from {l.source}{l.segmentId ? ` · ${l.count} leads` : ""}</p>
+                      <p className="text-xs text-slate-500">Added from {l.source}{l.segmentId ? ` · ${l.count} leads` : ""} · click to view leads</p>
                     </div>
                   </div>
-                  <button onClick={() => setLists(lists.filter((x) => x.id !== l.id))} aria-label="Remove list" className="p-2 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50">
+                  <button onClick={(e) => { e.stopPropagation(); setLists(lists.filter((x) => x.id !== l.id)); }} aria-label="Remove list" className="p-2 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </Card>
@@ -576,7 +647,11 @@ export default function CampaignBuilderPage() {
             <div className="p-5 space-y-3">
               {error && (
                 <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{error}</span>
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span className="flex-1">{error}</span>
+                  <button type="button" onClick={() => setError(null)} aria-label="Dismiss" className="text-red-400 hover:text-red-600 flex-shrink-0">
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
               )}
               <Textarea
@@ -670,29 +745,23 @@ export default function CampaignBuilderPage() {
                 <option>Drip over time</option>
               </Select>
             </div>
+            {schedule === "Schedule for later" && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Send at</label>
+                <Input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  min={minScheduleAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                />
+                <p className="text-xs text-slate-400 mt-1">Step 1 goes out at this time in your local timezone.</p>
+              </div>
+            )}
             <div className="text-sm text-slate-500 flex items-center gap-2 bg-slate-50 rounded-lg p-3">
               <Filter className="h-4 w-4 flex-shrink-0" /> Leads who reply are automatically put on hold — no further steps are sent.
             </div>
           </Card>
         </div>
-      )}
-
-      {/* ── Analytics tab ── */}
-      {tab === "analytics" && (
-        <Card className="p-12 text-center text-slate-500 max-w-2xl mx-auto">
-          <BarChart3 className="h-10 w-10 mx-auto mb-3 text-slate-300" />
-          <p className="font-medium text-slate-900">No analytics yet</p>
-          <p className="text-sm mt-1">Open rates, replies, and clicks will show up here once you launch this campaign.</p>
-        </Card>
-      )}
-
-      {/* ── Replies tab ── */}
-      {tab === "replies" && (
-        <Card className="p-12 text-center text-slate-500 max-w-2xl mx-auto">
-          <InboxIcon className="h-10 w-10 mx-auto mb-3 text-slate-300" />
-          <p className="font-medium text-slate-900">No replies yet</p>
-          <p className="text-sm mt-1">Replies to this campaign will appear on its Inbox tab once it&apos;s launched.</p>
-        </Card>
       )}
 
       {/* Bottom bar — save draft, always available */}
@@ -703,6 +772,27 @@ export default function CampaignBuilderPage() {
       </div>
 
       <AddLeadsWizard open={showImport} onClose={() => setShowImport(false)} />
+
+      {/* Preview a list's actual leads — the real data table, not a bare card */}
+      <Modal
+        open={viewingList !== null}
+        onClose={() => { setViewingList(null); setViewingLeads(null); }}
+        title={viewingList?.label}
+        description={viewingList ? `${viewingList.segmentId ? "Segment" : "Workspace"} · who this list actually reaches` : undefined}
+        size="xl"
+      >
+        <div className="p-5 max-h-[75vh] overflow-y-auto bg-slate-50/60">
+          {loadingLeads ? (
+            <div className="flex items-center justify-center py-16 text-slate-400">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading leads…
+            </div>
+          ) : viewingLeads && viewingLeads.length > 0 ? (
+            <LeadsTable leads={viewingLeads} />
+          ) : (
+            <div className="py-16 text-center text-sm text-slate-500">No leads in this list yet.</div>
+          )}
+        </div>
+      </Modal>
 
       {/* Template preview — visual workflow flow + Select */}
       <Modal

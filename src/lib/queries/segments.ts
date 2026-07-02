@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { leadMatches, isRuleComplete, type EvalRule } from "@/lib/segments";
+import type { LeadRow } from "@/lib/queries/leads";
 
 // Only the columns a rule can match — keeps the membership scan lightweight.
 const LEAD_MATCH_FIELDS = "id, industry, interest_area, source, status, lead_score";
@@ -179,6 +180,18 @@ function csvEscape(val: unknown): string {
     return '"' + s.replace(/"/g, '""') + '"';
   }
   return s;
+}
+
+/** Full lead records for a segment's members — for previewing/reviewing who's actually in it. */
+export async function getSegmentMemberLeads(segmentId: string): Promise<LeadRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("segment_members")
+    .select("leads(*)")
+    .eq("segment_id", segmentId);
+  return ((data ?? []) as unknown as { leads: LeadRow | null }[])
+    .map((m) => m.leads)
+    .filter((l): l is LeadRow => l !== null);
 }
 
 export async function exportSegmentCsv(segmentId: string): Promise<{ filename: string; csv: string }> {

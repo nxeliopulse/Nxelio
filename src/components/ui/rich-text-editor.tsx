@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -10,9 +10,10 @@ import FontFamily from "@tiptap/extension-font-family";
 import Placeholder from "@tiptap/extension-placeholder";
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, Link2, Image as ImageIcon,
-  List, ListOrdered, ChevronDown,
+  List, ListOrdered, ChevronDown, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { uploadNewsletterImage } from "@/lib/storage/upload";
 
 const FONTS = [
   { label: "Sans Serif", value: "" },
@@ -47,6 +48,9 @@ interface RichTextEditorProps {
 /** Rich text email body editor (Bold/Italic/Underline/Strike, font, link, image). Emits HTML. */
 export function RichTextEditor({ value, onChange, placeholder, className, minHeight = 220 }: RichTextEditorProps) {
   const [fontOpen, setFontOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -88,9 +92,30 @@ export function RichTextEditor({ value, onChange, placeholder, className, minHei
   };
 
   const insertImage = () => {
-    const url = window.prompt("Image URL");
-    if (!url) return;
-    editor.chain().focus().setImage({ src: url }).run();
+    setUploadError(null);
+    fileInputRef.current?.click();
+  };
+
+  const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const result = await uploadNewsletterImage(formData);
+      if (result.ok && result.url) {
+        editor.chain().focus().setImage({ src: result.url }).run();
+      } else {
+        setUploadError(result.error || "Upload failed");
+      }
+    } catch {
+      setUploadError("Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const currentFont = (editor.getAttributes("textStyle").fontFamily as string) || "";
@@ -154,9 +179,22 @@ export function RichTextEditor({ value, onChange, placeholder, className, minHei
 
         <span className="mx-1 h-5 w-px bg-slate-200" />
 
-        <ToolbarButton title="Insert image" onClick={insertImage}><ImageIcon className="h-4 w-4" /></ToolbarButton>
+        <ToolbarButton title="Insert image from device" onClick={insertImage}>
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+        </ToolbarButton>
         <ToolbarButton title="Insert link" active={editor.isActive("link")} onClick={setLink}><Link2 className="h-4 w-4" /></ToolbarButton>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          className="hidden"
+          onChange={handleImageFile}
+        />
       </div>
+
+      {uploadError && (
+        <div className="px-3 py-1.5 text-xs text-red-600 bg-red-50 border-b border-red-100">{uploadError}</div>
+      )}
 
       {/* Content */}
       <div

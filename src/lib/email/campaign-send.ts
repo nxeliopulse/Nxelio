@@ -1,6 +1,7 @@
 "use server";
-import { createClient } from "@/lib/supabase/server";
-import { getCampaignById } from "@/lib/queries/campaigns";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { getCampaignById, type CampaignRow } from "@/lib/queries/campaigns";
 import { getCurrentUserProfile } from "@/lib/queries/users";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { parseCampaignSteps, sendCampaignStepToLead, scheduleCampaignFollowups, fromNameForWorkspace, AUDIENCE_COLS, type StepLead } from "@/lib/email/campaign-scheduler";
@@ -18,17 +19,11 @@ export interface CampaignSendResult {
   error?: string;
 }
 
-/**
- * Launches a campaign: sends Step 1 to the whole audience immediately (with the
- * campaign's Brevo tag + inbox/activity logging) and queues each later step at
- * its delay in campaign_jobs. The per-minute cron then drains those follow-ups,
- * stopping a lead's remaining steps once they reply.
- */
-export async function sendCampaign(campaignId: string): Promise<CampaignSendResult> {
-  const supabase = await createClient();
-  const campaign = await getCampaignById(campaignId);
-  if (!campaign) return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Campaign not found" };
-
+/** Shared send logic — takes whichever client/campaign the caller already has
+ *  (a user-scoped client for a manual launch, or the admin client for the cron
+ *  that fires scheduled sends with no user session to scope RLS to). */
+async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow): Promise<CampaignSendResult> {
+  const campaignId = campaign.id;
   const workspaceId = (campaign as { workspace_id?: string }).workspace_id;
   if (!workspaceId) return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Campaign has no workspace." };
 
@@ -95,4 +90,39 @@ export async function sendCampaign(campaignId: string): Promise<CampaignSendResu
   revalidatePath("/campaigns");
   revalidatePath(`/campaigns/${campaignId}`);
   return { ok: sent > 0, sent, failed, skipped, scheduled, simulated, error: sent === 0 ? "No emails were sent." : undefined };
+}
+
+/**
+ * Launches a campaign: sends Step 1 to the whole audience immediately (with the
+ * campaign's Brevo tag + inbox/activity logging) and queues each later step at
+ * its delay in campaign_jobs. The per-minute cron then drains those follow-ups,
+ * stopping a lead's remaining steps once they reply.
+ */
+export async function sendCampaign(campaignId: string): Promise<CampaignSendResult> {
+  const supabase = await createClient();
+  const campaign = await getCampaignById(campaignId);
+  if (!campaign) return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Campaign not found" };
+  return runCampaignSend(supabase, campaign);
+}
+
+/**
+ * Fires any campaigns whose "Schedule for later" time has arrived. Runs off
+ * the per-minute cron with the admin client — there's no user session to scope
+ * RLS to at that point, so the lookup and send both need to bypass it.
+ */
+export async function processDueScheduledCampaigns(limit = 20): Promise<{ launched: number; failed: number }> {
+  const admin = createAdminClient();
+  const { data: due } = await admin
+    .from("campaigns")
+    .select("*")
+    .eq("status", "Scheduled")
+    .lte("scheduled_at", new Date().toISOString())
+    .limit(limit);
+
+  let launched = 0, failed = 0;
+  for (const campaign of (due || []) as CampaignRow[]) {
+    const res = await runCampaignSend(admin, campaign);
+    if (res.ok) launched++; else failed++;
+  }
+  return { launched, failed };
 }

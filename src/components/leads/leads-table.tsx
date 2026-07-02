@@ -434,8 +434,12 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
                   </tr>
                 )}
                 {paged.map((l, i) => (
-                  <tr key={l.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
+                  <tr
+                    key={l.id}
+                    onClick={() => router.push(`/leads/${l.id}`)}
+                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.includes(l.id)}
@@ -444,9 +448,15 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
                       />
                     </td>
                     {visibleCols.map((c) => (
-                      <td key={c.key} className="px-4 py-3">{renderCell(c.key, l, safePage * PAGE_SIZE + i + 1)}</td>
+                      <td
+                        key={c.key}
+                        className="px-4 py-3"
+                        onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
+                      >
+                        {renderCell(c.key, l, safePage * PAGE_SIZE + i + 1)}
+                      </td>
                     ))}
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleDelete(l.id)}
                         disabled={pending}
