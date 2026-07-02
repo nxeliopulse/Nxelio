@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { X, Sparkles, HelpCircle } from "lucide-react";
 import { getAiCreditsUsage } from "@/lib/queries/credits";
-import { getUnreadInboxCount } from "@/lib/queries/inbox";
 import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 import { navMainItems, navAdminItems, filterNavByRoleAndOverrides } from "@/lib/nav-config";
@@ -12,14 +11,14 @@ import { navMainItems, navAdminItems, filterNavByRoleAndOverrides } from "@/lib/
 export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolean; onClose: () => void; role?: string; navAccess?: Record<string, boolean> | null }) {
   const pathname = usePathname();
   const [credits, setCredits] = useState<{ used: number; total: number } | null>(null);
-  const [inboxUnread, setInboxUnread] = useState<number>(0);
 
-  useEffect(() => { onClose(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [pathname]);
+  // Close the drawer on navigation; onClose is stable enough not to need in deps.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { onClose(); }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
     getAiCreditsUsage().then((c) => { if (!cancelled) setCredits(c); }).catch(() => {});
-    getUnreadInboxCount().then((n) => { if (!cancelled) setInboxUnread(n); }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
@@ -61,7 +60,6 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
               {main.map((item) => {
                 const Icon = item.icon;
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
-                const showBadge = item.href === "/inbox" && inboxUnread > 0;
                 return (
                   <li key={item.href}>
                     <Link
@@ -74,11 +72,6 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
                     >
                       <Icon className={cn("h-4.5 w-4.5 flex-shrink-0", active ? "text-blue-600" : "text-slate-400")} strokeWidth={2} />
                       <span className="flex-1">{item.label}</span>
-                      {showBadge && (
-                        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
-                          {inboxUnread > 9 ? "9+" : inboxUnread}
-                        </span>
-                      )}
                     </Link>
                   </li>
                 );

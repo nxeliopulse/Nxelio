@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users2, Send, Layers3, Briefcase, BarChart3, Inbox, Newspaper, UserCog, Settings, Link2, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Users2, Send, Layers3, Briefcase, BarChart3, Newspaper, UserCog, Settings, Link2, CalendarDays } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type Role = "Super Admin" | "Sales Admin" | "Marketing Admin" | string;
@@ -18,18 +18,20 @@ const SUPER: Role[] = ["Super Admin"];
 
 /**
  * Ordered by day-to-day priority (the Instantly/Apollo daily loop):
- * Dashboard → Leads → Campaigns (now includes Sequences/Outreach) → Inbox,
- * then supporting tools (Segments, Newsletters, Templates, Workflows),
- * measurement last (Analytics). The old Outreach tab is merged into Campaigns.
+ * Dashboard → Leads → Campaigns (now includes Sequences/Outreach) → Segments
+ * (build the audience right after building the campaign), then supporting
+ * tools (Opportunities, Meetings, Newsletters), measurement last (Analytics).
+ * The old Outreach tab is merged into Campaigns. Inbox is no longer a
+ * standalone nav item — replies are viewed per-campaign, on that campaign's
+ * own "Inbox" tab (see CampaignDetailView).
  */
 export const navMainItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ALL },
   { label: "Leads", href: "/leads", icon: Users2, roles: SALES },
   { label: "Campaigns", href: "/campaigns", icon: Send, roles: SALES },
-  { label: "Inbox", href: "/inbox", icon: Inbox, roles: SALES },
+  { label: "Segments", href: "/segments", icon: Layers3, roles: MARKETING },
   { label: "Opportunities", href: "/opportunities", icon: Briefcase, roles: SALES },
   { label: "Meetings", href: "/meetings", icon: CalendarDays, roles: SALES },
-  { label: "Segments", href: "/segments", icon: Layers3, roles: MARKETING },
   { label: "Newsletters", href: "/newsletters", icon: Newspaper, roles: MARKETING },
   { label: "Analytics", href: "/analytics", icon: BarChart3, roles: ALL },
 ];

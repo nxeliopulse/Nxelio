@@ -246,7 +246,7 @@ export function CampaignsView({
                 const isActive = r.status === "Active";
                 const pct = progressPct(r);
                 return (
-                  <li key={`${r.kind}-${r.id}`} className="px-5 py-4 hover:bg-slate-50/60 transition-colors">
+                  <li key={`${r.kind}-${r.id}`} className="px-5 py-2.5 hover:bg-slate-50/60 transition-colors">
                     <div className="grid grid-cols-1 lg:grid-cols-[2fr_1.2fr_1.2fr_auto] gap-4 lg:items-center">
                       {/* Overview */}
                       <div className="min-w-0">
@@ -259,7 +259,7 @@ export function CampaignsView({
                             <p className="text-xs text-slate-400">{r.kind === "email" ? "Email campaign" : `Sequence · ${r.channel}`} · {formatDate(r.updatedAt)}</p>
                           </div>
                         </Link>
-                        <div className="mt-2.5 flex items-center gap-2">
+                        <div className="mt-1.5 flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                             <div className={cn("h-full rounded-full", isActive ? "bg-blue-500 lp-progress-active" : r.status === "Completed" ? "bg-emerald-500" : "bg-slate-300")} style={{ width: `${pct}%` }} />
                           </div>
@@ -273,7 +273,7 @@ export function CampaignsView({
                           <span className="text-slate-500">{r.kind === "sequence" ? "Enrolled" : "Recipients"}</span>
                           <span className="font-semibold text-slate-900">{r.leads === null ? "—" : r.leads.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center justify-between max-w-[160px] mt-1">
+                        <div className="flex items-center justify-between max-w-[160px] mt-0.5">
                           <span className="text-slate-500">Sent</span>
                           <span className="font-semibold text-slate-900">{r.sent.toLocaleString()}</span>
                         </div>
@@ -285,7 +285,7 @@ export function CampaignsView({
                           <span className="text-slate-500">{r.kind === "email" ? "Open rate" : "Acceptance"}</span>
                           <span className="font-semibold text-slate-900">{r.openRate === null ? "—" : `${r.openRate}%`}</span>
                         </div>
-                        <div className="flex items-center justify-between max-w-[160px] mt-1">
+                        <div className="flex items-center justify-between max-w-[160px] mt-0.5">
                           <span className="text-slate-500">Reply rate</span>
                           <span className="font-semibold text-emerald-700">{r.replyRate}%</span>
                         </div>

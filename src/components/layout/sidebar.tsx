@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getAiCreditsUsage } from "@/lib/queries/credits";
-import { getUnreadInboxCount } from "@/lib/queries/inbox";
 import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -17,12 +16,10 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
   const pathname = usePathname();
   const { collapsed, toggleCollapsed } = useSidebar();
   const [credits, setCredits] = useState<{ used: number; total: number } | null>(null);
-  const [inboxUnread, setInboxUnread] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
     getAiCreditsUsage().then((c) => { if (!cancelled) setCredits(c); }).catch(() => {});
-    getUnreadInboxCount().then((n) => { if (!cancelled) setInboxUnread(n); }).catch(() => {});
     return () => { cancelled = true; };
   }, [pathname]);
 
@@ -34,8 +31,6 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
     const active = exactActive
       ? pathname === item.href
       : pathname === item.href || pathname.startsWith(item.href + "/");
-    const showBadge = item.href === "/inbox" && inboxUnread > 0;
-    const badgeLabel = inboxUnread > 9 ? "9+" : inboxUnread;
 
     if (collapsed) {
       return (
@@ -51,11 +46,6 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             )}
           >
             <Icon className="h-[21px] w-[21px]" strokeWidth={2} />
-            {showBadge && (
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center ring-2 ring-blue-600">
-                {badgeLabel}
-              </span>
-            )}
           </Link>
         </li>
       );
@@ -74,11 +64,6 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
         >
           <Icon className={cn("h-5 w-5 flex-shrink-0", active ? "text-white" : "text-white/50 group-hover:text-white")} strokeWidth={2} />
           <span className="flex-1 whitespace-nowrap">{item.label}</span>
-          {showBadge && (
-            <span className="bg-white text-blue-600 text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
-              {badgeLabel}
-            </span>
-          )}
         </Link>
       </li>
     );

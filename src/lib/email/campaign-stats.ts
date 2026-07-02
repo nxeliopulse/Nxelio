@@ -10,6 +10,61 @@ export interface CampaignEngagement {
   bounced: number;
 }
 
+export interface LeadEngagementRow {
+  leadId: string;
+  leadName: string;
+  leadEmail: string | null;
+  sentAt: string | null;
+  openedAt: string | null;
+  clickedAt: string | null;
+  repliedAt: string | null;
+  bouncedAt: string | null;
+}
+
+interface ActivityRow {
+  lead_id: string | null;
+  activity_type: string;
+  created_at: string;
+  leads: { full_name: string | null; company_name: string | null; email: string | null } | null;
+}
+
+/**
+ * Per-lead, per-event timestamps for one campaign — who was sent to, who opened
+ * (and when), who clicked, replied, or bounced. Backs the Analytics tab's
+ * activity table so "which leads opened today" is an answerable question, not
+ * just an aggregate percentage.
+ */
+export async function getCampaignLeadActivity(campaignId: string): Promise<LeadEngagementRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("lead_activities")
+    .select("lead_id, activity_type, created_at, leads(full_name, company_name, email)")
+    .eq("metadata->>campaign_id", campaignId)
+    .in("activity_type", ["EMAIL_SENT", "EMAIL_OPENED", "EMAIL_CLICKED", "EMAIL_REPLIED", "EMAIL_BOUNCED"])
+    .order("created_at", { ascending: true });
+
+  const byLead = new Map<string, LeadEngagementRow>();
+  for (const row of (data as unknown as ActivityRow[]) ?? []) {
+    if (!row.lead_id) continue;
+    if (!byLead.has(row.lead_id)) {
+      byLead.set(row.lead_id, {
+        leadId: row.lead_id,
+        leadName: row.leads?.full_name || row.leads?.company_name || "Unknown",
+        leadEmail: row.leads?.email ?? null,
+        sentAt: null, openedAt: null, clickedAt: null, repliedAt: null, bouncedAt: null,
+      });
+    }
+    const r = byLead.get(row.lead_id)!;
+    // Keep the EARLIEST timestamp per event type (rows are already oldest-first).
+    if (row.activity_type === "EMAIL_SENT" && !r.sentAt) r.sentAt = row.created_at;
+    else if (row.activity_type === "EMAIL_OPENED" && !r.openedAt) r.openedAt = row.created_at;
+    else if (row.activity_type === "EMAIL_CLICKED" && !r.clickedAt) r.clickedAt = row.created_at;
+    else if (row.activity_type === "EMAIL_REPLIED" && !r.repliedAt) r.repliedAt = row.created_at;
+    else if (row.activity_type === "EMAIL_BOUNCED" && !r.bouncedAt) r.bouncedAt = row.created_at;
+  }
+  return [...byLead.values()].sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""));
+}
+
 /**
  * Recomputes a campaign's open / reply / bounce rates from the engagement events
  * recorded against it (lead_activities tagged with the campaign_id, plus inbound

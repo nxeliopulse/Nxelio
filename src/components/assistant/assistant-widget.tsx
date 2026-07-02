@@ -46,7 +46,6 @@ const APP_NAV = [
   { label: "Dashboard", Icon: LayoutDashboard, href: "/dashboard" },
   { label: "Leads", Icon: Users, href: "/leads" },
   { label: "Campaigns", Icon: Mail, href: "/campaigns" },
-  { label: "Inbox", Icon: Inbox, href: "/inbox" },
   { label: "Segments", Icon: Layers, href: "/segments" },
   { label: "Newsletters", Icon: Newspaper, href: "/newsletters" },
   { label: "Templates", Icon: FileText, href: "/templates" },

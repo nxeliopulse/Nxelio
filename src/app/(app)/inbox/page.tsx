@@ -1,7 +1,7 @@
-import { getInboxConversations } from "@/lib/queries/inbox";
-import { InboxView } from "@/components/inbox/inbox-view";
+import { redirect } from "next/navigation";
 
-export default async function InboxPage() {
-  const conversations = await getInboxConversations();
-  return <InboxView conversations={conversations} />;
+// Inbox is no longer a standalone page — replies are viewed per-campaign, on
+// that campaign's own "Inbox" tab (see CampaignDetailView + /campaigns/[id]).
+export default function InboxPage() {
+  redirect("/campaigns");
 }

@@ -13,6 +13,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { markRead, markUnread, sendReply, getInboxThread, deleteInboxConversation, type InboxConversation, type InboxMessage } from "@/lib/queries/inbox";
 import { addBlocklistEntry } from "@/lib/queries/blocklist";
 import { getEmailTemplates, type EmailTemplateRow } from "@/lib/queries/templates";
+import { cn } from "@/lib/utils";
 
 const TAG_OPTIONS = ["Hot", "Needs Reply", "Follow Up", "Spam"] as const;
 
@@ -48,7 +49,15 @@ function relativeTime(iso: string): string {
   return `${days}d ago`;
 }
 
-export function InboxView({ conversations }: { conversations: InboxConversation[] }) {
+interface InboxViewProps {
+  conversations: InboxConversation[];
+  /** Renders without the page title/description and with a fixed (not viewport-relative)
+   *  height — used when this same inbox UI is embedded inside a campaign's "Inbox" tab
+   *  instead of the standalone /inbox page. */
+  embedded?: boolean;
+}
+
+export function InboxView({ conversations, embedded = false }: InboxViewProps) {
   const router = useRouter();
   const { toast, confirm } = useFeedback();
   const [pending, start] = useTransition();
@@ -250,11 +259,11 @@ export function InboxView({ conversations }: { conversations: InboxConversation[
   const isStarred = active ? starred.has(active.id) : false;
 
   return (
-    <div className="max-w-[1600px] mx-auto">
-      <PageHeader title="Smart Inbox" description="Unified inbox for all campaign replies" />
+    <div className={embedded ? "" : "max-w-[1600px] mx-auto"}>
+      {!embedded && <PageHeader title="Smart Inbox" description="Unified inbox for all campaign replies" />}
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] h-[calc(100vh-220px)]">
+        <div className={cn("grid grid-cols-1 lg:grid-cols-[380px_1fr]", embedded ? "h-[600px]" : "h-[calc(100vh-220px)]")}>
           {/* Conversation list */}
           <div className="border-r border-slate-100 flex flex-col">
             <div className="p-3 border-b border-slate-100 space-y-2">

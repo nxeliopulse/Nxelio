@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Save, Send, Mail, Plus, Clock, AlertCircle,
   Loader2, Users2, Layers3, Trash2, Filter, LayoutTemplate, Wand2, CheckCircle2, Eye, Share2,
-  ChevronDown, X, BarChart3, Inbox as InboxIcon,
+  X, BarChart3, Inbox as InboxIcon,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,18 @@ const PAGE_TABS: { id: TabId; label: string }[] = [
 
 interface LeadList { id: string; label: string; source: string; count: number; segmentId: string | null }
 interface SegmentLite { id: string; segment_name: string; contacts: number }
+
+/** Server actions can throw plain objects (e.g. a raw Postgrest error) that lose
+ *  their `.message` crossing back from the server — this defends against that
+ *  showing up as a blank/"null" error in the UI. */
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (err && typeof err === "object" && "message" in err) {
+    const m = (err as { message?: unknown }).message;
+    if (typeof m === "string" && m) return m;
+  }
+  return fallback;
+}
 
 /** "Enable HTML" off → strip tags before saving so the campaign sends as plain text. */
 function stripHtmlToText(html: string): string {
@@ -79,10 +91,14 @@ export default function CampaignBuilderPage() {
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
 
-  // Setup panel
-  const [setupOpen, setSetupOpen] = useState(true);
+  // Setup strip
   const [enableHtml, setEnableHtml] = useState(true);
   const [pauseSameCompany, setPauseSameCompany] = useState(false);
+
+  // AI rewrite — asks for the user's own instruction each time, instead of
+  // silently reusing the template's original goal text.
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiInput, setAiInput] = useState("");
 
   // Settings tab
   const [schedule, setSchedule] = useState("Send immediately");
@@ -153,15 +169,25 @@ export default function CampaignBuilderPage() {
     setSequence([{ day: "Day 1", subject: "", body: "" }]);
   }
 
+  function openAiRewrite() {
+    setAiInput(prompt); // pre-fill with whatever goal is already known, but it's fully editable
+    setAiModalOpen(true);
+  }
+
   async function handleGenerate() {
-    if (!prompt.trim()) { setError("Describe your campaign goal first"); return; }
+    const instruction = aiInput.trim();
+    if (!instruction) { setError("Describe what this sequence should say first."); return; }
     setError(null);
     setGenerating(true);
     try {
-      const emails = await generateEmailSequence(prompt.trim());
-      if (emails.length) setSequence(emails);
+      const emails = await generateEmailSequence(instruction);
+      if (emails.length) {
+        setSequence(emails);
+        setPrompt(instruction);
+        setAiModalOpen(false);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI generation failed");
+      setError(getErrorMessage(err, "AI generation failed"));
     } finally {
       setGenerating(false);
     }
@@ -213,7 +239,7 @@ export default function CampaignBuilderPage() {
         setDirty(false);
         toast("Draft saved", "success");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Save failed");
+        setError(getErrorMessage(err, "Save failed"));
       }
     });
   }
@@ -235,7 +261,7 @@ export default function CampaignBuilderPage() {
           setError(res.error || "Saved, but no emails were sent.");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Save failed");
+        setError(getErrorMessage(err, "Save failed"));
       }
     });
   }
@@ -400,98 +426,71 @@ export default function CampaignBuilderPage() {
               })()}
             </>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-              {/* LEFT — Setup panel */}
-              <div className="space-y-4 order-2 lg:order-1">
-                <Card className="p-0 overflow-hidden">
-                  <button onClick={() => setSetupOpen((v) => !v)} className="w-full flex items-center justify-between px-4 py-3">
-                    <span className="font-semibold text-slate-900">Setup</span>
-                    <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", setupOpen && "rotate-180")} />
-                  </button>
-                  {setupOpen && (
-                    <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-5">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Lead email address</label>
-                        {lists.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-2">
-                            {lists.map((l) => (
-                              <span key={l.id} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
-                                {l.label}
-                                <button onClick={() => setLists(lists.filter((x) => x.id !== l.id))} className="text-slate-400 hover:text-red-600"><X className="h-3 w-3" /></button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <div className="relative">
-                          <Button variant="outline" className="w-full" onClick={() => setAddOpen((v) => !v)}>
-                            <Plus className="h-4 w-4" /> Add lead list
-                          </Button>
-                          {addOpen && (
-                            <div className="lp-anim-pop origin-top absolute left-0 top-full mt-1 z-20 w-full bg-white rounded-xl border border-slate-200 shadow-lg p-1">
-                              <button onClick={() => addList(null)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
-                                <Users2 className="h-4 w-4 text-slate-400" /> All leads
-                              </button>
-                              {segments.length > 0 && <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Segments</p>}
-                              {segments.map((s) => (
-                                <button key={s.id} onClick={() => addList(s.id)} className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
-                                  <span className="flex items-center gap-2 min-w-0"><Layers3 className="h-4 w-4 text-slate-400 flex-shrink-0" /> <span className="truncate">{s.segment_name}</span></span>
-                                  <span className="text-xs text-slate-400">{s.contacts}</span>
-                                </button>
-                              ))}
-                              <button onClick={() => { setAddOpen(false); setShowImport(true); }} className="w-full flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-100 rounded-lg text-sm font-medium text-blue-600 hover:bg-slate-50">
-                                <Plus className="h-4 w-4" /> Import new leads…
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-700">Enable HTML</p>
-                          <p className="text-xs text-slate-500 mt-0.5">Use HTML to add links, images, formatting, and tracking. HTML can negatively affect deliverability for cold outbound.</p>
-                        </div>
-                        <Switch checked={enableHtml} onChange={setEnableHtml} className="mt-0.5 flex-shrink-0" aria-label="Enable HTML" />
-                      </div>
-
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-700">Pause leads at the same company on reply</p>
-                          <p className="text-xs text-slate-500 mt-0.5">When a lead replies, automatically pause other leads with the same email domain.</p>
-                        </div>
-                        <Switch checked={pauseSameCompany} onChange={setPauseSameCompany} className="mt-0.5 flex-shrink-0" aria-label="Pause leads at the same company on reply" />
-                      </div>
-                    </div>
-                  )}
-                </Card>
-
-                <Card className="p-4 flex items-center justify-between gap-3">
-                  <div className="text-xs text-slate-500">
-                    <span className="font-medium text-slate-700">{sequence.length}</span> step{sequence.length === 1 ? "" : "s"}
-                    {typeof totalLeadsCount === "number" && totalLeadsCount > 0 && <> · <span className="font-medium text-slate-700">{totalLeadsCount}</span> lead{totalLeadsCount === 1 ? "" : "s"}</>}
-                  </div>
+            <div>
+              {/* Toolbar */}
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <button onClick={() => { setChosenTpl(null); setTplTab("prebuilt"); }} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+                  <LayoutTemplate className="h-4 w-4" /> Change template
+                </button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={openAiRewrite} disabled={generating}>
+                    <Wand2 className="h-3.5 w-3.5" /> AI rewrite
+                  </Button>
                   <Button variant={dirty || !campaign ? "primary" : "outline"} size="sm" onClick={saveDraft} disabled={pending}>
                     {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : dirty || !campaign ? <><Save className="h-3.5 w-3.5" /> Save</> : <><CheckCircle2 className="h-3.5 w-3.5" /> Saved</>}
                   </Button>
-                </Card>
-
-                {campaign && (
-                  <p className="text-xs text-slate-400 px-1">{new Date(campaign.created_at).toLocaleDateString()} · {name}</p>
-                )}
+                </div>
               </div>
 
-              {/* RIGHT — Sequence editor */}
-              <div className="order-1 lg:order-2 min-w-0">
-                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                  <button onClick={() => { setChosenTpl(null); setTplTab("prebuilt"); }} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-                    <LayoutTemplate className="h-4 w-4" /> Change template
-                  </button>
-                  <Button variant="outline" size="sm" onClick={handleGenerate} disabled={generating}>
-                    {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />} AI rewrite
-                  </Button>
+              {/* Compact setup strip — leads + toggles, no longer a permanent sidebar */}
+              <Card className="p-3 mb-4 flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {lists.map((l) => (
+                    <span key={l.id} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
+                      {l.label}
+                      <button onClick={() => setLists(lists.filter((x) => x.id !== l.id))} className="text-slate-400 hover:text-red-600"><X className="h-3 w-3" /></button>
+                    </span>
+                  ))}
+                  <div className="relative">
+                    <button onClick={() => setAddOpen((v) => !v)} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">
+                      <Plus className="h-3 w-3" /> Lead list
+                    </button>
+                    {addOpen && (
+                      <div className="lp-anim-pop origin-top-left absolute left-0 top-full mt-1 z-20 w-56 bg-white rounded-xl border border-slate-200 shadow-lg p-1">
+                        <button onClick={() => addList(null)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
+                          <Users2 className="h-4 w-4 text-slate-400" /> All leads
+                        </button>
+                        {segments.length > 0 && <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Segments</p>}
+                        {segments.map((s) => (
+                          <button key={s.id} onClick={() => addList(s.id)} className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
+                            <span className="flex items-center gap-2 min-w-0"><Layers3 className="h-4 w-4 text-slate-400 flex-shrink-0" /> <span className="truncate">{s.segment_name}</span></span>
+                            <span className="text-xs text-slate-400">{s.contacts}</span>
+                          </button>
+                        ))}
+                        <button onClick={() => { setAddOpen(false); setShowImport(true); }} className="w-full flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-100 rounded-lg text-sm font-medium text-blue-600 hover:bg-slate-50">
+                          <Plus className="h-4 w-4" /> Import new leads…
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Steps — stacked vertically, every step editable at once */}
+                <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                  <Switch checked={enableHtml} onChange={setEnableHtml} aria-label="Enable HTML" /> Enable HTML
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                  <Switch checked={pauseSameCompany} onChange={setPauseSameCompany} aria-label="Pause leads at the same company on reply" /> Pause same company on reply
+                </label>
+
+                <div className="ml-auto text-xs text-slate-400">
+                  <span className="font-medium text-slate-600">{sequence.length}</span> step{sequence.length === 1 ? "" : "s"}
+                  {typeof totalLeadsCount === "number" && totalLeadsCount > 0 && <> · <span className="font-medium text-slate-600">{totalLeadsCount}</span> lead{totalLeadsCount === 1 ? "" : "s"}</>}
+                </div>
+              </Card>
+
+              {/* Steps — full width, stacked vertically, every step editable at once */}
                 <div className="relative pl-4">
                   <div className="absolute left-[27px] top-2 bottom-10 w-px bg-slate-200" />
                   <div className="space-y-3">
@@ -570,8 +569,31 @@ export default function CampaignBuilderPage() {
                   </Button>
                 </div>
               </div>
-            </div>
           )}
+
+          {/* AI rewrite — takes the user's own instruction, doesn't silently reuse the template goal */}
+          <Modal open={aiModalOpen} onClose={() => setAiModalOpen(false)} title="AI rewrite" description="Describe what this sequence should say — the AI writes from your input." size="md">
+            <div className="p-5 space-y-3">
+              {error && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{error}</span>
+                </div>
+              )}
+              <Textarea
+                autoFocus
+                rows={4}
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                placeholder="e.g. Follow up after a product demo, focus on urgency and offer a discount for signing this week."
+              />
+            </div>
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setAiModalOpen(false)} disabled={generating}>Cancel</Button>
+              <Button onClick={handleGenerate} disabled={generating}>
+                {generating ? <><Loader2 className="h-4 w-4 animate-spin" /> Writing…</> : <><Wand2 className="h-4 w-4" /> Generate</>}
+              </Button>
+            </div>
+          </Modal>
         </div>
       )}
 
@@ -669,7 +691,7 @@ export default function CampaignBuilderPage() {
         <Card className="p-12 text-center text-slate-500 max-w-2xl mx-auto">
           <InboxIcon className="h-10 w-10 mx-auto mb-3 text-slate-300" />
           <p className="font-medium text-slate-900">No replies yet</p>
-          <p className="text-sm mt-1">Replies to this campaign will appear here once it&apos;s launched — or check your <Link href="/inbox" className="text-blue-600 hover:underline">Inbox</Link> directly.</p>
+          <p className="text-sm mt-1">Replies to this campaign will appear on its Inbox tab once it&apos;s launched.</p>
         </Card>
       )}
 
