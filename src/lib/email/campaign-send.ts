@@ -27,6 +27,12 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
   const workspaceId = (campaign as { workspace_id?: string }).workspace_id;
   if (!workspaceId) return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Campaign has no workspace." };
 
+  // A campaign's content must be human-approved before it can reach anyone's inbox —
+  // this is the real enforcement point, not just a disabled button in the UI.
+  if (campaign.approval_status !== "Approved") {
+    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "This campaign must be approved before it can be launched." };
+  }
+
   const steps = parseCampaignSteps(campaign.content, campaign.subject);
   const step1 = steps[0];
   if (!step1 || (!step1.subject && !step1.body)) {
@@ -78,7 +84,17 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
   await supabase.from("campaigns").update({
     sent_count: (campaign.sent_count || 0) + sent,
     status: "Active",
+    approval_status: "Live/Distributing",
   }).eq("id", campaignId);
+
+  const admin = createAdminClient();
+  await admin.from("campaign_approval_log").insert({
+    campaign_id: campaignId,
+    workspace_id: workspaceId,
+    from_status: campaign.approval_status,
+    to_status: "Live/Distributing",
+    changed_by: null, // System — this fires from the send pipeline, not a manual click
+  });
 
   await notifyCurrentUser({
     type: "email",

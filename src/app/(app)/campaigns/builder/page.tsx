@@ -19,6 +19,8 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { createCampaign, updateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { sendCampaign } from "@/lib/email/campaign-send";
+import { submitForReview, getApprovalHistory, type ApprovalLogEntry } from "@/lib/queries/campaign-approval";
+import { approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { getSegments, getSegmentMemberLeads } from "@/lib/queries/segments";
 import { getLeads, type LeadRow } from "@/lib/queries/leads";
 import { LeadsTable } from "@/components/leads/leads-table";
@@ -88,6 +90,9 @@ export default function CampaignBuilderPage() {
   const [error, setError] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<CampaignRow | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<ApprovalLogEntry[] | null>(null);
 
   // Leads
   const [segments, setSegments] = useState<SegmentLite[]>([]);
@@ -247,6 +252,14 @@ export default function CampaignBuilderPage() {
   const visibleTabs = PAGE_TABS
     .map((t) => ({ ...t, disabled: t.id !== "leads" && !leadsGate, disabledReason: LEADS_GATE_MESSAGE }));
 
+  // A campaign's content must be reviewed and approved before it can be launched —
+  // enforced again server-side in sendCampaign(), this is just the UI-level gate.
+  const approvalStatus = campaign?.approval_status || "Draft (AI-generated)";
+  const approvalGate = approvalStatus === "Approved";
+  const APPROVAL_GATE_MESSAGE = approvalStatus === "Pending review"
+    ? "Waiting on reviewer approval."
+    : "Submit this campaign for review and get it approved before launching.";
+
   function buildContent(): string {
     return sequence.map((s) => {
       const isLi = s.channel === "linkedin";
@@ -296,11 +309,34 @@ export default function CampaignBuilderPage() {
     });
   }
 
+  function handleSubmitForReview() {
+    if (!campaign) return;
+    setError(null);
+    setSubmittingReview(true);
+    start(async () => {
+      try {
+        await submitForReview(campaign.id);
+        setCampaign({ ...campaign, approval_status: "Pending review" });
+        toast("Submitted for review.", "success");
+      } catch (err) {
+        setError(getErrorMessage(err, "Couldn't submit for review"));
+      } finally {
+        setSubmittingReview(false);
+      }
+    });
+  }
+
+  function openHistory() {
+    setHistoryOpen(true);
+    if (campaign) getApprovalHistory(campaign.id).then(setHistory).catch(() => setHistory([]));
+  }
+
   function launch() {
     setError(null);
     if (lists.length === 0) { setError("Add at least one list of leads before launching."); setTab("leads"); return; }
     if (!chosenTpl || sequence.length === 0 || !sequence.some((s) => s.subject || s.body)) { setError("Build a sequence first."); setTab("sequence"); return; }
     if (!name.trim()) { setError("Campaign name required"); setTab("settings"); return; }
+    if (!approvalGate) { setError("This campaign isn't approved yet — submit it for review first."); return; }
     const isScheduled = schedule === "Schedule for later";
     if (isScheduled && (!scheduledAt || new Date(scheduledAt).getTime() <= Date.now())) {
       setError("Pick a send time in the future first.");
@@ -342,10 +378,24 @@ export default function CampaignBuilderPage() {
           <Input value={name} onChange={(e) => setName(e.target.value)} className="max-w-[280px] font-medium" />
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant={campaign?.status === "Active" ? "success" : campaign?.status === "Scheduled" ? "warning" : "default"}>
-            {campaign?.status || "Draft"}
-          </Badge>
-          <Button onClick={launch} disabled={pending || !leadsGate} title={!leadsGate ? LEADS_GATE_MESSAGE : undefined}>
+          {/* One badge, not two — operational status (Active/Scheduled) only matters
+              once it's actually true; before that, the review stage is what matters. */}
+          {campaign?.status === "Active" || campaign?.status === "Scheduled" ? (
+            <Badge variant={campaign.status === "Active" ? "success" : "warning"}>{campaign.status}</Badge>
+          ) : (
+            <Badge variant={approvalBadgeVariant(approvalStatus)}>{approvalStatus}</Badge>
+          )}
+          {campaign && (
+            <button onClick={openHistory} title="Approval history" className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2">
+              History
+            </button>
+          )}
+          {campaign && approvalStatus === "Draft (AI-generated)" && (
+            <Button variant="outline" onClick={handleSubmitForReview} disabled={pending || submittingReview}>
+              {submittingReview ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Submit for review
+            </Button>
+          )}
+          <Button onClick={launch} disabled={pending || !leadsGate || !approvalGate} title={!leadsGate ? LEADS_GATE_MESSAGE : !approvalGate ? APPROVAL_GATE_MESSAGE : undefined}>
             {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Launching…</> : <><Send className="h-4 w-4" /> Launch campaign</>}
           </Button>
         </div>
@@ -810,6 +860,32 @@ export default function CampaignBuilderPage() {
           <Button onClick={() => { if (previewId) pickTemplate(previewId); setPreviewId(null); }}>
             <CheckCircle2 className="h-4 w-4" /> Select template
           </Button>
+        </div>
+      </Modal>
+
+      {/* Approval history — every review-lifecycle transition, who and when */}
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="Approval history" size="md">
+        <div className="p-5 max-h-[60vh] overflow-y-auto space-y-3">
+          {history === null ? (
+            <div className="flex items-center justify-center py-10 text-slate-400">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading…
+            </div>
+          ) : history.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-10">No status changes yet.</p>
+          ) : (
+            history.map((h) => (
+              <div key={h.id} className="flex items-start gap-3 text-sm border-b border-slate-100 pb-3 last:border-0">
+                <Badge variant={approvalBadgeVariant(h.to_status)} className="mt-0.5 flex-shrink-0">{h.to_status}</Badge>
+                <div className="min-w-0">
+                  <p className="text-slate-700">
+                    {h.from_status ? `${h.from_status} → ${h.to_status}` : h.to_status} · <span className="text-slate-500">{h.changed_by_name || "System"}</span>
+                  </p>
+                  {h.comment && <p className="text-slate-500 mt-0.5 italic">&quot;{h.comment}&quot;</p>}
+                  <p className="text-xs text-slate-400 mt-0.5">{new Date(h.created_at).toLocaleString()}</p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </Modal>
     </div>

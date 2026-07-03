@@ -193,8 +193,10 @@ export async function inviteUser(email: string, fullName: string, roleId: number
   // 1. Only a Super Admin may invite users; scope to their workspace.
   const { workspaceId: inviterWorkspaceId } = await requireSuperAdmin();
 
-  // Only allow assigning one of the known roles (1 Super, 2 Marketing, 3 Sales)
-  if (![1, 2, 3].includes(roleId)) throw new Error("Invalid role");
+  // Only allow assigning a role that actually exists (was hardcoded to [1,2,3],
+  // which silently rejected any role added later, e.g. Reviewer).
+  const { data: role } = await admin.from("roles").select("role_id").eq("role_id", roleId).single();
+  if (!role) throw new Error("Invalid role");
 
   // 2. Create the auth user via direct REST API (guarantees password is set)
   const tempPassword = generateTempPassword();

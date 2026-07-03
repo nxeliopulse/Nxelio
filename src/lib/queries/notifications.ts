@@ -94,15 +94,25 @@ export async function notifyWorkspaceAdmins(workspaceId: string, payload: {
   message?: string;
   link?: string;
 }) {
+  return notifyUsersByRole(workspaceId, 1, payload);
+}
+
+/** Notifies every user in the workspace with the given role_id (e.g. Reviewers). */
+export async function notifyUsersByRole(workspaceId: string, roleId: number, payload: {
+  type: string;
+  title: string;
+  message?: string;
+  link?: string;
+}) {
   const admin = createAdminClient();
-  const { data: admins } = await admin
+  const { data: users } = await admin
     .from("users")
     .select("user_id")
     .eq("workspace_id", workspaceId)
-    .eq("role_id", 1);
-  if (!admins?.length) return;
+    .eq("role_id", roleId);
+  if (!users?.length) return;
   await admin.from("notifications").insert(
-    admins.map((a: { user_id: string }) => ({
+    users.map((a: { user_id: string }) => ({
       user_id: a.user_id,
       workspace_id: workspaceId,
       type: payload.type,

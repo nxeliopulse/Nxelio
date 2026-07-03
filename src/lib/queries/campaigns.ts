@@ -17,6 +17,7 @@ export interface CampaignRow {
   content_is_html: boolean;
   pause_same_company_on_reply: boolean;
   scheduled_at: string | null;
+  approval_status: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Users2, Send, MailOpen, Reply, AlertTriangle, Clock, Trash2,
-  Plus, BarChart3, MousePointerClick, CalendarClock,
+  BarChart3, MousePointerClick, CalendarClock,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
 import { setCampaignStatus, updateCampaign, deleteCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { sendCampaign } from "@/lib/email/campaign-send";
-import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { SequenceFlow, type FlowStep } from "@/components/campaigns/sequence-flow";
 import { FlowCanvas } from "@/components/campaigns/flow-canvas";
 import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
@@ -91,7 +90,6 @@ export function CampaignDetailView({
   const [tab, setTab] = useState<Tab>("Audience");
   const [name, setName] = useState(campaign.campaign_name);
   const [status, setStatusLocal] = useState(campaign.status);
-  const [showImport, setShowImport] = useState(false);
 
   // While a campaign is Active, poll for fresh stats so sent/opened/replied/pending
   // update on their own (follow-ups send via cron, opens arrive via webhook) without
@@ -154,9 +152,13 @@ export function CampaignDetailView({
   async function handleSendNow() {
     if (!(await confirm({ title: "Send this campaign?", message: `Send the opener email to everyone in “${audienceLabel}” (${audience.toLocaleString()} leads).`, confirmLabel: "Send now" }))) return;
     start(async () => {
-      const res = await sendCampaign(campaign.id);
-      if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
-      else toast(res.error || "No emails were sent.", "error");
+      try {
+        const res = await sendCampaign(campaign.id);
+        if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
+        else toast(res.error || "No emails were sent.", "error");
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Send failed. Try again.", "error");
+      }
     });
   }
   function saveName() {
@@ -227,23 +229,16 @@ export function CampaignDetailView({
         ))}
       </div>
 
-      {/* Audience — the actual leads this campaign targets, not just a count */}
+      {/* Audience — the actual leads this campaign targets, not just a count.
+          LeadsTable already has its own "Add Leads" button + empty state, so we
+          don't duplicate a second "Add leads" control at the page level. */}
       {tab === "Audience" && (
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="font-semibold text-slate-900">{audienceLabel}</h2>
-              <p className="text-xs text-slate-500">{audienceLeads.length.toLocaleString()} of {audience.toLocaleString()} leads shown below</p>
-            </div>
-            <Button onClick={() => setShowImport(true)}><Plus className="h-4 w-4" /> Add leads</Button>
+          <div className="mb-3">
+            <h2 className="font-semibold text-slate-900">{audienceLabel}</h2>
+            <p className="text-xs text-slate-500">{audienceLeads.length.toLocaleString()} of {audience.toLocaleString()} leads shown below</p>
           </div>
-          {audienceLeads.length === 0 ? (
-            <Card className="p-10 text-center text-sm text-slate-500">
-              No recipients yet — this campaign hasn&apos;t been sent, or its audience list is empty.
-            </Card>
-          ) : (
-            <LeadsTable leads={audienceLeads} />
-          )}
+          <LeadsTable leads={audienceLeads} />
         </div>
       )}
 
@@ -395,8 +390,6 @@ export function CampaignDetailView({
           </Card>
         </div>
       )}
-
-      <AddLeadsWizard open={showImport} onClose={() => setShowImport(false)} />
 
       {/* Inline step editor — opens when a node on the canvas is clicked */}
       <Modal open={editIndex !== null} onClose={() => setEditIndex(null)} title={`Edit step ${editIndex !== null ? editIndex + 1 : ""}`} description="Modify this email in the sequence" size="lg">

@@ -1,11 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail, Phone, AtSign, Globe, Calendar, Star, Send, Building2, Target, Users, BarChart3, MoreHorizontal, MapPin, FileDown, MailOpen, Mouse, Briefcase } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Mail, Phone, AtSign, Globe, Calendar, Star, Send, Building2, Target, Users, BarChart3, MoreHorizontal, MapPin, FileDown, MailOpen, Mouse, Briefcase, Pencil, Trash2 } from "lucide-react";
 import { Tabs } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useFeedback } from "@/components/ui/feedback";
 import { ProspectScoreTab } from "@/components/leads/tabs/prospect-score";
 import { CompanyIntelTab } from "@/components/leads/tabs/company-intel";
 import { ContactIntelTab } from "@/components/leads/tabs/contact-intel";
@@ -13,8 +15,11 @@ import { OutreachTab } from "@/components/leads/tabs/outreach";
 import { NextStepsTab } from "@/components/leads/tabs/next-steps";
 import { SendEmailModal } from "@/components/leads/send-email-modal";
 import { ConvertOpportunityModal } from "@/components/leads/convert-opportunity-modal";
-import type { LeadRow } from "@/lib/queries/leads";
-import { formatDate } from "@/lib/utils";
+import { EditLeadModal } from "@/components/leads/edit-lead-modal";
+import { deleteLead, type LeadRow } from "@/lib/queries/leads";
+import { formatDate, cn } from "@/lib/utils";
+
+const TIMELINE_VISIBLE = 5;
 
 interface Activity {
   id: string;
@@ -51,12 +56,32 @@ function relativeTime(iso: string): string {
 }
 
 export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities: Activity[] }) {
+  const router = useRouter();
+  const { confirm, toast } = useFeedback();
+  const [, startDelete] = useTransition();
   const [tab, setTab] = useState("score");
   const [emailOpen, setEmailOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [converted, setConverted] = useState(lead.status === "Converted");
   const displayName = lead.full_name || lead.company_name || "—";
   const initials = displayName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+
+  async function handleDelete() {
+    setMenuOpen(false);
+    const ok = await confirm({ title: "Delete lead?", message: `Delete ${displayName}? This can't be undone.`, confirmLabel: "Delete", danger: true });
+    if (!ok) return;
+    startDelete(async () => {
+      try {
+        await deleteLead(lead.id);
+        toast("Lead deleted.", "success");
+        router.push("/leads");
+      } catch {
+        toast("Couldn't delete lead. Try again.", "error");
+      }
+    });
+  }
 
   // Always include "Lead created" at the bottom
   const timeline = [
@@ -127,7 +152,30 @@ export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities
               ) : (
                 <Button variant="outline" onClick={() => setConvertOpen(true)}><Briefcase className="h-4 w-4" /> Convert to Opportunity</Button>
               )}
-              <Button variant="ghost" size="icon" className="self-end"><MoreHorizontal className="h-4 w-4" /></Button>
+              <div className="relative self-end">
+                <Button variant="ghost" size="icon" onClick={() => setMenuOpen((v) => !v)}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+                {menuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                    <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                      <button
+                        onClick={() => { setMenuOpen(false); setEditOpen(true); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      >
+                        <Pencil className="h-4 w-4 text-slate-400" /> Edit lead
+                      </button>
+                      <button
+                        onClick={handleDelete}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" /> Delete lead
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -164,7 +212,7 @@ export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities
                 <BarChart3 className="h-4 w-4 text-blue-600" /> Activity Timeline
               </h3>
             </div>
-            <div className="p-5">
+            <div className={cn("p-5", timeline.length > TIMELINE_VISIBLE && "max-h-80 overflow-y-auto")}>
               {timeline.length === 0 ? (
                 <p className="text-sm text-slate-500">No activity yet</p>
               ) : (
@@ -223,6 +271,8 @@ export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities
         lead={lead}
         onConverted={() => { setConverted(true); setConvertOpen(false); }}
       />
+
+      <EditLeadModal open={editOpen} onClose={() => setEditOpen(false)} lead={lead} />
     </div>
   );
 }

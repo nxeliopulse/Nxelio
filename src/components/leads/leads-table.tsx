@@ -70,6 +70,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState(initialSearch ?? "");
   const [industryFilter, setIndustryFilter] = useState("");
+  const [interestFilter, setInterestFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showWizard, setShowWizard] = useState(false);
@@ -86,7 +87,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
   // Industry/interest/date filters — opened as a popover next to the count chip.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersPos, setFiltersPos] = useState<{ top: number; left: number } | null>(null);
-  const hasActiveFilters = Boolean(industryFilter || dateFrom || dateTo);
+  const hasActiveFilters = Boolean(industryFilter || interestFilter || dateFrom || dateTo);
   function openFiltersPopover(e: React.MouseEvent<HTMLButtonElement>) {
     const r = e.currentTarget.getBoundingClientRect();
     setFiltersPos({ top: r.bottom + 6, left: r.left });
@@ -138,6 +139,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
       (l.email?.toLowerCase().includes(q) ?? false) ||
       (l.website_url?.toLowerCase().includes(q) ?? false);
     const matchIndustry = !industryFilter || l.industry === industryFilter;
+    const matchInterest = !interestFilter || l.interest_area === interestFilter;
 
     const created = new Date(l.created_at);
     const matchDateFrom = !dateFrom || created >= new Date(`${dateFrom}T00:00:00`);
@@ -148,7 +150,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
       return getColumnText(k, l).toLowerCase().includes(v);
     });
 
-    return matchSearch && matchIndustry && matchDateFrom && matchDateTo && matchColumns;
+    return matchSearch && matchIndustry && matchInterest && matchDateFrom && matchDateTo && matchColumns;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -548,8 +550,8 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Interest area</label>
-              <Select>
-                <option>All interest areas</option>
+              <Select value={interestFilter} onChange={(e) => setInterestFilter(e.target.value)}>
+                <option value="">All interest areas</option>
                 {interestAreas.map((a) => (
                   <option key={a}>{a}</option>
                 ))}
@@ -579,7 +581,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
             </div>
             {hasActiveFilters && (
               <button
-                onClick={() => { setIndustryFilter(""); setDateFrom(""); setDateTo(""); }}
+                onClick={() => { setIndustryFilter(""); setInterestFilter(""); setDateFrom(""); setDateTo(""); }}
                 className="text-xs text-slate-500 hover:text-slate-700 underline"
               >
                 Clear filters
