@@ -825,7 +825,7 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
           : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
       </Button>
 
-      <p className="text-xs text-slate-500">Sourced from public LinkedIn profiles via Bright Data — each lead includes a LinkedIn URL (no email).</p>
+      <p className="text-xs text-slate-500">Sourced from public LinkedIn profiles via Bright Data — each lead includes a LinkedIn URL, with an email attached where one is found.</p>
 
       {results && isReal && (
         <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
@@ -847,22 +847,29 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
 
 function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; location: string } }) {
   const withLinkedIn = prospects.filter((p) => p.linkedin).length;
+  const withEmail = prospects.filter((p) => p.email).length;
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
         Prospects for <span className="font-medium text-slate-900">{criteria.role || "decision makers"}</span> in <span className="font-medium text-slate-900">{criteria.industry || "any industry"}</span>{criteria.location ? <> · {criteria.location}</> : null}
-        {prospects.length > 0 && <span className="text-slate-400"> · {withLinkedIn} with LinkedIn</span>}
+        {prospects.length > 0 && <span className="text-slate-400"> · {withLinkedIn} with LinkedIn · {withEmail} with an email</span>}
       </div>
       <div className="border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Title</th><th className="px-3 py-2 text-left font-semibold">LinkedIn</th></tr>
+            <tr>
+              <th className="px-3 py-2 text-left font-semibold">Name</th>
+              <th className="px-3 py-2 text-left font-semibold">Title</th>
+              <th className="px-3 py-2 text-left font-semibold">Email</th>
+              <th className="px-3 py-2 text-left font-semibold">LinkedIn</th>
+            </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {prospects.slice(0, 8).map((p, i) => (
               <tr key={i}>
                 <td className="px-3 py-2 align-top">{p.full_name || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2 text-slate-600 align-top"><span className="line-clamp-2">{p.title || "—"}</span></td>
+                <td className="px-3 py-2 text-slate-600 align-top">{p.email || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2 align-top">{p.linkedin ? <a href={p.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Profile</a> : <span className="text-slate-400">—</span>}</td>
               </tr>
             ))}

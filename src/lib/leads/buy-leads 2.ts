@@ -1,7 +1,6 @@
 "use server";
 import { aiJson } from "@/lib/ai/client";
 import { brightDataConfigured, brightDataSearchPeople } from "@/lib/leads/bright-data";
-import { anysiteConfigured, findEmailsByLinkedIn } from "@/lib/leads/anysite";
 
 export interface BuyCriteria {
   industry: string;
@@ -19,7 +18,7 @@ export interface GeneratedProspect {
   /** Real LinkedIn profile URL (from Bright Data); empty for AI samples. */
   linkedin?: string;
   location?: string;
-  /** Found via Anysite when configured; empty if not found or not configured. Never fabricated. */
+  /** Always empty for Bright Data leads (a SERP source has no emails). */
   email?: string;
 }
 
@@ -40,29 +39,20 @@ export async function searchBuyLeads(criteria: BuyCriteria): Promise<BuyLeadsRes
   if (brightDataConfigured) {
     const r = await brightDataSearchPeople(criteria);
     if (r.ok && r.prospects.length) {
-      let prospects: GeneratedProspect[] = r.prospects.map((p) => ({
-        full_name: p.full_name,
-        title: p.title,
-        company_name: p.company_name,
-        industry: criteria.industry || "",
-        website_url: "",
-        linkedin: p.linkedin,
-        location: p.location,
-        email: p.email || "",
-      }));
-
-      // Enrich real LinkedIn profiles with an email via Anysite, when configured.
-      // Never fabricated — a lookup miss just leaves email empty.
-      if (anysiteConfigured) {
-        const urls = prospects.map((p) => p.linkedin).filter((u): u is string => Boolean(u));
-        const found = await findEmailsByLinkedIn(urls);
-        prospects = prospects.map((p) => {
-          const hit = p.linkedin ? found.get(p.linkedin) : undefined;
-          return hit?.ok ? { ...p, email: hit.email || p.email } : p;
-        });
-      }
-
-      return { ok: true, source: "brightdata", prospects };
+      return {
+        ok: true,
+        source: "brightdata",
+        prospects: r.prospects.map((p) => ({
+          full_name: p.full_name,
+          title: p.title,
+          company_name: p.company_name,
+          industry: criteria.industry || "",
+          website_url: "",
+          linkedin: p.linkedin,
+          location: p.location,
+          email: p.email || "",
+        })),
+      };
     }
     // Bright Data configured but failed → surface the error rather than faking data.
     return { ok: false, prospects: [], error: r.error || "No prospects found." };

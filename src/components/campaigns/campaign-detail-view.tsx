@@ -14,6 +14,7 @@ import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
 import { setCampaignStatus, updateCampaign, deleteCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { sendCampaign } from "@/lib/email/campaign-send";
+import { approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { SequenceFlow, type FlowStep } from "@/components/campaigns/sequence-flow";
 import { FlowCanvas } from "@/components/campaigns/flow-canvas";
 import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
@@ -65,10 +66,6 @@ function serializeStep(s: FlowStep): string {
     : `${s.day} — ${s.subject}`;
   return `${header}\n${s.body || ""}`;
 }
-
-const statusVariant: Record<string, "success" | "warning" | "default" | "blue"> = {
-  Active: "success", Paused: "warning", Draft: "default", Completed: "blue",
-};
 
 const TABS = ["Audience", "Sequence", "Analytics", "Inbox", "Settings"] as const;
 type Tab = (typeof TABS)[number];
@@ -181,7 +178,7 @@ export function CampaignDetailView({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
               <h1 className="text-xl font-bold text-slate-900 truncate">{campaign.campaign_name}</h1>
-              <Badge variant={statusVariant[status] || "default"}>{status}</Badge>
+              <Badge variant={approvalBadgeVariant(campaign.approval_status)}>{campaign.approval_status}</Badge>
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden max-w-md">
               <div className={cn("h-full bg-blue-500 rounded-full transition-all", isActive && "lp-progress-active")} style={{ width: `${progress}%` }} />
