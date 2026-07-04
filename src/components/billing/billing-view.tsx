@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Check, X, Sparkles, CreditCard, Users2, Send,
   Zap, Crown, Rocket, Lock, AlertTriangle, Clock,
-  TrendingUp, RefreshCw, ExternalLink, Loader2, PartyPopper,
+  TrendingUp, ExternalLink, Loader2, PartyPopper,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -75,12 +75,6 @@ const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
     { label: "Priority support",         included: true  },
   ],
 };
-
-const TOP_UP_PACKS = [
-  { credits: 100,  price_cents: 500,  label: "100 credits",   per: "$0.05 / credit" },
-  { credits: 500,  price_cents: 2000, label: "500 credits",   per: "$0.04 / credit" },
-  { credits: 1500, price_cents: 5000, label: "1,500 credits", per: "$0.033 / credit" },
-];
 
 const STATUS_COLORS: Record<string, string> = {
   trialing: "bg-blue-100 text-blue-700",
@@ -157,7 +151,6 @@ function CheckoutSuccessWatcher({
 export function BillingView({ subscription: sub, plans, leadsCount, sentCount }: Props) {
   const router = useRouter();
   const [interval, setInterval] = useState<BillingInterval>("monthly");
-  const [topUpOpen, setTopUpOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [checkoutPending, startCheckout] = useTransition();
   const [portalPending, startPortal] = useTransition();
@@ -230,9 +223,9 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
           <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800">You&apos;ve run out of credits</p>
-            <p className="text-xs text-red-600 mt-0.5">All AI operations are paused. Upgrade or buy a top-up pack.</p>
+            <p className="text-xs text-red-600 mt-0.5">All AI operations are paused. Upgrade your plan for more credits.</p>
           </div>
-          <Button size="sm" onClick={() => setTopUpOpen(true)}>Top up credits</Button>
+          <a href="#plans"><Button size="sm">Upgrade plan</Button></a>
         </div>
       )}
       {low && credRemaining > 0 && (
@@ -242,7 +235,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
             <p className="text-sm font-semibold text-amber-800">{credRemaining} credits remaining — running low</p>
             <p className="text-xs text-amber-600 mt-0.5">Less than 10% of your monthly allowance.</p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setTopUpOpen(true)}>Top up</Button>
+          <a href="#plans"><Button size="sm" variant="outline">Upgrade plan</Button></a>
         </div>
       )}
       {status === "trialing" && daysLeft > 0 && daysLeft <= 3 && (
@@ -344,9 +337,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
           </div>
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs text-slate-500">{pct}% used</span>
-            <button onClick={() => setTopUpOpen(true)} className="text-xs text-blue-600 hover:underline font-medium">
-              Buy more credits →
-            </button>
           </div>
         </div>
       </Card>
@@ -381,7 +371,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
       </div>
 
       {/* ── Pricing grid ──────────────────────────────────────── */}
-      <div className="mb-8">
+      <div className="mb-8" id="plans">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-slate-900">Pick a plan, grow your pipeline</h2>
           <p className="text-slate-500 mt-1">Start free. Upgrade when you&apos;re ready.</p>
@@ -534,36 +524,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
           Cancel subscription
         </button>
       </div>
-
-      {/* ── Top-up modal ──────────────────────────────────────── */}
-      <Modal open={topUpOpen} onClose={() => setTopUpOpen(false)} title="Buy extra credits" description="Added to your balance immediately — expire at cycle end" size="sm">
-        <div className="p-5 space-y-3">
-          {TOP_UP_PACKS.map((pack) => (
-            <div key={pack.credits} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer"
-              onClick={() => {
-                setTopUpOpen(false);
-                goCheckout("basic"); // placeholder — wire to top-up checkout when ready
-              }}
-            >
-              <div>
-                <p className="font-semibold text-slate-900 text-sm">{pack.label}</p>
-                <p className="text-xs text-slate-500">{pack.per}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-slate-900">{fmtCents(pack.price_cents)}</p>
-                <p className="text-xs text-slate-400">one-time</p>
-              </div>
-            </div>
-          ))}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-start gap-2 text-xs text-slate-600">
-            <RefreshCw className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            Top-up credits expire at the end of your current billing cycle. Charged via Chargebee + Stripe.
-          </div>
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => setTopUpOpen(false)}>Close</Button>
-          </div>
-        </div>
-      </Modal>
 
       {/* ── Success modal ─────────────────────────────────────── */}
       <Modal open={successOpen} onClose={() => setSuccessOpen(false)} title="" size="sm">
