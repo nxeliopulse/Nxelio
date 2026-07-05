@@ -1,7 +1,7 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { refreshAccessToken, fetchBusy, type CalProvider, type BusyInterval } from "@/lib/calendar/providers";
+import { refreshAccessToken, fetchBusy, fetchEvents, type CalProvider, type BusyInterval, type ExternalCalendarEvent } from "@/lib/calendar/providers";
 import { calendarConfigured } from "@/lib/calendar/config";
 
 export interface CalendarAccountRow {
@@ -90,6 +90,38 @@ export async function getCalendarBusy(startIso: string, endIso: string): Promise
   }
   busy.sort((a, b) => a.start.localeCompare(b.start));
   return { busy, errors };
+}
+
+export interface SyncedCalendarEvent extends ExternalCalendarEvent {
+  provider: CalProvider;
+  accountEmail: string | null;
+}
+
+/**
+ * Reads actual titled events (not just busy blocks) across all connected calendars,
+ * so the Meetings calendar can show what's really on your Google/Microsoft calendar —
+ * not just LeadPro-scheduled meetings.
+ */
+export async function getExternalCalendarEvents(startIso: string, endIso: string): Promise<{ events: SyncedCalendarEvent[]; errors: string[] }> {
+  const supabase = await createClient();
+  const { data: accounts } = await supabase
+    .from("calendar_accounts")
+    .select("id, provider, email, access_token, refresh_token, token_expires_at")
+    .eq("status", "connected");
+
+  const events: SyncedCalendarEvent[] = [];
+  const errors: string[] = [];
+  for (const acc of (accounts as AccountWithTokens[]) || []) {
+    try {
+      const token = await ensureToken(acc);
+      const list = await fetchEvents(acc.provider, token, acc.email, startIso, endIso);
+      events.push(...list.map((e) => ({ ...e, provider: acc.provider, accountEmail: acc.email })));
+    } catch (e) {
+      errors.push(`${acc.provider}${acc.email ? ` (${acc.email})` : ""}: ${e instanceof Error ? e.message : "sync failed"}`);
+    }
+  }
+  events.sort((a, b) => a.start.localeCompare(b.start));
+  return { events, errors };
 }
 
 /**

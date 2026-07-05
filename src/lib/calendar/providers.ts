@@ -11,6 +11,15 @@ export interface TokenSet {
 
 export interface BusyInterval { start: string; end: string }
 
+export interface ExternalCalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  htmlLink: string | null;
+}
+
 // Read-only calendar + identity. offline_access (MS) / access_type=offline (Google)
 // are what earn us a refresh token so availability keeps syncing without re-login.
 const GOOGLE_SCOPE = "openid email https://www.googleapis.com/auth/calendar.readonly";
@@ -148,4 +157,58 @@ export async function fetchBusy(
     .filter((it) => it.status && it.status !== "free")
     .map((it) => ({ start: it.start?.dateTime || "", end: it.end?.dateTime || "" }))
     .filter((b) => b.start && b.end);
+}
+
+/** Fetch actual titled events (not just busy blocks) so the app calendar can mirror the real one. */
+export async function fetchEvents(
+  provider: CalProvider,
+  accessToken: string,
+  email: string | null,
+  startIso: string,
+  endIso: string
+): Promise<ExternalCalendarEvent[]> {
+  if (provider === "google") {
+    const p = new URLSearchParams({
+      timeMin: startIso,
+      timeMax: endIso,
+      singleEvents: "true",
+      orderBy: "startTime",
+      maxResults: "250",
+    });
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${p}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error?.message || `Google events failed (${res.status})`);
+    interface GEvent { id: string; summary?: string; status?: string; htmlLink?: string; start?: { date?: string; dateTime?: string }; end?: { date?: string; dateTime?: string } }
+    return ((d.items || []) as GEvent[])
+      .filter((e) => e.status !== "cancelled" && (e.start?.dateTime || e.start?.date))
+      .map((e) => ({
+        id: e.id,
+        title: e.summary || "(No title)",
+        start: e.start?.dateTime || `${e.start?.date}T00:00:00`,
+        end: e.end?.dateTime || `${e.end?.date}T00:00:00`,
+        allDay: Boolean(e.start?.date && !e.start?.dateTime),
+        htmlLink: e.htmlLink || null,
+      }));
+  }
+  // Microsoft Graph calendarView returns real events (title, times) for the mailbox.
+  if (!email) throw new Error("Microsoft calendar has no mailbox address; please reconnect");
+  const p = new URLSearchParams({ startDateTime: startIso, endDateTime: endIso, $top: "250" });
+  const res = await fetch(`https://graph.microsoft.com/v1.0/me/calendarView?${p}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, Prefer: 'outlook.timezone="UTC"' },
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error?.message || `Graph calendarView failed (${res.status})`);
+  interface MSEvent { id: string; subject?: string; isCancelled?: boolean; webLink?: string; isAllDay?: boolean; start?: { dateTime?: string }; end?: { dateTime?: string } }
+  return ((d.value || []) as MSEvent[])
+    .filter((e) => !e.isCancelled && e.start?.dateTime && e.end?.dateTime)
+    .map((e) => ({
+      id: e.id,
+      title: e.subject || "(No title)",
+      start: `${e.start!.dateTime}Z`,
+      end: `${e.end!.dateTime}Z`,
+      allDay: Boolean(e.isAllDay),
+      htmlLink: e.webLink || null,
+    }));
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   CalendarDays, Clock, Users, ExternalLink, Pencil, X, Plus, Link2, FileText,
   PlayCircle, Video, MapPin, CalendarClock, AlertCircle, Loader2, Wand2,
-  Send, Check, ChevronLeft, ChevronRight, UserPlus, CalendarCheck,
+  Send, Check, ChevronLeft, ChevronRight, UserPlus, CalendarCheck, RefreshCw,
 } from "lucide-react";
 import { generateConferenceLink, type ConferenceProvider } from "@/lib/meetings/conference-link";
 import { Card } from "@/components/ui/card";
@@ -17,7 +17,16 @@ import {
   updateMeeting, cancelMeeting, deleteMeeting, scheduleMeeting,
   type MeetingRow, type MeetingInput,
 } from "@/lib/queries/meetings";
-import { getCalendarBusy } from "@/lib/queries/calendar-accounts";
+import {
+  getCalendarBusy, getCalendarAccounts, getExternalCalendarEvents,
+  type CalendarAccountRow, type SyncedCalendarEvent,
+} from "@/lib/queries/calendar-accounts";
+
+/** Per-provider accent used consistently across the legend, day chips, and agenda. */
+const PROVIDER_STYLE: Record<string, { dot: string; chip: string; label: string }> = {
+  google: { dot: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Google Calendar" },
+  microsoft: { dot: "bg-indigo-500", chip: "bg-indigo-50 text-indigo-700 border-indigo-200", label: "Outlook Calendar" },
+};
 
 interface LeadOption { id: string; full_name: string | null; company_name: string | null; email: string | null }
 
@@ -82,6 +91,44 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
     }
   }, []);
 
+  // Connected calendar accounts — drives the legend + "connect a calendar" prompt.
+  const [accounts, setAccounts] = useState<CalendarAccountRow[]>([]);
+  useEffect(() => {
+    getCalendarAccounts().then(setAccounts).catch(() => {});
+  }, []);
+
+  // Real Google/Microsoft events for the visible month — refetched on month change so the
+  // calendar shows what's actually on your connected calendar, not just LeadPro meetings.
+  const [external, setExternal] = useState<{ events: SyncedCalendarEvent[]; errors: string[]; loading: boolean }>({ events: [], errors: [], loading: false });
+  const monthRange = useMemo(() => {
+    const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+    const gridStart = new Date(first); gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+    const gridEnd = new Date(gridStart); gridEnd.setDate(gridStart.getDate() + 42);
+    return { start: gridStart.toISOString(), end: gridEnd.toISOString() };
+  }, [calendarMonth]);
+  useEffect(() => {
+    if (accounts.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets stale events once accounts are known to be disconnected
+      setExternal({ events: [], errors: [], loading: false });
+      return;
+    }
+    let cancelled = false;
+    setExternal((s) => ({ ...s, loading: true }));
+    getExternalCalendarEvents(monthRange.start, monthRange.end)
+      .then((res) => { if (!cancelled) setExternal({ ...res, loading: false }); })
+      .catch(() => { if (!cancelled) setExternal({ events: [], errors: ["Couldn't sync your calendar"], loading: false }); });
+    return () => { cancelled = true; };
+  }, [monthRange, accounts.length]);
+
+  const externalByDay = useMemo(() => {
+    const map = new Map<string, SyncedCalendarEvent[]>();
+    for (const e of external.events) {
+      const k = dateKey(new Date(e.start));
+      (map.get(k) ?? map.set(k, []).get(k)!).push(e);
+    }
+    return map;
+  }, [external.events]);
+
   const [now] = useState(() => Date.now());
   const { upcoming, past } = useMemo(() => {
     const up: MeetingRow[] = [];
@@ -116,7 +163,20 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
     for (const list of map.values()) list.sort((a, b) => a.start_at.localeCompare(b.start_at));
     return map;
   }, [meetings]);
-  const selectedDayMeetings = meetingsByDay.get(dateKey(selectedDay)) ?? [];
+  const selectedDayKey = dateKey(selectedDay);
+  // A single, time-ordered agenda for the selected day — this is what actually reads like
+  // Google/Microsoft/Zoho's day view, instead of two disconnected lists.
+  const selectedDayAgenda = useMemo(() => {
+    type AgendaItem = { key: string; start: string; end: string; kind: "meeting"; meeting: MeetingRow } | { key: string; start: string; end: string; kind: "external"; event: SyncedCalendarEvent };
+    const dayMeetings = meetingsByDay.get(selectedDayKey) ?? [];
+    const dayExternal = externalByDay.get(selectedDayKey) ?? [];
+    const items: AgendaItem[] = [
+      ...dayMeetings.map((m) => ({ key: `m-${m.id}`, start: m.start_at, end: m.end_at, kind: "meeting" as const, meeting: m })),
+      ...dayExternal.map((e) => ({ key: `e-${e.id}`, start: e.start, end: e.end, kind: "external" as const, event: e })),
+    ];
+    items.sort((a, b) => a.start.localeCompare(b.start));
+    return items;
+  }, [meetingsByDay, externalByDay, selectedDayKey]);
 
   function doCancel(m: MeetingRow) {
     start(async () => {
@@ -160,22 +220,49 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
 
       {tab === "calendar" ? (
         <div>
+          {/* Legend + connection status — makes it explicit what's LeadPro vs synced */}
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3 text-xs">
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-slate-600"><span className="h-2 w-2 rounded-full bg-blue-600" /> My meetings</span>
+              {accounts.map((a) => {
+                const style = PROVIDER_STYLE[a.provider] || PROVIDER_STYLE.google;
+                return <span key={a.id} className="inline-flex items-center gap-1.5 text-slate-600"><span className={`h-2 w-2 rounded-full ${style.dot}`} /> {style.label}</span>;
+              })}
+              {external.loading && <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> Syncing…</span>}
+            </div>
+            {accounts.length === 0 ? (
+              <Link href="/settings?section=calendar" className="inline-flex items-center gap-1 font-medium text-blue-600 hover:underline">
+                <RefreshCw className="h-3 w-3" /> Connect Google or Outlook calendar
+              </Link>
+            ) : external.errors.length > 0 ? (
+              <span className="inline-flex items-center gap-1 text-amber-600"><AlertCircle className="h-3 w-3" /> {external.errors[0]}</span>
+            ) : null}
+          </div>
+
           <CalendarGrid
             month={calendarMonth}
             onMonthChange={setCalendarMonth}
             meetingsByDay={meetingsByDay}
+            externalByDay={externalByDay}
             selectedDay={selectedDay}
             onSelectDay={setSelectedDay}
           />
+
           <div className="mt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
               {selectedDay.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
             </h3>
-            {selectedDayMeetings.length === 0 ? (
-              <Card className="p-6 text-center text-sm text-slate-400">No meetings this day.</Card>
+            {selectedDayAgenda.length === 0 ? (
+              <Card className="p-6 text-center text-sm text-slate-400">Nothing scheduled this day.</Card>
             ) : (
               <div className="space-y-2">
-                {selectedDayMeetings.map((m) => <MeetingRowItem key={m.id} m={m} onOpen={() => setDetail(m)} past={new Date(m.end_at).getTime() < now} />)}
+                {selectedDayAgenda.map((item) =>
+                  item.kind === "meeting" ? (
+                    <MeetingRowItem key={item.key} m={item.meeting} onOpen={() => setDetail(item.meeting)} past={new Date(item.meeting.end_at).getTime() < now} />
+                  ) : (
+                    <ExternalEventRow key={item.key} e={item.event} />
+                  )
+                )}
               </div>
             )}
           </div>
@@ -234,7 +321,7 @@ function MeetingRowItem({ m, onOpen, past }: { m: MeetingRow; onOpen: () => void
   return (
     <button
       onClick={onOpen}
-      className="w-full text-left flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
+      className="w-full text-left flex items-center gap-3 rounded-xl border border-slate-200 border-l-4 border-l-blue-500 bg-white px-4 py-3 hover:border-blue-300 hover:border-l-blue-500 hover:bg-blue-50/40 transition-colors"
     >
       <div className="h-10 w-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0">
         <Video className="h-4.5 w-4.5" />
@@ -259,13 +346,52 @@ function MeetingRowItem({ m, onOpen, past }: { m: MeetingRow; onOpen: () => void
   );
 }
 
+/** Read-only row for an event synced from Google/Outlook — opens the real event when clicked. */
+function ExternalEventRow({ e }: { e: SyncedCalendarEvent }) {
+  const style = PROVIDER_STYLE[e.provider] || PROVIDER_STYLE.google;
+  const body = (
+    <div className={`w-full text-left flex items-center gap-3 rounded-xl border border-slate-200 border-l-4 bg-white px-4 py-3 ${e.htmlLink ? "hover:bg-slate-50 cursor-pointer" : ""}`}
+      style={{ borderLeftColor: undefined }}
+    >
+      <div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${style.chip}`}>
+        <CalendarDays className="h-4.5 w-4.5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-slate-900 truncate">{e.title}</p>
+          <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border ${style.chip}`}>{style.label}</span>
+        </div>
+        <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+          <Clock className="h-3 w-3" /> {e.allDay ? "All day" : fmtRange(e.start, e.end)}
+        </p>
+      </div>
+      {e.htmlLink && <ExternalLink className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />}
+    </div>
+  );
+  const dotClass = style.dot;
+  return e.htmlLink ? (
+    <a href={e.htmlLink} target="_blank" rel="noopener noreferrer" className="block">
+      <div className="relative">
+        <span className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${dotClass}`} />
+        {body}
+      </div>
+    </a>
+  ) : (
+    <div className="relative">
+      <span className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${dotClass}`} />
+      {body}
+    </div>
+  );
+}
+
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** Zoho-style month grid — highlights days with meetings, click a day to see them below. */
-function CalendarGrid({ month, onMonthChange, meetingsByDay, selectedDay, onSelectDay }: {
+function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, selectedDay, onSelectDay }: {
   month: Date;
   onMonthChange: (d: Date) => void;
   meetingsByDay: Map<string, MeetingRow[]>;
+  externalByDay: Map<string, SyncedCalendarEvent[]>;
   selectedDay: Date;
   onSelectDay: (d: Date) => void;
 }) {
@@ -320,22 +446,52 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, selectedDay, onSele
         {cells.map((d) => {
           const inMonth = d.getMonth() === month.getMonth();
           const dayMeetings = meetingsByDay.get(dateKey(d)) ?? [];
+          const dayExternal = externalByDay.get(dateKey(d)) ?? [];
+          const totalCount = dayMeetings.length + dayExternal.length;
           const isToday = sameDay(d, today);
           const isSelected = sameDay(d, selectedDay);
+          // Chips shown in chronological order, LeadPro meetings first on ties.
+          const chips = [
+            ...dayMeetings.map((m) => ({ kind: "meeting" as const, start: m.start_at, title: m.title })),
+            ...dayExternal.map((e) => ({ kind: "external" as const, start: e.start, title: e.title, provider: e.provider })),
+          ].sort((a, b) => a.start.localeCompare(b.start));
+          const visibleChips = chips.slice(0, 2);
+          const overflow = chips.length - visibleChips.length;
           return (
             <button
               key={d.toISOString()}
               onClick={() => onSelectDay(d)}
-              className={`h-14 sm:h-16 rounded-lg flex flex-col items-center justify-center gap-0.5 text-sm transition-colors px-0.5 ${
-                isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-50 text-blue-700 font-semibold" : inMonth ? "text-slate-700 hover:bg-slate-100" : "text-slate-300 hover:bg-slate-50"
+              className={`min-h-[72px] sm:min-h-[88px] rounded-lg flex flex-col items-stretch gap-1 text-sm transition-colors px-1 pt-1 pb-1.5 text-left ${
+                isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : inMonth ? "hover:bg-slate-100" : "text-slate-300 hover:bg-slate-50"
               }`}
             >
-              <span>{d.getDate()}</span>
-              {dayMeetings.length > 0 && (
-                <span className={`text-[10px] leading-tight ${isSelected ? "text-blue-100" : "text-blue-600"}`}>
-                  {fmtTime(dayMeetings[0].start_at)}{dayMeetings.length > 1 ? ` +${dayMeetings.length - 1}` : ""}
-                </span>
-              )}
+              <span className={`self-start h-5 w-5 flex items-center justify-center rounded-full text-xs ${
+                isSelected ? "bg-white text-blue-700 font-semibold" : isToday ? "bg-blue-600 text-white font-semibold" : inMonth ? "text-slate-700" : "text-slate-300"
+              }`}>
+                {d.getDate()}
+              </span>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                {visibleChips.map((c, i) => (
+                  <span
+                    key={i}
+                    className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight border-l-2 ${
+                      isSelected
+                        ? "bg-white/15 border-white text-white"
+                        : c.kind === "meeting"
+                          ? "bg-blue-50 border-blue-500 text-blue-700"
+                          : `${(PROVIDER_STYLE[c.provider] || PROVIDER_STYLE.google).chip} border-l-2`
+                    }`}
+                  >
+                    {fmtTime(c.start)} {c.title}
+                  </span>
+                ))}
+                {overflow > 0 && (
+                  <span className={`text-[10px] font-medium px-1 ${isSelected ? "text-blue-100" : "text-slate-400"}`}>+{overflow} more</span>
+                )}
+                {inMonth && totalCount === 0 && isToday && (
+                  <span className="text-[10px] text-blue-400 px-1">Today</span>
+                )}
+              </div>
             </button>
           );
         })}
