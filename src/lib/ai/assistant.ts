@@ -9,6 +9,7 @@ import { sendNewsletter } from "@/lib/email/newsletter-actions";
 import { getUsers } from "@/lib/queries/users";
 import { sendLeadEmail } from "@/lib/email/actions";
 import { getOnboarding } from "@/lib/queries/onboarding";
+import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 
 const API_KEY = process.env.AI_API_KEY;
 const BASE_URL = process.env.AI_BASE_URL || "https://api.groq.com/openai/v1";
@@ -589,6 +590,23 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
     return { reply: OFF_TOPIC_REPLY, actions: [] };
   }
 
+  if (!(await canAfford(1))) {
+    return { reply: "", actions: [], error: "You're out of AI credits for this billing cycle. Upgrade your plan for more." };
+  }
+  // Charged once per user message, regardless of how many internal tool round-trips
+  // the model needs — matches how every other AI feature bills "one action, one credit".
+  let charged = false;
+  async function chargeOnce() {
+    if (charged) return;
+    charged = true;
+    try {
+      const res = await deductCredits("ai_assistant", 1, { metadata: { model: MODEL } });
+      if (!res.ok) console.error("[ai_assistant] credit deduct failed:", res.error);
+    } catch (err) {
+      console.error("[ai_assistant] credit deduct threw:", err);
+    }
+  }
+
   const trimmed = history.slice(-16);
   const systemPrompt = await buildSystemPrompt();
 
@@ -672,6 +690,7 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
           || (writes.length === 1
             ? "I'm ready to make this change — approve it below to proceed."
             : `I'm ready to make ${writes.length} changes — approve them below to proceed.`);
+        await chargeOnce();
         return { reply: intro, actions, proposal: writes };
       }
 
@@ -686,9 +705,11 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
       continue;
     }
 
+    await chargeOnce();
     return { reply: msg.content || "Done.", actions };
   }
 
+  await chargeOnce();
   return { reply: "I hit my action limit for one request — ask me to continue.", actions };
 }
 

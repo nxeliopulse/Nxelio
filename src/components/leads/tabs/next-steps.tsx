@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { generateNextSteps, type AiNextStepsResult } from "@/lib/ai/actions";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 
 const priorityColor: Record<string, string> = {
   Now: "bg-red-500",
@@ -25,6 +26,7 @@ export function NextStepsTab({ leadId }: { leadId: string }) {
     setError(null);
     try {
       setData(await generateNextSteps(leadId));
+      notifyCreditsChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {

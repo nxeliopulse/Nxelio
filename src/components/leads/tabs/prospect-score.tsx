@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { scoreLeadWithAi, type AiScoreResult } from "@/lib/ai/actions";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 
 const dimMeta = [
   { key: "companyFit", label: "Company Fit", icon: <ShieldCheck className="h-4 w-4" />, color: "bg-emerald-500", desc: "Industry, size, and tech stack match your ICP" },
@@ -26,6 +27,7 @@ export function ProspectScoreTab({ leadId, initialResult }: { leadId: string; in
     try {
       const r = await scoreLeadWithAi(leadId);
       setResult(r);
+      notifyCreditsChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI scoring failed");
     } finally {

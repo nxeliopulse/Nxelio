@@ -111,7 +111,10 @@ export async function POST(req: NextRequest) {
         break;
       }
       case "payment_succeeded": {
-        // Payment recovered — already handled by subscription_reactivated in most cases
+        // A recovered payment doesn't always come with a subscription_reactivated
+        // event — re-sync directly from whatever status Chargebee reports so a
+        // workspace can't get stuck at past_due after paying.
+        await handlePaymentSucceeded(content);
         break;
       }
       default:
@@ -177,6 +180,13 @@ async function handleCancellation(content: Record<string, unknown>) {
     .from("subscriptions")
     .update({ status: "canceled", updated_at: new Date().toISOString() })
     .eq("workspace_id", workspaceId);
+}
+
+async function handlePaymentSucceeded(content: Record<string, unknown>) {
+  // Not every payment_succeeded payload includes the subscription object
+  // (e.g. one-off invoices) — only re-sync when it does.
+  if (!content.subscription) return;
+  await handleSubscriptionUpsert(content);
 }
 
 async function handlePaymentFailed(content: Record<string, unknown>) {

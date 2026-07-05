@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getAiCreditsUsage } from "@/lib/queries/credits";
+import { onCreditsChanged } from "@/lib/credits-refresh";
 import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,14 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
     getAiCreditsUsage().then((c) => { if (!cancelled) setCredits(c); }).catch(() => {});
     return () => { cancelled = true; };
   }, [pathname]);
+
+  // Refetch immediately after any AI feature deducts a credit — without this,
+  // the widget only updates on the next route change.
+  useEffect(() => {
+    return onCreditsChanged(() => {
+      getAiCreditsUsage().then(setCredits).catch(() => {});
+    });
+  }, []);
 
   const main = filterNavByRoleAndOverrides(navMainItems, role, navAccess);
   const admin = filterNavByRoleAndOverrides(navAdminItems, role, navAccess);

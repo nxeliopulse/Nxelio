@@ -13,6 +13,7 @@ import { bulkInsertLeads, type LeadRow } from "@/lib/queries/leads";
 import { importLinkedInLeads, hasLinkedInAccount } from "@/lib/leads/linkedin-import";
 import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outreach-accounts";
 import { searchBuyLeads, type GeneratedProspect } from "@/lib/leads/buy-leads";
+import { hasFeature } from "@/lib/queries/subscriptions";
 
 type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
 
@@ -23,6 +24,8 @@ interface SourceDef {
   icon: React.ComponentType<{ className?: string }>;
   color: string;
   badge?: string;
+  /** Plan feature this source requires — undefined means available on every plan. */
+  featureFlag?: "discovery";
 }
 
 const SOURCES: SourceDef[] = [
@@ -30,7 +33,7 @@ const SOURCES: SourceDef[] = [
   { id: "linkedin-post", label: "LinkedIn Post", desc: "Capture people who engaged with a post", icon: Megaphone, color: "text-sky-600 bg-sky-50", badge: "New" },
   { id: "youtube", label: "YouTube Post", desc: "Scrape engagers from a video or post", icon: Video, color: "text-red-600 bg-red-50" },
   { id: "manual", label: "Add Leads Manually", desc: "Type in leads one by one with full details", icon: Pencil, color: "text-indigo-600 bg-indigo-50" },
-  { id: "buy", label: "Buy Leads", desc: "Find real prospects by industry, role & location", icon: ShoppingCart, color: "text-amber-600 bg-amber-50" },
+  { id: "buy", label: "Buy Leads", desc: "Find real prospects by industry, role & location", icon: ShoppingCart, color: "text-amber-600 bg-amber-50", featureFlag: "discovery" },
   { id: "csv", label: "Upload CSV file", desc: "Import an existing prospect list in bulk", icon: FileSpreadsheet, color: "text-emerald-600 bg-emerald-50" },
 ];
 
@@ -154,6 +157,15 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
   const [liConnected, setLiConnected] = useState<boolean | null>(null);
   const [connecting, setConnecting] = useState(false);
 
+  // Plan-gated sources (Buy Leads) — checked once when the wizard opens.
+  const [locked, setLocked] = useState<{ discovery: boolean }>({ discovery: false });
+  useEffect(() => {
+    if (!open) return;
+    hasFeature("discovery")
+      .then((discovery) => setLocked({ discovery: !discovery }))
+      .catch(() => {});
+  }, [open]);
+
   const isCsv = source === "csv";
   const isLinkedIn = source === "linkedin-search" || source === "linkedin-post";
   const isManualEntry = source === "manual";
@@ -205,7 +217,13 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     onClose();
   }
 
+  function isLocked(id: SourceId): boolean {
+    const flag = SOURCES.find((s) => s.id === id)?.featureFlag;
+    return flag ? locked[flag] : false;
+  }
+
   function chooseSource(id: SourceId) {
+    if (isLocked(id)) return;
     setSource(id);
     setStep2Error(null);
     setStep2Warning(null);
@@ -400,20 +418,27 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
               {SOURCES.map((s) => {
                 const Icon = s.icon;
                 const active = source === s.id;
+                const sourceLocked = isLocked(s.id);
                 return (
                   <button
                     key={s.id}
                     onClick={() => chooseSource(s.id)}
-                    className={`relative text-left rounded-xl border p-4 transition-all ${active ? "border-blue-500 ring-2 ring-blue-100 dark:ring-blue-500/20 bg-blue-50/40 dark:bg-blue-500/15" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
+                    className={`relative text-left rounded-xl border p-4 transition-all ${
+                      sourceLocked
+                        ? "border-slate-200 bg-slate-50 opacity-70 cursor-not-allowed"
+                        : active ? "border-blue-500 ring-2 ring-blue-100 dark:ring-blue-500/20 bg-blue-50/40 dark:bg-blue-500/15" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
                   >
-                    {s.badge && (
+                    {sourceLocked ? (
+                      <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-slate-400 text-white rounded-full px-2 py-0.5">Upgrade</span>
+                    ) : s.badge && (
                       <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white rounded-full px-2 py-0.5">{s.badge}</span>
                     )}
                     <div className={`h-10 w-10 rounded-lg flex items-center justify-center mb-3 ${s.color}`}>
                       <Icon className="h-5 w-5" />
                     </div>
                     <p className="font-semibold text-slate-900 text-sm">{s.label}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{s.desc}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}</p>
                   </button>
                 );
               })}

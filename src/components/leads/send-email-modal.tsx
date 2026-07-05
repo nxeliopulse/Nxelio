@@ -6,6 +6,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { sendLeadEmail } from "@/lib/email/actions";
 import { generateLeadOutreach } from "@/lib/ai/actions";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 
 interface Props {
   open: boolean;
@@ -32,6 +33,7 @@ export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: P
         setSubject(seq[0].subject);
         setBody(seq[0].body);
       }
+      notifyCreditsChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Draft failed");
     } finally {

@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { generateContactIntel, type AiContact } from "@/lib/ai/actions";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 
 export function ContactIntelTab({ leadId }: { leadId: string }) {
   const [contacts, setContacts] = useState<AiContact[] | null>(null);
@@ -16,6 +17,7 @@ export function ContactIntelTab({ leadId }: { leadId: string }) {
     setError(null);
     try {
       setContacts(await generateContactIntel(leadId));
+      notifyCreditsChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {

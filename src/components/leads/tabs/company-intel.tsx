@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { generateCompanyIntel, type AiCompanyIntel } from "@/lib/ai/actions";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 
 export function CompanyIntelTab({ leadId }: { leadId: string }) {
   const [data, setData] = useState<AiCompanyIntel | null>(null);
@@ -16,6 +17,7 @@ export function CompanyIntelTab({ leadId }: { leadId: string }) {
     setError(null);
     try {
       setData(await generateCompanyIntel(leadId));
+      notifyCreditsChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {

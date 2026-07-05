@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { generateLeadOutreach, type GeneratedEmail } from "@/lib/ai/actions";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 
 const colors = ["bg-blue-500", "bg-indigo-500", "bg-emerald-500", "bg-amber-500", "bg-pink-500"];
 
@@ -19,6 +20,7 @@ export function OutreachTab({ leadId }: { leadId: string }) {
     setError(null);
     try {
       setEmails(await generateLeadOutreach(leadId));
+      notifyCreditsChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {

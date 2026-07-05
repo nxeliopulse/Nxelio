@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { X, Sparkles, HelpCircle } from "lucide-react";
 import { getAiCreditsUsage } from "@/lib/queries/credits";
+import { onCreditsChanged } from "@/lib/credits-refresh";
 import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 import { navMainItems, navAdminItems, filterNavByRoleAndOverrides } from "@/lib/nav-config";
@@ -20,6 +21,12 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
     let cancelled = false;
     getAiCreditsUsage().then((c) => { if (!cancelled) setCredits(c); }).catch(() => {});
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    return onCreditsChanged(() => {
+      getAiCreditsUsage().then(setCredits).catch(() => {});
+    });
   }, []);
 
   useEffect(() => {

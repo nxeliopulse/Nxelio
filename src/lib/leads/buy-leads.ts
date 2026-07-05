@@ -2,6 +2,7 @@
 import { aiJson } from "@/lib/ai/client";
 import { brightDataConfigured, brightDataSearchPeople } from "@/lib/leads/bright-data";
 import { anysiteConfigured, findEmailsByLinkedIn } from "@/lib/leads/anysite";
+import { hasFeature } from "@/lib/queries/subscriptions";
 
 export interface BuyCriteria {
   industry: string;
@@ -37,6 +38,9 @@ export interface BuyLeadsResult {
  * Data isn't configured or returns nothing.
  */
 export async function searchBuyLeads(criteria: BuyCriteria): Promise<BuyLeadsResult> {
+  if (!(await hasFeature("discovery"))) {
+    return { ok: false, prospects: [], error: "Lead discovery isn't included on your plan. Upgrade to Starter or Pro to unlock it." };
+  }
   if (brightDataConfigured) {
     const r = await brightDataSearchPeople(criteria);
     if (r.ok && r.prospects.length) {

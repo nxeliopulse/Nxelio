@@ -8,6 +8,7 @@ import {
   FileText, Layers, Newspaper, Zap, ChevronRight,
 } from "lucide-react";
 import { runAssistant, approveAssistantActions, type AssistantMessage, type ProposedAction } from "@/lib/ai/assistant";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import {
   listAssistantChats, getAssistantChat, saveAssistantChat, deleteAssistantChat,
   type AssistantChatMeta,
@@ -259,6 +260,7 @@ export function AssistantWidget({
         ...(res.proposal?.length ? { proposal: res.proposal, proposalStatus: "pending" as const } : {}),
       }];
       setChat(finalChat); persist(finalChat);
+      notifyCreditsChanged();
     });
   }
 
