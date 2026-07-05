@@ -77,7 +77,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<"none" | "name" | "score" | "newest">("none");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const PAGE_SIZE = 25;
+  const PAGE_SIZE = 15;
 
   // Per-column header search (click a header to filter by that column's value).
   const [columnFilters, setColumnFilters] = useState<Partial<Record<ColKey, string>>>({});
