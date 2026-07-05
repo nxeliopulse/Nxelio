@@ -53,6 +53,16 @@ export async function markAllRead() {
   revalidatePath("/", "layout");
 }
 
+/** Deletes every notification for the current user (RLS scopes this to their own rows). */
+export async function clearAllNotifications() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  const { error } = await supabase.from("notifications").delete().eq("user_id", user.id);
+  if (error) throw error;
+  revalidatePath("/", "layout");
+}
+
 /**
  * Creates a notification for the currently logged-in user.
  * Used by other server actions when events happen (campaign sent,

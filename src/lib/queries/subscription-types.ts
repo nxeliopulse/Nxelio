@@ -16,6 +16,8 @@ export interface PlanFeatures {
   core_workflows: boolean;
   crm_export: boolean;
   priority_support: boolean;
+  opportunities: boolean;
+  meetings: boolean;
 }
 
 export interface SubscriptionPlan {

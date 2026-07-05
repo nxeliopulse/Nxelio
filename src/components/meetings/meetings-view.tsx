@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   CalendarDays, Clock, Users, ExternalLink, Pencil, X, Plus, Link2, FileText,
   PlayCircle, Video, MapPin, CalendarClock, AlertCircle, Loader2, Wand2,
-  Send, Check, ChevronLeft, UserPlus, CalendarCheck,
+  Send, Check, ChevronLeft, ChevronRight, UserPlus, CalendarCheck,
 } from "lucide-react";
 import { generateConferenceLink, type ConferenceProvider } from "@/lib/meetings/conference-link";
 import { Card } from "@/components/ui/card";
@@ -48,6 +48,10 @@ function dayLabel(iso: string) {
   if (same(d, tomorrow)) return "Tomorrow";
   return d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
 }
+/** Local YYYY-MM-DD key — used to group meetings by calendar day. */
+function dateKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 /** datetime-local value (local time) for an <input>. */
 function toLocalInput(iso: string) {
   const d = new Date(iso);
@@ -62,7 +66,9 @@ const STATUS_VARIANT: Record<string, "blue" | "success" | "danger" | "default"> 
 export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; leads: LeadOption[] }) {
   const { confirm } = useFeedback();
   const [pending, start] = useTransition();
-  const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+  const [tab, setTab] = useState<"upcoming" | "past" | "calendar">("calendar");
+  const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
+  const [selectedDay, setSelectedDay] = useState<Date>(() => new Date());
   const [detail, setDetail] = useState<MeetingRow | null>(null);
   const [editing, setEditing] = useState<MeetingRow | "new" | null>(null);
   // LP-16 — arriving from Leads with ?leads=id1,id2 pre-opens the scheduler with those attendees.
@@ -70,12 +76,13 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("leads");
     if (p) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
       setPresetLeadIds(p.split(",").map((s) => s.trim()).filter(Boolean));
       setEditing("new");
     }
   }, []);
 
-  const now = Date.now();
+  const [now] = useState(() => Date.now());
   const { upcoming, past } = useMemo(() => {
     const up: MeetingRow[] = [];
     const pa: MeetingRow[] = [];
@@ -98,6 +105,18 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
     }
     return [...map.entries()];
   }, [upcoming]);
+
+  // Group ALL meetings by calendar day (local) for the Calendar tab.
+  const meetingsByDay = useMemo(() => {
+    const map = new Map<string, MeetingRow[]>();
+    for (const m of meetings) {
+      const k = dateKey(new Date(m.start_at));
+      (map.get(k) ?? map.set(k, []).get(k)!).push(m);
+    }
+    for (const list of map.values()) list.sort((a, b) => a.start_at.localeCompare(b.start_at));
+    return map;
+  }, [meetings]);
+  const selectedDayMeetings = meetingsByDay.get(dateKey(selectedDay)) ?? [];
 
   function doCancel(m: MeetingRow) {
     start(async () => {
@@ -128,18 +147,40 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
 
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-4 border-b border-slate-200">
-        {(["upcoming", "past"] as const).map((t) => (
+        {(["upcoming", "past", "calendar"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
           >
-            {t === "upcoming" ? `Upcoming (${upcoming.length})` : `Past (${past.length})`}
+            {t === "upcoming" ? `Upcoming (${upcoming.length})` : t === "past" ? `Past (${past.length})` : "Calendar"}
           </button>
         ))}
       </div>
 
-      {list.length === 0 ? (
+      {tab === "calendar" ? (
+        <div>
+          <CalendarGrid
+            month={calendarMonth}
+            onMonthChange={setCalendarMonth}
+            meetingsByDay={meetingsByDay}
+            selectedDay={selectedDay}
+            onSelectDay={setSelectedDay}
+          />
+          <div className="mt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+              {selectedDay.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
+            </h3>
+            {selectedDayMeetings.length === 0 ? (
+              <Card className="p-6 text-center text-sm text-slate-400">No meetings this day.</Card>
+            ) : (
+              <div className="space-y-2">
+                {selectedDayMeetings.map((m) => <MeetingRowItem key={m.id} m={m} onOpen={() => setDetail(m)} past={new Date(m.end_at).getTime() < now} />)}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : list.length === 0 ? (
         <Card className="p-12 text-center text-slate-500">
           <CalendarClock className="h-10 w-10 mx-auto mb-3 text-slate-300" />
           {tab === "upcoming" ? "No upcoming meetings. Click " : "No past meetings yet."}
@@ -181,6 +222,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
           meeting={editing === "new" ? null : editing}
           leads={leads}
           initialLeadIds={editing === "new" ? presetLeadIds : []}
+          otherMeetings={meetings.filter((m) => m.status === "scheduled" && m.id !== (editing === "new" ? null : editing.id))}
           onClose={() => { setEditing(null); setPresetLeadIds([]); }}
         />
       )}
@@ -214,6 +256,91 @@ function MeetingRowItem({ m, onOpen, past }: { m: MeetingRow; onOpen: () => void
       )}
       {past && m.recording_url && <PlayCircle className="h-4 w-4 text-slate-400" />}
     </button>
+  );
+}
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Zoho-style month grid — highlights days with meetings, click a day to see them below. */
+function CalendarGrid({ month, onMonthChange, meetingsByDay, selectedDay, onSelectDay }: {
+  month: Date;
+  onMonthChange: (d: Date) => void;
+  meetingsByDay: Map<string, MeetingRow[]>;
+  selectedDay: Date;
+  onSelectDay: (d: Date) => void;
+}) {
+  const today = new Date();
+  const cells = useMemo(() => {
+    const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+    const start = new Date(firstOfMonth);
+    start.setDate(start.getDate() - start.getDay()); // back up to the Sunday on/before the 1st
+    const days: Date[] = [];
+    for (let i = 0; i < 42; i++) { // 6 rows x 7 cols always covers a month
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  }, [month]);
+
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-slate-900">{month.toLocaleDateString([], { month: "long", year: "numeric" })}</h3>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() - 1); onMonthChange(d); }}
+            className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => { const d = new Date(); d.setDate(1); onMonthChange(d); onSelectDay(new Date()); }}
+            className="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-slate-100"
+          >
+            Today
+          </button>
+          <button
+            onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() + 1); onMonthChange(d); }}
+            className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {WEEKDAY_LABELS.map((w) => (
+          <div key={w} className="text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 pb-1">{w}</div>
+        ))}
+        {cells.map((d) => {
+          const inMonth = d.getMonth() === month.getMonth();
+          const dayMeetings = meetingsByDay.get(dateKey(d)) ?? [];
+          const isToday = sameDay(d, today);
+          const isSelected = sameDay(d, selectedDay);
+          return (
+            <button
+              key={d.toISOString()}
+              onClick={() => onSelectDay(d)}
+              className={`h-14 sm:h-16 rounded-lg flex flex-col items-center justify-center gap-0.5 text-sm transition-colors px-0.5 ${
+                isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-50 text-blue-700 font-semibold" : inMonth ? "text-slate-700 hover:bg-slate-100" : "text-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span>{d.getDate()}</span>
+              {dayMeetings.length > 0 && (
+                <span className={`text-[10px] leading-tight ${isSelected ? "text-blue-100" : "text-blue-600"}`}>
+                  {fmtTime(dayMeetings[0].start_at)}{dayMeetings.length > 1 ? ` +${dayMeetings.length - 1}` : ""}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
@@ -289,12 +416,13 @@ function Row({ icon, label, children }: { icon: React.ReactNode; label: string; 
 
 interface Attendee { leadId?: string; name: string; email: string }
 
-function MeetingFormModal({ meeting, leads, initialLeadIds = [], onClose }: { meeting: MeetingRow | null; leads: LeadOption[]; initialLeadIds?: string[]; onClose: () => void }) {
+function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings = [], onClose }: { meeting: MeetingRow | null; leads: LeadOption[]; initialLeadIds?: string[]; otherMeetings?: MeetingRow[]; onClose: () => void }) {
   const isEdit = !!meeting;
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"details" | "review">("details");
   const [sendInvites, setSendInvites] = useState(true);
+  const [nowMs] = useState(() => Date.now());
 
   const [form, setForm] = useState({
     title: meeting?.title ?? "",
@@ -351,6 +479,11 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], onClose }: { me
     }
   }
 
+  // Your own existing LeadPro meetings are busy too — not just what an external
+  // synced calendar reports. Always counted, whether or not "Check my calendar" was clicked.
+  const ownBusy = useMemo(() => otherMeetings.map((m) => ({ start: m.start_at, end: m.end_at })), [otherMeetings]);
+  const allBusy = useMemo(() => [...ownBusy, ...avail.busy], [ownBusy, avail.busy]);
+
   const freeSlots = useMemo(() => {
     if (!avail.checked || !form.startLocal) return [];
     const day = new Date(form.startLocal); day.setHours(0, 0, 0, 0);
@@ -359,19 +492,19 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], onClose }: { me
       for (const m of [0, 30]) {
         const s = new Date(day); s.setHours(h, m, 0, 0);
         const e = new Date(s.getTime() + 30 * 60000);
-        if (s.getTime() < Date.now()) continue;
-        if (avail.busy.some((b) => new Date(b.start) < e && new Date(b.end) > s)) continue;
+        if (s.getTime() < nowMs) continue;
+        if (allBusy.some((b) => new Date(b.start) < e && new Date(b.end) > s)) continue;
         out.push({ startLocal: toLocalInput(s.toISOString()), endLocal: toLocalInput(e.toISOString()), label: s.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) });
       }
     }
     return out;
-  }, [avail, form.startLocal]);
+  }, [allBusy, avail.checked, form.startLocal, nowMs]);
 
   const conflict = useMemo(() => {
-    if (!avail.checked || !form.startLocal || !form.endLocal) return false;
+    if (!form.startLocal || !form.endLocal) return false;
     const s = new Date(form.startLocal), e = new Date(form.endLocal);
-    return avail.busy.some((b) => new Date(b.start) < e && new Date(b.end) > s);
-  }, [avail, form.startLocal, form.endLocal]);
+    return allBusy.some((b) => new Date(b.start) < e && new Date(b.end) > s);
+  }, [allBusy, form.startLocal, form.endLocal]);
 
   function build(): MeetingInput | null {
     setError(null);
@@ -472,13 +605,17 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], onClose }: { me
                     {avail.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />} Check my calendar
                   </Button>
                 </div>
+                {/* Own LeadPro meetings are checked immediately, regardless of the external-calendar check below. */}
+                {!avail.checked && conflict && (
+                  <p className="mt-2 text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> This time overlaps another meeting you already have scheduled.</p>
+                )}
                 {avail.checked && (
                   <div className="mt-2 text-xs">
                     {avail.error ? (
                       <p className="text-slate-400">Calendar not connected — connect it in Settings → Calendar to see free times.</p>
                     ) : (
                       <>
-                        {conflict && <p className="text-red-600 mb-1.5 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> This time overlaps a busy event on your calendar.</p>}
+                        {conflict && <p className="text-red-600 mb-1.5 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> This time overlaps a busy event on your calendar or another meeting.</p>}
                         {!conflict && form.startLocal && <p className="text-emerald-600 mb-1.5 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> You&apos;re free at the selected time.</p>}
                         {freeSlots.length > 0 && (
                           <>

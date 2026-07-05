@@ -20,6 +20,7 @@ import { FlowCanvas } from "@/components/campaigns/flow-canvas";
 import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
 import { formatDate, cn } from "@/lib/utils";
 import { InboxView } from "@/components/inbox/inbox-view";
+import { LockedFeature } from "@/components/billing/locked-feature";
 import type { InboxConversation } from "@/lib/queries/inbox";
 import { LeadsTable } from "@/components/leads/leads-table";
 import type { LeadRow } from "@/lib/queries/leads";
@@ -71,7 +72,7 @@ const TABS = ["Audience", "Sequence", "Analytics", "Inbox", "Settings"] as const
 type Tab = (typeof TABS)[number];
 
 export function CampaignDetailView({
-  campaign, audience, audienceLabel, pendingJobs = 0, inboxConversations = [], audienceLeads = [], leadActivity = [],
+  campaign, audience, audienceLabel, pendingJobs = 0, inboxConversations = [], audienceLeads = [], leadActivity = [], replyTrackingEnabled = false,
 }: {
   campaign: CampaignRow;
   audience: number;
@@ -80,6 +81,7 @@ export function CampaignDetailView({
   inboxConversations?: InboxConversation[];
   audienceLeads?: LeadRow[];
   leadActivity?: LeadEngagementRow[];
+  replyTrackingEnabled?: boolean;
 }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
@@ -359,7 +361,9 @@ export function CampaignDetailView({
 
       {/* Inbox — this campaign's replies, scoped from the shared inbox_messages table */}
       {tab === "Inbox" && (
-        <InboxView conversations={inboxConversations} embedded />
+        replyTrackingEnabled
+          ? <InboxView conversations={inboxConversations} embedded />
+          : <LockedFeature feature="Reply Tracking" />
       )}
 
       {/* Settings */}

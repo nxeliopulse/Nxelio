@@ -4,11 +4,12 @@ import { getSegments, getSegmentMemberLeads } from "@/lib/queries/segments";
 import { getLeads, getLeadStats } from "@/lib/queries/leads";
 import { getInboxConversations } from "@/lib/queries/inbox";
 import { getCampaignLeadActivity } from "@/lib/email/campaign-stats";
+import { hasFeature } from "@/lib/queries/subscriptions";
 import { CampaignDetailView } from "@/components/campaigns/campaign-detail-view";
 
 export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [campaign, segments, leadStats, pending, inboxConversations, allLeads, leadActivity] = await Promise.all([
+  const [campaign, segments, leadStats, pending, inboxConversations, allLeads, leadActivity, replyTrackingEnabled] = await Promise.all([
     getCampaignById(id),
     getSegments(),
     getLeadStats(),
@@ -16,6 +17,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     getInboxConversations(id),
     getLeads(),
     getCampaignLeadActivity(id),
+    hasFeature("reply_tracking"),
   ]);
   if (!campaign) notFound();
 
@@ -36,6 +38,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       inboxConversations={inboxConversations}
       audienceLeads={audienceLeads}
       leadActivity={leadActivity}
+      replyTrackingEnabled={replyTrackingEnabled}
     />
   );
 }
