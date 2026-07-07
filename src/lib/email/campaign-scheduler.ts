@@ -83,6 +83,23 @@ async function connectedLinkedInAccount(db: Db, workspaceId: string): Promise<st
   return (data?.account_id as string) ?? null;
 }
 
+/**
+ * Find the workspace's connected mailbox address, so replies actually land where
+ * the app is watching for them — falls back to REPLY_TO_EMAIL (sendEmail's default)
+ * when no mailbox is connected, rather than silently using a stale/unrelated address.
+ */
+async function connectedEmailAddress(db: Db, workspaceId: string): Promise<string | undefined> {
+  const { data } = await db
+    .from("outreach_accounts")
+    .select("identifier")
+    .eq("workspace_id", workspaceId)
+    .eq("channel", "email")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+  return (data?.identifier as string) || undefined;
+}
+
 async function isBlockedIn(db: Db, workspaceId: string, email: string): Promise<boolean> {
   const domain = email.split("@")[1] || "";
   const { data } = await db.from("blocklist").select("value").eq("workspace_id", workspaceId);
@@ -123,8 +140,9 @@ export async function sendCampaignStepToLead(
   // send them as html so formatting/links/images render; older plain-text
   // drafts have no tags and keep going through the text→<br> path.
   const isHtml = /<[a-z][\s\S]*>/i.test(body);
+  const replyTo = await connectedEmailAddress(db, workspaceId);
   const r = await sendEmail({
-    to: lead.email, subject, tags: [campaignId], fromName: opts.fromName,
+    to: lead.email, subject, tags: [campaignId], fromName: opts.fromName, replyTo,
     ...(isHtml ? { html: body } : { text: body }),
   });
   if (!r.ok) return { ok: false, error: r.error };

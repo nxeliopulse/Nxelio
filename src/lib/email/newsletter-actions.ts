@@ -178,6 +178,15 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
   // 4. Render and send
   const { data: onboarding } = await getOnboarding();
   const fromName = onboarding?.company_name?.trim() || "Nxelio";
+  // Route replies to whichever mailbox is actually connected, not a stale env var.
+  const { data: mailbox } = await supabase
+    .from("outreach_accounts")
+    .select("identifier")
+    .eq("channel", "email")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+  const replyTo = (mailbox?.identifier as string) || undefined;
   let sent = 0;
   let failed = 0;
   let redirectedNote: string | undefined;
@@ -203,6 +212,7 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
       subject: finalSubject,
       html,
       fromName,
+      replyTo,
     });
 
     if (result.ok) {
@@ -275,11 +285,19 @@ export async function sendTestNewsletter(newsletterId: string, testEmail: string
   });
 
   const { data: onboarding } = await getOnboarding();
+  const { data: mailbox } = await supabase
+    .from("outreach_accounts")
+    .select("identifier")
+    .eq("channel", "email")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
   const result = await sendEmail({
     to: testEmail,
     subject: `[TEST] ${substituteMergeTags(n.subject || n.title, fakeLead)}`,
     html,
     fromName: onboarding?.company_name?.trim() || "Nxelio",
+    replyTo: (mailbox?.identifier as string) || undefined,
   });
 
   return result.ok

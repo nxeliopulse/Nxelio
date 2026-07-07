@@ -49,6 +49,9 @@ interface SendArgs {
   /** Sender display name recipients see. Per-workspace (e.g. the customer's company
    *  name); falls back to BREVO_FROM_NAME ("Nxelio") when not provided. */
   fromName?: string;
+  /** Where replies should land. Callers should pass the workspace's actually-connected
+   *  mailbox address when known — falls back to REPLY_TO_EMAIL only if omitted. */
+  replyTo?: string;
 }
 
 function toHtml(html?: string, text?: string): string {
@@ -58,7 +61,8 @@ function toHtml(html?: string, text?: string): string {
   );
 }
 
-async function sendViaBrevo({ to, subject, html, text, tags, fromName }: SendArgs): Promise<SendResult> {
+async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo }: SendArgs): Promise<SendResult> {
+  const effectiveReplyTo = replyTo || REPLY_TO_EMAIL;
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
@@ -71,7 +75,7 @@ async function sendViaBrevo({ to, subject, html, text, tags, fromName }: SendArg
       to: [{ email: to }],
       subject,
       htmlContent: toHtml(html, text),
-      ...(REPLY_TO_EMAIL ? { replyTo: { email: REPLY_TO_EMAIL } } : {}),
+      ...(effectiveReplyTo ? { replyTo: { email: effectiveReplyTo } } : {}),
       ...(tags && tags.length ? { tags } : {}),
     }),
   });

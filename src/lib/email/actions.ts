@@ -41,11 +41,22 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
   const { data: onboarding } = await getOnboarding();
   const fromName = onboarding?.company_name?.trim() || "Nxelio";
 
+  // Route replies to whichever mailbox is actually connected, not a stale env var.
+  const supabase = await createClient();
+  const { data: mailbox } = await supabase
+    .from("outreach_accounts")
+    .select("identifier")
+    .eq("channel", "email")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+
   const result = await sendEmail({
     to: lead.email,
     subject: finalSubject,
     text: finalBody,
     fromName,
+    replyTo: (mailbox?.identifier as string) || undefined,
   });
 
   if (!result.ok) {
@@ -53,7 +64,6 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
   }
 
   // Log to inbox as outbound message (store the substituted text)
-  const supabase = await createClient();
   await supabase.from("inbox_messages").insert({
     lead_id: leadId,
     direction: "outbound",
