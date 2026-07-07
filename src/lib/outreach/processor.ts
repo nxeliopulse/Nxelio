@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import { substituteMergeTags } from "@/lib/email/merge-tags";
-import { sendEmail as resendSendEmail } from "@/lib/email/resend";
+import { sendEmail as brevoSendEmail } from "@/lib/email/resend";
 import {
   unipileConfigured,
   unipileSendEmail,
@@ -120,7 +120,7 @@ async function executeJob(db: Db, job: JobRow, lead: Record<string, unknown>): P
     if (!to) return { status: "failed", detail: "Lead has no email address" };
     if (await isBlockedInWorkspace(db, job.workspace_id, to)) return { status: "failed", detail: "Recipient is on the blocklist" };
 
-    // Prefer a connected Unipile mailbox; fall back to Resend so email works pre-Unipile.
+    // Prefer a connected Unipile mailbox; fall back to Brevo so email works pre-Unipile.
     if (unipileConfigured && account) {
       try {
         await unipileSendEmail({ accountId: account.account_id, to, subject, body });
@@ -129,9 +129,9 @@ async function executeJob(db: Db, job: JobRow, lead: Record<string, unknown>): P
         return { status: "failed", detail: err instanceof Error ? err.message : "Unipile email failed" };
       }
     }
-    const r = await resendSendEmail({ to, subject, text: body });
-    if (!r.ok) return { status: "failed", detail: r.error || "Resend send failed" };
-    return { status: "sent", detail: `Email via Resend → ${to}${r.redirectedTo ? ` (sandbox→${r.redirectedTo})` : ""}: ${subject}` };
+    const r = await brevoSendEmail({ to, subject, text: body });
+    if (!r.ok) return { status: "failed", detail: r.error || "Brevo send failed" };
+    return { status: "sent", detail: `Email via Brevo → ${to}${r.redirectedTo ? ` (sandbox→${r.redirectedTo})` : ""}: ${subject}` };
   }
 
   // LinkedIn

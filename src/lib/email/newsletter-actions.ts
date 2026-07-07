@@ -137,8 +137,8 @@ interface SendResult {
 
 /**
  * Sends a newsletter to all subscribed leads (or members of a segment).
- * In Resend sandbox mode, only the owner email gets the actual delivery — we still
- * record all recipient rows to make analytics realistic.
+ * Without a configured Brevo sender, sends are simulated — we still record all
+ * recipient rows to make analytics realistic.
  */
 export async function sendNewsletter(newsletterId: string): Promise<SendResult> {
   const supabase = await createClient();

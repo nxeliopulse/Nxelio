@@ -66,11 +66,11 @@ const categories = [
   {
     id: "integrations",
     title: "Integrations",
-    description: "Connect Resend, Supabase, Groq, and your CRM",
+    description: "Connect Brevo, Supabase, Groq, and your CRM",
     icon: Plug,
     color: "from-amber-500 to-orange-600",
     articles: [
-      "Verifying your sender domain in Resend",
+      "Verifying your sender domain in Brevo",
       "Rotating API keys safely",
       "Syncing leads with HubSpot",
       "Outbound webhooks (coming soon)",
@@ -94,7 +94,7 @@ const faqs = [
   },
   {
     q: "Can I send emails to anyone?",
-    a: "By default, Resend is in sandbox mode — emails only deliver to the verified account owner. To send to your real prospects, verify a sending domain at resend.com/domains, then set EMAIL_DOMAIN_VERIFIED=true and update EMAIL_FROM to use your verified domain. Once verified, all campaigns and one-off sends route through your domain.",
+    a: "Yes — once BREVO_API_KEY and BREVO_FROM_EMAIL are set with a verified Brevo sender, campaigns and one-off sends deliver to any real recipient. Without that configured, emails are simulated (logged, not delivered).",
   },
   {
     q: "How do I customize email templates?",
@@ -102,7 +102,7 @@ const faqs = [
   },
   {
     q: "What integrations are supported?",
-    a: "Nxelio ships with Groq (AI), Resend (email), and Supabase (database, auth, storage) wired in. HubSpot CRM sync is optional and configurable in Settings > API Keys. A general REST API and webhooks are on the roadmap.",
+    a: "Nxelio ships with Groq (AI), Brevo (email), and Supabase (database, auth, storage) wired in. HubSpot CRM sync is optional and configurable in Settings > API Keys. A general REST API and webhooks are on the roadmap.",
   },
 ];
 

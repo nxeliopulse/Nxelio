@@ -337,7 +337,7 @@ export function LandingPage() {
           </div>
           <div className="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
             <p>© 2026 Nxelio. All rights reserved.</p>
-            <p>Built with AI · Powered by Supabase, Groq & Resend</p>
+            <p>Built with AI · Powered by Supabase, Groq & Brevo</p>
           </div>
         </div>
       </footer>

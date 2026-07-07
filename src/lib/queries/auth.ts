@@ -2,7 +2,7 @@
 import { sendEmail } from "@/lib/email/resend";
 
 /**
- * Direct signup that bypasses Resend's sandbox restriction on email confirmation.
+ * Direct signup that skips Supabase's own email-confirmation step (auto-confirmed).
  * Uses the Supabase auth admin REST API directly so the password is reliably
  * persisted (the SDK has been flaky on Next 16/Turbopack).
  */
@@ -39,7 +39,7 @@ export async function signUpDirect(args: { email: string; password: string; full
     body: JSON.stringify({ password: args.password }),
   }).catch(() => {});
 
-  // 3. Courtesy notification to the Resend account owner
+  // 3. Courtesy notification to the workspace owner
   const ownerEmail = process.env.EMAIL_TEST_RECIPIENT || "harirajanncse@gmail.com";
   try {
     await sendEmail({

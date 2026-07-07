@@ -52,7 +52,7 @@ interface BlockProps {
 }
 
 interface EmailStatus {
-  provider: "brevo" | "resend" | "none";
+  provider: "brevo" | "none";
   canReachRecipients: boolean;
   from: string | null;
 }
@@ -785,11 +785,7 @@ export function NewsletterBuilder({
           </p>
           {email.canReachRecipients ? (
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-800">
-              ✅ Sends via {email.provider === "brevo" ? "Brevo" : "Resend"}{email.from ? ` from ${email.from}` : ""} to every recipient.
-            </div>
-          ) : email.provider === "resend" ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-              ⚠️ Resend has no verified domain, so delivery is restricted to the account-owner inbox. Verify a domain at resend.com/domains for production sending.
+              ✅ Sends via Brevo{email.from ? ` from ${email.from}` : ""} to every recipient.
             </div>
           ) : (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
@@ -817,10 +813,8 @@ export function NewsletterBuilder({
           />
           <p className="text-xs text-slate-500">
             {email.canReachRecipients
-              ? `Sends via ${email.provider === "brevo" ? "Brevo" : "Resend"} to any address.`
-              : email.provider === "resend"
-                ? "Without a verified Resend domain, only the account-owner inbox receives the test."
-                : "No email provider configured — the test is simulated (logged, not sent)."}
+              ? "Sends via Brevo to any address."
+              : "No email provider configured — the test is simulated (logged, not sent)."}
           </p>
         </div>
         <div className="p-5 border-t border-slate-100 flex justify-end gap-2">

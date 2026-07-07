@@ -104,7 +104,7 @@ export async function sendReply(
 ): Promise<{ ok: boolean; error?: string; simulated?: boolean }> {
   const supabase = await createClient();
 
-  // Actually deliver the reply via the email service (Brevo/Resend/dev-sim) —
+  // Actually deliver the reply via the email service (Brevo/dev-sim) —
   // previously this only logged a row without sending anything.
   const { data: lead } = await supabase.from("leads").select("email").eq("id", leadId).single();
   let simulated = false;

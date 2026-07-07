@@ -24,10 +24,10 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatus[]> {
       emoji: "🤖",
     },
     {
-      name: "Resend (Email)",
+      name: "Brevo (Email)",
       description: "Outbound transactional + campaign email",
-      configured: Boolean(process.env.RESEND_API_KEY),
-      maskedKey: mask(process.env.RESEND_API_KEY),
+      configured: Boolean(process.env.BREVO_API_KEY),
+      maskedKey: mask(process.env.BREVO_API_KEY),
       emoji: "📧",
     },
     {
@@ -52,8 +52,8 @@ export async function getIntegrationStatuses(): Promise<IntegrationStatus[]> {
 export async function getEmailDomainStatus() {
   const { emailProvider, emailDomainVerified, emailFromAddress } = await import("@/lib/email/resend");
   return {
-    provider: emailProvider, // "brevo" | "resend" | "none"
-    verified: emailDomainVerified, // Brevo configured, or Resend domain verified
-    from: emailFromAddress || process.env.EMAIL_FROM || "—",
+    provider: emailProvider, // "brevo" | "none"
+    verified: emailDomainVerified, // Brevo configured
+    from: emailFromAddress || "—",
   };
 }

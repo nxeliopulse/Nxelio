@@ -8,7 +8,7 @@ import "server-only";
  *   UNIPILE_API_KEY  your API access token
  *
  * If these are unset, `unipileConfigured` is false and callers fall back
- * (email → Resend, LinkedIn → logged-only), so the app keeps working.
+ * (email → Brevo, LinkedIn → logged-only), so the app keeps working.
  */
 const DSN = process.env.UNIPILE_DSN;
 const API_KEY = process.env.UNIPILE_API_KEY;

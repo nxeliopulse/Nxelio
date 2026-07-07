@@ -36,7 +36,7 @@ interface Profile {
 interface Props {
   profile: Profile | null;
   integrations: IntegrationStatus[];
-  emailDomain: { verified: boolean; from: string; provider?: "brevo" | "resend" | "none" };
+  emailDomain: { verified: boolean; from: string; provider?: "brevo" | "none" };
   blocklist: BlocklistEntry[];
   calendarAccounts: CalendarAccountRow[];
   calendarProviderStatus: { google: boolean; microsoft: boolean };
@@ -245,9 +245,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
               <p className="text-sm text-slate-500 mb-5">
                 {emailDomain.provider === "brevo"
                   ? "Currently sending via Brevo"
-                  : emailDomain.provider === "resend"
-                    ? "Currently sending via Resend"
-                    : "No email provider configured"}
+                  : "No email provider configured"}
               </p>
 
               <div className={`mb-4 flex items-start gap-2 rounded-lg p-3 text-sm border ${emailDomain.verified ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
@@ -256,16 +254,12 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
                   <p className="font-semibold">
                     {emailDomain.verified
                       ? "Production mode — reaching real recipients"
-                      : emailDomain.provider === "resend"
-                        ? "Sandbox mode — no verified domain"
-                        : "Simulated — no provider configured"}
+                      : "Simulated — no provider configured"}
                   </p>
                   <p className="text-xs mt-1">
                     {emailDomain.verified
-                      ? `Emails sent from ${emailDomain.from} via ${emailDomain.provider === "brevo" ? "Brevo" : "Resend"} to real recipients.`
-                      : emailDomain.provider === "resend"
-                        ? "Resend only delivers to the account owner until you verify a domain at resend.com/domains, then set EMAIL_DOMAIN_VERIFIED=true and update EMAIL_FROM."
-                        : "Set BREVO_API_KEY + BREVO_FROM_EMAIL (recommended) to deliver to real recipients. Until then, emails are logged, not sent."}
+                      ? `Emails sent from ${emailDomain.from} via Brevo to real recipients.`
+                      : "Set BREVO_API_KEY + BREVO_FROM_EMAIL (recommended) to deliver to real recipients. Until then, emails are logged, not sent."}
                   </p>
                 </div>
               </div>
@@ -279,7 +273,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
                         <p className="font-semibold text-slate-900">{emailDomain.from}</p>
                         <Badge variant="blue">Default</Badge>
                       </div>
-                      <p className="text-xs text-slate-500">{emailDomain.provider === "brevo" ? "Brevo" : emailDomain.provider === "resend" ? "Resend" : "No"} provider</p>
+                      <p className="text-xs text-slate-500">{emailDomain.provider === "brevo" ? "Brevo" : "No"} provider</p>
                     </div>
                   </div>
                   {emailDomain.verified ? <Badge variant="success"><Check className="h-2.5 w-2.5" /> Verified</Badge> : <Badge variant="warning">Sandbox</Badge>}
@@ -345,7 +339,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
                 {integrations.map((k) => {
                   const notes: Record<string, string> = {
                     "AI Provider (Groq)": "Powers lead scoring, email writing, and prospect insights",
-                    "Resend (Email)": "Sends OTP emails, campaign emails, and notifications",
+                    "Brevo (Email)": "Sends OTP emails, campaign emails, and notifications",
                     "Supabase": "Database, authentication, and file storage",
                     "HubSpot CRM": "Sync leads and campaigns with your CRM (optional)",
                   };

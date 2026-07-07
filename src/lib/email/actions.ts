@@ -20,7 +20,7 @@ export interface SendLeadEmailResult {
 }
 
 /**
- * Sends an email to a lead via Resend and logs it as an outbound message
+ * Sends an email to a lead via Brevo and logs it as an outbound message
  * in the inbox thread so it shows up in conversation history.
  */
 export async function sendLeadEmail(leadId: string, subject: string, body: string): Promise<SendLeadEmailResult> {
