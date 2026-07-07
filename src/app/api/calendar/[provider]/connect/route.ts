@@ -4,7 +4,7 @@
  * user to the provider's consent screen. The callback finishes the connection.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { buildAuthUrl, type CalProvider } from "@/lib/calendar/providers";
 import { calendarConfigured } from "@/lib/calendar/config";
 
@@ -21,6 +21,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL("/login", req.url));
+
+  const admin = createAdminClient();
+  const { data: callerProfile } = await admin.from("users").select("role_id").eq("user_id", user.id).single();
+  if (callerProfile?.role_id !== 1) {
+    return settings("calendar_error=" + encodeURIComponent("Only a Super Admin can connect a calendar."));
+  }
 
   if (!calendarConfigured(provider)) {
     return settings("calendar_error=" + encodeURIComponent(`${provider} calendar isn't configured yet (missing OAuth credentials).`));

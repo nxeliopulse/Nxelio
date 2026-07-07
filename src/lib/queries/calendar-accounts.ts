@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { refreshAccessToken, fetchBusy, fetchEvents, type CalProvider, type BusyInterval, type ExternalCalendarEvent } from "@/lib/calendar/providers";
 import { calendarConfigured } from "@/lib/calendar/config";
+import { requireSuperAdmin } from "@/lib/queries/auth-guards";
 
 export interface CalendarAccountRow {
   id: string;
@@ -28,6 +29,11 @@ export async function getCalendarAccounts(): Promise<CalendarAccountRow[]> {
 }
 
 export async function disconnectCalendar(id: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await requireSuperAdmin();
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Forbidden" };
+  }
   const supabase = await createClient();
   const { error } = await supabase.from("calendar_accounts").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };

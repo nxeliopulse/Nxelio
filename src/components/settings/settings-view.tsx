@@ -1,10 +1,9 @@
 "use client";
 import { useState, useTransition, useEffect, type ReactNode } from "react";
-import { User, Mail, Bell, Key, ShieldCheck, Ban, CreditCard, Plus, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor, Calendar } from "lucide-react";
-import { CalendarConnections } from "@/components/settings/calendar-connections";
+import { User, Bell, Key, ShieldCheck, Ban, CreditCard, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor, Plug } from "lucide-react";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
-import { MailboxConnections } from "@/components/settings/mailbox-connections";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
+import { ConnectorsView } from "@/components/settings/connectors-view";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,8 +17,7 @@ import type { IntegrationStatus } from "@/lib/queries/integrations";
 const sections = [
   { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
   { id: "appearance", label: "Appearance", icon: <Palette className="h-4 w-4" /> },
-  { id: "email", label: "Email Accounts", icon: <Mail className="h-4 w-4" /> },
-  { id: "calendar", label: "Calendar", icon: <Calendar className="h-4 w-4" /> },
+  { id: "connectors", label: "Connectors", icon: <Plug className="h-4 w-4" /> },
   { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
   { id: "api", label: "API Keys", icon: <Key className="h-4 w-4" /> },
   { id: "blocklist", label: "Blocklist", icon: <Ban className="h-4 w-4" /> },
@@ -41,16 +39,23 @@ interface Props {
   calendarAccounts: CalendarAccountRow[];
   calendarProviderStatus: { google: boolean; microsoft: boolean };
   mailboxAccounts: OutreachAccountRow[];
+  linkedinAccounts: OutreachAccountRow[];
   unipileConfigured: boolean;
   bookingSlug?: string | null;
+  isSuperAdmin: boolean;
 }
 
-export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, unipileConfigured, bookingSlug }: Props) {
+export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin }: Props) {
   const [active, setActive] = useState("profile");
-  // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar.
+  // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar
+  // (and the mailbox flow used ?section=email) — both now live under "connectors".
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get("section");
-    if (s && sections.some((sec) => sec.id === s)) setActive(s);
+    const resolved = s === "calendar" || s === "email" ? "connectors" : s;
+    if (resolved && sections.some((sec) => sec.id === resolved)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
+      setActive(resolved);
+    }
   }, []);
   const [pending, start] = useTransition();
   const [name, setName] = useState(profile?.full_name || "");
@@ -239,59 +244,17 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
             </Card>
           )}
 
-          {active === "email" && (
-            <Card className="p-6">
-              <h3 className="font-semibold text-slate-900 mb-1">Email sending</h3>
-              <p className="text-sm text-slate-500 mb-5">
-                {emailDomain.provider === "brevo"
-                  ? "Currently sending via Brevo"
-                  : "No email provider configured"}
-              </p>
-
-              <div className={`mb-4 flex items-start gap-2 rounded-lg p-3 text-sm border ${emailDomain.verified ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-                {emailDomain.verified ? <CheckCircle2 className="h-4 w-4 mt-0.5" /> : <AlertCircle className="h-4 w-4 mt-0.5" />}
-                <div>
-                  <p className="font-semibold">
-                    {emailDomain.verified
-                      ? "Production mode — reaching real recipients"
-                      : "Simulated — no provider configured"}
-                  </p>
-                  <p className="text-xs mt-1">
-                    {emailDomain.verified
-                      ? `Emails sent from ${emailDomain.from} via Brevo to real recipients.`
-                      : "Set BREVO_API_KEY + BREVO_FROM_EMAIL (recommended) to deliver to real recipients. Until then, emails are logged, not sent."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><Mail className="h-4.5 w-4.5" /></div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-slate-900">{emailDomain.from}</p>
-                        <Badge variant="blue">Default</Badge>
-                      </div>
-                      <p className="text-xs text-slate-500">{emailDomain.provider === "brevo" ? "Brevo" : "No"} provider</p>
-                    </div>
-                  </div>
-                  {emailDomain.verified ? <Badge variant="success"><Check className="h-2.5 w-2.5" /> Verified</Badge> : <Badge variant="warning">Sandbox</Badge>}
-                </div>
-              </div>
-
-              <div className="mt-6 border-t border-slate-100 pt-5">
-                <h4 className="font-semibold text-slate-900 mb-1">Connected mailboxes</h4>
-                <p className="text-sm text-slate-500 mb-4">Link Gmail/Outlook to send from your own inbox and capture replies. Disconnect or switch anytime.</p>
-                <MailboxConnections accounts={mailboxAccounts} unipileConfigured={unipileConfigured} />
-              </div>
-            </Card>
-          )}
-
-          {active === "calendar" && (
-            <Card className="p-6">
-              <CalendarConnections accounts={calendarAccounts} providerStatus={calendarProviderStatus} bookingSlug={bookingSlug} />
-            </Card>
+          {active === "connectors" && (
+            <ConnectorsView
+              isSuperAdmin={isSuperAdmin}
+              emailSendingActive={emailDomain.verified}
+              mailboxAccounts={mailboxAccounts}
+              linkedinAccounts={linkedinAccounts}
+              connectorReady={unipileConfigured}
+              calendarAccounts={calendarAccounts}
+              calendarProviderStatus={calendarProviderStatus}
+              bookingSlug={bookingSlug}
+            />
           )}
 
           {active === "notifications" && (

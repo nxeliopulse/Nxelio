@@ -19,6 +19,9 @@ export default async function SettingsPage() {
     getCurrentWorkspace(),
   ]);
   const mailboxAccounts = outreachAccounts.filter((a) => a.channel === "email");
+  const linkedinAccounts = outreachAccounts.filter((a) => a.channel === "linkedin");
+  const p = profile as { role_id?: number | null; roles?: { role_name?: string } | null } | null;
+  const isSuperAdmin = p?.roles?.role_name === "Super Admin" || p?.role_id === 1;
   return (
     <SettingsView
       profile={profile}
@@ -28,8 +31,10 @@ export default async function SettingsPage() {
       calendarAccounts={calendarAccounts}
       calendarProviderStatus={calendarProviderStatus}
       mailboxAccounts={mailboxAccounts}
+      linkedinAccounts={linkedinAccounts}
       unipileConfigured={unipileConfigured}
       bookingSlug={workspace?.capture_slug ?? null}
+      isSuperAdmin={isSuperAdmin}
     />
   );
 }
