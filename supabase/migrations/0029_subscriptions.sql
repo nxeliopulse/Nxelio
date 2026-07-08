@@ -22,14 +22,14 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
 INSERT INTO subscription_plans
   (id, name, monthly_price_cents, annual_price_cents, credits_per_cycle, trial_days, features, sort_order)
 VALUES
-  ('basic',   'Basic',    899,   8990,    150,  7,
-   '{"discovery":false,"reply_tracking":false,"csv_import":true,"enrichment":true,"scoring":true,"linkedin_outreach":true,"core_workflows":true,"crm_export":false,"priority_support":false}',
+  ('basic',   'Basic',    1900,  18240,   500,  7,
+   '{"discovery":false,"reply_tracking":false,"csv_import":true,"enrichment":false,"scoring":false,"linkedin_outreach":false,"core_workflows":true,"crm_export":false,"priority_support":false,"opportunities":false,"meetings":false}',
    1),
-  ('starter', 'Starter',  5900,  59000,  1000,  0,
-   '{"discovery":true,"reply_tracking":false,"csv_import":true,"enrichment":true,"scoring":true,"linkedin_outreach":true,"core_workflows":true,"crm_export":true,"priority_support":false}',
+  ('starter', 'Starter',  8900,  85440,  3000,  0,
+   '{"discovery":true,"reply_tracking":false,"csv_import":true,"enrichment":true,"scoring":true,"linkedin_outreach":true,"core_workflows":true,"crm_export":true,"priority_support":false,"opportunities":true,"meetings":false}',
    2),
-  ('pro',     'Pro',     13900, 139000,  2500,  0,
-   '{"discovery":true,"reply_tracking":true,"csv_import":true,"enrichment":true,"scoring":true,"linkedin_outreach":true,"core_workflows":true,"crm_export":true,"priority_support":true}',
+  ('pro',     'Pro',     15900, 152640,  8000,  0,
+   '{"discovery":true,"reply_tracking":true,"csv_import":true,"enrichment":true,"scoring":true,"linkedin_outreach":true,"core_workflows":true,"crm_export":true,"priority_support":true,"opportunities":true,"meetings":true}',
    3)
 ON CONFLICT (id) DO UPDATE SET
   monthly_price_cents = EXCLUDED.monthly_price_cents,
@@ -117,12 +117,12 @@ BEGIN
     now() + INTERVAL '7 days',
     now(),
     now() + INTERVAL '7 days',
-    150, 150
+    500, 500
   ) ON CONFLICT (workspace_id) DO NOTHING;
 
   INSERT INTO credit_ledger
     (workspace_id, operation_type, credits_delta, status, metadata)
-  SELECT NEW.id, 'trial_grant', 150, 'completed', '{"note":"7-day Basic trial"}'
+  SELECT NEW.id, 'trial_grant', 500, 'completed', '{"note":"7-day Basic trial"}'
   WHERE NOT EXISTS (
     SELECT 1 FROM credit_ledger
     WHERE workspace_id = NEW.id AND operation_type = 'trial_grant'

@@ -10,6 +10,18 @@ import { chargebee, PRICE_ID_TO_PLAN, PLAN_CREDITS } from "@/lib/chargebee";
 import { syncSubscriptionFromChargebee } from "@/lib/queries/subscriptions";
 import type { PlanId, BillingInterval, SubscriptionStatus } from "@/lib/queries/subscriptions";
 
+function mapChargebeeStatus(s: string): SubscriptionStatus {
+  switch (s) {
+    case "in_trial":      return "trialing";
+    case "active":        return "active";
+    case "future":        return "active";
+    case "non_renewing":  return "active";
+    case "paused":        return "past_due";
+    case "cancelled":     return "canceled";
+    default:              return "active";
+  }
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -80,7 +92,7 @@ export async function POST(req: NextRequest) {
       workspaceId:              profile.workspace_id,
       planId:                   planId as PlanId,
       billingInterval:          interval as BillingInterval,
-      status:                   (cbSub.status ?? "active") as SubscriptionStatus,
+      status:                   mapChargebeeStatus(cbSub.status ?? "active"),
       creditsTotal,
       currentPeriodStart:       periodStart,
       currentPeriodEnd:         periodEnd,

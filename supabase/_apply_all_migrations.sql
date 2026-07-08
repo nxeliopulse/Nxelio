@@ -1,7 +1,7 @@
 -- ============================================================================
--- LeadPro — FULL DATABASE INITIALIZATION
--- Auto-generated: concatenation of all supabase/migrations/*.sql in order.
--- Run this ONCE in the Supabase SQL Editor on an empty project.
+-- Nxelio -- FULL DATABASE INITIALIZATION
+-- Regenerated: correct migrations in apply order. App-code-aligned schema.
+-- Run ONCE in the Supabase SQL Editor on a fresh (empty) project.
 -- ============================================================================
 
 
@@ -1865,634 +1865,627 @@ ALTER TABLE outreach_accounts ADD CONSTRAINT outreach_accounts_account_id_key UN
 
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0027_subscription_plans.sql
+-- >>> FILE: 0027_lead_ai_score.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- Persist the full AI prospect-score breakdown (overall, dimensions, insight,
+-- next steps) so it survives reloads instead of living only in component state.
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS ai_score JSONB;
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0028_onboarding.sql
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 -- ============================================================================
--- 0027 — Subscription plan catalog (recurring plans + one-time top-ups)
--- Part of the Subscription System. Additive only — touches no existing tables.
---
--- A single "catalog" table holds BOTH recurring plans (Basic/Starter/Pro) and
--- one-time credit top-ups, distinguished by `kind`. This lets the billing UI
--- query one source of truth for everything purchasable.
+-- Onboarding — company & sales "essentials" captured right after signup.
+-- Stored on the workspace (one setup per team). `onboarding_completed` gates
+-- access to the app until the wizard is finished.
+-- workspaces already has RLS (owner can update); no new policies needed.
 -- ============================================================================
 
--- 1. Catalog table -----------------------------------------------------------
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS onboarding JSONB DEFAULT NULL;
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE;
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0029_subscriptions.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================
+-- 0028_subscriptions.sql
+-- Subscription plans, per-workspace subscriptions, credit
+-- ledger, top-up packs.  Chargebee is the billing engine
+-- (Stripe connected inside Chargebee as the payment gateway).
+-- ============================================================
+
+-- ── 1. Plan definitions (static reference) ──────────────────
 CREATE TABLE IF NOT EXISTS subscription_plans (
-  id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- Stable machine key used in app logic & feature_access joins. Never shown raw.
-  code                     TEXT UNIQUE NOT NULL,
-  -- 'plan' = recurring subscription, 'topup' = one-time credit pack.
-  kind                     TEXT NOT NULL DEFAULT 'plan'
-                             CHECK (kind IN ('plan', 'topup')),
-  name                     TEXT NOT NULL,
-  -- Chargebee Item Price id (Product Catalog 2.0). Filled when CB items exist;
-  -- nullable so seeds work before the Chargebee site is configured.
-  chargebee_item_price_id  TEXT,
-  -- Money stored as integer cents to avoid floating-point rounding errors.
-  price_cents              INT  NOT NULL DEFAULT 0,
-  currency                 TEXT NOT NULL DEFAULT 'USD',
-  -- For 'plan': credits granted each billing cycle.
-  -- For 'topup': credits added once on purchase.
-  monthly_credits          INT  NOT NULL DEFAULT 0,
-  -- Free-trial length in days (Basic = 7). 0 = no trial.
-  trial_days               INT  NOT NULL DEFAULT 0,
-  -- Display ordering on the pricing UI.
-  sort_order               INT  NOT NULL DEFAULT 0,
-  -- Soft-disable a plan without deleting it (keeps historical FK references valid).
-  is_active                BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+  id                    TEXT PRIMARY KEY,   -- 'basic' | 'starter' | 'pro'
+  name                  TEXT NOT NULL,
+  monthly_price_cents   INTEGER NOT NULL,
+  annual_price_cents    INTEGER NOT NULL,   -- full year price, already discounted
+  credits_per_cycle     INTEGER NOT NULL,
+  trial_days            INTEGER NOT NULL DEFAULT 0,
+  features              JSONB NOT NULL DEFAULT '{}',
+  sort_order            INTEGER NOT NULL DEFAULT 0,
+  created_at            TIMESTAMPTZ DEFAULT now()
 );
 
--- Keep updated_at fresh using the helper defined in 0001_initial_schema.sql.
-DROP TRIGGER IF EXISTS trg_subscription_plans_updated ON subscription_plans;
-CREATE TRIGGER trg_subscription_plans_updated
-  BEFORE UPDATE ON subscription_plans
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- Fast lookup of the active plans the UI lists, in display order.
-CREATE INDEX IF NOT EXISTS idx_subscription_plans_active
-  ON subscription_plans (kind, sort_order) WHERE is_active;
-
--- 2. Row Level Security ------------------------------------------------------
--- Pricing is non-sensitive reference data: any signed-in user may read it.
--- No user-facing writes — the catalog is managed by migrations / service role.
-ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS sp_select_authenticated ON subscription_plans;
-CREATE POLICY sp_select_authenticated ON subscription_plans
-  FOR SELECT TO authenticated USING (TRUE);
-
--- 3. Seed the catalog (idempotent via UNIQUE(code) upsert) -------------------
--- Recurring plans. price_cents: $8.99 / $59 / $139. Credits: 150 / 1000 / 2500.
+-- Seed plan rows (idempotent)
 INSERT INTO subscription_plans
-  (code, kind, name, chargebee_item_price_id, price_cents, monthly_credits, trial_days, sort_order)
+  (id, name, monthly_price_cents, annual_price_cents, credits_per_cycle, trial_days, features, sort_order)
 VALUES
-  ('basic',   'plan', 'Basic',   'plan-basic-USD-monthly',    899, 150, 7, 1),
-  ('starter', 'plan', 'Starter', 'plan-starter-USD-monthly', 5900, 1000, 0, 2),
-  ('pro',     'plan', 'Pro',     'plan-pro-USD-monthly',    13900, 2500, 0, 3)
-ON CONFLICT (code) DO UPDATE SET
-  name                    = EXCLUDED.name,
-  chargebee_item_price_id = EXCLUDED.chargebee_item_price_id,
-  price_cents             = EXCLUDED.price_cents,
-  monthly_credits         = EXCLUDED.monthly_credits,
-  trial_days              = EXCLUDED.trial_days,
-  sort_order              = EXCLUDED.sort_order,
-  is_active               = TRUE;
+  ('basic',   'Basic',    899,   8990,    150,  7,
+   '{"discovery":false,"reply_tracking":false,"csv_import":true,"enrichment":false,"scoring":false,"linkedin_outreach":false,"core_workflows":true,"crm_export":false,"priority_support":false,"opportunities":false,"meetings":false}',
+   1),
+  ('starter', 'Starter',  5900,  59000,  1000,  0,
+   '{"discovery":true,"reply_tracking":false,"csv_import":true,"enrichment":true,"scoring":true,"linkedin_outreach":false,"core_workflows":true,"crm_export":true,"priority_support":false,"opportunities":true,"meetings":false}',
+   2),
+  ('pro',     'Pro',     13900, 139000,  2500,  0,
+   '{"discovery":true,"reply_tracking":true,"csv_import":true,"enrichment":true,"scoring":true,"linkedin_outreach":true,"core_workflows":true,"crm_export":true,"priority_support":true,"opportunities":true,"meetings":true}',
+   3)
+ON CONFLICT (id) DO UPDATE SET
+  monthly_price_cents = EXCLUDED.monthly_price_cents,
+  annual_price_cents  = EXCLUDED.annual_price_cents,
+  credits_per_cycle   = EXCLUDED.credits_per_cycle,
+  trial_days          = EXCLUDED.trial_days,
+  features            = EXCLUDED.features;
 
--- One-time top-ups. price_cents: $9 / $15 / $59. Credits never expire.
-INSERT INTO subscription_plans
-  (code, kind, name, chargebee_item_price_id, price_cents, monthly_credits, trial_days, sort_order)
-VALUES
-  ('topup-500',  'topup', '500 Credits',   'topup-500-USD',    900,  500, 0, 10),
-  ('topup-1000', 'topup', '1,000 Credits', 'topup-1000-USD',  1500, 1000, 0, 11),
-  ('topup-5000', 'topup', '5,000 Credits', 'topup-5000-USD',  5900, 5000, 0, 12)
-ON CONFLICT (code) DO UPDATE SET
-  name                    = EXCLUDED.name,
-  chargebee_item_price_id = EXCLUDED.chargebee_item_price_id,
-  price_cents             = EXCLUDED.price_cents,
-  monthly_credits         = EXCLUDED.monthly_credits,
-  sort_order              = EXCLUDED.sort_order,
-  is_active               = TRUE;
-
-
--- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0028_feature_access.sql
--- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- ============================================================================
--- 0028 — Feature access matrix (data-driven feature gates)
--- Additive only. A row (plan_code, feature_key, enabled=true) GRANTS a feature.
--- Absence of a row = denied. Flip access by editing data, never code.
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS feature_access (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- FK to the plan catalog by its stable code (UNIQUE in 0027).
-  plan_code   TEXT NOT NULL REFERENCES subscription_plans(code) ON DELETE CASCADE,
-  -- App-level capability key: 'lead_discovery', 'reply_tracking', etc.
-  feature_key TEXT NOT NULL,
-  enabled     BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (plan_code, feature_key)
+-- ── 2. Subscriptions (one per workspace) ────────────────────
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id                       UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id             UUID    NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  plan_id                  TEXT    NOT NULL REFERENCES subscription_plans(id) DEFAULT 'basic',
+  billing_interval         TEXT    NOT NULL DEFAULT 'monthly'
+                             CHECK (billing_interval IN ('monthly','annual')),
+  status                   TEXT    NOT NULL DEFAULT 'trialing'
+                             CHECK (status IN ('trialing','active','past_due','canceled')),
+  trial_ends_at            TIMESTAMPTZ,
+  current_period_start     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  current_period_end       TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '7 days'),
+  credits_remaining        INTEGER NOT NULL DEFAULT 150  CHECK (credits_remaining >= 0),
+  credits_total            INTEGER NOT NULL DEFAULT 150,
+  low_balance_notified_at  TIMESTAMPTZ,
+  -- Chargebee / Stripe references
+  chargebee_customer_id      TEXT,
+  chargebee_subscription_id  TEXT UNIQUE,
+  chargebee_plan_id          TEXT,   -- e.g. 'starter-monthly-USD'
+  created_at               TIMESTAMPTZ DEFAULT now(),
+  updated_at               TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (workspace_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_feature_access_plan ON feature_access (plan_code);
-
--- Reference data: readable by any signed-in user, never user-writable.
-ALTER TABLE feature_access ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS fa_select_authenticated ON feature_access;
-CREATE POLICY fa_select_authenticated ON feature_access
-  FOR SELECT TO authenticated USING (TRUE);
-
--- Seed the matrix from Phase 2 §2.3. Only GRANTED features are inserted.
-INSERT INTO feature_access (plan_code, feature_key) VALUES
-  -- Basic: import + AI scoring + enrichment only.
-  ('basic',   'csv_import'),
-  ('basic',   'lead_enrichment'),
-  ('basic',   'ai_scoring'),
-  -- Starter: everything in Basic + discovery, CRM export, LinkedIn, automation.
-  ('starter', 'csv_import'),
-  ('starter', 'lead_enrichment'),
-  ('starter', 'ai_scoring'),
-  ('starter', 'lead_discovery'),
-  ('starter', 'crm_export'),
-  ('starter', 'linkedin_outreach'),
-  ('starter', 'automation'),
-  -- Pro: everything in Starter + reply tracking + priority support.
-  ('pro',     'csv_import'),
-  ('pro',     'lead_enrichment'),
-  ('pro',     'ai_scoring'),
-  ('pro',     'lead_discovery'),
-  ('pro',     'crm_export'),
-  ('pro',     'linkedin_outreach'),
-  ('pro',     'automation'),
-  ('pro',     'reply_tracking'),
-  ('pro',     'priority_support')
-ON CONFLICT (plan_code, feature_key) DO UPDATE SET enabled = TRUE;
-
-
--- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0029_workspace_subscriptions.sql
--- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- ============================================================================
--- 0029 — Workspace subscriptions (the live subscription per tenant)
--- One LIVE subscription per workspace; cancelled rows kept for history.
--- Mirrors the Chargebee subscription. Read-only to users; written by webhooks
--- via the service role (createAdminClient), consistent with brevo/unipile.
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS workspace_subscriptions (
-  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id              UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  plan_id                   UUID REFERENCES subscription_plans(id),
-  -- Denormalized for fast feature-gate checks without a join.
-  plan_code                 TEXT,
-  chargebee_customer_id     TEXT,
-  chargebee_subscription_id TEXT UNIQUE,
-  -- Mirrors Chargebee subscription states.
-  status                    TEXT NOT NULL DEFAULT 'trialing'
-                              CHECK (status IN ('none','trialing','active','non_renewing','cancelled','past_due')),
-  current_term_start        TIMESTAMPTZ,
-  current_term_end          TIMESTAMPTZ,  -- renewal date shown in the dashboard
-  trial_end                 TIMESTAMPTZ,
-  cancel_at_period_end      BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at                TIMESTAMPTZ NOT NULL DEFAULT now()
+-- ── 3. Credit ledger (immutable audit log) ───────────────────
+CREATE TABLE IF NOT EXISTS credit_ledger (
+  id               UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id     UUID    NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  subscription_id  UUID    REFERENCES subscriptions(id),
+  operation_type   TEXT    NOT NULL,
+  -- 'enrichment'|'scoring'|'content_analysis'|'discovery'
+  -- 'top_up'|'cycle_reset'|'trial_grant'|'plan_change'
+  credits_delta    INTEGER NOT NULL,  -- negative = consumed, positive = granted
+  lead_id          UUID,
+  campaign_id      UUID,
+  status           TEXT    NOT NULL DEFAULT 'completed'
+                     CHECK (status IN ('completed','failed','refunded')),
+  metadata         JSONB   DEFAULT '{}',
+  created_at       TIMESTAMPTZ DEFAULT now()
 );
 
-DROP TRIGGER IF EXISTS trg_workspace_subscriptions_updated ON workspace_subscriptions;
-CREATE TRIGGER trg_workspace_subscriptions_updated
-  BEFORE UPDATE ON workspace_subscriptions
+CREATE INDEX IF NOT EXISTS credit_ledger_workspace_idx
+  ON credit_ledger (workspace_id, created_at DESC);
+
+-- ── 4. Top-up packs ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS credit_top_ups (
+  id                          UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id                UUID    NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  credits                     INTEGER NOT NULL,
+  price_cents                 INTEGER NOT NULL,
+  expires_at                  TIMESTAMPTZ,
+  chargebee_invoice_id        TEXT,
+  created_at                  TIMESTAMPTZ DEFAULT now()
+);
+
+-- ── 5. updated_at trigger ────────────────────────────────────
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END;
+$$;
+
+DROP TRIGGER IF EXISTS subscriptions_updated_at ON subscriptions;
+CREATE TRIGGER subscriptions_updated_at
+  BEFORE UPDATE ON subscriptions
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- At most ONE live subscription per workspace (cancelled rows excluded).
-CREATE UNIQUE INDEX IF NOT EXISTS idx_ws_sub_one_live
-  ON workspace_subscriptions (workspace_id)
-  WHERE status IN ('trialing','active','non_renewing','past_due');
-
-CREATE INDEX IF NOT EXISTS idx_ws_sub_workspace ON workspace_subscriptions (workspace_id);
-CREATE INDEX IF NOT EXISTS idx_ws_sub_cb_sub    ON workspace_subscriptions (chargebee_subscription_id);
-
--- Any member of the workspace may READ its subscription. No user writes:
--- all mutations flow Chargebee -> webhook -> service role.
-ALTER TABLE workspace_subscriptions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS ws_sub_select ON workspace_subscriptions;
-CREATE POLICY ws_sub_select ON workspace_subscriptions
-  FOR SELECT TO authenticated
-  USING (workspace_id = get_current_workspace_id());
-
-
--- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0030_credit_wallet.sql
--- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- ============================================================================
--- 0030 — Credit wallet (one balance per workspace)
--- Replaces the approximation in src/lib/queries/credits.ts with a real wallet.
--- Two buckets: monthly (resets each cycle) and topup (never expires).
--- remaining = (monthly_allowance - monthly_used) + topup_balance
--- Balances are mutated ONLY via SECURITY DEFINER RPCs (added in 0031), never
--- by direct client writes.
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS credit_wallet (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id      UUID NOT NULL UNIQUE REFERENCES workspaces(id) ON DELETE CASCADE,
-  monthly_allowance INT NOT NULL DEFAULT 0,   -- plan credits for the cycle
-  monthly_used      INT NOT NULL DEFAULT 0,   -- consumed this cycle
-  topup_balance     INT NOT NULL DEFAULT 0,   -- purchased credits, roll over
-  cycle_start       TIMESTAMPTZ,
-  cycle_end         TIMESTAMPTZ,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT credit_wallet_monthly_used_nonneg CHECK (monthly_used >= 0),
-  CONSTRAINT credit_wallet_topup_nonneg        CHECK (topup_balance >= 0)
-);
-
-DROP TRIGGER IF EXISTS trg_credit_wallet_updated ON credit_wallet;
-CREATE TRIGGER trg_credit_wallet_updated
-  BEFORE UPDATE ON credit_wallet
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
--- Members of the workspace may READ the balance. No user writes.
-ALTER TABLE credit_wallet ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS cw_select ON credit_wallet;
-CREATE POLICY cw_select ON credit_wallet
-  FOR SELECT TO authenticated
-  USING (workspace_id = get_current_workspace_id());
-
-
--- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0031_credit_transactions.sql
--- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- ============================================================================
--- 0031 — Credit ledger + atomic credit RPCs + workspace auto-provisioning
---
--- This migration adds:
---   (A) credit_transactions   — immutable, idempotent ledger
---   (B) consume_credits()     — atomic deduct (monthly first, then topup)
---   (C) refund_credits()      — reverse a debit (failed jobs)
---   (D) grant_monthly_credits / add_topup_credits — used by the webhook
---   (E) provision_workspace_billing() + trigger — new workspace => Basic trial
---
--- All mutating functions are SECURITY DEFINER and REVOKE'd from PUBLIC, so they
--- can only be called by the service role (createAdminClient) — a client can
--- never call them with an arbitrary workspace_id to drain credits.
--- ============================================================================
-
--- (A) Immutable ledger -------------------------------------------------------
-CREATE TABLE IF NOT EXISTS credit_transactions (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id    UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  wallet_id       UUID NOT NULL REFERENCES credit_wallet(id) ON DELETE CASCADE,
-  type            TEXT NOT NULL CHECK (type IN ('grant','topup','debit','refund','reset')),
-  amount          INT  NOT NULL,                 -- signed: + credit, - debit
-  balance_after   INT  NOT NULL,                 -- total remaining snapshot
-  bucket          TEXT NOT NULL DEFAULT 'monthly'
-                    CHECK (bucket IN ('monthly','topup','mixed')),
-  feature_key     TEXT,                           -- which feature consumed it
-  reference_type  TEXT,                           -- e.g. 'lead','invoice'
-  reference_id    UUID,
-  -- The double-charge guard: same key twice = no-op.
-  idempotency_key TEXT UNIQUE,
-  metadata        JSONB,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()  -- immutable: no updated_at
-);
-
-CREATE INDEX IF NOT EXISTS idx_credit_tx_workspace ON credit_transactions (workspace_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_credit_tx_wallet    ON credit_transactions (wallet_id, created_at DESC);
-
--- Workspace members may READ their history; inserts only via the RPCs below.
-ALTER TABLE credit_transactions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS ct_select ON credit_transactions;
-CREATE POLICY ct_select ON credit_transactions
-  FOR SELECT TO authenticated
-  USING (workspace_id = get_current_workspace_id());
-
--- (B) consume_credits — atomic, idempotent deduction ------------------------
-CREATE OR REPLACE FUNCTION consume_credits(
-  p_workspace_id    UUID,
-  p_feature         TEXT,
-  p_cost            INT,
-  p_idempotency_key TEXT,
-  p_reference_type  TEXT DEFAULT NULL,
-  p_reference_id    UUID DEFAULT NULL
-) RETURNS JSONB
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $$
-DECLARE
-  w                   credit_wallet%ROWTYPE;
-  v_monthly_remaining INT;
-  v_total             INT;
-  v_from_monthly      INT;
-  v_from_topup        INT;
-  v_balance_after     INT;
+-- ── 6. Auto-create subscription on new workspace ─────────────
+CREATE OR REPLACE FUNCTION create_workspace_subscription()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  IF p_cost <= 0 THEN
-    RETURN jsonb_build_object('ok', true, 'charged', 0);
-  END IF;
+  INSERT INTO subscriptions (
+    workspace_id, plan_id, billing_interval, status,
+    trial_ends_at, current_period_start, current_period_end,
+    credits_remaining, credits_total
+  ) VALUES (
+    NEW.id, 'basic', 'monthly', 'trialing',
+    now() + INTERVAL '7 days',
+    now(),
+    now() + INTERVAL '7 days',
+    150, 150
+  ) ON CONFLICT (workspace_id) DO NOTHING;
 
-  -- Idempotency: already processed -> succeed without charging again.
-  IF EXISTS (SELECT 1 FROM credit_transactions WHERE idempotency_key = p_idempotency_key) THEN
-    RETURN jsonb_build_object('ok', true, 'idempotent', true);
-  END IF;
+  INSERT INTO credit_ledger
+    (workspace_id, operation_type, credits_delta, status, metadata)
+  SELECT NEW.id, 'trial_grant', 150, 'completed', '{"note":"7-day Basic trial"}'
+  WHERE NOT EXISTS (
+    SELECT 1 FROM credit_ledger
+    WHERE workspace_id = NEW.id AND operation_type = 'trial_grant'
+  );
 
-  -- Lock the wallet row so concurrent calls serialize (no double-spend).
-  SELECT * INTO w FROM credit_wallet WHERE workspace_id = p_workspace_id FOR UPDATE;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'no_wallet');
-  END IF;
-
-  v_monthly_remaining := GREATEST(w.monthly_allowance - w.monthly_used, 0);
-  v_total := v_monthly_remaining + w.topup_balance;
-
-  IF v_total < p_cost THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'insufficient_credits',
-                              'remaining', v_total, 'required', p_cost);
-  END IF;
-
-  -- Spend monthly allowance first, then top-up balance.
-  v_from_monthly := LEAST(v_monthly_remaining, p_cost);
-  v_from_topup   := p_cost - v_from_monthly;
-
-  UPDATE credit_wallet
-     SET monthly_used  = monthly_used + v_from_monthly,
-         topup_balance = topup_balance - v_from_topup,
-         updated_at    = now()
-   WHERE id = w.id;
-
-  v_balance_after := v_total - p_cost;
-
-  INSERT INTO credit_transactions
-    (workspace_id, wallet_id, type, amount, balance_after, bucket,
-     feature_key, reference_type, reference_id, idempotency_key, metadata)
-  VALUES
-    (p_workspace_id, w.id, 'debit', -p_cost, v_balance_after,
-     CASE WHEN v_from_topup = 0 THEN 'monthly'
-          WHEN v_from_monthly = 0 THEN 'topup'
-          ELSE 'mixed' END,
-     p_feature, p_reference_type, p_reference_id, p_idempotency_key,
-     jsonb_build_object('from_monthly', v_from_monthly, 'from_topup', v_from_topup));
-
-  RETURN jsonb_build_object('ok', true, 'charged', p_cost, 'remaining', v_balance_after);
-END;
-$$;
-
--- (C) refund_credits — reverse a prior debit (e.g. AI job failed) ------------
-CREATE OR REPLACE FUNCTION refund_credits(
-  p_idempotency_key TEXT,
-  p_reason          TEXT DEFAULT NULL
-) RETURNS JSONB
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $$
-DECLARE
-  d              credit_transactions%ROWTYPE;
-  w              credit_wallet%ROWTYPE;
-  v_from_monthly INT;
-  v_from_topup   INT;
-  v_total        INT;
-BEGIN
-  -- Already refunded -> no-op.
-  IF EXISTS (SELECT 1 FROM credit_transactions WHERE idempotency_key = p_idempotency_key || ':refund') THEN
-    RETURN jsonb_build_object('ok', true, 'idempotent', true);
-  END IF;
-
-  SELECT * INTO d FROM credit_transactions
-   WHERE idempotency_key = p_idempotency_key AND type = 'debit' LIMIT 1;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'no_debit');
-  END IF;
-
-  SELECT * INTO w FROM credit_wallet WHERE id = d.wallet_id FOR UPDATE;
-
-  v_from_monthly := COALESCE((d.metadata->>'from_monthly')::INT, 0);
-  v_from_topup   := COALESCE((d.metadata->>'from_topup')::INT, 0);
-
-  UPDATE credit_wallet
-     SET monthly_used  = GREATEST(monthly_used - v_from_monthly, 0),
-         topup_balance = topup_balance + v_from_topup,
-         updated_at    = now()
-   WHERE id = w.id;
-
-  SELECT GREATEST(monthly_allowance - monthly_used, 0) + topup_balance
-    INTO v_total FROM credit_wallet WHERE id = w.id;
-
-  INSERT INTO credit_transactions
-    (workspace_id, wallet_id, type, amount, balance_after, bucket,
-     feature_key, reference_type, reference_id, idempotency_key, metadata)
-  VALUES
-    (d.workspace_id, w.id, 'refund', -d.amount, v_total, 'mixed',
-     d.feature_key, d.reference_type, d.reference_id, p_idempotency_key || ':refund',
-     jsonb_build_object('reason', p_reason, 'refunds', p_idempotency_key));
-
-  RETURN jsonb_build_object('ok', true, 'refunded', -d.amount);
-END;
-$$;
-
--- (D) grant_monthly_credits — webhook on subscription start / renewal --------
-CREATE OR REPLACE FUNCTION grant_monthly_credits(
-  p_workspace_id    UUID,
-  p_amount          INT,
-  p_term_start      TIMESTAMPTZ,
-  p_term_end        TIMESTAMPTZ,
-  p_idempotency_key TEXT
-) RETURNS JSONB
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $$
-DECLARE
-  w       credit_wallet%ROWTYPE;
-  v_total INT;
-BEGIN
-  IF EXISTS (SELECT 1 FROM credit_transactions WHERE idempotency_key = p_idempotency_key) THEN
-    RETURN jsonb_build_object('ok', true, 'idempotent', true);
-  END IF;
-
-  SELECT * INTO w FROM credit_wallet WHERE workspace_id = p_workspace_id FOR UPDATE;
-  IF NOT FOUND THEN
-    INSERT INTO credit_wallet (workspace_id, monthly_allowance, monthly_used, topup_balance, cycle_start, cycle_end)
-    VALUES (p_workspace_id, p_amount, 0, 0, p_term_start, p_term_end)
-    RETURNING * INTO w;
-  ELSE
-    -- Renewal resets the monthly bucket; top-up balance is untouched.
-    UPDATE credit_wallet
-       SET monthly_allowance = p_amount,
-           monthly_used      = 0,
-           cycle_start       = p_term_start,
-           cycle_end         = p_term_end,
-           updated_at        = now()
-     WHERE id = w.id
-    RETURNING * INTO w;
-  END IF;
-
-  v_total := GREATEST(w.monthly_allowance - w.monthly_used, 0) + w.topup_balance;
-
-  INSERT INTO credit_transactions
-    (workspace_id, wallet_id, type, amount, balance_after, bucket, idempotency_key, metadata)
-  VALUES
-    (p_workspace_id, w.id, 'grant', p_amount, v_total, 'monthly', p_idempotency_key,
-     jsonb_build_object('reason', 'renewal'));
-
-  RETURN jsonb_build_object('ok', true, 'granted', p_amount);
-END;
-$$;
-
--- (D) add_topup_credits — webhook on one-time top-up purchase ----------------
-CREATE OR REPLACE FUNCTION add_topup_credits(
-  p_workspace_id    UUID,
-  p_amount          INT,
-  p_idempotency_key TEXT
-) RETURNS JSONB
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $$
-DECLARE
-  w       credit_wallet%ROWTYPE;
-  v_total INT;
-BEGIN
-  IF EXISTS (SELECT 1 FROM credit_transactions WHERE idempotency_key = p_idempotency_key) THEN
-    RETURN jsonb_build_object('ok', true, 'idempotent', true);
-  END IF;
-
-  SELECT * INTO w FROM credit_wallet WHERE workspace_id = p_workspace_id FOR UPDATE;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'no_wallet');
-  END IF;
-
-  UPDATE credit_wallet
-     SET topup_balance = topup_balance + p_amount, updated_at = now()
-   WHERE id = w.id
-  RETURNING * INTO w;
-
-  v_total := GREATEST(w.monthly_allowance - w.monthly_used, 0) + w.topup_balance;
-
-  INSERT INTO credit_transactions
-    (workspace_id, wallet_id, type, amount, balance_after, bucket, idempotency_key, metadata)
-  VALUES
-    (p_workspace_id, w.id, 'topup', p_amount, v_total, 'topup', p_idempotency_key,
-     jsonb_build_object('reason', 'topup_purchase'));
-
-  RETURN jsonb_build_object('ok', true, 'added', p_amount);
-END;
-$$;
-
--- (E) Auto-provision a new workspace onto the Basic 7-day trial --------------
--- Creates the subscription row + wallet + initial credit grant in one shot.
--- Idempotent (skips if already provisioned). Reused for backfill below.
-CREATE OR REPLACE FUNCTION provision_workspace_billing(p_workspace_id UUID)
-RETURNS VOID
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $$
-DECLARE
-  v_plan      subscription_plans%ROWTYPE;
-  v_wallet_id UUID;
-  v_now       TIMESTAMPTZ := now();
-  v_trial_end TIMESTAMPTZ;
-BEGIN
-  IF EXISTS (SELECT 1 FROM workspace_subscriptions WHERE workspace_id = p_workspace_id) THEN
-    RETURN;  -- already provisioned
-  END IF;
-
-  SELECT * INTO v_plan FROM subscription_plans WHERE code = 'basic' LIMIT 1;
-  IF NOT FOUND THEN
-    RETURN;  -- catalog not seeded yet; nothing to do
-  END IF;
-
-  v_trial_end := v_now + (v_plan.trial_days || ' days')::interval;
-
-  INSERT INTO workspace_subscriptions
-    (workspace_id, plan_id, plan_code, status, current_term_start, current_term_end, trial_end)
-  VALUES
-    (p_workspace_id, v_plan.id, v_plan.code, 'trialing', v_now, v_trial_end, v_trial_end);
-
-  INSERT INTO credit_wallet
-    (workspace_id, monthly_allowance, monthly_used, topup_balance, cycle_start, cycle_end)
-  VALUES
-    (p_workspace_id, v_plan.monthly_credits, 0, 0, v_now, v_trial_end)
-  RETURNING id INTO v_wallet_id;
-
-  INSERT INTO credit_transactions
-    (workspace_id, wallet_id, type, amount, balance_after, bucket, idempotency_key, metadata)
-  VALUES
-    (p_workspace_id, v_wallet_id, 'grant', v_plan.monthly_credits, v_plan.monthly_credits,
-     'monthly', 'provision:' || p_workspace_id,
-     jsonb_build_object('reason', 'trial_start', 'plan', 'basic'));
-END;
-$$;
-
--- Trigger: every new workspace gets billing provisioned automatically.
--- Separate AFTER INSERT trigger — does NOT modify the existing signup logic.
-CREATE OR REPLACE FUNCTION trg_provision_workspace_billing()
-RETURNS TRIGGER
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog AS $$
-BEGIN
-  PERFORM provision_workspace_billing(NEW.id);
   RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS provision_billing_trigger ON workspaces;
-CREATE TRIGGER provision_billing_trigger
+DROP TRIGGER IF EXISTS on_workspace_created_subscription ON workspaces;
+CREATE TRIGGER on_workspace_created_subscription
   AFTER INSERT ON workspaces
-  FOR EACH ROW EXECUTE FUNCTION trg_provision_workspace_billing();
+  FOR EACH ROW EXECUTE FUNCTION create_workspace_subscription();
 
--- Backfill existing workspaces (e.g. the Legacy Workspace) onto the trial.
-DO $$
-DECLARE r RECORD;
+-- Backfill existing workspaces
+INSERT INTO subscriptions (
+  workspace_id, plan_id, billing_interval, status,
+  current_period_start, current_period_end,
+  credits_remaining, credits_total
+)
+SELECT w.id, 'basic', 'monthly', 'active',
+       now(), now() + INTERVAL '30 days', 150, 150
+FROM workspaces w
+WHERE NOT EXISTS (
+  SELECT 1 FROM subscriptions s WHERE s.workspace_id = w.id
+)
+ON CONFLICT (workspace_id) DO NOTHING;
+
+-- ── 7. Atomic credit deduction (SECURITY DEFINER) ────────────
+CREATE OR REPLACE FUNCTION deduct_credits(
+  p_workspace_id    UUID,
+  p_operation_type  TEXT,
+  p_amount          INTEGER DEFAULT 1,
+  p_lead_id         UUID    DEFAULT NULL,
+  p_campaign_id     UUID    DEFAULT NULL,
+  p_metadata        JSONB   DEFAULT '{}'
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_sub  subscriptions%ROWTYPE;
+  v_bal  INTEGER;
 BEGIN
-  FOR r IN SELECT id FROM workspaces LOOP
-    PERFORM provision_workspace_billing(r.id);
+  SELECT * INTO v_sub
+  FROM subscriptions WHERE workspace_id = p_workspace_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'No subscription found');
+  END IF;
+
+  IF v_sub.status NOT IN ('active','trialing') THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Subscription not active', 'status', v_sub.status);
+  END IF;
+
+  IF v_sub.status = 'trialing'
+     AND v_sub.trial_ends_at IS NOT NULL
+     AND v_sub.trial_ends_at < now() THEN
+    UPDATE subscriptions SET status = 'canceled', updated_at = now()
+    WHERE id = v_sub.id;
+    RETURN jsonb_build_object('ok', false, 'error', 'Trial expired');
+  END IF;
+
+  IF v_sub.credits_remaining < p_amount THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Insufficient credits',
+                              'remaining', v_sub.credits_remaining);
+  END IF;
+
+  v_bal := v_sub.credits_remaining - p_amount;
+
+  UPDATE subscriptions
+  SET credits_remaining = v_bal, updated_at = now()
+  WHERE id = v_sub.id;
+
+  INSERT INTO credit_ledger
+    (workspace_id, subscription_id, operation_type, credits_delta,
+     lead_id, campaign_id, status, metadata)
+  VALUES
+    (p_workspace_id, v_sub.id, p_operation_type, -p_amount,
+     p_lead_id, p_campaign_id, 'completed', p_metadata);
+
+  RETURN jsonb_build_object('ok', true, 'remaining', v_bal, 'deducted', p_amount);
+END;
+$$;
+
+-- ── 8. Cycle reset (called by Chargebee webhook) ─────────────
+CREATE OR REPLACE FUNCTION reset_subscription_cycle(p_workspace_id UUID)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_sub  subscriptions%ROWTYPE;
+  v_plan subscription_plans%ROWTYPE;
+BEGIN
+  SELECT * INTO v_sub  FROM subscriptions      WHERE workspace_id = p_workspace_id FOR UPDATE;
+  SELECT * INTO v_plan FROM subscription_plans WHERE id = v_sub.plan_id;
+
+  UPDATE subscriptions SET
+    credits_remaining       = v_plan.credits_per_cycle,
+    credits_total           = v_plan.credits_per_cycle,
+    current_period_start    = now(),
+    current_period_end      = CASE
+                                WHEN v_sub.billing_interval = 'annual'
+                                THEN now() + INTERVAL '1 year'
+                                ELSE now() + INTERVAL '30 days'
+                              END,
+    low_balance_notified_at = NULL,
+    status                  = 'active',
+    updated_at              = now()
+  WHERE workspace_id = p_workspace_id;
+
+  INSERT INTO credit_ledger
+    (workspace_id, subscription_id, operation_type, credits_delta, status, metadata)
+  VALUES (p_workspace_id, v_sub.id, 'cycle_reset', v_plan.credits_per_cycle,
+          'completed', jsonb_build_object('plan', v_plan.id, 'interval', v_sub.billing_interval));
+END;
+$$;
+
+-- ── 9. RLS ───────────────────────────────────────────────────
+ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subscriptions      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_ledger      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_top_ups     ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "plans_public_read"              ON subscription_plans;
+DROP POLICY IF EXISTS "subscriptions_workspace_read"   ON subscriptions;
+DROP POLICY IF EXISTS "credit_ledger_workspace_read"   ON credit_ledger;
+DROP POLICY IF EXISTS "credit_top_ups_workspace_read"  ON credit_top_ups;
+
+CREATE POLICY "plans_public_read"
+  ON subscription_plans FOR SELECT USING (true);
+
+CREATE POLICY "subscriptions_workspace_read"
+  ON subscriptions FOR SELECT USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "credit_ledger_workspace_read"
+  ON credit_ledger FOR SELECT USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "credit_top_ups_workspace_read"
+  ON credit_top_ups FOR SELECT USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0030_calendar_accounts.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- LP-3 — Calendar connections. Stores per-workspace OAuth tokens for Google
+-- Calendar and Microsoft (Graph) so we can read the user's free/busy and sync
+-- availability automatically. Workspace-scoped via get_current_workspace_id()
+-- and the set_workspace_from_user() trigger, matching outreach_accounts (0017).
+--
+-- Tokens are sensitive: rows are RLS-scoped to the owning workspace, and the
+-- app reads token columns only server-side. The UI lists provider/email/status.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS calendar_accounts (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id     UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  provider         TEXT NOT NULL CHECK (provider IN ('google', 'microsoft')),
+  email            TEXT,
+  access_token     TEXT,
+  refresh_token    TEXT,
+  token_expires_at TIMESTAMPTZ,
+  scope            TEXT,
+  status           TEXT NOT NULL DEFAULT 'connected',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (workspace_id, provider, email)
+);
+
+CREATE INDEX IF NOT EXISTS calendar_accounts_workspace_idx ON calendar_accounts(workspace_id);
+
+-- Auto-populate workspace_id on insert + workspace-scoped RLS (same helpers 0017 uses).
+DROP TRIGGER IF EXISTS auto_workspace_trigger ON calendar_accounts;
+CREATE TRIGGER auto_workspace_trigger BEFORE INSERT ON calendar_accounts
+  FOR EACH ROW EXECUTE FUNCTION set_workspace_from_user();
+
+DROP TRIGGER IF EXISTS set_updated_at ON calendar_accounts;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON calendar_accounts
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE calendar_accounts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ws_select_calendar_accounts ON calendar_accounts;
+DROP POLICY IF EXISTS ws_insert_calendar_accounts ON calendar_accounts;
+DROP POLICY IF EXISTS ws_update_calendar_accounts ON calendar_accounts;
+DROP POLICY IF EXISTS ws_delete_calendar_accounts ON calendar_accounts;
+CREATE POLICY ws_select_calendar_accounts ON calendar_accounts FOR SELECT TO authenticated USING (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_insert_calendar_accounts ON calendar_accounts FOR INSERT TO authenticated WITH CHECK (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_update_calendar_accounts ON calendar_accounts FOR UPDATE TO authenticated USING (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_delete_calendar_accounts ON calendar_accounts FOR DELETE TO authenticated USING (workspace_id = get_current_workspace_id());
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0031_meetings.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- Epic 5 — Meetings. Stores scheduled/past meetings for the Meetings view:
+-- upcoming list, detail panel, edit/reschedule/cancel, past tab with
+-- recordings + summaries, and a link to the contact (lead) so history lives in
+-- one place. Workspace-scoped via the same helpers as outreach/calendar.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS meetings (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id  UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  title         TEXT NOT NULL,
+  description   TEXT,
+  start_at      TIMESTAMPTZ NOT NULL,
+  end_at        TIMESTAMPTZ NOT NULL,
+  location      TEXT,                      -- "Google Meet" / "Webex" / room / address
+  join_url      TEXT,                      -- conferencing link (LP-22 join button)
+  provider      TEXT,                      -- 'google_meet' | 'teams' | 'webex' | 'manual'
+  status        TEXT NOT NULL DEFAULT 'scheduled',  -- scheduled | completed | canceled
+  lead_id       UUID REFERENCES leads(id) ON DELETE SET NULL,  -- LP-25 linked contact
+  attendees     JSONB NOT NULL DEFAULT '[]'::jsonb,            -- [{name,email}]
+  recording_url TEXT,                      -- LP-24 past meeting recording
+  summary       TEXT,                      -- LP-24 post-meeting summary
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS meetings_workspace_start_idx ON meetings(workspace_id, start_at);
+CREATE INDEX IF NOT EXISTS meetings_lead_idx ON meetings(lead_id);
+
+DROP TRIGGER IF EXISTS auto_workspace_trigger ON meetings;
+CREATE TRIGGER auto_workspace_trigger BEFORE INSERT ON meetings
+  FOR EACH ROW EXECUTE FUNCTION set_workspace_from_user();
+
+DROP TRIGGER IF EXISTS set_updated_at ON meetings;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON meetings
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ws_select_meetings ON meetings;
+DROP POLICY IF EXISTS ws_insert_meetings ON meetings;
+DROP POLICY IF EXISTS ws_update_meetings ON meetings;
+DROP POLICY IF EXISTS ws_delete_meetings ON meetings;
+CREATE POLICY ws_select_meetings ON meetings FOR SELECT TO authenticated USING (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_insert_meetings ON meetings FOR INSERT TO authenticated WITH CHECK (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_update_meetings ON meetings FOR UPDATE TO authenticated USING (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_delete_meetings ON meetings FOR DELETE TO authenticated USING (workspace_id = get_current_workspace_id());
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0032_campaign_sequence_settings.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- Campaign builder settings surfaced in the redesigned Sequence tab:
+--   - content_is_html: the step bodies are rich-text (HTML) rather than plain
+--     text, so the sender knows to render/send them as HTML.
+--   - pause_same_company_on_reply: when a lead replies, also pause remaining
+--     steps for OTHER leads at the same email domain (not just that lead).
+-- ============================================================================
+
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS content_is_html BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS pause_same_company_on_reply BOOLEAN NOT NULL DEFAULT false;
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0033_campaign_approval_lifecycle.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- Content approval lifecycle for campaigns — a second, independent status
+-- track alongside the existing operational `status` (Draft/Active/Paused/
+-- Scheduled). `approval_status` gates whether a campaign may be launched at
+-- all: Draft (AI-generated) -> Pending review -> Approved -> Live/Distributing
+-- -> Archived. campaign_approval_log is an append-only audit trail of every
+-- transition (who, when, optional comment).
+-- ============================================================================
+
+-- New workspace role: the only role (besides Super Admin) allowed to approve
+-- or send back a Pending review campaign.
+INSERT INTO roles (role_name, role_description)
+SELECT 'Reviewer', 'Can approve or send back AI-generated campaign content before it goes live.'
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE role_name = 'Reviewer');
+
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS approval_status VARCHAR(30) NOT NULL DEFAULT 'Draft (AI-generated)';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'campaigns_approval_status_check'
+  ) THEN
+    ALTER TABLE campaigns ADD CONSTRAINT campaigns_approval_status_check
+      CHECK (approval_status IN ('Draft (AI-generated)', 'Pending review', 'Approved', 'Live/Distributing', 'Archived'));
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS campaign_approval_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  from_status VARCHAR(30),
+  to_status VARCHAR(30) NOT NULL,
+  changed_by UUID REFERENCES users(user_id), -- NULL = System (e.g. auto-archive)
+  comment TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_campaign_approval_log_campaign ON campaign_approval_log(campaign_id, created_at);
+
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY['campaign_approval_log']) LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS auto_workspace_trigger ON %I;', t);
+    EXECUTE format('CREATE TRIGGER auto_workspace_trigger BEFORE INSERT ON %I FOR EACH ROW EXECUTE FUNCTION set_workspace_from_user();', t);
+
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
+    EXECUTE format('DROP POLICY IF EXISTS ws_select_%s ON %I;', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS ws_insert_%s ON %I;', t, t);
+    EXECUTE format('CREATE POLICY ws_select_%s ON %I FOR SELECT TO authenticated USING (workspace_id = get_current_workspace_id());', t, t);
+    EXECUTE format('CREATE POLICY ws_insert_%s ON %I FOR INSERT TO authenticated WITH CHECK (workspace_id = get_current_workspace_id());', t, t);
   END LOOP;
 END $$;
 
--- Lock down mutating functions: service role only (clients must go through
--- server actions that use createAdminClient).
-REVOKE ALL ON FUNCTION consume_credits(UUID, TEXT, INT, TEXT, TEXT, UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION refund_credits(TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION grant_monthly_credits(UUID, INT, TIMESTAMPTZ, TIMESTAMPTZ, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION add_topup_credits(UUID, INT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION provision_workspace_billing(UUID) FROM PUBLIC;
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0034_backfill_campaign_approval_status.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- Backfill approval_status for campaigns that were already sending before the
+-- content-approval lifecycle (migration 0033) existed. Those rows got the
+-- column's default 'Draft (AI-generated)' even though they were genuinely
+-- already Active/Paused with real sends — misleadingly showing "Draft" in the
+-- list while their detail page correctly showed "Active".
+-- ============================================================================
+
+UPDATE campaigns
+SET approval_status = 'Live/Distributing'
+WHERE approval_status = 'Draft (AI-generated)'
+  AND (status IN ('Active', 'Paused') OR sent_count > 0);
 
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0032_payments.sql
+-- >>> FILE: 0035_defer_trial_until_card.sql
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 -- ============================================================================
--- 0032 — Payments / invoice history (local mirror of Chargebee invoices)
--- Powers the dashboard's Payment History + Invoices without calling Chargebee
--- on render. Written by the webhook via the service role.
+-- Card-first, then trial: a brand-new workspace should have NO subscription
+-- row until a payment method has actually been added (via Chargebee checkout).
+-- Previously, on_workspace_created_subscription auto-granted a 7-day Basic
+-- trial with 150 credits the instant a workspace was created — no card
+-- required. That's being replaced by a dashboard-level gate (in the app) that
+-- routes an unsubscribed user into Chargebee checkout, whose Basic Monthly
+-- item price already has its own native 7-day trial configured — so
+-- completing that checkout is what starts the trial now, not signup.
+--
+-- getSubscription() already returns null gracefully when no row exists, so
+-- no application code depends on a subscription row always being present.
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS payments (
-  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id         UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  chargebee_invoice_id TEXT UNIQUE,
-  chargebee_payment_id TEXT,
-  amount_cents         INT  NOT NULL DEFAULT 0,
-  currency             TEXT NOT NULL DEFAULT 'USD',
-  status               TEXT NOT NULL DEFAULT 'paid'
-                         CHECK (status IN ('paid','payment_due','failed','refunded','voided')),
-  description          TEXT,                 -- "Starter plan — Jan 2026"
-  invoice_url          TEXT,                 -- Chargebee hosted invoice / PDF
-  paid_at              TIMESTAMPTZ,
-  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-DROP TRIGGER IF EXISTS trg_payments_updated ON payments;
-CREATE TRIGGER trg_payments_updated
-  BEFORE UPDATE ON payments
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
-CREATE INDEX IF NOT EXISTS idx_payments_workspace ON payments (workspace_id, created_at DESC);
-
--- Workspace members may READ their invoices; no user writes.
-ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS pay_select ON payments;
-CREATE POLICY pay_select ON payments
-  FOR SELECT TO authenticated
-  USING (workspace_id = get_current_workspace_id());
+DROP TRIGGER IF EXISTS on_workspace_created_subscription ON workspaces;
+DROP FUNCTION IF EXISTS create_workspace_subscription();
 
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0033_webhook_logs.sql
+-- >>> FILE: 0036_gate_opportunities_meetings.sql
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 -- ============================================================================
--- 0033 — Webhook event log (audit + idempotency for Chargebee)
--- Every inbound event is logged by event_id BEFORE processing; duplicates are
--- skipped. Not tenant-facing: RLS enabled with NO policies => only the service
--- role (which bypasses RLS) can read/write.
+-- Add two new plan features: "opportunities" and "meetings", both Pro-only —
+-- per product decision, these pages weren't gated by plan before at all.
+-- Merged into the existing features JSONB rather than overwriting it.
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS webhook_logs (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  source       TEXT NOT NULL DEFAULT 'chargebee',
-  event_id     TEXT UNIQUE,                 -- Chargebee event.id — dedupe key
-  event_type   TEXT,                        -- 'subscription_created', etc.
-  workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL,
-  payload      JSONB,
-  status       TEXT NOT NULL DEFAULT 'received'
-                 CHECK (status IN ('received','processed','failed','skipped')),
-  error        TEXT,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  processed_at TIMESTAMPTZ
-);
+UPDATE subscription_plans
+SET features = features || '{"opportunities": false, "meetings": false}'::jsonb
+WHERE id IN ('basic', 'starter');
 
-CREATE INDEX IF NOT EXISTS idx_webhook_logs_type ON webhook_logs (event_type, created_at DESC);
+UPDATE subscription_plans
+SET features = features || '{"opportunities": true, "meetings": true}'::jsonb
+WHERE id = 'pro';
 
--- RLS on, no policies: invisible to all client roles; service role bypasses.
-ALTER TABLE webhook_logs ENABLE ROW LEVEL SECURITY;
 
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0037_notifications_delete_policy.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- Notifications: allow users to delete their own notifications (Clear all)
+-- ============================================================================
+
+DROP POLICY IF EXISTS "Delete own notifications" ON notifications;
+CREATE POLICY "Delete own notifications" ON notifications
+  FOR DELETE TO authenticated
+  USING (user_id = auth.uid());
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0057_user_nav_access.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- Per-user nav permission overrides on top of role defaults.
+-- Shape: { "/leads": true, "/newsletters": false }
+-- A present key overrides the role default for that nav item.
+-- A missing key falls back to whatever the user's role normally allows.
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS nav_access JSONB DEFAULT '{}'::jsonb;
+
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0038_reprice.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================
+-- 0038_reprice.sql
+-- Reprices all three subscription plans to market rate.
+-- Basic $19/mo, Starter $89/mo, Pro $159/mo (20% annual discount).
+-- Credits: Basic 500, Starter 3,000, Pro 8,000.
+-- LinkedIn outreach unlocked at Starter tier (was Pro-only).
+-- ============================================================
+
+-- ── 1. Update plan prices, credits, and feature flags ───────
+INSERT INTO subscription_plans
+  (id, name, monthly_price_cents, annual_price_cents, credits_per_cycle, trial_days, features, sort_order)
+VALUES
+  ('basic', 'Basic', 1900, 18240, 500, 7,
+   '{"discovery":false,"reply_tracking":false,"csv_import":true,"enrichment":false,"scoring":false,"linkedin_outreach":false,"core_workflows":true,"crm_export":false,"priority_support":false,"opportunities":false,"meetings":false}',
+   1),
+  ('starter', 'Starter', 8900, 85440, 3000, 0,
+   '{"discovery":true,"reply_tracking":false,"csv_import":true,"enrichment":true,"scoring":true,"linkedin_outreach":true,"core_workflows":true,"crm_export":true,"priority_support":false,"opportunities":true,"meetings":false}',
+   2),
+  ('pro', 'Pro', 15900, 152640, 8000, 0,
+   '{"discovery":true,"reply_tracking":true,"csv_import":true,"enrichment":true,"scoring":true,"linkedin_outreach":true,"core_workflows":true,"crm_export":true,"priority_support":true,"opportunities":true,"meetings":true}',
+   3)
+ON CONFLICT (id) DO UPDATE SET
+  monthly_price_cents = EXCLUDED.monthly_price_cents,
+  annual_price_cents  = EXCLUDED.annual_price_cents,
+  credits_per_cycle   = EXCLUDED.credits_per_cycle,
+  trial_days          = EXCLUDED.trial_days,
+  features            = EXCLUDED.features;
+
+-- ── 2. Update the workspace subscription trigger ─────────────
+-- Patch create_workspace_subscription to grant 500 trial credits
+-- instead of the old hardcoded 150.
+CREATE OR REPLACE FUNCTION create_workspace_subscription()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO subscriptions (
+    workspace_id, plan_id, billing_interval, status,
+    trial_ends_at, current_period_start, current_period_end,
+    credits_remaining, credits_total
+  ) VALUES (
+    NEW.id, 'basic', 'monthly', 'trialing',
+    now() + INTERVAL '7 days',
+    now(),
+    now() + INTERVAL '7 days',
+    500, 500
+  ) ON CONFLICT (workspace_id) DO NOTHING;
+
+  INSERT INTO credit_ledger
+    (workspace_id, operation_type, credits_delta, status, metadata)
+  SELECT NEW.id, 'trial_grant', 500, 'completed', '{"note":"7-day Basic trial"}'
+  WHERE NOT EXISTS (
+    SELECT 1 FROM credit_ledger
+    WHERE workspace_id = NEW.id AND operation_type = 'trial_grant'
+  );
+
+  RETURN NEW;
+END;
+$$;
+
+-- ── 3. Update existing Basic trial subscriptions ─────────────
+-- Bump credits_total (and remaining if not yet used) for any
+-- workspace currently on the Basic trial with the old 150 allocation.
+UPDATE subscriptions
+SET
+  credits_total     = 500,
+  credits_remaining = LEAST(credits_remaining + (500 - credits_total), 500)
+WHERE
+  plan_id = 'basic'
+  AND status = 'trialing'
+  AND credits_total = 150;
 

@@ -43,23 +43,23 @@ const PLAN_ICONS: Record<string, React.ElementType> = {
 };
 const PLAN_DESC: Record<string, string> = {
   basic:   "Bring your own leads",
-  starter: "For growing pipelines",
-  pro:     "Highest volume + replies",
+  starter: "Email + LinkedIn, all-in-one",
+  pro:     "Highest volume + full suite",
 };
 
 const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
   basic: [
-    { label: "~150 AI credits / mo",     included: true  },
+    { label: "500 AI credits / mo",      included: true  },
     { label: "Import your own leads",    included: true  },
-    { label: "Enrichment + scoring",     included: true  },
-    { label: "LinkedIn outreach",        included: true  },
     { label: "Core workflows",           included: true  },
+    { label: "Enrichment + scoring",     included: false },
+    { label: "LinkedIn outreach",        included: false },
     { label: "Lead discovery",           included: false },
     { label: "CRM export",              included: false },
     { label: "Reply tracking",           included: false },
   ],
   starter: [
-    { label: "1,000 AI credits / mo",    included: true  },
+    { label: "3,000 AI credits / mo",    included: true  },
     { label: "Automated lead discovery", included: true  },
     { label: "Full enrichment + scoring",included: true  },
     { label: "LinkedIn outreach",        included: true  },
@@ -69,9 +69,10 @@ const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
     { label: "Priority support",         included: false },
   ],
   pro: [
-    { label: "2,500 AI credits / mo",    included: true  },
+    { label: "8,000 AI credits / mo",    included: true  },
     { label: "Everything in Starter",    included: true  },
     { label: "Reply tracking",           included: true  },
+    { label: "Meetings & calendar",      included: true  },
     { label: "Priority support",         included: true  },
   ],
 };
@@ -384,7 +385,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
               >
                 {iv === "monthly" ? "Monthly" : "Annual"}
                 {iv === "annual" && (
-                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">2 months free</span>
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Save 20%</span>
                 )}
               </button>
             ))}

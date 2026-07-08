@@ -23,7 +23,7 @@ for (const [planId, intervals] of Object.entries(CHARGEBEE_PRICE_IDS)) {
 
 // Credits granted per plan (must match subscription_plans table)
 export const PLAN_CREDITS: Record<string, number> = {
-  basic: 150, starter: 1000, pro: 2500,
+  basic: 500, starter: 3000, pro: 8000,
 };
 
 function buildChargebeeClient() {
