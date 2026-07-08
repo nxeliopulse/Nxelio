@@ -1,0 +1,606 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode (toggled via .dark on <html>) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Softened light theme — surfaces are a calm off-white/cool-gray instead of
+     pure #fff so the UI is easier on the eyes. Cards (bg-white, remapped below)
+     stay a step lighter than the canvas so they still lift off the page. */
+  --background: #e9edf3;
+  --foreground: #0f172a;
+  --card: #f5f8fc;
+  --muted: #e1e7ef;
+  --muted-foreground: #64748b;
+  --border: #d7dde7;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  /* Dim the slate ramp that hardcoded utilities use for surfaces/hovers so the
+     whole canvas drops a notch in brightness (dark mode re-inverts these). */
+  --color-slate-50:  #e9edf3;
+  --color-slate-100: #dfe5ee;
+}
+
+/* ============================================================================
+   Dark theme — remaps the slate palette + white so the app's hardcoded
+   bg-white / text-slate-* / border-slate-* utilities theme automatically.
+   Utilities reference --color-* CSS vars in Tailwind v4, so redefining them
+   under .dark flips the whole UI without per-component edits.
+   ============================================================================ */
+.dark {
+  color-scheme: dark;
+
+  /* Softer, "natural" dark — a slate-blue charcoal with clear elevation tiers
+     (canvas → card → muted) instead of a near-black void. */
+  --background: #121620;      /* tier 0: page canvas / body */
+  --foreground: #e6eaf2;
+  --card: #1b212e;            /* tier 1: cards/surfaces — lifts off the canvas */
+  --muted: #242c3a;           /* tier 2: muted/hover surfaces */
+  --muted-foreground: #9aa6b8;
+  --border: #2b3444;          /* visible-but-subtle separators */
+
+  /* invert the slate ramp: light shades become dark, dark shades become light */
+  --color-slate-50:  #121620;
+  --color-slate-100: #242c3a;
+  --color-slate-200: #313b4d;
+  --color-slate-300: #475569;
+  --color-slate-400: #64748b;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #cbd5e1;
+  --color-slate-700: #e2e8f0;
+  --color-slate-800: #eef2f7;
+  --color-slate-900: #f8fafc;
+}
+
+/* white surfaces → dark. Kept as an explicit rule (not via --color-white) so
+   `text-white` on colored buttons/badges stays white. */
+.dark .bg-white { background-color: #1b212e; }
+
+/* slate shades used AS backgrounds must stay dark (the ramp inversion above
+   would otherwise turn them light, e.g. the dark secondary button / overlays). */
+.dark .bg-slate-700 { background-color: #475569; }
+.dark .bg-slate-800 { background-color: #313b4d; }
+.dark .bg-slate-900 { background-color: #242c3a; }
+.dark .bg-slate-900\/40 { background-color: rgb(7 10 18 / 0.6); }
+
+/* Flow/sequence canvas grid — themed via class (NOT inline style) so dark mode
+   can override it. Light = soft slate dots; dark = subtle dots on the canvas. */
+.flow-grid {
+  background-color: #f1f4f9;
+  background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+}
+.dark .flow-grid {
+  background-color: #161b26;
+  background-image: radial-gradient(circle, #2b3444 1px, transparent 1px);
+}
+
+/* dark scrollbar */
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* Light mode: soften pure-white surfaces (cards, sidebar, topbar, modals) to a
+   calm off-white so the UI isn't glaring. `text-white` is untouched (only the
+   bg utility is remapped). In dark mode `.dark .bg-white` (higher specificity)
+   still wins, so this has no effect there. */
+.bg-white { background-color: #f5f8fc; }
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Smaller scrollbar on touch devices */
+@media (hover: none) {
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+}
+
+/* Better touch targets on mobile */
+@media (max-width: 640px) {
+  button, a { -webkit-tap-highlight-color: transparent; }
+}
+
+/* Prevent input zoom on iOS */
+@supports (-webkit-touch-callout: none) {
+  input[type="text"], input[type="email"], input[type="password"],
+  input[type="number"], input[type="search"], input[type="tel"],
+  input[type="url"], textarea, select { font-size: 16px; }
+}
+
+/* ============================================================================
+   Auth hero animations
+   ============================================================================ */
+
+/* Floating gradient blobs that drift slowly */
+@keyframes blob-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(60px, -40px) scale(1.1); }
+  66%      { transform: translate(-30px, 50px) scale(0.95); }
+}
+@keyframes blob-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(-50px, 60px) scale(1.15); }
+  66%      { transform: translate(40px, -30px) scale(0.9); }
+}
+@keyframes blob-float-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(40px, 30px) scale(1.2); }
+}
+.animate-blob-1 { animation: blob-float-1 18s ease-in-out infinite; }
+.animate-blob-2 { animation: blob-float-2 22s ease-in-out infinite; }
+.animate-blob-3 { animation: blob-float-3 16s ease-in-out infinite; }
+
+/* Reveal: fade up with slight blur to feel premium */
+@keyframes fade-up {
+  0%   { opacity: 0; transform: translateY(16px); filter: blur(6px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+.animate-fade-up { animation: fade-up 0.7s ease-out both; }
+
+/* Stagger by index for lists */
+.stagger > * { opacity: 0; animation: fade-up 0.55s ease-out both; }
+.stagger > *:nth-child(1) { animation-delay: 0.10s; }
+.stagger > *:nth-child(2) { animation-delay: 0.20s; }
+.stagger > *:nth-child(3) { animation-delay: 0.30s; }
+.stagger > *:nth-child(4) { animation-delay: 0.40s; }
+.stagger > *:nth-child(5) { animation-delay: 0.50s; }
+
+/* Rotating word: fade + slight rise */
+@keyframes word-rotate {
+  0%   { opacity: 0; transform: translateY(8px); }
+  15%  { opacity: 1; transform: translateY(0); }
+  85%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+.animate-word { animation: word-rotate 2.4s ease-in-out both; }
+
+/* Shimmer line for headline accent */
+@keyframes shimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.bg-shimmer {
+  background: linear-gradient(90deg, #93c5fd 0%, #ffffff 50%, #93c5fd 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 3.5s linear infinite;
+}
+
+/* Floating stat card that gently breathes */
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.animate-float-gentle { animation: float-gentle 4.5s ease-in-out infinite; }
+
+/* Pulse ring around live dot */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.animate-pulse-ring { animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+/* ============================================================================
+   Public landing page — always renders in light mode, regardless of the user's
+   theme preference. Marketing surfaces shouldn't surprise visitors with the
+   logged-in user's dark UI.
+   ============================================================================ */
+.landing-page,
+.dark .landing-page {
+  /* Reset slate ramp to light values even when html has .dark */
+  --color-slate-50:  #f8fafc !important;
+  --color-slate-100: #f1f5f9 !important;
+  --color-slate-200: #e2e8f0 !important;
+  --color-slate-300: #cbd5e1 !important;
+  --color-slate-400: #94a3b8 !important;
+  --color-slate-500: #64748b !important;
+  --color-slate-600: #475569 !important;
+  --color-slate-700: #334155 !important;
+  --color-slate-800: #1e293b !important;
+  --color-slate-900: #0f172a !important;
+  --background: #ffffff !important;
+  --foreground: #0f172a !important;
+  --card: #ffffff !important;
+  --border: #e2e8f0 !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  color-scheme: light;
+}
+
+/* Wrapper itself uses bg-white — override the .dark rule for self-match */
+.dark .landing-page.bg-white,
+.dark .landing-page .bg-white { background-color: #ffffff !important; }
+.dark .landing-page .bg-slate-50 { background-color: #f8fafc !important; }
+.dark .landing-page .bg-slate-100 { background-color: #f1f5f9 !important; }
+.dark .landing-page .bg-slate-200 { background-color: #e2e8f0 !important; }
+.dark .landing-page .bg-slate-900 { background-color: #0f172a !important; }
+.dark .landing-page .bg-slate-800 { background-color: #1e293b !important; }
+.dark .landing-page .bg-white\/80 { background-color: rgb(255 255 255 / 0.8) !important; }
+.dark .landing-page .text-slate-900 { color: #0f172a !important; }
+.dark .landing-page .text-slate-700 { color: #334155 !important; }
+.dark .landing-page .text-slate-600 { color: #475569 !important; }
+.dark .landing-page .text-slate-500 { color: #64748b !important; }
+.dark .landing-page .text-slate-400 { color: #94a3b8 !important; }
+.dark .landing-page .border-slate-100 { border-color: #f1f5f9 !important; }
+.dark .landing-page .border-slate-200 { border-color: #e2e8f0 !important; }
+
+/* In-app toast/dialog entrance animation */
+@keyframes lp-toast-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ---- Smooth entrance animations (panels, popovers, modals) ---- */
+@keyframes lp-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes lp-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes lp-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.lp-anim-pop   { animation: lp-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.lp-anim-fade  { animation: lp-fade-in 0.18s ease-out; }
+.lp-anim-scale { animation: lp-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Active-campaign progress bar — a moving barber-pole stripe so a running
+   campaign visibly animates instead of sitting still. */
+@keyframes lp-progress-stripes {
+  from { background-position: 0 0; }
+  to   { background-position: 32px 0; }
+}
+.lp-progress-active {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.28) 25%, transparent 25%,
+    transparent 50%, rgba(255, 255, 255, 0.28) 50%,
+    rgba(255, 255, 255, 0.28) 75%, transparent 75%, transparent
+  );
+  background-size: 32px 32px;
+  animation: lp-progress-stripes 0.9s linear infinite;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .lp-anim-pop, .lp-anim-fade, .lp-anim-scale { animation: none; }
+  .lp-progress-active { animation: none; }
+}
+
+/* ============================================================================
+   Nxelio Landing Page — additional animations
+   ============================================================================ */
+
+/* Scrolling logo marquee */
+@keyframes nxl-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.nxl-marquee {
+  animation: nxl-marquee 35s linear infinite;
+}
+.nxl-marquee:hover { animation-play-state: paused; }
+
+/* Glow pulse for the primary brand color */
+@keyframes nxl-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(24,167,184,0.35), 0 0 40px rgba(24,167,184,0.15); }
+  50%       { box-shadow: 0 0 35px rgba(24,167,184,0.55), 0 0 70px rgba(24,167,184,0.25); }
+}
+.nxl-glow { animation: nxl-glow 3.5s ease-in-out infinite; }
+
+/* Smooth gradient shift for animated borders/backgrounds */
+@keyframes nxl-gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+.nxl-gradient-shift {
+  background-size: 200% 200%;
+  animation: nxl-gradient-shift 5s ease infinite;
+}
+
+/* Hero dashboard float — slightly different from float-gentle */
+@keyframes nxl-float {
+  0%, 100% { transform: translateY(0px);  }
+  40%      { transform: translateY(-10px); }
+  70%      { transform: translateY(-5px);  }
+}
+.nxl-float       { animation: nxl-float 7s ease-in-out infinite; }
+.nxl-float-slow  { animation: nxl-float 9s ease-in-out infinite 1.5s; }
+.nxl-float-fast  { animation: nxl-float 5s ease-in-out infinite 0.8s; }
+
+/* FAQ accordion height transition */
+.nxl-accordion-enter { animation: nxl-accordion-open 0.25s ease-out both; }
+@keyframes nxl-accordion-open {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Stat counter reveal */
+@keyframes nxl-count-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.nxl-count-in { animation: nxl-count-in 0.6s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* Gradient text animation */
+@keyframes nxl-text-shimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.nxl-text-shimmer {
+  background: linear-gradient(90deg, #18A7B8, #4F46E5, #18A7B8, #06B6D4);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: nxl-text-shimmer 5s linear infinite;
+}
+
+/* Dot pulse for live indicators */
+@keyframes nxl-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(1.4); }
+}
+.nxl-dot-pulse { animation: nxl-dot-pulse 1.6s ease-in-out infinite; }
+
+/* Section fade-in on scroll (applied via JS IntersectionObserver alternative — CSS only) */
+@keyframes nxl-section-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.nxl-section-in { animation: nxl-section-in 0.7s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* Landing page — preserve light mode overrides for new brand classes */
+.landing-page .bg-\[\#18A7B8\]        { background-color: #18A7B8 !important; }
+.landing-page .text-\[\#18A7B8\]      { color: #18A7B8 !important; }
+.landing-page .border-\[\#18A7B8\]    { border-color: #18A7B8 !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nxl-marquee, .nxl-glow, .nxl-gradient-shift,
+  .nxl-float, .nxl-float-slow, .nxl-float-fast,
+  .nxl-count-in, .nxl-text-shimmer, .nxl-dot-pulse { animation: none; }
+}
+
+/* ============================================================================
+   Nxelio v2 — Extended animation library
+   ============================================================================ */
+
+/* Blob morphing (organic shape shift) */
+@keyframes nxl-blob-morph {
+  0%,100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  25%      { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+  50%      { border-radius: 50% 60% 30% 60% / 40% 30% 60% 50%; }
+  75%      { border-radius: 60% 40% 60% 30% / 30% 60% 40% 60%; }
+}
+.nxl-blob       { animation: nxl-blob-morph 10s ease-in-out infinite; }
+.nxl-blob-slow  { animation: nxl-blob-morph 14s ease-in-out infinite 2s; }
+.nxl-blob-fast  { animation: nxl-blob-morph  7s ease-in-out infinite 1s; }
+
+/* Slow / reverse spin for orbit rings */
+@keyframes nxl-spin-cw  { from { transform: rotate(0deg);   } to { transform: rotate(360deg);  } }
+@keyframes nxl-spin-ccw { from { transform: rotate(0deg);   } to { transform: rotate(-360deg); } }
+.nxl-spin-slow     { animation: nxl-spin-cw  25s linear infinite; }
+.nxl-spin-slow-rev { animation: nxl-spin-ccw 18s linear infinite; }
+.nxl-spin-med      { animation: nxl-spin-cw  12s linear infinite; }
+
+/* Orbit counter-rotate — keeps child items upright while parent ring spins */
+.nxl-orbit-cw  { animation: nxl-spin-ccw 25s linear infinite; }
+.nxl-orbit-ccw { animation: nxl-spin-cw  18s linear infinite; }
+
+/* Beam sweep (light reflection across card surface) */
+@keyframes nxl-beam {
+  0%   { transform: translateX(-120%) skewX(-15deg); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: translateX(350%)  skewX(-15deg); opacity: 0; }
+}
+.nxl-beam-parent { position: relative; overflow: hidden; }
+.nxl-beam-parent::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%);
+  width: 40%;
+  animation: nxl-beam 4s ease-in-out infinite 1.5s;
+  pointer-events: none;
+}
+
+/* Cursor blink (typewriter) */
+@keyframes nxl-blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+.nxl-cursor { display: inline-block; animation: nxl-blink 0.9s step-end infinite; }
+
+/* Scroll-reveal — add .nxl-revealed via JS IntersectionObserver */
+.nxl-reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.75s cubic-bezier(0.16,1,0.3,1),
+              transform 0.75s cubic-bezier(0.16,1,0.3,1);
+}
+.nxl-reveal.nxl-revealed { opacity: 1; transform: translateY(0); }
+.nxl-reveal-left  { opacity: 0; transform: translateX(-32px);
+  transition: opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1); }
+.nxl-reveal-right { opacity: 0; transform: translateX(32px);
+  transition: opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1); }
+.nxl-reveal-left.nxl-revealed,
+.nxl-reveal-right.nxl-revealed { opacity: 1; transform: translateX(0); }
+.nxl-reveal-scale { opacity: 0; transform: scale(0.92);
+  transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1); }
+.nxl-reveal-scale.nxl-revealed { opacity: 1; transform: scale(1); }
+
+/* Stagger delay helpers */
+.nxl-d1 { transition-delay: 0.08s; } .nxl-d2 { transition-delay: 0.16s; }
+.nxl-d3 { transition-delay: 0.24s; } .nxl-d4 { transition-delay: 0.32s; }
+.nxl-d5 { transition-delay: 0.40s; } .nxl-d6 { transition-delay: 0.48s; }
+.nxl-d7 { transition-delay: 0.56s; } .nxl-d8 { transition-delay: 0.64s; }
+
+/* Gradient border spin (conic-gradient rotating behind card) */
+@keyframes nxl-border-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.nxl-grad-border {
+  position: relative;
+  isolation: isolate;
+}
+.nxl-grad-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(from 0deg, #18A7B8, #7C3AED, #EC4899, #F59E0B, #10B981, #18A7B8);
+  animation: nxl-border-spin 5s linear infinite;
+  z-index: -1;
+}
+.nxl-grad-border::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: inherit;
+  z-index: -1;
+}
+
+/* Ring expand (expanding halo on hover/active dots) */
+@keyframes nxl-ring-out {
+  0%   { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.nxl-ring-out { animation: nxl-ring-out 2s ease-out infinite; }
+
+/* Typewriter text gradient (rainbow cycle) */
+@keyframes nxl-rainbow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.nxl-text-rainbow {
+  background: linear-gradient(90deg, #18A7B8, #7C3AED, #EC4899, #F59E0B, #10B981, #18A7B8);
+  background-size: 300% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: nxl-rainbow 6s ease infinite;
+}
+
+/* Tilt card 3-D hover — applied via group hover and perspective parent */
+.nxl-card-3d {
+  transition: transform 0.4s cubic-bezier(0.23,1,0.32,1), box-shadow 0.4s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* Activity feed row reveal */
+@keyframes nxl-feed-in {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.nxl-feed-item { animation: nxl-feed-in 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* Number pop */
+@keyframes nxl-num-pop {
+  0%   { transform: scale(0.5) translateY(20px); opacity: 0; }
+  60%  { transform: scale(1.1) translateY(-4px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+.nxl-num-pop { animation: nxl-num-pop 0.7s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* Gradient wave for CTA backgrounds */
+@keyframes nxl-wave-bg {
+  0%,100% { background-position: 0% 50%; }
+  50%     { background-position: 100% 50%; }
+}
+.nxl-wave-bg { background-size: 400% 400%; animation: nxl-wave-bg 10s ease infinite; }
+
+/* Progress bar fill (for feature bars etc.) */
+@keyframes nxl-bar-fill {
+  from { width: 0; }
+}
+.nxl-bar-fill { animation: nxl-bar-fill 1.2s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* Neon text glow */
+@keyframes nxl-neon {
+  0%,100% { text-shadow: 0 0 8px #18A7B8, 0 0 24px #18A7B8cc, 0 0 48px #18A7B866; }
+  50%     { text-shadow: 0 0 4px #18A7B8, 0 0 12px #18A7B880; }
+}
+.nxl-neon-text { animation: nxl-neon 3s ease-in-out infinite; }
+
+/* Dot grid background pulse */
+@keyframes nxl-grid-pulse {
+  0%,100% { opacity: 0.4; }
+  50%     { opacity: 0.8; }
+}
+.nxl-dot-grid {
+  background-image: radial-gradient(circle, rgba(24,167,184,0.4) 1px, transparent 1px);
+  background-size: 28px 28px;
+  animation: nxl-grid-pulse 5s ease-in-out infinite;
+}
+
+/* Marquee variant (reverse direction) */
+@keyframes nxl-marquee-rev {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}
+.nxl-marquee-rev { animation: nxl-marquee-rev 40s linear infinite; }
+
+/* Icon bounce-in */
+@keyframes nxl-icon-in {
+  0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+  70%  { transform: scale(1.15) rotate(5deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.nxl-icon-in { animation: nxl-icon-in 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* Staggered bar chart bars growing up */
+@keyframes nxl-bar-up {
+  from { transform: scaleY(0); transform-origin: bottom; }
+  to   { transform: scaleY(1); transform-origin: bottom; }
+}
+.nxl-bar-up { animation: nxl-bar-up 0.8s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* Reduced motion — disable all v2 animations */
+@media (prefers-reduced-motion: reduce) {
+  .nxl-blob, .nxl-blob-slow, .nxl-blob-fast,
+  .nxl-spin-slow, .nxl-spin-slow-rev, .nxl-spin-med,
+  .nxl-orbit-cw, .nxl-orbit-ccw,
+  .nxl-beam-parent::after,
+  .nxl-cursor, .nxl-ring-out, .nxl-text-rainbow,
+  .nxl-num-pop, .nxl-wave-bg, .nxl-bar-fill, .nxl-neon-text,
+  .nxl-dot-grid, .nxl-marquee-rev, .nxl-icon-in, .nxl-bar-up,
+  .nxl-grad-border::before,
+  .nxl-feed-item { animation: none !important; }
+  .nxl-reveal, .nxl-reveal-left, .nxl-reveal-right, .nxl-reveal-scale {
+    opacity: 1 !important; transform: none !important; transition: none !important;
+  }
+}
