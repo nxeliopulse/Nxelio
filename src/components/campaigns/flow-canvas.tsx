@@ -16,11 +16,14 @@ export function FlowCanvas({ children, height = 560 }: { children: React.ReactNo
   const drag = useRef<{ sx: number; sy: number; px: number; py: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Native non-passive wheel listener so we can preventDefault (zoom, not page scroll)
+  // Native non-passive wheel listener so we can preventDefault — but ONLY when
+  // zooming (Ctrl/Cmd+scroll, the standard canvas-editor gesture). A plain scroll
+  // must fall through untouched so it scrolls the page, not the canvas.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey && !e.metaKey) return; // let the page scroll normally
       e.preventDefault();
       setScale((s) => clamp(s + (e.deltaY < 0 ? 0.08 : -0.08), 0.4, 2));
     }
@@ -64,7 +67,7 @@ export function FlowCanvas({ children, height = 560 }: { children: React.ReactNo
           style={{
             transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})`,
             transformOrigin: "center top",
-            transition: drag.current ? "none" : "transform 0.12s ease-out",
+            transition: grabbing ? "none" : "transform 0.12s ease-out",
             padding: "36px 24px",
             display: "flex",
             justifyContent: "center",

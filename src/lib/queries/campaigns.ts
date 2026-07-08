@@ -14,6 +14,10 @@ export interface CampaignRow {
   open_rate: number;
   reply_rate: number;
   bounce_rate: number;
+  content_is_html: boolean;
+  pause_same_company_on_reply: boolean;
+  scheduled_at: string | null;
+  approval_status: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -72,7 +76,10 @@ export async function createCampaign(payload: Partial<CampaignRow>) {
     .insert({ campaign_name: payload.campaign_name || "Untitled Campaign", status: "Draft", ...payload })
     .select()
     .single();
-  if (error) throw error;
+  // Throw a real Error (not the raw Postgrest object) — plain objects thrown from
+  // a server action can lose their message crossing back to the client, which
+  // then shows up as a blank/"null" error instead of the actual DB message.
+  if (error) throw new Error(error.message || "Couldn't create the campaign.");
   revalidatePath("/campaigns");
   return data;
 }
@@ -80,7 +87,7 @@ export async function createCampaign(payload: Partial<CampaignRow>) {
 export async function updateCampaign(id: string, payload: Partial<CampaignRow>) {
   const supabase = await createClient();
   const { error } = await supabase.from("campaigns").update(payload).eq("id", id);
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Couldn't update the campaign.");
   revalidatePath("/campaigns");
 }
 

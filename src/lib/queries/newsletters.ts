@@ -5,10 +5,27 @@ import { revalidatePath } from "next/cache";
 export type NewsletterStatus = "Draft" | "Scheduled" | "Sending" | "Sent" | "Failed";
 
 export interface NewsletterBlock {
-  type: "heading" | "paragraph" | "image" | "cta" | "divider";
+  type: "heading" | "paragraph" | "image" | "cta" | "divider" | "banner" | "section";
+  /** Body copy for paragraph/section blocks. Supports **bold** and [label](url) link syntax. */
   text?: string;
   url?: string;
   alt?: string;
+  /** Background color for "banner"/"section" blocks, or button color for "cta" blocks. Hex string. */
+  color?: string;
+  /** Text color for "banner" blocks — defaults to white. */
+  textColor?: string;
+  /** Small uppercase label above a "section" block's heading, e.g. "ARTIFICIAL INTELLIGENCE". */
+  eyebrow?: string;
+  /** Heading for a "section" block (separate from its body text). */
+  heading?: string;
+  /** Optional pull-quote shown inside a "section" block. */
+  quote?: string;
+  /** Where a "section" block's image sits relative to its text. */
+  imagePosition?: "top" | "left" | "right" | "none";
+  /** Optional embedded button inside a "section" block. */
+  ctaText?: string;
+  ctaUrl?: string;
+  ctaColor?: string;
 }
 
 export interface NewsletterContent {

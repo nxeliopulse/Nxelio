@@ -2,6 +2,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendEmail } from "./resend";
 import { substituteMergeTags } from "./merge-tags";
+import { getOnboarding } from "@/lib/queries/onboarding";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
 import type { NewsletterBlock, NewsletterContent, NewsletterRow } from "@/lib/queries/newsletters";
@@ -17,11 +18,17 @@ function renderNewsletterHtml(content: NewsletterContent, opts: { subject?: stri
         case "heading":
           return `<h1 style="margin:24px 0 12px;font-size:24px;color:#0f172a;font-weight:700;line-height:1.3">${escape(b.text || "")}</h1>`;
         case "paragraph":
-          return `<p style="margin:0 0 16px;font-size:15px;color:#334155;line-height:1.7">${escape(b.text || "")}</p>`;
+          return `<p style="margin:0 0 16px;font-size:15px;color:#334155;line-height:1.7">${richText(b.text || "")}</p>`;
         case "cta":
-          return `<div style="margin:24px 0;text-align:center"><a href="${escape(b.url || "#")}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">${escape(b.text || "Learn more")}</a></div>`;
-        case "image":
-          return b.url ? `<img src="${escape(b.url)}" alt="${escape(b.alt || "")}" style="max-width:100%;height:auto;border-radius:8px;margin:16px 0" />` : "";
+          return `<div style="margin:24px 0;text-align:center"><a href="${escape(safeUrl(b.url))}" style="display:inline-block;padding:12px 24px;background:${escape(b.color || "#2563eb")};color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">${escape(b.text || "Learn more")}</a></div>`;
+        case "image": {
+          const src = safeUrl(b.url);
+          return src !== "#" ? `<img src="${escape(src)}" alt="${escape(b.alt || "")}" style="max-width:100%;height:auto;border-radius:8px;margin:16px 0" />` : "";
+        }
+        case "banner":
+          return `<div style="background:${escape(b.color || "#2563eb")};color:${escape(b.textColor || "#ffffff")};padding:20px 24px;border-radius:10px;margin:0 0 20px;font-weight:700;font-size:16px;line-height:1.4">${escape(b.text || "")}</div>`;
+        case "section":
+          return renderSection(b);
         case "divider":
           return `<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0" />`;
         default:
@@ -45,7 +52,7 @@ function renderNewsletterHtml(content: NewsletterContent, opts: { subject?: stri
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden">
           <tr><td style="padding:32px 32px 24px;border-bottom:1px solid #f1f5f9">
             <table role="presentation" width="100%"><tr>
-              <td style="font-weight:700;font-size:18px;color:#0f172a">LeadPro</td>
+              <td style="font-weight:700;font-size:18px;color:#0f172a">Nxelio</td>
               <td align="right" style="font-size:12px;color:#94a3b8">AI Engagement</td>
             </tr></table>
           </td></tr>
@@ -53,7 +60,7 @@ function renderNewsletterHtml(content: NewsletterContent, opts: { subject?: stri
             ${blockHtml}
           </td></tr>
           <tr><td style="padding:24px 32px;border-top:1px solid #f1f5f9;font-size:12px;color:#94a3b8;text-align:center">
-            <p style="margin:0">You're receiving this because you subscribed to LeadPro updates.</p>
+            <p style="margin:0">You're receiving this because you subscribed to Nxelio updates.</p>
             <p style="margin:6px 0 0"><a href="#" style="color:#94a3b8;text-decoration:underline">Unsubscribe</a> · <a href="#" style="color:#94a3b8;text-decoration:underline">Preferences</a></p>
           </td></tr>
         </table>
@@ -64,8 +71,59 @@ function renderNewsletterHtml(content: NewsletterContent, opts: { subject?: stri
 </html>`;
 }
 
+/**
+ * Renders newsletter content to HTML for the builder's full-screen preview —
+ * the exact same markup that sendNewsletter/sendTestNewsletter would deliver.
+ */
+export async function previewNewsletterHtml(content: NewsletterContent, opts: { subject?: string; preheader?: string }): Promise<string> {
+  return renderNewsletterHtml(content, opts);
+}
+
 function escape(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** Only allow safe link schemes — blocks javascript:/data: URLs in CTA/image blocks. */
+function safeUrl(u?: string): string {
+  const s = (u || "").trim();
+  return /^(https?:|mailto:)/i.test(s) ? s : "#";
+}
+
+/** Escapes text, then applies lightweight **bold** and [label](url) markdown. */
+function richText(s: string): string {
+  const escaped = escape(s);
+  const bolded = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  return bolded.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_m, label: string, url: string) => {
+    return `<a href="${url}" style="color:#2563eb;text-decoration:underline;font-weight:600">${label}</a>`;
+  });
+}
+
+/** Renders a colored "section" card — an eyebrow label, heading, body copy, optional image/quote/CTA. */
+function renderSection(b: NewsletterBlock): string {
+  const bg = escape(b.color || "#f1f5f9");
+  const fg = b.textColor ? escape(b.textColor) : "#0f172a";
+  const bodyFg = b.textColor ? escape(b.textColor) : "#334155";
+  const eyebrow = b.eyebrow ? `<p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:${fg};opacity:0.75">${richText(b.eyebrow)}</p>` : "";
+  const heading = b.heading ? `<h2 style="margin:0 0 10px;font-size:20px;font-weight:800;color:${fg};line-height:1.3">${richText(b.heading)}</h2>` : "";
+  const body = b.text ? `<div style="font-size:14px;color:${bodyFg};line-height:1.7">${richText(b.text)}</div>` : "";
+  const quote = b.quote ? `<div style="margin-top:14px;padding:2px 0 2px 14px;border-left:3px solid ${fg};font-size:14px;color:${fg};font-style:italic">${richText(b.quote)}</div>` : "";
+  const cta = b.ctaText
+    ? `<div style="margin-top:14px"><a href="${escape(safeUrl(b.ctaUrl))}" style="display:inline-block;padding:10px 20px;background:${escape(b.ctaColor || "#e11d48")};color:#fff;text-decoration:none;border-radius:999px;font-weight:700;font-size:13px">${escape(b.ctaText)}</a></div>`
+    : "";
+  const imgSrc = safeUrl(b.url);
+  const imgTag = imgSrc !== "#" ? `<img src="${escape(imgSrc)}" alt="${escape(b.alt || "")}" style="width:100%;max-width:100%;height:auto;border-radius:10px;display:block" />` : "";
+  const textCol = `${eyebrow}${heading}${body}${quote}${cta}`;
+
+  let inner: string;
+  if ((b.imagePosition === "left" || b.imagePosition === "right") && imgTag) {
+    const imgCell = `<td style="width:38%;vertical-align:top;${b.imagePosition === "left" ? "padding-right:16px" : "padding-left:16px"}">${imgTag}</td>`;
+    const textCell = `<td style="vertical-align:top">${textCol}</td>`;
+    inner = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${b.imagePosition === "left" ? imgCell + textCell : textCell + imgCell}</tr></table>`;
+  } else {
+    inner = `${imgTag && b.imagePosition !== "none" ? `<div style="margin-bottom:14px">${imgTag}</div>` : ""}${textCol}`;
+  }
+
+  return `<div style="background:${bg};border-radius:14px;padding:24px;margin:0 0 20px">${inner}</div>`;
 }
 
 interface SendResult {
@@ -79,8 +137,8 @@ interface SendResult {
 
 /**
  * Sends a newsletter to all subscribed leads (or members of a segment).
- * In Resend sandbox mode, only the owner email gets the actual delivery — we still
- * record all recipient rows to make analytics realistic.
+ * Without a configured Brevo sender, sends are simulated — we still record all
+ * recipient rows to make analytics realistic.
  */
 export async function sendNewsletter(newsletterId: string): Promise<SendResult> {
   const supabase = await createClient();
@@ -96,10 +154,11 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
 
   const n = newsletter as NewsletterRow;
 
-  // 2. Resolve recipients (admin client bypasses RLS so we hit all leads)
-  let query = admin.from("leads").select("id, email, full_name, company_name, industry, interest_area").not("email", "is", null);
+  // 2. Resolve recipients with the RLS client so we ONLY ever reach the current
+  //    workspace's leads (the admin client would leak/mail every tenant's leads).
+  let query = supabase.from("leads").select("id, email, full_name, company_name, industry, interest_area").not("email", "is", null);
   if (n.audience_type === "segment" && n.segment_id) {
-    const { data: members } = await admin.from("segment_members").select("lead_id").eq("segment_id", n.segment_id);
+    const { data: members } = await supabase.from("segment_members").select("lead_id").eq("segment_id", n.segment_id);
     const ids = (members || []).map((m: { lead_id: string }) => m.lead_id);
     if (!ids.length) return { ok: false, error: "Segment has no members" };
     query = query.in("id", ids);
@@ -117,6 +176,17 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
   }).eq("id", n.id);
 
   // 4. Render and send
+  const { data: onboarding } = await getOnboarding();
+  const fromName = onboarding?.company_name?.trim() || "Nxelio";
+  // Route replies to whichever mailbox is actually connected, not a stale env var.
+  const { data: mailbox } = await supabase
+    .from("outreach_accounts")
+    .select("identifier")
+    .eq("channel", "email")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+  const replyTo = (mailbox?.identifier as string) || undefined;
   let sent = 0;
   let failed = 0;
   let redirectedNote: string | undefined;
@@ -141,6 +211,8 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
       to: lead.email,
       subject: finalSubject,
       html,
+      fromName,
+      replyTo,
     });
 
     if (result.ok) {
@@ -212,10 +284,20 @@ export async function sendTestNewsletter(newsletterId: string, testEmail: string
     preheader: n.preheader || undefined,
   });
 
+  const { data: onboarding } = await getOnboarding();
+  const { data: mailbox } = await supabase
+    .from("outreach_accounts")
+    .select("identifier")
+    .eq("channel", "email")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
   const result = await sendEmail({
     to: testEmail,
     subject: `[TEST] ${substituteMergeTags(n.subject || n.title, fakeLead)}`,
     html,
+    fromName: onboarding?.company_name?.trim() || "Nxelio",
+    replyTo: (mailbox?.identifier as string) || undefined,
   });
 
   return result.ok

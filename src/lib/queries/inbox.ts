@@ -20,17 +20,20 @@ export interface InboxConversation extends InboxMessage {
   campaign_name: string | null;
 }
 
-export async function getInboxConversations(): Promise<InboxConversation[]> {
+/** Pass a campaignId to scope the inbox to one campaign's replies (used by the
+ *  campaign detail screen's "Inbox" tab instead of a separate inbox system). */
+export async function getInboxConversations(campaignId?: string): Promise<InboxConversation[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("inbox_messages")
     .select(`
       *,
       leads(full_name, company_name, email),
       campaigns(campaign_name)
     `)
-    .eq("direction", "inbound")
-    .order("created_at", { ascending: false });
+    .eq("direction", "inbound");
+  if (campaignId) q = q.eq("campaign_id", campaignId);
+  const { data, error } = await q.order("created_at", { ascending: false });
   if (error || !data) return [];
 
   // Group by lead so each person shows as ONE conversation card. Messages are
@@ -72,26 +75,18 @@ export async function getInboxThread(leadId: string): Promise<InboxMessage[]> {
   return data || [];
 }
 
-export async function getUnreadInboxCount(): Promise<number> {
-  const supabase = await createClient();
-  const { count } = await supabase
-    .from("inbox_messages")
-    .select("id", { count: "exact", head: true })
-    .eq("direction", "inbound")
-    .eq("is_read", false);
-  return count ?? 0;
-}
-
 export async function markRead(id: string) {
   const supabase = await createClient();
   await supabase.from("inbox_messages").update({ is_read: true }).eq("id", id);
-  revalidatePath("/inbox");
+  // Inbox is now viewed embedded on each campaign's own "Inbox" tab, not a
+  // standalone page — revalidate that whole subtree so it reflects the change.
+  revalidatePath("/campaigns", "layout");
 }
 
 export async function markUnread(id: string) {
   const supabase = await createClient();
   await supabase.from("inbox_messages").update({ is_read: false }).eq("id", id);
-  revalidatePath("/inbox");
+  revalidatePath("/campaigns", "layout");
 }
 
 /** Permanently deletes one lead's whole conversation (all their inbox messages). */
@@ -99,7 +94,7 @@ export async function deleteInboxConversation(leadId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("inbox_messages").delete().eq("lead_id", leadId);
   if (error) throw error;
-  revalidatePath("/inbox");
+  revalidatePath("/campaigns", "layout");
 }
 
 export async function sendReply(
@@ -109,13 +104,16 @@ export async function sendReply(
 ): Promise<{ ok: boolean; error?: string; simulated?: boolean }> {
   const supabase = await createClient();
 
-  // Actually deliver the reply via the email service (Brevo/Resend/dev-sim) —
+  // Actually deliver the reply via the email service (Brevo/dev-sim) —
   // previously this only logged a row without sending anything.
   const { data: lead } = await supabase.from("leads").select("email").eq("id", leadId).single();
   let simulated = false;
   if (lead?.email) {
     const { sendEmail } = await import("@/lib/email/resend");
-    const result = await sendEmail({ to: lead.email, subject, text: body });
+    const { getOnboarding } = await import("@/lib/queries/onboarding");
+    const { data: onboarding } = await getOnboarding();
+    const fromName = onboarding?.company_name?.trim() || "Nxelio";
+    const result = await sendEmail({ to: lead.email, subject, text: body, fromName });
     if (!result.ok) return { ok: false, error: result.error };
     simulated = result.simulated ?? false;
   }
@@ -127,6 +125,6 @@ export async function sendReply(
     body,
     is_read: true,
   });
-  revalidatePath("/inbox");
+  revalidatePath("/campaigns", "layout");
   return { ok: true, simulated };
 }

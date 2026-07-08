@@ -7,8 +7,10 @@ import {
   getUnreadCount,
   markNotificationRead,
   markAllRead,
+  clearAllNotifications,
   type NotificationRow,
 } from "@/lib/queries/notifications";
+import { useFeedback } from "@/components/ui/feedback";
 
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -26,6 +28,7 @@ function relativeTime(iso: string): string {
 
 export function NotificationsBell() {
   const router = useRouter();
+  const { confirm } = useFeedback();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [unread, setUnread] = useState(0);
@@ -77,13 +80,23 @@ export function NotificationsBell() {
     refresh();
   }
 
+  async function handleClearAll() {
+    if (!(await confirm({ title: "Clear all notifications?", message: "This removes every notification. This can't be undone.", confirmLabel: "Clear all", danger: true }))) return;
+    try {
+      await clearAllNotifications();
+    } catch {
+      // ignore
+    }
+    refresh();
+  }
+
   const countLabel = unread >= 10 ? "9+" : String(unread);
 
   return (
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative h-9 w-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600"
+        className="relative h-10 w-10 rounded-2xl bg-white border border-slate-100 shadow-[0_2px_8px_rgba(17,12,46,0.05)] hover:bg-slate-50 flex items-center justify-center text-slate-600"
       >
         <Bell className="h-4.5 w-4.5" />
         {unread > 0 && (
@@ -97,12 +110,22 @@ export function NotificationsBell() {
         <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden z-40">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <p className="text-sm font-semibold text-slate-900">Notifications</p>
-            <button
-              onClick={handleMarkAll}
-              className="text-xs font-medium text-blue-600 hover:text-blue-700"
-            >
-              Mark all read
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleMarkAll}
+                className="text-xs font-medium text-blue-600 hover:text-blue-700"
+              >
+                Mark all read
+              </button>
+              {items.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="text-xs font-medium text-slate-400 hover:text-red-600"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {items.length === 0 ? (

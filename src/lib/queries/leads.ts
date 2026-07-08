@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
+import type { AiScoreResult } from "@/lib/ai/actions";
 
 export interface LeadRow {
   id: string;
@@ -16,6 +17,8 @@ export interface LeadRow {
   linkedin: string | null;
   website_url: string | null;
   lead_score: number;
+  /** Full saved AI score breakdown (null until the lead is scored). */
+  ai_score: AiScoreResult | null;
   status: string;
   verified: boolean;
   owner_id: string | null;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Users2, Send, MailOpen, Reply, AlertTriangle, Clock, Trash2,
-  Layers3, Plus, BarChart3, Sparkles,
+  BarChart3, MousePointerClick, CalendarClock,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,28 @@ import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
 import { setCampaignStatus, updateCampaign, deleteCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { sendCampaign } from "@/lib/email/campaign-send";
-import { simulateCampaignEngagement } from "@/lib/email/campaign-stats";
-import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
+import { approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { SequenceFlow, type FlowStep } from "@/components/campaigns/sequence-flow";
 import { FlowCanvas } from "@/components/campaigns/flow-canvas";
 import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
 import { formatDate, cn } from "@/lib/utils";
+import { InboxView } from "@/components/inbox/inbox-view";
+import { LockedFeature } from "@/components/billing/locked-feature";
+import type { InboxConversation } from "@/lib/queries/inbox";
+import { LeadsTable } from "@/components/leads/leads-table";
+import type { LeadRow } from "@/lib/queries/leads";
+import type { LeadEngagementRow } from "@/lib/email/campaign-stats";
+
+/** "Jul 2, 3:45 PM" — used in the activity table so opens/sends are traceable to a moment, not just a rate. */
+function fmtDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+function isToday(iso: string | null): boolean {
+  if (!iso) return false;
+  const d = new Date(iso), n = new Date();
+  return d.toDateString() === n.toDateString();
+}
 
 /** Reconstruct sequence steps from the stored "Day N — Subject\nBody" blocks. */
 function parseSequence(content: string | null): FlowStep[] {
@@ -52,18 +68,20 @@ function serializeStep(s: FlowStep): string {
   return `${header}\n${s.body || ""}`;
 }
 
-const statusVariant: Record<string, "success" | "warning" | "default" | "blue"> = {
-  Active: "success", Paused: "warning", Draft: "default", Completed: "blue",
-};
-
-const TABS = ["Audience", "Sequence", "Statistics", "Settings"] as const;
+const TABS = ["Audience", "Sequence", "Analytics", "Inbox", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
-export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJobs = 0 }: {
+export function CampaignDetailView({
+  campaign, audience, audienceLabel, pendingJobs = 0, inboxConversations = [], audienceLeads = [], leadActivity = [], replyTrackingEnabled = false,
+}: {
   campaign: CampaignRow;
   audience: number;
   audienceLabel: string;
   pendingJobs?: number;
+  inboxConversations?: InboxConversation[];
+  audienceLeads?: LeadRow[];
+  leadActivity?: LeadEngagementRow[];
+  replyTrackingEnabled?: boolean;
 }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
@@ -71,7 +89,6 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
   const [tab, setTab] = useState<Tab>("Audience");
   const [name, setName] = useState(campaign.campaign_name);
   const [status, setStatusLocal] = useState(campaign.status);
-  const [showImport, setShowImport] = useState(false);
 
   // While a campaign is Active, poll for fresh stats so sent/opened/replied/pending
   // update on their own (follow-ups send via cron, opens arrive via webhook) without
@@ -134,20 +151,17 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
   async function handleSendNow() {
     if (!(await confirm({ title: "Send this campaign?", message: `Send the opener email to everyone in “${audienceLabel}” (${audience.toLocaleString()} leads).`, confirmLabel: "Send now" }))) return;
     start(async () => {
-      const res = await sendCampaign(campaign.id);
-      if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
-      else toast(res.error || "No emails were sent.", "error");
+      try {
+        const res = await sendCampaign(campaign.id);
+        if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
+        else toast(res.error || "No emails were sent.", "error");
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Send failed. Try again.", "error");
+      }
     });
   }
   function saveName() {
     start(async () => { await updateCampaign(campaign.id, { campaign_name: name.trim() || "Untitled Campaign" }); toast("Campaign updated", "success"); });
-  }
-  function handleSimulate() {
-    start(async () => {
-      const res = await simulateCampaignEngagement(campaign.id);
-      if (res.ok) { toast(`Simulated engagement: ${res.opened} opened, ${res.replied} replied, ${res.bounced} bounced.`, "success"); router.refresh(); }
-      else toast(res.error || "Nothing to simulate yet.", "error");
-    });
   }
   async function handleDelete() {
     if (!(await confirm({ title: "Delete campaign?", message: `Delete “${campaign.campaign_name}”? This can't be undone.`, confirmLabel: "Delete", danger: true }))) return;
@@ -166,7 +180,7 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
               <h1 className="text-xl font-bold text-slate-900 truncate">{campaign.campaign_name}</h1>
-              <Badge variant={statusVariant[status] || "default"}>{status}</Badge>
+              <Badge variant={approvalBadgeVariant(campaign.approval_status)}>{campaign.approval_status}</Badge>
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden max-w-md">
               <div className={cn("h-full bg-blue-500 rounded-full transition-all", isActive && "lp-progress-active")} style={{ width: `${progress}%` }} />
@@ -185,9 +199,6 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
 
           <div className="flex items-center gap-3 lg:flex-col lg:items-end lg:gap-2">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleSimulate} disabled={pending || sent === 0} title="Generate sample opens/replies/bounces for testing (dev/demo)">
-                <Sparkles className="h-4 w-4" /> Simulate
-              </Button>
               <Button onClick={handleSendNow} disabled={pending}>
                 <Send className="h-4 w-4" /> Send now
               </Button>
@@ -206,17 +217,6 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
         </div>
       </Card>
 
-      {/* Stat tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        {tiles.map((t) => (
-          <Card key={t.label} className="p-4">
-            <div className={`h-8 w-8 rounded-lg flex items-center justify-center mb-2 ${t.color}`}>{t.icon}</div>
-            <p className="text-2xl font-bold text-slate-900 tabular-nums">{t.value.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{t.label}</p>
-          </Card>
-        ))}
-      </div>
-
       {/* Tabs */}
       <div className="flex items-center gap-6 border-b border-slate-200 mb-5">
         {TABS.map((t) => (
@@ -228,29 +228,16 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
         ))}
       </div>
 
-      {/* Audience */}
+      {/* Audience — the actual leads this campaign targets, not just a count.
+          LeadsTable already has its own "Add Leads" button + empty state, so we
+          don't duplicate a second "Add leads" control at the page level. */}
       {tab === "Audience" && (
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-slate-900">Lists of leads</h2>
-            <Button onClick={() => setShowImport(true)}><Plus className="h-4 w-4" /> Add leads</Button>
+          <div className="mb-3">
+            <h2 className="font-semibold text-slate-900">{audienceLabel}</h2>
+            <p className="text-xs text-slate-500">{audienceLeads.length.toLocaleString()} of {audience.toLocaleString()} leads shown below</p>
           </div>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><Layers3 className="h-4.5 w-4.5" /></div>
-                <div>
-                  <p className="font-medium text-slate-900">{audienceLabel}</p>
-                  <p className="text-xs text-slate-500">{audience.toLocaleString()} leads</p>
-                </div>
-              </div>
-              <Link href={`/leads?campaign=${campaign.id}`} className="text-sm font-medium text-blue-600 hover:text-blue-700">View report →</Link>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-100 text-sm max-w-md">
-              <div className="flex items-center justify-between"><span className="text-slate-500">Acceptance / open</span><span className="font-semibold text-slate-900">{openRate}%</span></div>
-              <div className="flex items-center justify-between"><span className="text-slate-500">Response</span><span className="font-semibold text-slate-900">{replyRate}%</span></div>
-            </div>
-          </Card>
+          <LeadsTable leads={audienceLeads} />
         </div>
       )}
 
@@ -260,7 +247,7 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
           <h2 className="font-semibold text-slate-900 mb-3">Email sequence</h2>
           {steps.length > 0 ? (
             <>
-              <p className="text-xs text-slate-500 mb-2">Tip: click any email node to edit it.</p>
+              <p className="text-xs text-slate-500 mb-2">Tip: click any email node to edit it. Drag to pan, Ctrl/Cmd + scroll (or the +/− buttons) to zoom.</p>
               <FlowCanvas>
                 <SequenceFlow steps={steps} onStepClick={openStep} />
               </FlowCanvas>
@@ -271,21 +258,112 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
         </div>
       )}
 
-      {/* Statistics */}
-      {tab === "Statistics" && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: "Open rate", value: `${openRate}%`, sub: `${opened.toLocaleString()} opened` },
-            { label: "Reply rate", value: `${replyRate}%`, sub: `${replied.toLocaleString()} replied` },
-            { label: "Bounce rate", value: `${bounceRate}%`, sub: `${bounced.toLocaleString()} bounced` },
-          ].map((s) => (
-            <Card key={s.label} className="p-5">
-              <div className="flex items-center gap-2 text-slate-500 text-sm mb-2"><BarChart3 className="h-4 w-4" /> {s.label}</div>
-              <p className="text-3xl font-bold text-slate-900">{s.value}</p>
-              <p className="text-xs text-slate-500 mt-1">{s.sub}</p>
-            </Card>
-          ))}
+      {/* Analytics — aggregate tiles/rates plus the actual per-lead, per-date data */}
+      {tab === "Analytics" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {tiles.map((t) => (
+              <Card key={t.label} className="p-4">
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center mb-2 ${t.color}`}>{t.icon}</div>
+                <p className="text-2xl font-bold text-slate-900 tabular-nums">{t.value.toLocaleString()}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{t.label}</p>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="p-5">
+            <p className="text-sm font-medium text-slate-500 mb-3">Funnel</p>
+            <div className="flex items-center gap-1.5">
+              {[
+                { label: "Sent", value: sent, color: "bg-indigo-500" },
+                { label: "Opened", value: opened, color: "bg-emerald-500" },
+                { label: "Replied", value: replied, color: "bg-teal-500" },
+                { label: "Bounced", value: bounced, color: "bg-red-500" },
+              ].map((s) => (
+                <div key={s.label} className="flex-1 min-w-0">
+                  <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div className={cn("h-full rounded-full", s.color)} style={{ width: `${sent > 0 ? Math.min(100, (s.value / sent) * 100) : 0}%` }} />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1.5">{s.label} <span className="font-semibold text-slate-700">{s.value.toLocaleString()}</span></p>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { label: "Open rate", value: `${openRate}%`, sub: `${opened.toLocaleString()} opened` },
+              { label: "Reply rate", value: `${replyRate}%`, sub: `${replied.toLocaleString()} replied` },
+              { label: "Bounce rate", value: `${bounceRate}%`, sub: `${bounced.toLocaleString()} bounced` },
+            ].map((s) => (
+              <Card key={s.label} className="p-5">
+                <div className="flex items-center gap-2 text-slate-500 text-sm mb-2"><BarChart3 className="h-4 w-4" /> {s.label}</div>
+                <p className="text-3xl font-bold text-slate-900">{s.value}</p>
+                <p className="text-xs text-slate-500 mt-1">{s.sub}</p>
+              </Card>
+            ))}
+          </div>
+
+          {/* Per-lead activity — who was sent to, who opened (and when), who replied/bounced */}
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-900 flex items-center gap-2"><CalendarClock className="h-4 w-4 text-slate-400" /> Lead activity</p>
+              <p className="text-xs text-slate-400">{leadActivity.filter((r) => isToday(r.openedAt)).length} opened today</p>
+            </div>
+            {leadActivity.length === 0 ? (
+              <p className="p-8 text-center text-sm text-slate-500">No activity recorded yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-2.5 font-semibold">Lead</th>
+                      <th className="px-4 py-2.5 font-semibold">Sent</th>
+                      <th className="px-4 py-2.5 font-semibold">Opened</th>
+                      <th className="px-4 py-2.5 font-semibold">Replied</th>
+                      <th className="px-4 py-2.5 font-semibold">Clicked</th>
+                      <th className="px-4 py-2.5 font-semibold">Bounced</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {leadActivity.map((r) => (
+                      <tr key={r.leadId} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-2.5">
+                          <p className="font-medium text-slate-900">{r.leadName}</p>
+                          {r.leadEmail && <p className="text-xs text-slate-400">{r.leadEmail}</p>}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600">{fmtDateTime(r.sentAt)}</td>
+                        <td className="px-4 py-2.5">
+                          {r.openedAt ? (
+                            <span className={cn("inline-flex items-center gap-1.5", isToday(r.openedAt) ? "text-emerald-700 font-medium" : "text-slate-600")}>
+                              <MailOpen className="h-3.5 w-3.5" /> {fmtDateTime(r.openedAt)} {isToday(r.openedAt) && <Badge variant="success">Today</Badge>}
+                            </span>
+                          ) : <span className="text-slate-400">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600">
+                          {r.repliedAt ? <span className="inline-flex items-center gap-1.5 text-teal-700"><Reply className="h-3.5 w-3.5" /> {fmtDateTime(r.repliedAt)}</span> : "—"}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600">
+                          {r.clickedAt ? <span className="inline-flex items-center gap-1.5 text-indigo-600"><MousePointerClick className="h-3.5 w-3.5" /> {fmtDateTime(r.clickedAt)}</span> : "—"}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600">
+                          {r.bouncedAt ? <span className="inline-flex items-center gap-1.5 text-red-600"><AlertTriangle className="h-3.5 w-3.5" /> {fmtDateTime(r.bouncedAt)}</span> : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
+      )}
+
+      {/* Inbox — this campaign's replies, scoped from the shared inbox_messages table */}
+      {tab === "Inbox" && (
+        replyTrackingEnabled
+          ? <InboxView conversations={inboxConversations} embedded />
+          : <LockedFeature feature="Reply Tracking" />
       )}
 
       {/* Settings */}
@@ -313,8 +391,6 @@ export function CampaignDetailView({ campaign, audience, audienceLabel, pendingJ
           </Card>
         </div>
       )}
-
-      <AddLeadsWizard open={showImport} onClose={() => setShowImport(false)} />
 
       {/* Inline step editor — opens when a node on the canvas is clicked */}
       <Modal open={editIndex !== null} onClose={() => setEditIndex(null)} title={`Edit step ${editIndex !== null ? editIndex + 1 : ""}`} description="Modify this email in the sequence" size="lg">

@@ -1,5 +1,10 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * Nxelio brand mark — a unique linear "growth path" glyph:
+ * three connected nodes ascending into an arrowhead, representing
+ * lead → nurture → convert. Line-art style (instantly.ai / expandi.io vibe).
+ */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg
@@ -9,24 +14,27 @@ export function LogoMark({ className }: { className?: string }) {
       className={className}
       aria-hidden="true"
     >
-      {/* Stylized N with ascending data path */}
+      {/* ascending connector line */}
       <path
-        d="M7 24 L7 8 L19 22 L19 8"
-        stroke="white"
-        strokeWidth="2.6"
+        d="M6 23 L13 15 L19 19 L26 9"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.95"
+      />
+      {/* arrowhead at the summit */}
+      <path
+        d="M20.5 9 H26 V14.5"
+        stroke="currentColor"
+        strokeWidth="2.4"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {/* Rising accent */}
-      <path
-        d="M19 15 L26 8"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        opacity="0.75"
-      />
-      {/* Summit dot — represents the revenue peak */}
-      <circle cx="26" cy="8" r="2.2" fill="white" />
+      {/* nodes along the path */}
+      <circle cx="6" cy="23" r="2.6" fill="white" stroke="currentColor" strokeWidth="2" />
+      <circle cx="13" cy="15" r="2.6" fill="white" stroke="currentColor" strokeWidth="2" />
+      <circle cx="19" cy="19" r="2.6" fill="white" stroke="currentColor" strokeWidth="2" />
     </svg>
   );
 }
@@ -34,19 +42,17 @@ export function LogoMark({ className }: { className?: string }) {
 export function Logo({ className, showText = true }: { className?: string; showText?: boolean }) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <div className="relative flex-shrink-0">
-        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-[#18A7B8] via-[#0e8fa0] to-[#4F46E5] flex items-center justify-center shadow-lg shadow-[#18A7B8]/30 ring-1 ring-white/10">
-          <LogoMark className="h-[22px] w-[22px]" />
+      <div className="relative">
+        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 ring-1 ring-white/10">
+          <LogoMark className="h-[22px] w-[22px] text-white" />
         </div>
       </div>
       {showText && (
         <div className="flex flex-col leading-none">
           <span className="font-bold text-slate-900 text-lg tracking-tight">
-            Nx<span className="text-[#18A7B8]">elio</span>
+            Nxelio
           </span>
-          <span className="text-[10px] text-slate-500 font-medium uppercase tracking-[0.12em]">
-            Turn Leads into Revenue
-          </span>
+          <span className="text-[10px] text-slate-500 font-medium uppercase tracking-[0.12em]">AI Engagement</span>
         </div>
       )}
     </div>

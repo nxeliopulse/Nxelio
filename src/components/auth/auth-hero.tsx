@@ -1,37 +1,55 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Sparkles, Zap, MessageSquare, BarChart3 } from "lucide-react";
+import { Sparkles, Quote } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 
-const ROTATING_WORDS = ["Score", "Engage", "Nurture", "Convert"];
+const TESTIMONIALS = [
+  {
+    quote:
+      "Nxelio writes better follow-ups than half my SDR team — and it never forgets to send them. Our reply rate doubled in six weeks.",
+    name: "Sarah Chen",
+    role: "VP of Sales, Northwind",
+    avatar: "SC",
+  },
+  {
+    quote:
+      "We replaced three tools with Nxelio. Lead scoring, sequences, and reporting all live in one place now. The AI just gets it.",
+    name: "Marcus Reyes",
+    role: "Founder, Loophole Labs",
+    avatar: "MR",
+  },
+  {
+    quote:
+      "It feels like having a revenue analyst on call 24/7. I open the dashboard and instantly know which deals need me today.",
+    name: "Priya Nair",
+    role: "Head of Growth, Cadence",
+    avatar: "PN",
+  },
+];
 
-const PILLARS = [
-  { icon: Sparkles, text: "AI that reads, scores, and writes — for every lead" },
-  { icon: Zap, text: "Drag-and-drop workflows that run 24/7" },
-  { icon: MessageSquare, text: "Personalized campaigns that don't feel automated" },
-  { icon: BarChart3, text: "See ROI in real time — every email, every reply" },
+const STATS = [
+  { value: "2.4×", label: "Higher reply rate" },
+  { value: "18hrs", label: "Saved per rep / week" },
+  { value: "94%", label: "Forecast accuracy" },
 ];
 
 export function AuthHero() {
-  const [wordIdx, setWordIdx] = useState(0);
-  const [tick, setTick] = useState(0);
+  const [idx, setIdx] = useState(0);
 
-  // Rotate the headline word every 2.4s
   useEffect(() => {
-    const t = setInterval(() => {
-      setWordIdx((i) => (i + 1) % ROTATING_WORDS.length);
-      setTick((n) => n + 1);
-    }, 2400);
+    const t = setInterval(() => setIdx((i) => (i + 1) % TESTIMONIALS.length), 5000);
     return () => clearInterval(t);
   }, []);
 
+  const t = TESTIMONIALS[idx];
+
   return (
-    <div className="hidden lg:flex relative bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white p-12 flex-col justify-between overflow-hidden">
+    <div className="hidden lg:flex relative bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 text-white p-12 xl:p-16 flex-col justify-between overflow-hidden">
       {/* Floating gradient blobs */}
-      <div className="absolute inset-0 opacity-40 pointer-events-none">
-        <div className="absolute top-20 -left-20 w-96 h-96 bg-blue-500 rounded-full blur-3xl animate-blob-1" />
-        <div className="absolute bottom-20 -right-20 w-96 h-96 bg-indigo-500 rounded-full blur-3xl animate-blob-2" />
-        <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-purple-500/60 rounded-full blur-3xl animate-blob-3" />
+      <div className="absolute inset-0 opacity-50 pointer-events-none">
+        <div className="absolute top-10 -left-24 w-96 h-96 bg-blue-500 rounded-full blur-3xl animate-blob-1" />
+        <div className="absolute bottom-10 -right-24 w-96 h-96 bg-indigo-500 rounded-full blur-3xl animate-blob-2" />
+        <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-purple-500/50 rounded-full blur-3xl animate-blob-3" />
       </div>
 
       {/* Subtle grid overlay */}
@@ -49,75 +67,53 @@ export function AuthHero() {
         <Logo className="[&_span:first-child]:text-white [&_span:last-child]:text-blue-200" />
       </div>
 
-      {/* Middle: headline + pillars */}
-      <div className="relative space-y-10">
-        <div>
-          {/* Eyebrow badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-xs font-medium text-blue-100 mb-5 animate-fade-up" style={{ animationDelay: "0.05s" }}>
-            <Sparkles className="h-3 w-3" /> AI Sales Operating System
-          </div>
+      {/* Middle: rotating testimonial */}
+      <div className="relative max-w-lg">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-xs font-medium text-blue-100 mb-8 animate-fade-up">
+          <Sparkles className="h-3 w-3" /> Trusted by 4,000+ revenue teams
+        </div>
 
-          {/* Headline with rotating word */}
-          <h2 className="text-5xl font-bold leading-tight mb-5 animate-fade-up" style={{ animationDelay: "0.15s" }}>
-            <span className="block text-white">Stop chasing leads.</span>
-            <span className="block">
-              <span className="text-white/90">Let AI </span>
-              <span key={tick} className="inline-block animate-word bg-shimmer">
-                {ROTATING_WORDS[wordIdx]}
-              </span>
-              <span className="text-white/90"> them.</span>
-            </span>
-          </h2>
+        <Quote className="h-10 w-10 text-blue-300/40 mb-5" />
 
-          <p className="text-blue-100/80 text-lg leading-relaxed max-w-md animate-fade-up" style={{ animationDelay: "0.3s" }}>
-            LeadPro scores every prospect, writes every email, and runs every follow-up — so your team focuses on closing, not typing.
+        <blockquote key={idx} className="animate-fade-up">
+          <p className="text-2xl xl:text-[1.7rem] font-semibold leading-snug text-white/95">
+            “{t.quote}”
           </p>
-        </div>
-
-        {/* Pillars (stagger-animated) */}
-        <div className="space-y-3 max-w-md stagger">
-          {PILLARS.map((p) => {
-            const Icon = p.icon;
-            return (
-              <div
-                key={p.text}
-                className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/5 backdrop-blur-sm hover:bg-white/[0.08] hover:border-white/10 transition-all"
-              >
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500/30 to-indigo-500/30 ring-1 ring-blue-300/20 flex items-center justify-center flex-shrink-0">
-                  <Icon className="h-4 w-4 text-blue-200" />
-                </div>
-                <span className="text-blue-50/95 text-sm leading-relaxed pt-1">{p.text}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Floating live stat card */}
-        <div className="relative max-w-xs animate-float-gentle" style={{ animationDelay: "0.6s" }}>
-          <div className="relative p-4 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/10 shadow-2xl">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 animate-pulse-ring" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-              </span>
-              <span className="text-xs font-semibold text-emerald-300">Live now</span>
+          <footer className="mt-7 flex items-center gap-3.5">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center font-semibold text-white ring-2 ring-white/20 flex-shrink-0">
+              {t.avatar}
             </div>
-            <p className="text-sm font-semibold text-white leading-snug">
-              247 emails sent automatically in the last hour
-            </p>
-            <p className="text-xs text-blue-200/70 mt-1">Across 12 active campaigns • 42 replies</p>
-          </div>
+            <div>
+              <p className="font-semibold text-white">{t.name}</p>
+              <p className="text-sm text-blue-200/70">{t.role}</p>
+            </div>
+          </footer>
+        </blockquote>
+
+        {/* Dots */}
+        <div className="flex items-center gap-2 mt-8">
+          {TESTIMONIALS.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setIdx(i)}
+              aria-label={`Show testimonial ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all ${
+                i === idx ? "w-8 bg-white" : "w-1.5 bg-white/30 hover:bg-white/50"
+              }`}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Bottom: footer */}
-      <div className="relative text-sm text-blue-200/60 animate-fade-up" style={{ animationDelay: "0.75s" }}>
-        <div className="flex items-center justify-between">
-          <span>© 2026 LeadPro</span>
-          <span className="flex items-center gap-1.5 text-blue-200/40">
-            <span className="h-1 w-1 rounded-full bg-emerald-400 inline-block" />
-            All systems normal
-          </span>
+      {/* Bottom: stat strip */}
+      <div className="relative animate-fade-up" style={{ animationDelay: "0.3s" }}>
+        <div className="grid grid-cols-3 gap-6 pt-8 border-t border-white/10">
+          {STATS.map((s) => (
+            <div key={s.label}>
+              <p className="text-2xl xl:text-3xl font-bold text-white">{s.value}</p>
+              <p className="text-xs text-blue-200/60 mt-1 leading-tight">{s.label}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

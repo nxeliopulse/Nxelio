@@ -7,13 +7,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Nxelio — Turn Leads into Revenue",
-  description: "The AI-native platform that discovers, enriches, and converts B2B leads automatically. Turn every lead into revenue with Nxelio.",
-  openGraph: {
-    title: "Nxelio — Turn Leads into Revenue",
-    description: "AI-native lead intelligence. Discover, enrich, and close B2B deals at scale.",
-    siteName: "Nxelio",
-  },
+  title: "Nxelio — AI Lead Nurturing Platform",
+  description: "AI-powered customer engagement and lead nurturing platform",
 };
 
 // Runs before paint to set the theme class, avoiding a light flash on load.

@@ -161,7 +161,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { role: "Super Admin", count: adminCount, color: "bg-purple-50 text-purple-600" },
+          { role: "Super Admin", count: adminCount, color: "bg-indigo-50 text-indigo-600" },
           { role: "Marketing Admin", count: marketingCount, color: "bg-pink-50 text-pink-600" },
           { role: "Sales Admin", count: salesCount, color: "bg-blue-50 text-blue-600" },
         ].map((r) => (
@@ -240,7 +240,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Email *</label>
-            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@leadpro.ai" />
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@nxelio.ai" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Role *</label>

@@ -136,7 +136,7 @@ export function CaptureForm({ workspaceSlug, workspaceName }: Props) {
         </form>
 
         <p className="text-center text-xs text-slate-400 mt-8">
-          Powered by <Link href="/login" className="font-semibold text-slate-600 hover:text-slate-900">LeadPro</Link>
+          Powered by <Link href="/login" className="font-semibold text-slate-600 hover:text-slate-900">Nxelio</Link>
         </p>
       </div>
     </div>

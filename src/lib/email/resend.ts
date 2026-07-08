@@ -1,12 +1,10 @@
 import "server-only";
 
 /**
- * Multi-provider email service. Tries, in order:
+ * Email service. Tries, in order:
  *   1. Brevo  (BREVO_API_KEY + BREVO_FROM_EMAIL)  — free 300/day, verifies a
  *      plain email address as sender, NO custom domain required.
- *   2. Resend (RESEND_API_KEY)                    — needs a verified domain to
- *      reach real recipients; sandbox redirects to the test inbox.
- *   3. Dev simulation (no keys)                   — pretends the send succeeded
+ *   2. Dev simulation (no keys)                   — pretends the send succeeded
  *      so every app flow keeps working during development; the email body is
  *      printed to the server console.
  *
@@ -16,36 +14,28 @@ import "server-only";
 
 const BREVO_KEY = process.env.BREVO_API_KEY;
 const BREVO_FROM_EMAIL = process.env.BREVO_FROM_EMAIL; // must be a verified sender in Brevo
-const BREVO_FROM_NAME = process.env.BREVO_FROM_NAME || "LeadPro";
+const BREVO_FROM_NAME = process.env.BREVO_FROM_NAME || "Nxelio";
 // Route replies to the mailbox connected to Unipile (so replies are captured),
 // even when we send from a different verified Brevo sender.
 const REPLY_TO_EMAIL = process.env.REPLY_TO_EMAIL;
 
-const RESEND_KEY = process.env.RESEND_API_KEY;
-const RESEND_FROM = process.env.EMAIL_FROM || "LeadPro <onboarding@resend.dev>";
-const DOMAIN_VERIFIED = process.env.EMAIL_DOMAIN_VERIFIED === "true";
-const TEST_RECIPIENT = process.env.EMAIL_TEST_RECIPIENT;
-
 const brevoConfigured = Boolean(BREVO_KEY && BREVO_FROM_EMAIL);
-const resendConfigured = Boolean(RESEND_KEY);
 
-/** True when ANY real provider is available (dev simulation still works without). */
-export const emailConfigured = brevoConfigured || resendConfigured;
+/** True when a real provider is available (dev simulation still works without). */
+export const emailConfigured = brevoConfigured;
 /** Brevo's single-sender verification reaches real recipients without a domain. */
-export const emailDomainVerified = brevoConfigured || DOMAIN_VERIFIED;
-/** Which provider sends in practice (Brevo wins when configured). */
-export const emailProvider: "brevo" | "resend" | "none" =
-  brevoConfigured ? "brevo" : resendConfigured ? "resend" : "none";
+export const emailDomainVerified = brevoConfigured;
+/** Which provider sends in practice. */
+export const emailProvider: "brevo" | "none" = brevoConfigured ? "brevo" : "none";
 /** The verified "from" address real recipients will see. */
-export const emailFromAddress: string | null =
-  brevoConfigured ? BREVO_FROM_EMAIL! : resendConfigured ? RESEND_FROM : null;
+export const emailFromAddress: string | null = brevoConfigured ? BREVO_FROM_EMAIL! : null;
 
 export interface SendResult {
   ok: boolean;
   id?: string;
   error?: string;
   redirectedTo?: string; // when sandboxed, the real recipient we fell back to
-  provider?: "brevo" | "resend" | "simulated";
+  provider?: "brevo" | "simulated";
   simulated?: boolean;
 }
 
@@ -56,6 +46,12 @@ interface SendArgs {
   text?: string;
   /** Brevo tags — used to attribute open/click/bounce webhook events back to a campaign. */
   tags?: string[];
+  /** Sender display name recipients see. Per-workspace (e.g. the customer's company
+   *  name); falls back to BREVO_FROM_NAME ("Nxelio") when not provided. */
+  fromName?: string;
+  /** Where replies should land. Callers should pass the workspace's actually-connected
+   *  mailbox address when known — falls back to REPLY_TO_EMAIL only if omitted. */
+  replyTo?: string;
 }
 
 function toHtml(html?: string, text?: string): string {
@@ -65,7 +61,8 @@ function toHtml(html?: string, text?: string): string {
   );
 }
 
-async function sendViaBrevo({ to, subject, html, text, tags }: SendArgs): Promise<SendResult> {
+async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo }: SendArgs): Promise<SendResult> {
+  const effectiveReplyTo = replyTo || REPLY_TO_EMAIL;
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
@@ -74,11 +71,11 @@ async function sendViaBrevo({ to, subject, html, text, tags }: SendArgs): Promis
       Accept: "application/json",
     },
     body: JSON.stringify({
-      sender: { name: BREVO_FROM_NAME, email: BREVO_FROM_EMAIL },
+      sender: { name: (fromName && fromName.trim()) || BREVO_FROM_NAME, email: BREVO_FROM_EMAIL },
       to: [{ email: to }],
       subject,
       htmlContent: toHtml(html, text),
-      ...(REPLY_TO_EMAIL ? { replyTo: { email: REPLY_TO_EMAIL } } : {}),
+      ...(effectiveReplyTo ? { replyTo: { email: effectiveReplyTo } } : {}),
       ...(tags && tags.length ? { tags } : {}),
     }),
   });
@@ -93,55 +90,13 @@ async function sendViaBrevo({ to, subject, html, text, tags }: SendArgs): Promis
   return { ok: true, id: data.messageId, provider: "brevo" };
 }
 
-async function sendViaResend({ to, subject, html, text }: SendArgs): Promise<SendResult> {
-  const realTo = to;
-  let effectiveTo = to;
-  let redirectedTo: string | undefined;
-
-  // In sandbox mode, redirect any non-owner recipient to the test inbox
-  if (!DOMAIN_VERIFIED && TEST_RECIPIENT && to.toLowerCase() !== TEST_RECIPIENT.toLowerCase()) {
-    effectiveTo = TEST_RECIPIENT;
-    redirectedTo = TEST_RECIPIENT;
-  }
-
-  const sandboxNote = redirectedTo
-    ? `<div style="margin-top:24px;padding:12px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;font-family:sans-serif;font-size:12px;color:#92400e">⚠️ Sandbox mode: this email was intended for <b>${realTo}</b> but Resend has no verified domain yet, so it was redirected to your test inbox.</div>`
-    : "";
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: RESEND_FROM, to: effectiveTo, subject, html: toHtml(html, text) + sandboxNote }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    let msg = errText;
-    try { msg = JSON.parse(errText).message || errText; } catch {}
-    return { ok: false, error: `Resend: ${msg.slice(0, 280)}`, provider: "resend" };
-  }
-  const data = await res.json();
-  return { ok: true, id: data.id, redirectedTo, provider: "resend" };
-}
-
 export async function sendEmail(args: SendArgs): Promise<SendResult> {
   // 1. Brevo — free tier that reaches real recipients without a domain.
   if (brevoConfigured) {
-    const r = await sendViaBrevo(args);
-    if (r.ok) return r;
-    // Brevo failed. Only fall back to Resend when it can actually deliver to the
-    // REAL recipient (verified domain). Otherwise return Brevo's error — never
-    // silently redirect to the sandbox test inbox, which misdelivers every mail.
-    if (resendConfigured && DOMAIN_VERIFIED) return sendViaResend(args);
-    return r;
+    return sendViaBrevo(args);
   }
 
-  // 2. Resend
-  if (resendConfigured) {
-    return sendViaResend(args);
-  }
-
-  // 3. Dev simulation — keep all flows working with zero config
+  // 2. Dev simulation — keep all flows working with zero config
   console.log(
     `\n📧 [DEV EMAIL — no provider configured]\nTo: ${args.to}\nSubject: ${args.subject}\n${(args.text || args.html || "").slice(0, 500)}\n`
   );

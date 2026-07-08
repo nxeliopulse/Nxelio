@@ -449,7 +449,7 @@ function AccountsTab({ channel, accounts, unipileReady }: {
       {!unipileReady && (
         <div className="mb-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <span>Unipile isn&apos;t configured yet. Add <code>UNIPILE_DSN</code> and <code>UNIPILE_API_KEY</code> to your environment to connect real accounts. {channel === "email" ? "Until then, email steps fall back to Resend." : "Until then, LinkedIn steps can't send."}</span>
+          <span>Unipile isn&apos;t configured yet. Add <code>UNIPILE_DSN</code> and <code>UNIPILE_API_KEY</code> to your environment to connect real accounts. {channel === "email" ? "Until then, email steps fall back to Brevo." : "Until then, LinkedIn steps can't send."}</span>
         </div>
       )}
       {error && (

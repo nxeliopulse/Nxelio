@@ -16,6 +16,8 @@ export interface DashboardStats {
   snapshot: { emailsSent: number; repliesReceived: number; hotLeads: number; aiScored: number };
   /** Pipeline revenue rollup from opportunities */
   pipeline: { openValue: number; openCount: number; wonValue: number; wonCount: number; winRate: number };
+  /** Real counts per product entity for the Campaign Types donut */
+  campaignTypes: { campaigns: number; newsletters: number; segments: number; workflows: number };
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -23,7 +25,11 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 export async function getDashboardStats(): Promise<DashboardStats> {
   const supabase = await createClient();
 
-  const [{ data: leads }, { data: campaigns }, { data: activities }, { data: allCampaigns }, { count: replyCount }, { data: opps }] = await Promise.all([
+  const [
+    { data: leads }, { data: campaigns }, { data: activities }, { data: allCampaigns },
+    { count: replyCount }, { data: opps },
+    { count: campaignCount }, { count: newsletterCount }, { count: segmentCount }, { count: workflowCount },
+  ] = await Promise.all([
     supabase.from("leads").select("id, full_name, company_name, lead_score, status, created_at"),
     supabase.from("campaigns").select("campaign_name, sent_count, open_rate, reply_rate").order("sent_count", { ascending: false }).limit(5),
     supabase.from("lead_activities")
@@ -33,6 +39,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     supabase.from("campaigns").select("sent_count"),
     supabase.from("inbox_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound"),
     supabase.from("opportunities").select("deal_value, stage"),
+    supabase.from("campaigns").select("id", { count: "exact", head: true }),
+    supabase.from("newsletters").select("id", { count: "exact", head: true }),
+    supabase.from("segments").select("id", { count: "exact", head: true }),
+    supabase.from("workflows").select("id", { count: "exact", head: true }),
   ]);
 
   // Pipeline revenue rollup
@@ -132,6 +142,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     leadsDelta,
     snapshot,
     pipeline,
+    campaignTypes: {
+      campaigns: campaignCount || 0,
+      newsletters: newsletterCount || 0,
+      segments: segmentCount || 0,
+      workflows: workflowCount || 0,
+    },
   };
 }
 

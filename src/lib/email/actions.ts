@@ -5,6 +5,7 @@ import { getLeadById } from "@/lib/queries/leads";
 import { isBlocked } from "@/lib/queries/blocklist";
 import { substituteMergeTags } from "@/lib/email/merge-tags";
 import { getCurrentUserProfile } from "@/lib/queries/users";
+import { getOnboarding } from "@/lib/queries/onboarding";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
 
@@ -19,7 +20,7 @@ export interface SendLeadEmailResult {
 }
 
 /**
- * Sends an email to a lead via Resend and logs it as an outbound message
+ * Sends an email to a lead via Brevo and logs it as an outbound message
  * in the inbox thread so it shows up in conversation history.
  */
 export async function sendLeadEmail(leadId: string, subject: string, body: string): Promise<SendLeadEmailResult> {
@@ -36,10 +37,26 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
   const finalSubject = substituteMergeTags(subject, lead, senderName);
   const finalBody = substituteMergeTags(body, lead, senderName);
 
+  // From Name recipients see = the workspace's company name (or "Nxelio").
+  const { data: onboarding } = await getOnboarding();
+  const fromName = onboarding?.company_name?.trim() || "Nxelio";
+
+  // Route replies to whichever mailbox is actually connected, not a stale env var.
+  const supabase = await createClient();
+  const { data: mailbox } = await supabase
+    .from("outreach_accounts")
+    .select("identifier")
+    .eq("channel", "email")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+
   const result = await sendEmail({
     to: lead.email,
     subject: finalSubject,
     text: finalBody,
+    fromName,
+    replyTo: (mailbox?.identifier as string) || undefined,
   });
 
   if (!result.ok) {
@@ -47,7 +64,6 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
   }
 
   // Log to inbox as outbound message (store the substituted text)
-  const supabase = await createClient();
   await supabase.from("inbox_messages").insert({
     lead_id: leadId,
     direction: "outbound",

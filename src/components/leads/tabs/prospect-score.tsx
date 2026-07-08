@@ -5,16 +5,19 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { scoreLeadWithAi, type AiScoreResult } from "@/lib/ai/actions";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 
 const dimMeta = [
   { key: "companyFit", label: "Company Fit", icon: <ShieldCheck className="h-4 w-4" />, color: "bg-emerald-500", desc: "Industry, size, and tech stack match your ICP" },
   { key: "contactAccess", label: "Contact Access", icon: <Users className="h-4 w-4" />, color: "bg-blue-500", desc: "Reachability of key decision-makers" },
-  { key: "opportunityQuality", label: "Opportunity Quality", icon: <TrendingUp className="h-4 w-4" />, color: "bg-purple-500", desc: "Strength of buying signals" },
+  { key: "opportunityQuality", label: "Opportunity Quality", icon: <TrendingUp className="h-4 w-4" />, color: "bg-indigo-500", desc: "Strength of buying signals" },
   { key: "competitivePosition", label: "Competitive Position", icon: <Sparkles className="h-4 w-4" />, color: "bg-amber-500", desc: "Position vs. competing solutions" },
 ] as const;
 
-export function ProspectScoreTab({ leadId }: { leadId: string }) {
-  const [result, setResult] = useState<AiScoreResult | null>(null);
+export function ProspectScoreTab({ leadId, initialResult }: { leadId: string; initialResult?: AiScoreResult | null }) {
+  // Seed from the saved score so the breakdown shows immediately on open and
+  // only the empty state appears when the lead has never been scored.
+  const [result, setResult] = useState<AiScoreResult | null>(initialResult ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,6 +27,7 @@ export function ProspectScoreTab({ leadId }: { leadId: string }) {
     try {
       const r = await scoreLeadWithAi(leadId);
       setResult(r);
+      notifyCreditsChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI scoring failed");
     } finally {
@@ -34,7 +38,7 @@ export function ProspectScoreTab({ leadId }: { leadId: string }) {
   if (!result) {
     return (
       <Card className="p-8 text-center">
-        <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center mb-4">
+        <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center mb-4">
           <Sparkles className="h-6 w-6 text-white" />
         </div>
         <h3 className="font-semibold text-slate-900 mb-1">AI Prospect Scoring</h3>

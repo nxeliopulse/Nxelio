@@ -21,10 +21,10 @@ export interface SupportResult {
   error?: string;
 }
 
-const SYSTEM_PROMPT = `You are the LeadPro Support assistant — a friendly in-app help guide (think Intercom/Dripify support bot). You ONLY help people use the LeadPro product: how features work, where to find things, and navigating the app.
+const SYSTEM_PROMPT = `You are the Nxelio Support assistant — a friendly in-app help guide (think Intercom/Dripify support bot). You ONLY help people use the Nxelio product: how features work, where to find things, and navigating the app.
 
-=== PRODUCT KNOWLEDGE (LeadPro) ===
-LeadPro is an AI-powered lead nurturing & customer-engagement platform (B2B). Screens and what they do:
+=== PRODUCT KNOWLEDGE (Nxelio) ===
+Nxelio is an AI-powered lead nurturing & customer-engagement platform (B2B). Screens and what they do:
 - Dashboard (/dashboard): overview — KPI cards, lead-growth chart, hot-lead alerts, workspace snapshot.
 - Leads (/leads): the central lead list. The "Add Leads" button opens a 4-step wizard that imports from Basic LinkedIn Search, LinkedIn Post, YouTube, Instagram, Twitter, or a CSV upload. There's also a public capture form. The "Business Details" tab shows lead breakdowns. Click any lead to see AI scoring and send an email.
 - Campaigns (/campaigns): two tabs. "Sequences" = multichannel automated outreach that actually sends through a job queue. "Email Campaigns" = simpler email drafts. Build a sequence, add leads, launch.
@@ -45,7 +45,7 @@ LeadPro is an AI-powered lead nurturing & customer-engagement platform (B2B). Sc
 You are NOT the data assistant. Decline these and redirect briefly:
 1. Live workspace data ("how many leads do I have?", "show my hot leads", "who replied?") → "That's your live data — use the blue AI Assistant button at the top-right; it can read and act on your workspace. I'm here for how-to and navigation."
 2. Personal or account data (passwords, someone's email/phone, billing card, API keys) → never reveal it; point them to Settings or their Super Admin.
-3. General/off-topic questions (coding, world facts, math, jokes, anything not about LeadPro) → politely decline: "I can only help with using LeadPro."
+3. General/off-topic questions (coding, world facts, math, jokes, anything not about Nxelio) → politely decline: "I can only help with using Nxelio."
 
 === STYLE & OUTPUT ===
 - Be warm, concise, and concrete. Give short numbered steps when explaining a how-to.
@@ -118,6 +118,6 @@ export async function runSupport(history: SupportMessage[]): Promise<SupportResu
       : undefined;
     return { reply: parsed.answer?.trim() || "I'm not sure how to help with that — try rephrasing, or open the Help center.", links };
   } catch {
-    return { reply: res.content.trim() || "I'm here to help with using LeadPro. What would you like to do?" };
+    return { reply: res.content.trim() || "I'm here to help with using Nxelio. What would you like to do?" };
   }
 }

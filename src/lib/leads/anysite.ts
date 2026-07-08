@@ -1,117 +1,58 @@
 import "server-only";
 
-const BASE_URL = (process.env.ANYSITE_BASE_URL || "https://api.anysite.io").replace(/\/+$/, "");
+// Anysite — LinkedIn Data API. Finds a real email address for a public LinkedIn
+// profile URL. Confirmed request shape against the live API (a request missing
+// the auth header returns a structured "access-token or user-authorization
+// required" validation error naming this exact endpoint/header):
+// https://docs.anysite.io — POST /api/linkedin/user/find_email_by_url
 const API_KEY = process.env.ANYSITE_API_KEY;
+const ENDPOINT = "https://api.anysite.io/api/linkedin/user/find_email_by_url";
 
 export const anysiteConfigured = Boolean(API_KEY);
 
-export interface AnysiteProspect {
-  full_name: string;
-  title: string;
-  company_name: string;
-  location: string;
-  linkedin: string;
-  email: string; // only set when AnySite returns a VERIFIED email
+export interface AnysiteResult {
+  ok: boolean;
+  email?: string;
+  status?: string; // e.g. "valid"
+  error?: string;
 }
 
-interface RawUser {
-  name?: string;
-  alias?: string;
-  url?: string;
-  headline?: string;
-  location?: string;
-}
-
-// Trim a value to a DB column's max length so long LinkedIn headlines don't overflow.
-const cut = (s: string | undefined, n: number) => (s || "").trim().slice(0, n);
-
-/** Pull the company out of a LinkedIn headline like "Head of Marketing at Acme" / "VP Sales | Acme". */
-function companyFromHeadline(headline: string): string {
-  const at = headline.split(/\s+at\s+/i);
-  if (at.length > 1) return at[1].split(/[|·•]/)[0].trim();
-  const bar = headline.split(/\s*[|·•]\s*/);
-  if (bar.length > 1) return bar[bar.length - 1].trim();
-  return "";
-}
-
-async function anysitePost(path: string, body: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
+/** Looks up a real email for one LinkedIn profile URL. Returns ok:false (never throws) so a batch of lookups can't be taken down by one bad profile. */
+export async function findEmailByLinkedIn(linkedinUrl: string, requestTimeoutSec = 60): Promise<AnysiteResult> {
+  if (!API_KEY) return { ok: false, error: "Anysite not configured" };
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  // Give the fetch a bit more headroom than the scrape timeout we ask Anysite to respect.
+  const t = setTimeout(() => ctrl.abort(), (requestTimeoutSec + 15) * 1000);
   try {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const res = await fetch(ENDPOINT, {
       method: "POST",
-      headers: { "access-token": API_KEY!, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      headers: { "access-token": API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: linkedinUrl, timeout: requestTimeoutSec }),
       signal: ctrl.signal,
     });
-    if (!res.ok) throw new Error(`AnySite (${res.status}): ${(await res.text().catch(() => "")).slice(0, 160)}`);
-    return await res.json();
+    const data = await res.json().catch(() => null) as { valid_email?: string; email?: string; email_status?: string; detail?: unknown } | null;
+    if (!res.ok) {
+      const detail = data?.detail;
+      return { ok: false, error: typeof detail === "string" ? detail : `Anysite (${res.status})` };
+    }
+    const email = data?.valid_email || data?.email;
+    if (!email) return { ok: false, error: "No email found" };
+    return { ok: true, email, status: data?.email_status };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Lookup failed" };
   } finally {
     clearTimeout(t);
   }
 }
 
-/** Find a VERIFIED email for one LinkedIn profile. Returns "" if none / unverified / times out. */
-async function findVerifiedEmail(url: string): Promise<string> {
-  try {
-    const data = await anysitePost("/api/linkedin/user/find_email_by_url", { url, timeout: 50 }, 55_000);
-    const row = (Array.isArray(data) ? data[0] : data) as { email?: string; email_status?: string } | undefined;
-    if (row && (row.email_status || "").toLowerCase() === "valid" && row.email) return cut(row.email, 255);
-    return "";
-  } catch {
-    return "";
+/** Enriches multiple LinkedIn URLs with emails, capped at a small concurrency so a big batch doesn't fire 25 requests at once. */
+export async function findEmailsByLinkedIn(linkedinUrls: string[]): Promise<Map<string, AnysiteResult>> {
+  const results = new Map<string, AnysiteResult>();
+  const CONCURRENCY = 5;
+  for (let i = 0; i < linkedinUrls.length; i += CONCURRENCY) {
+    const batch = linkedinUrls.slice(i, i + CONCURRENCY);
+    const settled = await Promise.all(batch.map((url) => findEmailByLinkedIn(url)));
+    batch.forEach((url, idx) => results.set(url, settled[idx]));
   }
-}
-
-/**
- * Real LinkedIn people search via AnySite. When `withEmail` is set, each prospect
- * is enriched with a VERIFIED email in parallel (best-effort — slow/unverified
- * ones are simply left without an email). All fields are trimmed to the lead
- * column limits so long headlines never break the import.
- */
-export async function anysiteSearchPeople(criteria: {
-  industry?: string;
-  role?: string;
-  location?: string;
-  count: number;
-  withEmail?: boolean;
-}): Promise<{ ok: boolean; prospects: AnysiteProspect[]; error?: string }> {
-  if (!API_KEY) return { ok: false, prospects: [], error: "AnySite not configured" };
-
-  const count = Math.max(1, Math.min(25, Math.round(criteria.count || 10)));
-  const keywords = [criteria.industry, criteria.role].filter(Boolean).join(" ").trim();
-
-  const body: Record<string, unknown> = { count, timeout: 60 };
-  if (keywords) body.keywords = keywords;
-  if (criteria.role) body.title = criteria.role;
-  if (criteria.industry) body.company_keywords = criteria.industry;
-
-  let users: RawUser[];
-  try {
-    const data = (await anysitePost("/api/linkedin/search/users", body, 60_000)) as RawUser[] | { data?: RawUser[] };
-    users = (Array.isArray(data) ? data : data.data || []).filter((u) => u.name).slice(0, count);
-  } catch (e) {
-    return { ok: false, prospects: [], error: e instanceof Error ? e.message : "AnySite request failed" };
-  }
-  if (!users.length) return { ok: false, prospects: [], error: "No matching people found. Try broader criteria." };
-
-  const prospects: AnysiteProspect[] = users.map((u) => {
-    const headline = (u.headline || "").trim();
-    return {
-      full_name: cut(u.name, 150),
-      title: cut(headline, 150),
-      company_name: cut(companyFromHeadline(headline), 200),
-      location: cut(u.location, 150),
-      linkedin: cut(u.url || (u.alias ? `https://www.linkedin.com/in/${u.alias}` : ""), 500),
-      email: "",
-    };
-  });
-
-  // Optional verified-email enrichment (parallel, best-effort).
-  if (criteria.withEmail) {
-    const emails = await Promise.all(prospects.map((p) => (p.linkedin ? findVerifiedEmail(p.linkedin) : Promise.resolve(""))));
-    emails.forEach((e, i) => { prospects[i].email = e; });
-  }
-
-  return { ok: true, prospects };
+  return results;
 }

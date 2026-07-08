@@ -20,6 +20,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const initials = userName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
@@ -39,7 +40,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   }
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sticky top-0 z-30">
+    <header className="h-16 bg-slate-50 px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sticky top-0 z-30">
       {/* Left side: hamburger (mobile) + search */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {/* Hamburger — mobile/tablet only */}
@@ -55,8 +56,16 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <div className="hidden sm:flex flex-1 max-w-md">
           <Input
             leftIcon={<Search className="h-4 w-4" />}
-            placeholder="Search..."
-            className="bg-slate-50 border-transparent focus:bg-white"
+            placeholder="Search leads, campaigns..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && searchQuery.trim()) {
+                router.push(`/leads?q=${encodeURIComponent(searchQuery.trim())}`);
+                setSearchQuery("");
+              }
+            }}
+            className="h-11 rounded-full bg-white border border-slate-100 shadow-[0_2px_8px_rgba(17,12,46,0.04)] focus:ring-blue-200"
           />
         </div>
       </div>
@@ -72,8 +81,9 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <button
           onClick={onToggleAssistant}
           aria-label={assistantOpen ? "Close AI assistant" : "Open AI assistant"}
-          className={`flex items-center gap-1.5 rounded-lg font-semibold text-sm transition-all flex-shrink-0 px-2.5 sm:px-3 py-2 text-white bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 shadow-sm shadow-blue-500/30 ${
-            assistantOpen ? "ring-2 ring-blue-300 shadow-md" : "hover:shadow-md hover:brightness-105 active:scale-[0.98]"
+          suppressHydrationWarning
+          className={`flex items-center gap-1.5 rounded-2xl font-semibold text-sm transition-all flex-shrink-0 px-3 sm:px-4 h-11 text-white bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-500 shadow-md shadow-blue-500/25 ${
+            assistantOpen ? "ring-2 ring-blue-300 shadow-lg" : "hover:shadow-lg hover:brightness-105 active:scale-[0.98]"
           }`}
         >
           <Sparkles className="h-4 w-4 flex-shrink-0" />

@@ -28,7 +28,7 @@ const categories = [
     icon: Rocket,
     color: "from-blue-500 to-indigo-600",
     articles: [
-      "Welcome to LeadPro",
+      "Welcome to Nxelio",
       "Setting up your workspace",
       "Inviting team members",
       "Importing your first leads",
@@ -54,7 +54,7 @@ const categories = [
     title: "AI Features",
     description: "Generate emails, score leads, and surface insights",
     icon: Sparkles,
-    color: "from-purple-500 to-pink-600",
+    color: "from-indigo-500 to-pink-600",
     articles: [
       "Choosing the right AI model",
       "Tuning the AI tone and persona",
@@ -66,11 +66,11 @@ const categories = [
   {
     id: "integrations",
     title: "Integrations",
-    description: "Connect Resend, Supabase, Groq, and your CRM",
+    description: "Connect Brevo, Supabase, Groq, and your CRM",
     icon: Plug,
     color: "from-amber-500 to-orange-600",
     articles: [
-      "Verifying your sender domain in Resend",
+      "Verifying your sender domain in Brevo",
       "Rotating API keys safely",
       "Syncing leads with HubSpot",
       "Outbound webhooks (coming soon)",
@@ -82,7 +82,7 @@ const categories = [
 const faqs = [
   {
     q: "How do I import leads from a CSV?",
-    a: "Open the Leads page, click 'Import' in the top-right, and upload a CSV with at least an email column. LeadPro will auto-map common fields like name, company, and title. You can review the mapping before committing the import.",
+    a: "Open the Leads page, click 'Import' in the top-right, and upload a CSV with at least an email column. Nxelio will auto-map common fields like name, company, and title. You can review the mapping before committing the import.",
   },
   {
     q: "Where do I configure AI?",
@@ -94,7 +94,7 @@ const faqs = [
   },
   {
     q: "Can I send emails to anyone?",
-    a: "By default, Resend is in sandbox mode — emails only deliver to the verified account owner. To send to your real prospects, verify a sending domain at resend.com/domains, then set EMAIL_DOMAIN_VERIFIED=true and update EMAIL_FROM to use your verified domain. Once verified, all campaigns and one-off sends route through your domain.",
+    a: "Yes — once BREVO_API_KEY and BREVO_FROM_EMAIL are set with a verified Brevo sender, campaigns and one-off sends deliver to any real recipient. Without that configured, emails are simulated (logged, not delivered).",
   },
   {
     q: "How do I customize email templates?",
@@ -102,7 +102,7 @@ const faqs = [
   },
   {
     q: "What integrations are supported?",
-    a: "LeadPro ships with Groq (AI), Resend (email), and Supabase (database, auth, storage) wired in. HubSpot CRM sync is optional and configurable in Settings > API Keys. A general REST API and webhooks are on the roadmap.",
+    a: "Nxelio ships with Groq (AI), Brevo (email), and Supabase (database, auth, storage) wired in. HubSpot CRM sync is optional and configurable in Settings > API Keys. A general REST API and webhooks are on the roadmap.",
   },
 ];
 
@@ -254,10 +254,10 @@ export function HelpView() {
           </p>
           <div className="space-y-2">
             <a
-              href="mailto:support@leadpro.ai"
+              href="mailto:support@nxelio.ai"
               className="text-sm font-medium text-blue-700 hover:underline block"
             >
-              support@leadpro.ai
+              support@nxelio.ai
             </a>
             <Button onClick={() => setContactOpen(true)} className="w-full mt-2">
               Send a message

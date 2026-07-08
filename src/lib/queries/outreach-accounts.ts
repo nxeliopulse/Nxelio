@@ -7,6 +7,7 @@ import {
   listUnipileAccounts,
   unipileDeleteAccount,
 } from "@/lib/outreach/unipile";
+import { requireSuperAdmin } from "@/lib/queries/auth-guards";
 
 export interface OutreachAccountRow {
   id: string;
@@ -42,10 +43,25 @@ export async function getOutreachAccounts(): Promise<OutreachAccountRow[]> {
  * /outreach?connected=<channel>, and we call syncOutreachAccounts() to store it.
  */
 export async function connectOutreachAccount(channel: "email" | "linkedin"): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    await requireSuperAdmin();
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Forbidden" };
+  }
   if (!unipileConfigured) {
     return { ok: false, error: "Unipile is not configured. Add UNIPILE_DSN and UNIPILE_API_KEY to your environment." };
   }
   const supabase = await createClient();
+
+  // Cap: at most one connected account per channel (email, linkedin).
+  const { count } = await supabase
+    .from("outreach_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("channel", channel);
+  if ((count ?? 0) >= 1) {
+    return { ok: false, error: `Only one ${channel === "email" ? "email" : "LinkedIn"} account can be connected. Disconnect the current one first.` };
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = user
     ? await supabase.from("users").select("workspace_id").eq("user_id", user.id).single()
@@ -120,6 +136,7 @@ export async function syncOutreachAccounts(): Promise<{ ok: boolean; count: numb
 }
 
 export async function deleteOutreachAccount(id: string) {
+  await requireSuperAdmin();
   const supabase = await createClient();
   // Look up the Unipile account_id (RLS guarantees it's one of THIS workspace's rows).
   const { data: row } = await supabase.from("outreach_accounts").select("account_id").eq("id", id).maybeSingle();

@@ -1,7 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Search, Mail, MoreHorizontal, Send, Eye, Copy, Trash2, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Search, Mail, MoreHorizontal, Send, Eye, Copy, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,6 +11,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useFeedback } from "@/components/ui/feedback";
 import { deleteNewsletter, duplicateNewsletter, type NewsletterRow } from "@/lib/queries/newsletters";
 import { formatDate } from "@/lib/utils";
+import { NewsletterTemplateGallery } from "@/components/newsletters/newsletter-template-gallery";
+import type { NewsletterTemplateCategory } from "@/lib/newsletter-templates";
 
 const statusVariant: Record<string, "default" | "blue" | "warning" | "success" | "danger"> = {
   Draft: "default",
@@ -25,8 +28,10 @@ interface Props {
 }
 
 export function NewslettersView({ newsletters, stats }: Props) {
+  const router = useRouter();
   const { confirm } = useFeedback();
   const [search, setSearch] = useState("");
+  const [templateCatFilter, setTemplateCatFilter] = useState<"All" | NewsletterTemplateCategory>("All");
   const [pending, start] = useTransition();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   // Fixed (viewport-relative) menu position so the dropdown isn't clipped by the
@@ -48,6 +53,20 @@ export function NewslettersView({ newsletters, stats }: Props) {
     setMenuOpen(null);
   }
 
+  if (newsletters.length === 0) {
+    return (
+      <div className="max-w-[1600px] mx-auto">
+        <PageHeader title="Newsletters" description="Send rich content updates to your subscribed leads" />
+        <NewsletterTemplateGallery
+          catFilter={templateCatFilter}
+          onCatFilterChange={setTemplateCatFilter}
+          onPick={(templateId) => router.push(`/newsletters/builder?template=${templateId}`)}
+          onBlank={() => router.push("/newsletters/builder")}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-[1600px] mx-auto">
       <PageHeader
@@ -65,7 +84,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
         {[
           { label: "Total newsletters", value: stats.total, color: "text-blue-600 bg-blue-50" },
           { label: "Sent", value: stats.sent, color: "text-emerald-600 bg-emerald-50" },
-          { label: "Avg. open rate", value: `${stats.avgOpenRate}%`, color: "text-purple-600 bg-purple-50" },
+          { label: "Avg. open rate", value: `${stats.avgOpenRate}%`, color: "text-indigo-600 bg-indigo-50" },
           { label: "Avg. click rate", value: `${stats.avgClickRate}%`, color: "text-amber-600 bg-amber-50" },
         ].map((s) => (
           <Card key={s.label} className="p-4">
@@ -91,12 +110,8 @@ export function NewslettersView({ newsletters, stats }: Props) {
 
         {filtered.length === 0 ? (
           <div className="p-12 text-center">
-            <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4">
-              <Sparkles className="h-6 w-6 text-white" />
-            </div>
-            <h3 className="font-semibold text-slate-900 mb-1">No newsletters yet</h3>
-            <p className="text-sm text-slate-500 mb-4">Send rich content updates to keep your leads engaged.</p>
-            <Link href="/newsletters/builder"><Button><Plus className="h-4 w-4" /> Create your first newsletter</Button></Link>
+            <h3 className="font-semibold text-slate-900 mb-1">No matches</h3>
+            <p className="text-sm text-slate-500">No newsletters match &quot;{search}&quot;.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -130,7 +145,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                         {n.sent_count > 0 ? (
                           <div className="flex items-center gap-2">
                             <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-purple-500 rounded-full" style={{ width: `${openRate}%` }} />
+                              <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${openRate}%` }} />
                             </div>
                             <span className="text-slate-700 font-medium">{openRate}%</span>
                           </div>

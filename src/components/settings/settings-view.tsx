@@ -1,6 +1,9 @@
 "use client";
 import { useState, useTransition, useEffect, type ReactNode } from "react";
-import { User, Mail, Bell, Key, ShieldCheck, Ban, CreditCard, Plus, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor } from "lucide-react";
+import { User, Bell, Key, ShieldCheck, Ban, CreditCard, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor, Plug } from "lucide-react";
+import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
+import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
+import { ConnectorsView } from "@/components/settings/connectors-view";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,7 +17,7 @@ import type { IntegrationStatus } from "@/lib/queries/integrations";
 const sections = [
   { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
   { id: "appearance", label: "Appearance", icon: <Palette className="h-4 w-4" /> },
-  { id: "email", label: "Email Accounts", icon: <Mail className="h-4 w-4" /> },
+  { id: "connectors", label: "Connectors", icon: <Plug className="h-4 w-4" /> },
   { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
   { id: "api", label: "API Keys", icon: <Key className="h-4 w-4" /> },
   { id: "blocklist", label: "Blocklist", icon: <Ban className="h-4 w-4" /> },
@@ -31,12 +34,29 @@ interface Profile {
 interface Props {
   profile: Profile | null;
   integrations: IntegrationStatus[];
-  emailDomain: { verified: boolean; from: string; provider?: "brevo" | "resend" | "none" };
+  emailDomain: { verified: boolean; from: string; provider?: "brevo" | "none" };
   blocklist: BlocklistEntry[];
+  calendarAccounts: CalendarAccountRow[];
+  calendarProviderStatus: { google: boolean; microsoft: boolean };
+  mailboxAccounts: OutreachAccountRow[];
+  linkedinAccounts: OutreachAccountRow[];
+  unipileConfigured: boolean;
+  bookingSlug?: string | null;
+  isSuperAdmin: boolean;
 }
 
-export function SettingsView({ profile, integrations, emailDomain, blocklist }: Props) {
+export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin }: Props) {
   const [active, setActive] = useState("profile");
+  // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar
+  // (and the mailbox flow used ?section=email) — both now live under "connectors".
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get("section");
+    const resolved = s === "calendar" || s === "email" ? "connectors" : s;
+    if (resolved && sections.some((sec) => sec.id === resolved)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
+      setActive(resolved);
+    }
+  }, []);
   const [pending, start] = useTransition();
   const [name, setName] = useState(profile?.full_name || "");
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
@@ -198,7 +218,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist }: 
           {active === "appearance" && (
             <Card className="p-6">
               <h3 className="font-semibold text-slate-900 mb-1">Appearance</h3>
-              <p className="text-sm text-slate-500 mb-5">Choose how LeadPro looks. &ldquo;System&rdquo; follows your device setting.</p>
+              <p className="text-sm text-slate-500 mb-5">Choose how Nxelio looks. &ldquo;System&rdquo; follows your device setting.</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
                 {([
                   { value: "light", label: "Light", icon: <Sun className="h-5 w-5" />, preview: "bg-white border-slate-200" },
@@ -224,54 +244,17 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist }: 
             </Card>
           )}
 
-          {active === "email" && (
-            <Card className="p-6">
-              <h3 className="font-semibold text-slate-900 mb-1">Email sending</h3>
-              <p className="text-sm text-slate-500 mb-5">
-                {emailDomain.provider === "brevo"
-                  ? "Currently sending via Brevo"
-                  : emailDomain.provider === "resend"
-                    ? "Currently sending via Resend"
-                    : "No email provider configured"}
-              </p>
-
-              <div className={`mb-4 flex items-start gap-2 rounded-lg p-3 text-sm border ${emailDomain.verified ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-                {emailDomain.verified ? <CheckCircle2 className="h-4 w-4 mt-0.5" /> : <AlertCircle className="h-4 w-4 mt-0.5" />}
-                <div>
-                  <p className="font-semibold">
-                    {emailDomain.verified
-                      ? "Production mode — reaching real recipients"
-                      : emailDomain.provider === "resend"
-                        ? "Sandbox mode — no verified domain"
-                        : "Simulated — no provider configured"}
-                  </p>
-                  <p className="text-xs mt-1">
-                    {emailDomain.verified
-                      ? `Emails sent from ${emailDomain.from} via ${emailDomain.provider === "brevo" ? "Brevo" : "Resend"} to real recipients.`
-                      : emailDomain.provider === "resend"
-                        ? "Resend only delivers to the account owner until you verify a domain at resend.com/domains, then set EMAIL_DOMAIN_VERIFIED=true and update EMAIL_FROM."
-                        : "Set BREVO_API_KEY + BREVO_FROM_EMAIL (recommended) to deliver to real recipients. Until then, emails are logged, not sent."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><Mail className="h-4.5 w-4.5" /></div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-slate-900">{emailDomain.from}</p>
-                        <Badge variant="blue">Default</Badge>
-                      </div>
-                      <p className="text-xs text-slate-500">{emailDomain.provider === "brevo" ? "Brevo" : emailDomain.provider === "resend" ? "Resend" : "No"} provider</p>
-                    </div>
-                  </div>
-                  {emailDomain.verified ? <Badge variant="success"><Check className="h-2.5 w-2.5" /> Verified</Badge> : <Badge variant="warning">Sandbox</Badge>}
-                </div>
-                <Button variant="outline" className="w-full" disabled><Plus className="h-4 w-4" /> Connect additional email account (coming soon)</Button>
-              </div>
-            </Card>
+          {active === "connectors" && (
+            <ConnectorsView
+              isSuperAdmin={isSuperAdmin}
+              emailSendingActive={emailDomain.verified}
+              mailboxAccounts={mailboxAccounts}
+              linkedinAccounts={linkedinAccounts}
+              connectorReady={unipileConfigured}
+              calendarAccounts={calendarAccounts}
+              calendarProviderStatus={calendarProviderStatus}
+              bookingSlug={bookingSlug}
+            />
           )}
 
           {active === "notifications" && (
@@ -312,14 +295,14 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist }: 
               <p className="text-sm text-slate-500 mb-3">Connected services — keys are stored as server-only env vars</p>
 
               <p className="text-sm text-slate-600 leading-relaxed mb-5 bg-slate-50 border border-slate-100 rounded-lg p-3">
-                LeadPro connects with these services to power AI, send emails, store data, and sync with your CRM. Keys are stored as server-only env vars and never exposed to the browser. Connect or rotate keys here, or in your hosting platform (Vercel) for production.
+                Nxelio connects with these services to power AI, send emails, store data, and sync with your CRM. Keys are stored as server-only env vars and never exposed to the browser. Connect or rotate keys here, or in your hosting platform (Vercel) for production.
               </p>
 
               <div className="space-y-3">
                 {integrations.map((k) => {
                   const notes: Record<string, string> = {
                     "AI Provider (Groq)": "Powers lead scoring, email writing, and prospect insights",
-                    "Resend (Email)": "Sends OTP emails, campaign emails, and notifications",
+                    "Brevo (Email)": "Sends OTP emails, campaign emails, and notifications",
                     "Supabase": "Database, authentication, and file storage",
                     "HubSpot CRM": "Sync leads and campaigns with your CRM (optional)",
                   };
