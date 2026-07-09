@@ -1,0 +1,421 @@
+"use server";
+import { createClient } from "@/lib/supabase/server";
+
+export interface DashboardStats {
+  totalLeads: number;
+  hotLeads: number;
+  avgOpenRate: number;
+  conversionRate: number;
+  leadGrowth: { date: string; leads: number; hot: number }[];
+  campaignPerf: { name: string; openRate: number; replyRate: number }[];
+  recentActivities: { id: string; lead: string; action: string; type: string; time: string }[];
+  hotLeadAlerts: { name: string; company: string; score: number }[];
+  /** Real month-over-month % change in new-lead count (undefined when no prior data) */
+  leadsDelta?: number;
+  /** Real workspace totals for the snapshot card */
+  snapshot: { emailsSent: number; repliesReceived: number; hotLeads: number; aiScored: number };
+  /** Pipeline revenue rollup from opportunities */
+  pipeline: { openValue: number; openCount: number; wonValue: number; wonCount: number; winRate: number };
+  /** Real counts per product entity for the Campaign Types donut */
+  campaignTypes: { campaigns: number; newsletters: number; segments: number; workflows: number };
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const supabase = await createClient();
+
+  const [
+    { data: leads }, { data: campaigns }, { data: activities }, { data: allCampaigns },
+    { count: replyCount }, { data: opps },
+    { count: campaignCount }, { count: newsletterCount }, { count: segmentCount }, { count: workflowCount },
+  ] = await Promise.all([
+    supabase.from("leads").select("id, full_name, company_name, lead_score, status, created_at"),
+    supabase.from("campaigns").select("campaign_name, sent_count, open_rate, reply_rate").order("sent_count", { ascending: false }).limit(5),
+    supabase.from("lead_activities")
+      .select("id, activity_type, created_at, leads(full_name, company_name)")
+      .order("created_at", { ascending: false })
+      .limit(8),
+    supabase.from("campaigns").select("sent_count"),
+    supabase.from("inbox_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound"),
+    supabase.from("opportunities").select("deal_value, stage"),
+    supabase.from("campaigns").select("id", { count: "exact", head: true }),
+    supabase.from("newsletters").select("id", { count: "exact", head: true }),
+    supabase.from("segments").select("id", { count: "exact", head: true }),
+    supabase.from("workflows").select("id", { count: "exact", head: true }),
+  ]);
+
+  // Pipeline revenue rollup
+  const oppRows = (opps as { deal_value: number; stage: string }[]) || [];
+  const openOpps = oppRows.filter((o) => o.stage !== "won" && o.stage !== "lost");
+  const wonOpps = oppRows.filter((o) => o.stage === "won");
+  const lostCount = oppRows.filter((o) => o.stage === "lost").length;
+  const closedCount = wonOpps.length + lostCount;
+  const pipeline = {
+    openValue: openOpps.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+    openCount: openOpps.length,
+    wonValue: wonOpps.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+    wonCount: wonOpps.length,
+    winRate: closedCount ? Math.round((wonOpps.length / closedCount) * 1000) / 10 : 0,
+  };
+
+  const totalLeads = leads?.length || 0;
+  const hotLeads = leads?.filter((l) => l.status === "Hot").length || 0;
+  const converted = leads?.filter((l) => l.status === "Converted").length || 0;
+  const conversionRate = totalLeads ? Math.round((converted / totalLeads) * 1000) / 10 : 0;
+
+  // Avg open rate from campaigns with sent emails
+  const sentCampaigns = (campaigns || []).filter((c) => (c.sent_count || 0) > 0);
+  const avgOpenRate = sentCampaigns.length
+    ? Math.round(sentCampaigns.reduce((s, c) => s + Number(c.open_rate || 0), 0) / sentCampaigns.length * 10) / 10
+    : 0;
+
+  // Group leads by month for growth chart (last 5 months)
+  const now = new Date();
+  const months: { date: string; leads: number; hot: number }[] = [];
+  for (let i = 4; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const start = d.getTime();
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1).getTime();
+    const monthLeads = (leads || []).filter((l) => {
+      const t = new Date(l.created_at).getTime();
+      return t >= start && t < end;
+    });
+    months.push({
+      date: MONTHS[d.getMonth()],
+      leads: monthLeads.length,
+      hot: monthLeads.filter((l) => l.status === "Hot").length,
+    });
+  }
+
+  // Real month-over-month delta on new-lead count (only when prior month had leads)
+  const thisMonthLeads = months[months.length - 1]?.leads ?? 0;
+  const lastMonthLeads = months[months.length - 2]?.leads ?? 0;
+  const leadsDelta = lastMonthLeads > 0
+    ? Math.round(((thisMonthLeads - lastMonthLeads) / lastMonthLeads) * 1000) / 10
+    : undefined;
+
+  // Real workspace snapshot totals
+  const emailsSent = (allCampaigns || []).reduce((s, c) => s + (c.sent_count || 0), 0);
+  const aiScored = (leads || []).filter((l) => (l.lead_score || 0) > 0).length;
+  const snapshot = {
+    emailsSent,
+    repliesReceived: replyCount || 0,
+    hotLeads,
+    aiScored,
+  };
+
+  const campaignPerf = (campaigns || []).map((c) => ({
+    name: c.campaign_name.length > 14 ? c.campaign_name.slice(0, 12) + "…" : c.campaign_name,
+    openRate: Math.round(Number(c.open_rate || 0)),
+    replyRate: Math.round(Number(c.reply_rate || 0)),
+  }));
+
+  const recentActivities = (activities || []).map((a) => ({
+    id: a.id,
+    // @ts-expect-error joined object
+    lead: a.leads?.full_name || a.leads?.company_name || "Unknown",
+    action: humanizeAction(a.activity_type),
+    type: activityType(a.activity_type),
+    time: relativeTime(new Date(a.created_at)),
+  }));
+
+  const hotLeadAlerts = (leads || [])
+    .filter((l) => l.status === "Hot")
+    .sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0))
+    .slice(0, 3)
+    .map((l) => ({
+      name: l.full_name || l.company_name || "—",
+      company: l.company_name || "—",
+      score: l.lead_score || 0,
+    }));
+
+  return {
+    totalLeads,
+    hotLeads,
+    avgOpenRate,
+    conversionRate,
+    leadGrowth: months,
+    campaignPerf,
+    recentActivities,
+    hotLeadAlerts,
+    leadsDelta,
+    snapshot,
+    pipeline,
+    campaignTypes: {
+      campaigns: campaignCount || 0,
+      newsletters: newsletterCount || 0,
+      segments: segmentCount || 0,
+      workflows: workflowCount || 0,
+    },
+  };
+}
+
+function humanizeAction(type: string): string {
+  const map: Record<string, string> = {
+    PAGE_VISITED: "visited a page",
+    EMAIL_OPENED: "opened an email",
+    EMAIL_CLICKED: "clicked an email link",
+    GUIDE_DOWNLOADED: "downloaded a guide",
+    WEBINAR_ATTENDED: "attended a webinar",
+    WEBINAR_REGISTERED: "registered for a webinar",
+    CONSULTATION_REQUESTED: "booked consultation",
+    LEAD_SCORE_UPDATED: "lead score updated",
+    LEAD_CREATED: "was added as a lead",
+    HOT_LEAD_IDENTIFIED: "became a hot lead",
+  };
+  return map[type] || type.toLowerCase().replace(/_/g, " ");
+}
+
+function activityType(type: string): string {
+  if (type.startsWith("EMAIL_")) return "email";
+  if (type.includes("PAGE")) return "page";
+  if (type.includes("GUIDE") || type.includes("DOWNLOAD")) return "download";
+  if (type.includes("WEBINAR")) return "webinar";
+  if (type.includes("CONSULTATION") || type.includes("MEETING")) return "meeting";
+  if (type.includes("CLICK")) return "click";
+  if (type.includes("SCORE")) return "score";
+  return "page";
+}
+
+function relativeTime(date: Date): string {
+  const diff = Date.now() - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} mins ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days > 1 ? "s" : ""} ago`;
+  return date.toLocaleDateString();
+}
+
+// ============================================================================
+// Analytics page
+// ============================================================================
+export interface AnalyticsStats {
+  // ── Email metrics ──
+  emailsSent: number;
+  openRate: number;
+  clickRate: number;
+  replyRate: number;
+  // ── Charts ──
+  funnel: { stage: string; value: number }[];
+  engagement: { day: string; opens: number; clicks: number; replies: number }[];
+  leadGrowth: { date: string; leads: number; hot: number }[];
+  campaignPerf: { name: string; openRate: number; replyRate: number; sent: number }[];
+  // ── Heatmap: [7 days Mon-Sun][24 hours] ──
+  heatmap: number[][];
+  // ── Lead metrics ──
+  totalLeads: number;
+  hotLeads: number;
+  convertedLeads: number;
+  leadScoreDist: { bucket: string; count: number }[];
+  // ── Revenue / pipeline ──
+  pipelineByStage: { stage: string; count: number; value: number }[];
+  pipelineTotal: number;
+  wonRevenue: number;
+  winRate: number;
+  avgDealValue: number;
+}
+
+const PIPELINE_STAGE_ORDER = ["new", "qualified", "meeting_scheduled", "proposal_sent", "negotiation", "won", "lost"];
+const PIPELINE_STAGE_LABEL: Record<string, string> = {
+  new: "New", qualified: "Qualified", meeting_scheduled: "Meeting Booked",
+  proposal_sent: "Proposal Sent", negotiation: "Negotiation", won: "Won", lost: "Lost",
+};
+
+async function computeAnalytics(startISO: string | null, endISO: string | null): Promise<AnalyticsStats> {
+  const supabase = await createClient();
+
+  let campaignsQ = supabase.from("campaigns").select("campaign_name, sent_count, open_rate, reply_rate, bounce_rate, created_at");
+  let leadsQ     = supabase.from("leads").select("status, lead_score, created_at");
+  let activitiesQ = supabase.from("lead_activities").select("activity_type, created_at");
+  let oppsQ      = supabase.from("opportunities").select("stage, deal_value, created_at");
+
+  if (startISO) {
+    campaignsQ  = campaignsQ.gte("created_at", startISO);
+    leadsQ      = leadsQ.gte("created_at", startISO);
+    activitiesQ = activitiesQ.gte("created_at", startISO);
+    oppsQ       = oppsQ.gte("created_at", startISO);
+  }
+  if (endISO) {
+    campaignsQ  = campaignsQ.lte("created_at", endISO);
+    leadsQ      = leadsQ.lte("created_at", endISO);
+    activitiesQ = activitiesQ.lte("created_at", endISO);
+    oppsQ       = oppsQ.lte("created_at", endISO);
+  }
+
+  const [
+    { data: campaigns },
+    { data: leads },
+    { data: activities },
+    { data: opps },
+  ] = await Promise.all([campaignsQ, leadsQ, activitiesQ, oppsQ]);
+
+  const allCampaigns  = campaigns   || [];
+  const allLeads      = leads       || [];
+  const allActivities = activities  || [];
+  const allOpps       = opps        || [];
+  const sentCampaigns = allCampaigns.filter((c) => (c.sent_count || 0) > 0);
+
+  // ── Email rates ──────────────────────────────────────────────────────────
+  const emailsSent = allCampaigns.reduce((s, c) => s + (c.sent_count || 0), 0);
+  const avgOpen    = sentCampaigns.length
+    ? sentCampaigns.reduce((s, c) => s + Number(c.open_rate  || 0), 0) / sentCampaigns.length : 0;
+  const avgReply   = sentCampaigns.length
+    ? sentCampaigns.reduce((s, c) => s + Number(c.reply_rate || 0), 0) / sentCampaigns.length : 0;
+  const totalClicks = allActivities.filter((a) => a.activity_type === "EMAIL_CLICKED").length;
+  const avgClick    = emailsSent > 0 ? (totalClicks / emailsSent) * 100 : 0;
+
+  // ── Funnel ───────────────────────────────────────────────────────────────
+  const funnel = ["New", "Warm", "Hot", "Scored", "Converted"].map((stage) => ({
+    stage,
+    value: allLeads.filter((l) => l.status === stage).length,
+  }));
+
+  // ── Engagement last 7 days ───────────────────────────────────────────────
+  const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const engagement: AnalyticsStats["engagement"] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const start = new Date(d.setHours(0, 0, 0, 0)).getTime();
+    const end   = start + 86400000;
+    const dayActs = allActivities.filter((a) => {
+      const t = new Date(a.created_at).getTime();
+      return t >= start && t < end;
+    });
+    engagement.push({
+      day:     DAY_LABELS[new Date(start).getDay()],
+      opens:   dayActs.filter((a) => a.activity_type === "EMAIL_OPENED").length,
+      clicks:  dayActs.filter((a) => a.activity_type === "EMAIL_CLICKED").length,
+      replies: dayActs.filter((a) => a.activity_type === "EMAIL_REPLIED").length,
+    });
+  }
+
+  // ── Lead growth (last 5 months) ──────────────────────────────────────────
+  const leadGrowth: AnalyticsStats["leadGrowth"] = [];
+  const now = new Date();
+  for (let i = 4; i >= 0; i--) {
+    const d     = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const start = d.getTime();
+    const end   = new Date(now.getFullYear(), now.getMonth() - i + 1, 1).getTime();
+    const ml    = allLeads.filter((l) => {
+      const t = new Date(l.created_at).getTime();
+      return t >= start && t < end;
+    });
+    leadGrowth.push({
+      date: MONTHS[d.getMonth()],
+      leads: ml.length,
+      hot:   ml.filter((l) => l.status === "Hot").length,
+    });
+  }
+
+  // ── Campaign perf ────────────────────────────────────────────────────────
+  const campaignPerf = sentCampaigns.slice(0, 8).map((c) => ({
+    name:      c.campaign_name.length > 16 ? c.campaign_name.slice(0, 14) + "…" : c.campaign_name,
+    openRate:  Math.round(Number(c.open_rate  || 0)),
+    replyRate: Math.round(Number(c.reply_rate || 0)),
+    sent:      c.sent_count || 0,
+  }));
+
+  // ── Activity heatmap (Mon=0 … Sun=6) × hour ──────────────────────────────
+  const heatmap: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
+  for (const act of allActivities) {
+    const d    = new Date(act.created_at);
+    const dow  = (d.getDay() + 6) % 7; // 0=Mon … 6=Sun
+    const hour = d.getHours();
+    heatmap[dow][hour]++;
+  }
+
+  // ── Lead metrics ─────────────────────────────────────────────────────────
+  const totalLeads     = allLeads.length;
+  const hotLeads       = allLeads.filter((l) => l.status === "Hot").length;
+  const convertedLeads = allLeads.filter((l) => l.status === "Converted").length;
+
+  const scoreBuckets = [
+    { bucket: "0–20",   min: 0,  max: 20  },
+    { bucket: "21–40",  min: 21, max: 40  },
+    { bucket: "41–60",  min: 41, max: 60  },
+    { bucket: "61–80",  min: 61, max: 80  },
+    { bucket: "81–100", min: 81, max: 100 },
+  ];
+  const leadScoreDist = scoreBuckets.map(({ bucket, min, max }) => ({
+    bucket,
+    count: allLeads.filter((l) => {
+      const s = l.lead_score || 0;
+      return s >= min && s <= max;
+    }).length,
+  }));
+
+  // ── Pipeline / revenue ───────────────────────────────────────────────────
+  const stageMap = new Map<string, { count: number; value: number }>();
+  for (const opp of allOpps) {
+    const key = opp.stage || "new";
+    const cur = stageMap.get(key) || { count: 0, value: 0 };
+    stageMap.set(key, { count: cur.count + 1, value: cur.value + Number(opp.deal_value || 0) });
+  }
+  const pipelineByStage = PIPELINE_STAGE_ORDER.map((s) => ({
+    stage: PIPELINE_STAGE_LABEL[s] || s,
+    count: stageMap.get(s)?.count || 0,
+    value: stageMap.get(s)?.value || 0,
+  }));
+
+  const openOpps   = allOpps.filter((o) => o.stage !== "won" && o.stage !== "lost");
+  const wonOpps    = allOpps.filter((o) => o.stage === "won");
+  const lostCount  = allOpps.filter((o) => o.stage === "lost").length;
+  const closedCount = wonOpps.length + lostCount;
+  const pipelineTotal = openOpps.reduce((s, o) => s + Number(o.deal_value || 0), 0);
+  const wonRevenue    = wonOpps.reduce((s, o)  => s + Number(o.deal_value || 0), 0);
+  const winRate       = closedCount > 0 ? Math.round((wonOpps.length / closedCount) * 1000) / 10 : 0;
+  const totalDeals    = openOpps.length + wonOpps.length;
+  const avgDealValue  = totalDeals > 0 ? Math.round((pipelineTotal + wonRevenue) / totalDeals) : 0;
+
+  return {
+    emailsSent,
+    openRate:  Math.round(avgOpen  * 10) / 10,
+    clickRate: Math.round(avgClick * 10) / 10,
+    replyRate: Math.round(avgReply * 10) / 10,
+    funnel,
+    engagement,
+    leadGrowth,
+    campaignPerf,
+    heatmap,
+    totalLeads,
+    hotLeads,
+    convertedLeads,
+    leadScoreDist,
+    pipelineByStage,
+    pipelineTotal,
+    wonRevenue,
+    winRate,
+    avgDealValue,
+  };
+}
+
+export async function getAnalyticsStats(): Promise<AnalyticsStats> {
+  return computeAnalytics(null, null);
+}
+
+export async function getAnalyticsStatsRanged(days: number | "year"): Promise<AnalyticsStats> {
+  const now = new Date();
+  let start: Date;
+  if (days === "year") {
+    start = new Date(now.getFullYear(), 0, 1);
+  } else {
+    start = new Date(now.getTime() - days * 86400000);
+  }
+  return computeAnalytics(start.toISOString(), now.toISOString());
+}
+
+export async function getAnalyticsStatsCustom(start: string, end: string): Promise<AnalyticsStats> {
+  // Accept YYYY-MM-DD or ISO timestamps. Normalize to inclusive day boundaries.
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  // Ensure end-of-day for end boundary if it's a date-only string
+  if (/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    endDate.setHours(23, 59, 59, 999);
+  }
+  return computeAnalytics(startDate.toISOString(), endDate.toISOString());
+}
