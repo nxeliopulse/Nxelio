@@ -8,6 +8,7 @@ import {
   Play, Layers, Megaphone, PieChart, Rss, Lock,
 } from "lucide-react";
 import { BookDemoModal } from "./book-demo-modal";
+import { AiAssistantWidget } from "./ai-assistant-widget";
 
 // ─── Infographic colour palette ───────────────────────────────────────────────
 // Primary teal + 7 vivid accent hues — no dark backgrounds anywhere
@@ -1616,6 +1617,7 @@ export function LandingPage() {
       <CTABanner onBookDemo={openDemoModal}/>
       <Footer/>
       <BookDemoModal open={showDemoModal} onClose={() => setShowDemoModal(false)}/>
+      <AiAssistantWidget/>
     </div>
   );
 }
