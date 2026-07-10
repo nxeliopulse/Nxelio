@@ -11,6 +11,9 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
+import { LeadDetailSidebar } from "@/components/leads/lead-detail-sidebar";
+import { getLeadDetail } from "@/lib/queries/lead-detail";
+import type { Activity } from "@/components/leads/lead-detail-view";
 import { deleteLead, bulkDeleteLeads, type LeadRow } from "@/lib/queries/leads";
 
 const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | "success" | "purple"> = {
@@ -61,9 +64,11 @@ interface Props {
   campaignFilter?: { id: string; name: string };
   /** Pre-populate the search box (from global search). */
   initialSearch?: string;
+  /** When landing directly on /leads/[id], opens the sidebar pre-loaded with this lead — avoids a second fetch/flash. */
+  initialSelectedLead?: { lead: LeadRow; activities: Activity[] } | null;
 }
 
-export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
+export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelectedLead }: Props) {
   const { confirm } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -75,6 +80,53 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
   const [dateTo, setDateTo] = useState("");
   const [showWizard, setShowWizard] = useState(false);
   const [page, setPage] = useState(0);
+
+  // Lead detail sidebar — opens over the table instead of navigating to /leads/[id].
+  // The URL still updates (via raw history push, not router.push) so the lead stays
+  // linkable/bookmarkable without remounting this table and losing filter/page state.
+  const [openLeadId, setOpenLeadId] = useState<string | null>(initialSelectedLead?.lead.id ?? null);
+  const [openLeadData, setOpenLeadData] = useState<{ lead: LeadRow; activities: Activity[] } | null>(initialSelectedLead ?? null);
+  const [openLeadLoading, setOpenLeadLoading] = useState(false);
+
+  async function openLead(id: string) {
+    if (id === openLeadId) return;
+    setOpenLeadId(id);
+    setOpenLeadData(null);
+    setOpenLeadLoading(true);
+    window.history.pushState(null, "", `/leads/${id}`);
+    const { lead, activities } = await getLeadDetail(id);
+    setOpenLeadLoading(false);
+    if (lead) setOpenLeadData({ lead: lead as LeadRow, activities: activities as Activity[] });
+  }
+
+  function closeLead() {
+    setOpenLeadId(null);
+    setOpenLeadData(null);
+    window.history.pushState(null, "", "/leads");
+  }
+
+  useEffect(() => {
+    function onPopState() {
+      const m = window.location.pathname.match(/^\/leads\/([^/]+)$/);
+      if (m) {
+        const id = m[1];
+        if (id !== openLeadId) {
+          setOpenLeadId(id);
+          setOpenLeadData(null);
+          setOpenLeadLoading(true);
+          getLeadDetail(id).then(({ lead, activities }) => {
+            setOpenLeadLoading(false);
+            if (lead) setOpenLeadData({ lead: lead as LeadRow, activities: activities as Activity[] });
+          });
+        }
+      } else {
+        setOpenLeadId(null);
+        setOpenLeadData(null);
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [openLeadId]);
   const [sort, setSort] = useState<"none" | "name" | "score" | "newest">("none");
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 15;
@@ -255,7 +307,15 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
       case "index":
         return <span className="text-slate-400 tabular-nums">{rowNumber}</span>;
       case "first_name":
-        return <Link href={`/leads/${l.id}`} className="font-medium text-slate-900 hover:text-blue-600">{splitName(l).first || "—"}</Link>;
+        return (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openLead(l.id); }}
+            className="font-medium text-slate-900 hover:text-blue-600"
+          >
+            {splitName(l).first || "—"}
+          </button>
+        );
       case "last_name":
         return <span className="text-slate-700">{splitName(l).last || "—"}</span>;
       case "email":
@@ -438,7 +498,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
                 {paged.map((l, i) => (
                   <tr
                     key={l.id}
-                    onClick={() => router.push(`/leads/${l.id}`)}
+                    onClick={() => openLead(l.id)}
                     className="hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -495,6 +555,10 @@ export function LeadsTable({ leads, campaignFilter, initialSearch }: Props) {
       </Card>
 
       <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
+
+      {openLeadId && (
+        <LeadDetailSidebar data={openLeadData} loading={openLeadLoading} onClose={closeLead} />
+      )}
 
       {/* Column picker — fixed-position so the table's horizontal scroll never clips it */}
       {showCols && colsPos && (

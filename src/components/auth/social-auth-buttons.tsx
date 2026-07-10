@@ -36,10 +36,13 @@ export function SocialAuthButtons({
   next = "/dashboard",
   disabled,
   onError,
+  variant = "light",
 }: {
   next?: string;
   disabled?: boolean;
   onError?: (message: string) => void;
+  /** "dark" matches the glassy dark login/signup card; "light" is the original white-card look. */
+  variant?: "light" | "dark";
 }) {
   const [busy, setBusy] = useState<Provider | null>(null);
 
@@ -60,24 +63,25 @@ export function SocialAuthButtons({
     }
   }
 
-  const base =
-    "flex w-full items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed";
+  const base = "flex w-full items-center justify-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+  const light = "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
+  const dark = "border-[1.5px] border-white/10 bg-white/[.06] text-white hover:bg-white/[.1]";
 
   return (
     <div className="space-y-3">
-      <button type="button" onClick={() => signIn("google")} disabled={disabled || busy !== null} className={base}>
+      <button type="button" onClick={() => signIn("google")} disabled={disabled || busy !== null} className={`${base} ${variant === "dark" ? dark : light}`}>
         <GoogleIcon />
         {busy === "google" ? "Redirecting…" : "Continue with Google"}
       </button>
-      <button type="button" onClick={() => signIn("linkedin_oidc")} disabled={disabled || busy !== null} className={base}>
+      <button type="button" onClick={() => signIn("linkedin_oidc")} disabled={disabled || busy !== null} className={`${base} ${variant === "dark" ? dark : light}`}>
         <LinkedInIcon />
         {busy === "linkedin_oidc" ? "Redirecting…" : "Continue with LinkedIn"}
       </button>
 
       <div className="flex items-center gap-3 py-1">
-        <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-medium text-slate-400">or</span>
-        <div className="h-px flex-1 bg-slate-200" />
+        <div className={`h-px flex-1 ${variant === "dark" ? "bg-white/10" : "bg-slate-200"}`} />
+        <span className={`text-xs font-medium ${variant === "dark" ? "text-white/35" : "text-slate-400"}`}>or</span>
+        <div className={`h-px flex-1 ${variant === "dark" ? "bg-white/10" : "bg-slate-200"}`} />
       </div>
     </div>
   );
