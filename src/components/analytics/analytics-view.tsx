@@ -21,14 +21,14 @@ import { getAnalyticsStatsRanged, getAnalyticsStatsCustom } from "@/lib/queries/
 import type { AnalyticsStats } from "@/lib/queries/analytics";
 
 // ── Tokens ─────────────────────────────────────────────────────────────────────
-const BG       = "#F4F5F7";
+const BG       = "#F0F2F5";
 const WHITE    = "#FFFFFF";
-const BORDER   = "#E8E9EF";
+const BORDER   = "#C8CBD6";
 const TEXT     = "#1A1A2B";
 const MUTED    = "#6B7280";
 const SOFT     = "#9CA3AF";
 const PILL_BG  = "#1C1C2B";
-const GRID_C   = "#F0F1F5";
+const GRID_C   = "#E8EAF0";
 const TICK_C   = "#9CA3AF";
 
 // KPI card background colors (solid, white text)
@@ -179,7 +179,7 @@ function KPICard({label,value,sub,trend,icon,colorIdx}:KPI){
   const bg=KPI_COLORS[colorIdx%KPI_COLORS.length];
   const up=(trend??0)>=0;
   return(
-    <div className="rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden" style={{background:bg,minHeight:140}}>
+    <div className="rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden border-2" style={{background:bg,minHeight:140,borderColor:"rgba(255,255,255,.2)",boxShadow:"0 4px 16px rgba(0,0,0,.18)"}}>
       <div className="absolute top-4 right-4 opacity-30">{icon}</div>
       <div>
         <p className="text-[14px] font-semibold mb-1" style={{color:"rgba(255,255,255,.65)"}}>{label}</p>
@@ -212,11 +212,11 @@ function WCard({title,icon,badge,extra,children,noPad,customizing,dragging,dragO
       onDragOver={e=>{e.preventDefault();onDragOver?.(e);}}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      className={cn("rounded-2xl border overflow-hidden transition-all duration-150",dragOver?"ring-2 ring-[#4F72DE] ring-offset-1":"",dragging?"opacity-40":"",className)}
-      style={{background:WHITE,borderColor:dragOver?"#4F72DE":BORDER,boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}
+      className={cn("rounded-2xl border-2 overflow-hidden transition-all duration-150",dragOver?"ring-2 ring-[#4F72DE] ring-offset-1":"",dragging?"opacity-40":"",className)}
+      style={{background:WHITE,borderColor:dragOver?"#4F72DE":BORDER,boxShadow:"0 2px 12px rgba(0,0,0,.10)"}}
     >
       {title&&(
-        <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{borderColor:BORDER}}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b-2" style={{borderColor:BORDER}}>
           <div className="flex items-center gap-2 min-w-0">
             {customizing&&<GripVertical size={14} style={{color:SOFT,flexShrink:0}}/>}
             {icon&&<span style={{color:"#4F72DE"}}>{icon}</span>}
@@ -254,7 +254,7 @@ function computeInsights(s:AnalyticsStats){
 }
 
 // ── Panel renderer ─────────────────────────────────────────────────────────────
-function renderContent(id:PanelId,s:AnalyticsStats):React.ReactNode{
+function renderContent(id:PanelId,s:AnalyticsStats,onViewReport?:()=>void):React.ReactNode{
   const convRate=s.totalLeads>0?((s.convertedLeads/s.totalLeads)*100).toFixed(1):"0.0";
   const insights=computeInsights(s);
   const mixData=[
@@ -340,7 +340,7 @@ function renderContent(id:PanelId,s:AnalyticsStats):React.ReactNode{
             );
           })}
           <div className="pt-3 border-t" style={{borderColor:BORDER}}>
-            <button className="w-full py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:PAL[0]}}>View Full Report</button>
+            <button onClick={onViewReport} className="w-full py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:PAL[0]}}>View Full Report</button>
           </div>
         </div>
       </div>
@@ -497,7 +497,7 @@ function renderContent(id:PanelId,s:AnalyticsStats):React.ReactNode{
       </ResponsiveContainer>
     );
 
-    case "pi-opps": return <>{renderContent("ov-opps",s)}</>;
+    case "pi-opps": return <>{renderContent("ov-opps",s,onViewReport)}</>;
 
     // ── Revenue ──────────────────────────────────────────────────────────────
     case "rv-forecast": return(
@@ -747,7 +747,7 @@ function renderContent(id:PanelId,s:AnalyticsStats):React.ReactNode{
       </div>
     );
 
-    case "aa-sources": return <>{renderContent("rv-sources",s)}</>;
+    case "aa-sources": return <>{renderContent("rv-sources",s,onViewReport)}</>;
 
     case "aa-score": return(
       <ResponsiveContainer width="100%" height={220}>
@@ -921,7 +921,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
     <div style={{background:BG,margin:"-20px -24px",minHeight:"100vh"}}>
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div style={{background:WHITE,borderBottom:`1px solid ${BORDER}`,boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}>
+      <div style={{background:WHITE,borderBottom:`2px solid ${BORDER}`,boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
@@ -1036,7 +1036,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
         </div>
 
         {/* Panel grid */}
-        <div className="flex flex-wrap gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {visiblePanels.map(id=>{
             const meta=PM[id];
             if(!meta)return null;
@@ -1045,7 +1045,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             const isDragOver=dragOver===id;
             const noPad=["ov-opps","pi-opps","ca-leader"].includes(id);
             return(
-              <div key={id} className="shrink-0" style={{width:isHalf?"calc(50% - 8px)":"100%"}}
+              <div key={id} className={isHalf?"":"col-span-2"}
                 draggable={customizing}
                 onDragStart={()=>setDragging(id)}
                 onDragOver={e=>{e.preventDefault();if(dragging!==id)setDragOver(id);}}
@@ -1060,14 +1060,14 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
                   dragOver={isDragOver}
                   onHide={()=>hidePanel(id)}
                 >
-                  {renderContent(id,s)}
+                  {renderContent(id,s,()=>setShowReport(true))}
                 </WCard>
               </div>
             );
           })}
 
           {visiblePanels.length===0&&(
-            <div className="w-full flex flex-col items-center justify-center py-20" style={{color:MUTED}}>
+            <div className="col-span-2 flex flex-col items-center justify-center py-20" style={{color:MUTED}}>
               <EyeOff size={32} className="mb-3 opacity-30"/>
               <p className="font-semibold mb-1" style={{color:TEXT}}>All panels are hidden</p>
               <p className="text-sm mb-4">Click the panel badges above to show them again</p>
