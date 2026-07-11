@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { signUpDirect } from "@/lib/queries/auth";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 
 const INPUT = {
   className: "w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 outline-none transition-all",
@@ -127,6 +128,9 @@ export default function SignupPage() {
         <p className="text-center text-xs font-medium" style={{ color:"rgba(255,255,255,.35)" }}>
           ✓ No credit card required
         </p>
+
+        {/* OAuth */}
+        <OAuthButtons label="Or sign up with" />
 
         {/* Switch */}
         <p className="text-center text-sm pt-1" style={{ color:"rgba(255,255,255,.4)" }}>

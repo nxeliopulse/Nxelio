@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2, Circle, Clock, Flame, LayoutGrid, Lightbulb,
   Mail, MailOpen, MoreHorizontal, Sliders, Sparkles, Target, TrendingUp,
@@ -14,6 +14,40 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { DashboardStats } from "@/lib/queries/analytics";
+
+// ── Welcome banner (shown once after checkout completes) ─────────────────────
+function WelcomeBanner() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (params.get("welcome") === "1") {
+      setVisible(true);
+      // Strip the param so a refresh doesn't re-show it
+      router.replace("/dashboard", { scroll: false });
+    }
+  }, [params, router]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.07] px-5 py-3.5 animate-in fade-in slide-in-from-top-2 duration-500">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/15">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-100">Payment method added — you&apos;re all set!</p>
+          <p className="text-xs text-gray-500 mt-0.5">Your trial is active. Explore all features below.</p>
+        </div>
+      </div>
+      <button onClick={() => setVisible(false)} className="text-gray-600 hover:text-gray-300 transition-colors">
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
 
 const BLUE   = "#2563eb";
 const INDIGO = "#4f46e5";
@@ -214,6 +248,11 @@ export function DashboardView({
 
   return (
     <div className="space-y-4 max-w-[1600px] mx-auto">
+
+      {/* ── Welcome banner (post-checkout) ── */}
+      <Suspense fallback={null}>
+        <WelcomeBanner />
+      </Suspense>
 
       {/* ── Header ── */}
       <div className="flex items-center justify-end">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 
 const INPUT = {
   className: "w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 outline-none transition-all",
@@ -128,6 +129,9 @@ function LoginForm() {
         <p className="text-center text-xs font-medium" style={{ color:"rgba(255,255,255,.35)" }}>
           ✓ No credit card required
         </p>
+
+        {/* OAuth */}
+        <OAuthButtons label="Or sign in with" />
 
         {/* Switch */}
         <p className="text-center text-sm pt-2" style={{ color:"rgba(255,255,255,.4)" }}>
