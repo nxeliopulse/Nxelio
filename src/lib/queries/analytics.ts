@@ -162,7 +162,7 @@ function relativeTime(date: Date): string {
 }
 
 // ============================================================================
-// Analytics page — Salesforce-level data model
+// Analytics page — Enterprise-level data model
 // ============================================================================
 export interface AnalyticsStats {
   // ── Email metrics ──
@@ -187,7 +187,7 @@ export interface AnalyticsStats {
   wonRevenue: number;
   winRate: number;
   avgDealValue: number;
-  // ── Salesforce-level additions ──
+  // ── Enterprise-level additions ──
   quotaTarget: number;
   quotaAttainment: number;
   pipelineCoverage: number;
@@ -352,7 +352,7 @@ async function computeAnalytics(startISO: string | null, endISO: string | null):
   const totalDeals    = openOpps.length + wonOpps.length;
   const avgDealValue  = totalDeals > 0 ? Math.round((pipelineTotal + wonRevenue) / totalDeals) : 0;
 
-  // ── Salesforce-level: quota & forecast ───────────────────────────────────
+  // ── Enterprise-level: quota & forecast ───────────────────────────────────
   const nowMs = Date.now();
 
   // Quota: 2× won revenue; minimum $20k for fresh workspaces
@@ -515,7 +515,7 @@ async function computeAnalytics(startISO: string | null, endISO: string | null):
     funnel, engagement, leadGrowth, campaignPerf, heatmap,
     totalLeads, hotLeads, convertedLeads, leadScoreDist,
     pipelineByStage, pipelineTotal, wonRevenue, winRate, avgDealValue,
-    // Salesforce-level
+    // Enterprise-level
     quotaTarget, quotaAttainment, pipelineCoverage, dealVelocity,
     forecastMonths, opportunityAging, stageConversion,
     leadSources, activityBreakdown, winLossReasons, accountHealthDist, topOpportunities,
