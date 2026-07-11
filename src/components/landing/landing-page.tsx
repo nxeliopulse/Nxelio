@@ -7,6 +7,8 @@ import {
   Menu, X, MessageSquare, TrendingUp, CheckCircle,
   Play, Layers, Megaphone, PieChart, Rss, Lock,
 } from "lucide-react";
+import { BookDemoModal } from "./book-demo-modal";
+import { AiAssistantWidget } from "./ai-assistant-widget";
 
 // ─── Infographic colour palette ───────────────────────────────────────────────
 // Primary teal + 7 vivid accent hues — no dark backgrounds anywhere
@@ -196,7 +198,7 @@ function useCounter(end: number, active: boolean) {
 }
 
 // ─── NAVBAR ───────────────────────────────────────────────────────────────────
-function Navbar({ scrolled, mobileOpen, toggle }: { scrolled: boolean; mobileOpen: boolean; toggle: () => void }) {
+function Navbar({ scrolled, mobileOpen, toggle, onBookDemo }: { scrolled: boolean; mobileOpen: boolean; toggle: () => void; onBookDemo: () => void }) {
   return (
     <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${
       scrolled ? "bg-white/95 backdrop-blur-lg shadow-sm border-b border-slate-100" : "bg-transparent"
@@ -245,13 +247,13 @@ function Navbar({ scrolled, mobileOpen, toggle }: { scrolled: boolean; mobileOpe
             }`}>
             Sign In
           </Link>
-          <Link href="/signup"
+          <button type="button" onClick={onBookDemo}
             className="px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all hover:scale-[1.03] hover:shadow-xl"
             style={scrolled
               ? { background:"linear-gradient(135deg,#18A7B8,#7E57C2)", color:"white", boxShadow:"0 4px 16px rgba(24,167,184,.3)" }
               : { background:"white", color:"#18A7B8", boxShadow:"0 4px 20px rgba(0,0,0,.18)" }}>
-            Get Started Free <ArrowRight className="h-3.5 w-3.5"/>
-          </Link>
+            Book Demo <ArrowRight className="h-3.5 w-3.5"/>
+          </button>
         </div>
 
         <button type="button" onClick={toggle}
@@ -275,8 +277,8 @@ function Navbar({ scrolled, mobileOpen, toggle }: { scrolled: boolean; mobileOpe
           ))}
           <div className="pt-3 flex flex-col gap-2 border-t border-slate-100 mt-3">
             <Link href="/login" className="block px-3 py-2.5 text-sm font-semibold text-center border border-slate-200 rounded-xl text-slate-700">Sign In</Link>
-            <Link href="/signup" className="block px-3 py-2.5 text-sm font-bold text-center text-white rounded-xl"
-              style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)" }}>Get Started Free</Link>
+            <button type="button" onClick={() => { toggle(); onBookDemo(); }} className="block w-full px-3 py-2.5 text-sm font-bold text-center text-white rounded-xl"
+              style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)" }}>Book Demo</button>
           </div>
         </div>
       )}
@@ -285,7 +287,7 @@ function Navbar({ scrolled, mobileOpen, toggle }: { scrolled: boolean; mobileOpe
 }
 
 // ─── HERO ─────────────────────────────────────────────────────────────────────
-function Hero() {
+function Hero({ onBookDemo }: { onBookDemo: () => void }) {
   const word = useTypewriter();
   return (
     <section className="relative overflow-hidden pt-24 pb-16" style={{ background:"#18A7B8" }}>
@@ -322,11 +324,11 @@ function Hero() {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12 nxl-section-in" style={{ animationDelay:"0.35s" }}>
-          <Link href="/signup"
+          <button type="button" onClick={onBookDemo}
             className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-base transition-all hover:scale-[1.03] hover:shadow-2xl"
             style={{ background:"white", color:"#18A7B8", boxShadow:"0 8px 32px rgba(0,0,0,0.18)" }}>
-            Start Free — No card needed <ArrowRight className="h-4 w-4"/>
-          </Link>
+            Book Demo <ArrowRight className="h-4 w-4"/>
+          </button>
           <Link href="/login"
             className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white border transition-all hover:bg-white/10"
             style={{ borderColor:"rgba(255,255,255,0.4)" }}>
@@ -1190,7 +1192,7 @@ function FAQ() {
 }
 
 // ─── CTA BANNER ───────────────────────────────────────────────────────────────
-function CTABanner() {
+function CTABanner({ onBookDemo }: { onBookDemo: () => void }) {
   return (
     <section className="py-8 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-5xl mx-auto">
@@ -1219,11 +1221,11 @@ function CTABanner() {
               from a single, beautifully simple workspace.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/signup"
+              <button type="button" onClick={onBookDemo}
                 className="inline-flex items-center gap-2 px-9 py-4 rounded-xl font-bold text-white text-base transition-all hover:scale-[1.03] hover:shadow-xl"
                 style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow:"0 12px 40px rgba(24,167,184,.35)", padding:"1rem 2.25rem" }}>
-                Get Started Free — No card needed <ArrowRight className="h-4 w-4"/>
-              </Link>
+                Book Demo — No card needed <ArrowRight className="h-4 w-4"/>
+              </button>
               <Link href="/login"
                 className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-slate-700 text-sm bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all">
                 <Play className="h-4 w-4" style={{ color:"#18A7B8" }}/> Sign In
@@ -1588,6 +1590,7 @@ function DemoVideo() {
 export function LandingPage() {
   const [scrolled,    setScrolled]    = useState(false);
   const [mobileOpen,  setMobileOpen]  = useState(false);
+  const [showDemoModal, setShowDemoModal] = useState(false);
   useReveal();
 
   useEffect(() => {
@@ -1596,10 +1599,12 @@ export function LandingPage() {
     return () => window.removeEventListener("scroll", fn);
   }, []);
 
+  const openDemoModal = () => setShowDemoModal(true);
+
   return (
     <div className="landing-page min-h-screen bg-white text-slate-900 overflow-x-hidden">
-      <Navbar scrolled={scrolled} mobileOpen={mobileOpen} toggle={() => setMobileOpen((v)=>!v)}/>
-      <Hero/>
+      <Navbar scrolled={scrolled} mobileOpen={mobileOpen} toggle={() => setMobileOpen((v)=>!v)} onBookDemo={openDemoModal}/>
+      <Hero onBookDemo={openDemoModal}/>
       <DemoVideo/>
       <BrandsSection/>
       <StatsSection/>
@@ -1609,8 +1614,10 @@ export function LandingPage() {
       <Pricing/>
       <Testimonials/>
       <FAQ/>
-      <CTABanner/>
+      <CTABanner onBookDemo={openDemoModal}/>
       <Footer/>
+      <BookDemoModal open={showDemoModal} onClose={() => setShowDemoModal(false)}/>
+      <AiAssistantWidget/>
     </div>
   );
 }

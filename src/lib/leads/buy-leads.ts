@@ -59,10 +59,17 @@ export async function searchBuyLeads(criteria: BuyCriteria): Promise<BuyLeadsRes
       // Never fabricated — a lookup miss just leaves email empty.
       if (anysiteConfigured) {
         const urls = prospects.map((p) => p.linkedin).filter((u): u is string => Boolean(u));
+        console.log(`[buy-leads] Enriching ${urls.length} profiles with AnySite email lookup…`);
         const found = await findEmailsByLinkedIn(urls);
         prospects = prospects.map((p) => {
           const hit = p.linkedin ? found.get(p.linkedin) : undefined;
           return hit?.ok ? { ...p, email: hit.email || p.email } : p;
+        });
+        const emailCount = prospects.filter(p => p.email).length;
+        console.log(`[buy-leads] Email enrichment done: ${emailCount}/${prospects.length} prospects have an email`);
+        // Log misses so we can debug
+        found.forEach((result, url) => {
+          if (!result.ok) console.log(`[buy-leads] Miss: ${url} → ${result.error}`);
         });
       }
 

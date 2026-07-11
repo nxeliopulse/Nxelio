@@ -265,12 +265,13 @@ Application modules you support: Dashboard, Leads, Contacts, Campaigns, Inbox, S
 STRICT OPERATION RULES:
 1. You support ONLY three operations: Read (instant), Create (approval required), and Edit/Update (approval required).
 2. DELETE operations are COMPLETELY DISABLED. If a user asks to delete anything, respond: "Delete operations are not available through the AI assistant. Please use the application interface to delete records directly." Do not call any delete tool.
-3. You ONLY answer questions related to the Nxelio application. If a user asks any general question unrelated to the application (e.g. weather, math, general knowledge, coding help, recipes, jokes, current events), respond politely: "I'm the Nxelio Assistant and I can only help with application-related questions — such as your leads, campaigns, analytics, segments, billing, or settings. How can I help you with the platform today?"
+3. The off-topic refusal below is ONLY for questions with NO connection to Nxelio at all (e.g. weather, math, general knowledge, coding help, recipes, jokes, current events). It is NOT for greetings, and NOT for questions about how a Nxelio feature works — answer those directly from your own knowledge of the app, even when no tool call is needed (e.g. "how do I buy leads here" — explain the Buy Leads flow conversationally; a friendly greeting — reply warmly and ask how you can help). Only use this exact refusal for genuinely unrelated topics: "I'm the Nxelio Assistant and I can only help with application-related questions — such as your leads, campaigns, analytics, segments, billing, or settings. How can I help you with the platform today?"
 
 How your tools work:
 - READ tools (stats, list_users, search_leads, list_*) execute immediately — use them freely to answer data questions.
 - WRITE tools (create/update/send) do NOT run immediately. They queue an approval card the admin must accept before anything changes.
 - Never call a write tool for a question — only for an explicit create/update/send request.
+- Not every on-topic question needs a tool call. Questions about how a feature works, what something means, or general guidance on using Nxelio should be answered directly and helpfully from your own knowledge, without forcing a tool call or a refusal.
 
 Reporting style:
 - Precise and factual — cite real values from tool results (names, emails, counts, statuses).
@@ -501,7 +502,9 @@ function summarizeAction(name: string, args: Record<string, unknown>): string {
 // Rate-limit-aware completion call: retries 429/5xx with backoff instead of
 // surfacing raw provider errors.
 // ---------------------------------------------------------------------------
-const FALLBACK_MODEL = "llama-3.3-70b-versatile";
+// Only kicks in when explicitly configured — a provider-specific retry model
+// (e.g. Groq's Llama fallback) has no equivalent on other providers like OpenAI.
+const FALLBACK_MODEL = process.env.AI_FALLBACK_MODEL;
 
 async function chatCompletion(body: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false; status: number; text: string }> {
   let lastStatus = 0;
@@ -518,8 +521,8 @@ async function chatCompletion(body: Record<string, unknown>): Promise<{ ok: true
     lastStatus = res.status;
     lastText = await res.text();
 
-    // On any 400 from the primary model, retry once with the fallback model.
-    if (res.status === 400 && !triedFallback && body.model !== FALLBACK_MODEL) {
+    // On any 400 from the primary model, retry once with the fallback model (if configured).
+    if (res.status === 400 && !triedFallback && FALLBACK_MODEL && body.model !== FALLBACK_MODEL) {
       triedFallback = true;
       body = { ...body, model: FALLBACK_MODEL };
       continue;

@@ -30,15 +30,25 @@ export async function findEmailByLinkedIn(linkedinUrl: string, requestTimeoutSec
       body: JSON.stringify({ url: linkedinUrl, timeout: requestTimeoutSec }),
       signal: ctrl.signal,
     });
-    const data = await res.json().catch(() => null) as { valid_email?: string; email?: string; email_status?: string; detail?: unknown } | null;
+    const rawData = await res.json().catch(() => null);
+    
+    // API may return an array (e.g., [result]) or an object directly
+    const data = Array.isArray(rawData) ? rawData[0] : rawData;
+
     if (!res.ok) {
       const detail = data?.detail;
-      return { ok: false, error: typeof detail === "string" ? detail : `Anysite (${res.status})` };
+      const error = typeof detail === "string" ? detail : `Anysite (${res.status})`;
+      console.error(`Anysite error for ${linkedinUrl}: ${error}`);
+      return { ok: false, error };
     }
     const email = data?.valid_email || data?.email;
-    if (!email) return { ok: false, error: "No email found" };
+    if (!email) {
+      console.warn(`Anysite: No email found for ${linkedinUrl}`);
+      return { ok: false, error: "No email found" };
+    }
     return { ok: true, email, status: data?.email_status };
   } catch (e) {
+    console.error(`Anysite exception for ${linkedinUrl}:`, e);
     return { ok: false, error: e instanceof Error ? e.message : "Lookup failed" };
   } finally {
     clearTimeout(t);

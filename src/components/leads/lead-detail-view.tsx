@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mail, Phone, AtSign, Globe, Calendar, Star, Send, Building2, Target, Users, BarChart3, MoreHorizontal, MapPin, FileDown, MailOpen, Mouse, Briefcase, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, X, Mail, Phone, AtSign, Globe, Calendar, Star, Send, Building2, Target, Users, BarChart3, MoreHorizontal, MapPin, FileDown, MailOpen, Mouse, Briefcase, Pencil, Trash2 } from "lucide-react";
 import { Tabs } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { formatDate, cn } from "@/lib/utils";
 
 const TIMELINE_VISIBLE = 5;
 
-interface Activity {
+export interface Activity {
   id: string;
   activity_type: string;
   metadata: Record<string, unknown> | null;
@@ -55,7 +55,7 @@ function relativeTime(iso: string): string {
   return formatDate(iso);
 }
 
-export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities: Activity[] }) {
+export function LeadDetailView({ lead, activities, onClose }: { lead: LeadRow; activities: Activity[]; onClose?: () => void }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
   const [, startDelete] = useTransition();
@@ -76,7 +76,8 @@ export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities
       try {
         await deleteLead(lead.id);
         toast("Lead deleted.", "success");
-        router.push("/leads");
+        if (onClose) onClose();
+        else router.push("/leads");
       } catch {
         toast("Couldn't delete lead. Try again.", "error");
       }
@@ -94,9 +95,15 @@ export function LeadDetailView({ lead, activities }: { lead: LeadRow; activities
 
   return (
     <div className="max-w-[1600px] mx-auto">
-      <Link href="/leads" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4">
-        <ArrowLeft className="h-4 w-4" /> Back to leads
-      </Link>
+      {onClose ? (
+        <button onClick={onClose} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4">
+          <X className="h-4 w-4" /> Close
+        </button>
+      ) : (
+        <Link href="/leads" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4">
+          <ArrowLeft className="h-4 w-4" /> Back to leads
+        </Link>
+      )}
 
       {/* Hero card */}
       <Card className="p-6 mb-6">
