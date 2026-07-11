@@ -1368,10 +1368,10 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
   const hiddenInTab=(DEFAULT_PANELS[tab]??[]).filter(id=>cfg.hidden.includes(id));
 
   return(
-    <div style={{background:BG,margin:"-20px -24px",minHeight:"100vh"}} className={cn(presentMode?"p-8":"", "font-sans text-slate-800")}>
+    <div className={cn(presentMode?"p-8":"", "font-sans text-slate-800 bg-[#F3F5F9] dark:bg-slate-900 min-h-screen -mx-6 -my-5")}>
 
       {/* ── Header Toolbar ─────────────────────────────────────────────────── */}
-      <div style={{background:WHITE,borderBottom:`1px solid ${BORDER}`}} className="shadow-xs sticky top-0 z-20">
+      <div className="shadow-xs sticky top-0 z-20 bg-white dark:bg-slate-950 border-b border-[#DDDBDA] dark:border-slate-800">
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-3.5 flex-wrap gap-4">
           <div className="flex items-center gap-3">
@@ -1382,11 +1382,11 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-black text-sm tracking-tight text-slate-900 uppercase">Nxelio Intelligence Hub</h1>
+                <h1 className="font-black text-sm tracking-tight text-slate-900 dark:text-white uppercase">Nxelio Intelligence Hub</h1>
                 <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-sm bg-indigo-600 text-white shadow-2xs">AI POWERED</span>
               </div>
-              <p style={{fontSize:11,color:MUTED}} className="font-bold flex items-center gap-1.5">
-                Dashboards <ChevronDown size={10}/> <span className="text-[#0176D3] hover:underline cursor-pointer">Sales Performance Overview</span>
+              <p className="font-bold flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Dashboards <ChevronDown size={10} className="text-slate-400"/> <span className="text-[#0176D3] hover:underline cursor-pointer">Sales Performance Overview</span>
               </p>
             </div>
           </div>
@@ -1399,15 +1399,15 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             <div className="relative">
               <button 
                 onClick={()=>setViewsOpen(!viewsOpen)} 
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all bg-white hover:bg-slate-50 border-[#DDDBDA] text-[#080707] cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border-[#DDDBDA] dark:border-slate-800 text-[#080707] dark:text-slate-200 cursor-pointer"
               >
                 <Layers size={12} className="text-[#0176D3]"/>
                 <span>View: {activeViewName}</span>
                 <ChevronDown size={10} className="text-slate-400"/>
               </button>
               {viewsOpen && (
-                <div className="absolute top-[38px] left-0 w-64 bg-white border border-[#DDDBDA] rounded-lg shadow-xl py-1.5 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <p className="px-3 py-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b pb-1.5 mb-1.5">Saved Analytics Views</p>
+                <div className="absolute top-[38px] left-0 w-64 bg-white dark:bg-slate-900 border border-[#DDDBDA] dark:border-slate-850 rounded-lg shadow-xl py-1.5 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <p className="px-3 py-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b pb-1.5 mb-1.5 border-[#DDDBDA] dark:border-slate-800">Saved Analytics Views</p>
                   {savedViews.map((view, i) => (
                     <button
                       key={i}
@@ -1416,7 +1416,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
                         setActiveViewName(view.name);
                         setViewsOpen(false);
                       }}
-                      className={cn("w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 font-semibold flex items-center justify-between cursor-pointer", activeViewName === view.name ? "text-[#0176D3] bg-blue-50/50" : "text-slate-600")}
+                      className={cn("w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center justify-between cursor-pointer", activeViewName === view.name ? "text-[#0176D3] bg-blue-50/50 dark:bg-blue-950/30" : "text-slate-600 dark:text-slate-400")}
                     >
                       <span>{view.name}</span>
                       {activeViewName === view.name && <CheckCircle2 size={12} className="text-[#0176D3]"/>}
@@ -1429,8 +1429,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             {/* IQL Editor Toggle */}
             <button 
               onClick={()=>setIqlMode(!iqlMode)} 
-              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", iqlMode?"bg-indigo-600 text-white border-indigo-700":"bg-white text-slate-600 hover:bg-slate-50")}
-              style={{borderColor:iqlMode?"":BORDER}}
+              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", iqlMode?"bg-indigo-600 text-white border-indigo-700":"bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border-[#DDDBDA] dark:border-slate-800")}
             >
               <Code2 size={12}/>{iqlMode?"Hide Editor":"Insight Query Studio"}
             </button>
@@ -1438,19 +1437,24 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             {/* Present Mode */}
             <button 
               onClick={()=>setPresentMode(!presentMode)} 
-              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", presentMode?"bg-[#032D5B] text-white border-[#032D5B]":"bg-white text-slate-600 hover:bg-slate-50")}
-              style={{borderColor:presentMode?"":BORDER}}
+              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", presentMode?"bg-[#032D5B] text-white border-[#032D5B]":"bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border-[#DDDBDA] dark:border-slate-800")}
             >
               <Eye size={12}/>{presentMode?"Dashboard View":"Present"}
             </button>
 
             {/* Customize */}
-            <button onClick={()=>setCustomizing(p=>!p)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer" style={{borderColor:customizing?"#0176D3":BORDER,background:customizing?BRAND_BLUE_BG:WHITE,color:customizing?"#0176D3":MUTED}}>
+            <button 
+              onClick={()=>setCustomizing(p=>!p)} 
+              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer border-[#DDDBDA] dark:border-slate-800", customizing?"bg-blue-50 dark:bg-blue-950/30 text-[#0176D3] border-[#0176D3]":"bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800")}
+            >
               <Settings2 size={12}/>{customizing?"Editing Grid":"Edit Dashboard Layout"}
             </button>
 
             {/* Export */}
-            <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all bg-white hover:bg-slate-50 text-slate-600 cursor-pointer" style={{borderColor:BORDER}}>
+            <button 
+              onClick={exportCSV} 
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 cursor-pointer border-[#DDDBDA] dark:border-slate-800"
+            >
               <Download size={12}/>CSV Export
             </button>
           </div>
@@ -1458,15 +1462,15 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
 
         {/* Global Filter Bar */}
         {!presentMode && (
-          <div className="px-6 py-2 border-t border-[#DDDBDA] bg-slate-50/70 flex items-center gap-3 flex-wrap text-xs font-bold text-slate-700">
-            <span className="flex items-center gap-1 text-slate-400 uppercase tracking-wider text-[10px] mr-1">
+          <div className="px-6 py-2 border-t border-[#DDDBDA] dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 flex items-center gap-3 flex-wrap text-xs font-bold text-slate-700">
+            <span className="flex items-center gap-1 text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mr-1">
               <Layers size={11} className="text-[#0176D3]"/> Global Filters
             </span>
 
             {/* Range */}
-            <div className="flex items-center gap-1 bg-white border rounded-md px-2.5 py-1.5 shadow-2xs" style={{borderColor:BORDER}}>
-              <Clock size={11} className="text-slate-400"/>
-              <select value={filters.range} onChange={e=>setFilters(prev=>({...prev,range:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 pr-1">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-[#DDDBDA] dark:border-slate-800 rounded-md px-2.5 py-1.5 shadow-2xs">
+              <Clock size={11} className="text-slate-400 dark:text-slate-500"/>
+              <select value={filters.range} onChange={e=>setFilters(prev=>({...prev,range:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 pr-1 border-0">
                 <option value="7">Last 7 Days</option>
                 <option value="14">Last 14 Days</option>
                 <option value="30">Last 30 Days</option>
@@ -1476,46 +1480,46 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             </div>
 
             {/* Region */}
-            <div className="flex items-center gap-1 bg-white border rounded-md px-2.5 py-1.5 shadow-2xs" style={{borderColor:BORDER}}>
-              <Globe size={11} className="text-slate-400"/>
-              <span className="text-slate-400 font-medium">Region:</span>
-              <select value={filters.region} onChange={e=>setFilters(prev=>({...prev,region:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 pr-1">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-[#DDDBDA] dark:border-slate-800 rounded-md px-2.5 py-1.5 shadow-2xs">
+              <Globe size={11} className="text-slate-400 dark:text-slate-500"/>
+              <span className="text-slate-400 dark:text-slate-500 font-medium">Region:</span>
+              <select value={filters.region} onChange={e=>setFilters(prev=>({...prev,region:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 pr-1 border-0">
                 {REGIONS.map(r=><option key={r} value={r}>{r}</option>)}
               </select>
             </div>
 
             {/* Owner */}
-            <div className="flex items-center gap-1 bg-white border rounded-md px-2.5 py-1.5 shadow-2xs" style={{borderColor:BORDER}}>
-              <Users size={11} className="text-slate-400"/>
-              <span className="text-slate-400 font-medium">Owner:</span>
-              <select value={filters.owner} onChange={e=>setFilters(prev=>({...prev,owner:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-[#0176D3] pr-1">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-[#DDDBDA] dark:border-slate-800 rounded-md px-2.5 py-1.5 shadow-2xs">
+              <Users size={11} className="text-slate-400 dark:text-slate-500"/>
+              <span className="text-slate-400 dark:text-slate-500 font-medium">Owner:</span>
+              <select value={filters.owner} onChange={e=>setFilters(prev=>({...prev,owner:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-[#0176D3] pr-1 border-0">
                 {OWNERS.map(o=><option key={o} value={o}>{o}</option>)}
               </select>
             </div>
 
             {/* Industry */}
-            <div className="flex items-center gap-1 bg-white border rounded-md px-2.5 py-1.5 shadow-2xs" style={{borderColor:BORDER}}>
-              <Layers size={11} className="text-slate-400"/>
-              <span className="text-slate-400 font-medium">Industry:</span>
-              <select value={filters.industry} onChange={e=>setFilters(prev=>({...prev,industry:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 pr-1">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-[#DDDBDA] dark:border-slate-800 rounded-md px-2.5 py-1.5 shadow-2xs">
+              <Layers size={11} className="text-slate-400 dark:text-slate-500"/>
+              <span className="text-slate-400 dark:text-slate-500 font-medium">Industry:</span>
+              <select value={filters.industry} onChange={e=>setFilters(prev=>({...prev,industry:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 pr-1 border-0">
                 {INDUSTRIES.map(i=><option key={i} value={i}>{i}</option>)}
               </select>
             </div>
 
             {/* Lead Source */}
-            <div className="flex items-center gap-1 bg-white border rounded-md px-2.5 py-1.5 shadow-2xs" style={{borderColor:BORDER}}>
-              <Globe size={11} className="text-slate-400"/>
-              <span className="text-slate-400 font-medium">Source:</span>
-              <select value={filters.leadSource} onChange={e=>setFilters(prev=>({...prev,leadSource:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 pr-1">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-[#DDDBDA] dark:border-slate-800 rounded-md px-2.5 py-1.5 shadow-2xs">
+              <Globe size={11} className="text-slate-400 dark:text-slate-500"/>
+              <span className="text-slate-400 dark:text-slate-500 font-medium">Source:</span>
+              <select value={filters.leadSource} onChange={e=>setFilters(prev=>({...prev,leadSource:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 pr-1 dark:text-slate-200 border-0">
                 {LEAD_SOURCES.map(l=><option key={l} value={l}>{l}</option>)}
               </select>
             </div>
 
             {/* Stage */}
-            <div className="flex items-center gap-1 bg-white border rounded-md px-2.5 py-1.5 shadow-2xs" style={{borderColor:BORDER}}>
-              <Target size={11} className="text-slate-400"/>
-              <span className="text-slate-400 font-medium">Stage:</span>
-              <select value={filters.stage} onChange={e=>setFilters(prev=>({...prev,stage:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 pr-1">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-[#DDDBDA] dark:border-slate-800 rounded-md px-2.5 py-1.5 shadow-2xs">
+              <Target size={11} className="text-slate-400 dark:text-slate-500"/>
+              <span className="text-slate-400 dark:text-slate-500 font-medium">Stage:</span>
+              <select value={filters.stage} onChange={e=>setFilters(prev=>({...prev,stage:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 pr-1 dark:text-slate-200 border-0">
                 {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -1533,10 +1537,13 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
         )}
 
         {/* Tab Navigation */}
-        <div className="flex items-center px-4 pt-1.5 pb-0 gap-1 border-t border-[#DDDBDA] bg-slate-50/30">
+        <div className="flex items-center px-4 pt-1.5 pb-0 gap-1 border-t border-[#DDDBDA] dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
           {TABS.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)}
-              className={cn("px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all relative border-b-2 uppercase tracking-wide cursor-pointer", tab===t.id?"border-[#0176D3] text-[#0176D3] bg-white shadow-2xs":"border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50")}>
+            <button 
+              key={t.id} 
+              onClick={()=>setTab(t.id)}
+              className={cn("px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all relative border-b-2 uppercase tracking-wide cursor-pointer", tab===t.id?"border-[#0176D3] text-[#0176D3] bg-white dark:bg-slate-950 shadow-2xs":"border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50")}
+            >
               {t.label}
               {tab===t.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0176D3]"/>}
             </button>
