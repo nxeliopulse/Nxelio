@@ -36,7 +36,10 @@ export async function POST(req: NextRequest) {
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const successUrl = `${appUrl}/billing?checkout=success`;
+  // /checkout-return syncs the subscription server-side before redirecting to
+  // /dashboard, so AppLayout's getSubscription() sees the row and the gate
+  // never reappears after a successful checkout.
+  const successUrl = `${appUrl}/checkout-return`;
   const cancelUrl  = `${appUrl}/billing?checkout=canceled`;
 
   const cb = chargebee();
