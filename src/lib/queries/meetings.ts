@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email/resend";
 import { getOnboarding } from "@/lib/queries/onboarding";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 
 export interface MeetingAttendee { name?: string; email?: string }
@@ -69,6 +70,7 @@ export async function createMeeting(input: MeetingInput): Promise<{ ok: boolean;
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/meetings");
+  await logAudit({ action: "meeting.created", entityType: "meeting", entityLabel: input.title });
   return { ok: true };
 }
 
@@ -82,6 +84,7 @@ export async function updateMeeting(id: string, input: Partial<MeetingInput> & {
   const { error } = await supabase.from("meetings").update(patch).eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/meetings");
+  await logAudit({ action: "meeting.updated", entityType: "meeting", entityId: id, metadata: patch });
   return { ok: true };
 }
 
@@ -134,6 +137,7 @@ export async function scheduleMeeting(
   }
 
   revalidatePath("/meetings");
+  await logAudit({ action: "meeting.scheduled", entityType: "meeting", entityLabel: input.title, metadata: { invitesSent } });
   return { ok: true, invitesSent };
 }
 
@@ -146,5 +150,6 @@ export async function deleteMeeting(id: string): Promise<{ ok: boolean; error?: 
   const { error } = await supabase.from("meetings").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/meetings");
+  await logAudit({ action: "meeting.deleted", entityType: "meeting", entityId: id });
   return { ok: true };
 }

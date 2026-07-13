@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 
 export interface EmailTemplateRow {
@@ -30,6 +31,7 @@ export async function createEmailTemplate(payload: Partial<EmailTemplateRow>) {
     .single();
   if (error) throw error;
   revalidatePath("/templates");
+  await logAudit({ action: "template.created", entityType: "email_template", entityId: data.id, entityLabel: data.template_name });
   return data;
 }
 
@@ -38,6 +40,7 @@ export async function updateEmailTemplate(id: string, payload: Partial<EmailTemp
   const { error } = await supabase.from("email_templates").update(payload).eq("id", id);
   if (error) throw error;
   revalidatePath("/templates");
+  await logAudit({ action: "template.updated", entityType: "email_template", entityId: id, metadata: payload as Record<string, unknown> });
 }
 
 export async function deleteEmailTemplate(id: string) {
@@ -45,4 +48,5 @@ export async function deleteEmailTemplate(id: string) {
   const { error } = await supabase.from("email_templates").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/templates");
+  await logAudit({ action: "template.deleted", entityType: "email_template", entityId: id });
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { refreshAccessToken, fetchBusy, fetchEvents, type CalProvider, type BusyInterval, type ExternalCalendarEvent } from "@/lib/calendar/providers";
 import { calendarConfigured } from "@/lib/calendar/config";
 import { requireSuperAdmin } from "@/lib/queries/auth-guards";
+import { logAudit } from "@/lib/queries/audit-log";
 
 export interface CalendarAccountRow {
   id: string;
@@ -38,6 +39,7 @@ export async function disconnectCalendar(id: string): Promise<{ ok: boolean; err
   const { error } = await supabase.from("calendar_accounts").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
+  await logAudit({ action: "calendar.disconnected", entityType: "calendar_account", entityId: id });
   return { ok: true };
 }
 

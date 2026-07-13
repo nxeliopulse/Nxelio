@@ -123,6 +123,14 @@ export default function SignupPage() {
           {loading ? "Creating account…" : "Sign Up"}
         </button>
 
+        {/* Legal agreement */}
+        <p className="text-center text-xs leading-relaxed" style={{ color:"rgba(255,255,255,.35)" }}>
+          By signing up, you agree to our{" "}
+          <Link href="/terms" className="hover:underline" style={{ color:"rgba(255,255,255,.55)" }}>Terms of Service</Link>
+          {" "}and{" "}
+          <Link href="/privacy" className="hover:underline" style={{ color:"rgba(255,255,255,.55)" }}>Privacy Policy</Link>.
+        </p>
+
         {/* No credit card */}
         <p className="text-center text-xs font-medium" style={{ color:"rgba(255,255,255,.35)" }}>
           ✓ No credit card required

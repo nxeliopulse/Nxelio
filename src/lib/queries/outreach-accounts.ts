@@ -8,6 +8,7 @@ import {
   unipileDeleteAccount,
 } from "@/lib/outreach/unipile";
 import { requireSuperAdmin } from "@/lib/queries/auth-guards";
+import { logAudit } from "@/lib/queries/audit-log";
 
 export interface OutreachAccountRow {
   id: string;
@@ -113,7 +114,10 @@ export async function syncOutreachAccounts(): Promise<{ ok: boolean; count: numb
         provider: "unipile", channel, account_id: a.id,
         name: a.name ?? null, identifier: a.identifier ?? null, status,
       });
-      if (!error) count++;
+      if (!error) {
+        count++;
+        await logAudit({ action: "connector.connected", entityType: "outreach_account", entityLabel: a.name ?? a.identifier ?? channel, metadata: { channel } });
+      }
     }
 
     // Prune local accounts that no longer exist in Unipile (deleted/expired) so dead
@@ -151,4 +155,5 @@ export async function deleteOutreachAccount(id: string) {
   if (error) throw error;
   revalidatePath("/outreach");
   revalidatePath("/campaigns");
+  await logAudit({ action: "connector.disconnected", entityType: "outreach_account", entityId: id });
 }

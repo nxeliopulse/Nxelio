@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 
 export type NewsletterStatus = "Draft" | "Scheduled" | "Sending" | "Sent" | "Failed";
@@ -100,6 +101,7 @@ export async function createNewsletter(payload: Partial<NewsletterRow>) {
     .single();
   if (error) throw error;
   revalidatePath("/newsletters");
+  await logAudit({ action: "newsletter.created", entityType: "newsletter", entityId: data.id, entityLabel: data.title });
   return data as NewsletterRow;
 }
 
@@ -118,6 +120,7 @@ export async function updateNewsletter(id: string, payload: Partial<NewsletterRo
   if (error) throw error;
   revalidatePath("/newsletters");
   revalidatePath(`/newsletters/builder`);
+  await logAudit({ action: "newsletter.updated", entityType: "newsletter", entityId: id, metadata: update });
 }
 
 export async function deleteNewsletter(id: string) {
@@ -125,6 +128,7 @@ export async function deleteNewsletter(id: string) {
   const { error } = await supabase.from("newsletters").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/newsletters");
+  await logAudit({ action: "newsletter.deleted", entityType: "newsletter", entityId: id });
 }
 
 export async function duplicateNewsletter(id: string) {
@@ -140,4 +144,5 @@ export async function duplicateNewsletter(id: string) {
   void _id; void _c; void _u; void _s; void _sa; void _sc; void _oc; void _cc; void _rc; void _oid;
   await supabase.from("newsletters").insert({ ...rest, title: orig.title + " (copy)", status: "Draft" });
   revalidatePath("/newsletters");
+  await logAudit({ action: "newsletter.duplicated", entityType: "newsletter", metadata: { duplicated_from: id } });
 }

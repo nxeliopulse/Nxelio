@@ -16,6 +16,7 @@ import { NextStepsTab } from "@/components/leads/tabs/next-steps";
 import { SendEmailModal } from "@/components/leads/send-email-modal";
 import { ConvertOpportunityModal } from "@/components/leads/convert-opportunity-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
+import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { deleteLead, type LeadRow } from "@/lib/queries/leads";
 import { formatDate, cn } from "@/lib/utils";
 
@@ -55,7 +56,7 @@ function relativeTime(iso: string): string {
   return formatDate(iso);
 }
 
-export function LeadDetailView({ lead, activities, onClose }: { lead: LeadRow; activities: Activity[]; onClose?: () => void }) {
+export function LeadDetailView({ lead, activities, onClose, embedded }: { lead: LeadRow; activities: Activity[]; onClose?: () => void; embedded?: boolean }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
   const [, startDelete] = useTransition();
@@ -65,6 +66,8 @@ export function LeadDetailView({ lead, activities, onClose }: { lead: LeadRow; a
   const [editOpen, setEditOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [converted, setConverted] = useState(lead.status === "Converted");
+  const [email, setEmail] = useState(lead.email);
+  const [findEmailOpen, setFindEmailOpen] = useState(false);
   const displayName = lead.full_name || lead.company_name || "—";
   const initials = displayName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
@@ -107,38 +110,55 @@ export function LeadDetailView({ lead, activities, onClose }: { lead: LeadRow; a
 
       {/* Hero card */}
       <Card className="p-6 mb-6">
-        <div className="flex items-start gap-5 flex-wrap">
-          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xl font-bold flex items-center justify-center flex-shrink-0">
-            {initials}
+        <div className={cn("flex", embedded ? "flex-col gap-5" : "items-start gap-5 flex-wrap")}>
+          <div className={cn("flex", embedded ? "items-start gap-4" : "contents")}>
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xl font-bold flex items-center justify-center flex-shrink-0">
+              {initials}
+            </div>
+
+            <div className={cn(embedded ? "min-w-0 flex-1" : "flex-1 min-w-[280px]")}>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h1 className="text-2xl font-bold text-slate-900">{displayName}</h1>
+                <Badge variant={lead.status === "Hot" ? "danger" : lead.status === "Warm" ? "warning" : lead.status === "Converted" ? "success" : "blue"}>{lead.status}</Badge>
+                {lead.lead_score > 0 && <Badge variant="purple">AI Scored</Badge>}
+              </div>
+              <p className="text-slate-500 mb-3">{lead.company_name || "—"} · {lead.industry || "—"}</p>
+
+              <div className={cn("grid gap-x-6 gap-y-2 text-sm", embedded ? "grid-cols-2" : "grid-cols-2 md:grid-cols-4")}>
+                <div className="flex items-center gap-2 text-slate-600 min-w-0">
+                  <Mail className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                  {email ? (
+                    <span className="truncate">{email}</span>
+                  ) : (
+                    <button type="button" onClick={() => setFindEmailOpen((v) => !v)} className="text-blue-600 hover:underline font-medium">
+                      Find email
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-slate-600 min-w-0">
+                  <Phone className="h-4 w-4 text-slate-400 flex-shrink-0" /> <span className="truncate">{lead.phone || "—"}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-600 min-w-0">
+                  <Globe className="h-4 w-4 text-slate-400 flex-shrink-0" /> <span className="truncate">{lead.website_url || "—"}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-600 min-w-0">
+                  <AtSign className="h-4 w-4 text-slate-400 flex-shrink-0" /> <span className="truncate">{lead.linkedin ? "LinkedIn" : "—"}</span>
+                </div>
+              </div>
+
+              {!email && findEmailOpen && (
+                <FindEmailPicker
+                  leadId={lead.id}
+                  linkedinUrl={lead.linkedin}
+                  onFound={(found) => { setEmail(found); setFindEmailOpen(false); }}
+                />
+              )}
+            </div>
           </div>
 
-          <div className="flex-1 min-w-[280px]">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h1 className="text-2xl font-bold text-slate-900">{displayName}</h1>
-              <Badge variant={lead.status === "Hot" ? "danger" : lead.status === "Warm" ? "warning" : lead.status === "Converted" ? "success" : "blue"}>{lead.status}</Badge>
-              {lead.lead_score > 0 && <Badge variant="purple">AI Scored</Badge>}
-            </div>
-            <p className="text-slate-500 mb-3">{lead.company_name || "—"} · {lead.industry || "—"}</p>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-sm">
-              <div className="flex items-center gap-2 text-slate-600">
-                <Mail className="h-4 w-4 text-slate-400" /> {lead.email || "—"}
-              </div>
-              <div className="flex items-center gap-2 text-slate-600">
-                <Phone className="h-4 w-4 text-slate-400" /> {lead.phone || "—"}
-              </div>
-              <div className="flex items-center gap-2 text-slate-600">
-                <Globe className="h-4 w-4 text-slate-400" /> {lead.website_url || "—"}
-              </div>
-              <div className="flex items-center gap-2 text-slate-600">
-                <AtSign className="h-4 w-4 text-slate-400" /> {lead.linkedin ? "LinkedIn" : "—"}
-              </div>
-            </div>
-          </div>
-
-          {/* Score */}
-          <div className="flex items-center gap-4">
-            <div className="text-center">
+          {/* Score + actions */}
+          <div className={cn("flex items-center gap-4", embedded && "w-full justify-between border-t border-slate-100 pt-4")}>
+            <div className="text-center flex-shrink-0">
               <div className="relative h-20 w-20">
                 <svg className="h-20 w-20 -rotate-90" viewBox="0 0 80 80">
                   <circle cx="40" cy="40" r="32" stroke="#f1f5f9" strokeWidth="6" fill="none" />
@@ -152,7 +172,7 @@ export function LeadDetailView({ lead, activities, onClose }: { lead: LeadRow; a
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className={cn("flex gap-2", embedded ? "flex-1 flex-col max-w-[220px]" : "flex-col")}>
               <Button onClick={() => setEmailOpen(true)}><Send className="h-4 w-4" /> Send Email</Button>
               {converted ? (
                 <Button variant="outline" disabled><Briefcase className="h-4 w-4" /> Converted</Button>
@@ -188,7 +208,7 @@ export function LeadDetailView({ lead, activities, onClose }: { lead: LeadRow; a
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <div className={cn("grid gap-6", embedded ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-[1fr_320px]")}>
         {/* Main column with tabs */}
         <div>
           <Tabs
@@ -268,7 +288,7 @@ export function LeadDetailView({ lead, activities, onClose }: { lead: LeadRow; a
         open={emailOpen}
         onClose={() => setEmailOpen(false)}
         leadId={lead.id}
-        leadEmail={lead.email}
+        leadEmail={email}
         leadName={displayName}
       />
 

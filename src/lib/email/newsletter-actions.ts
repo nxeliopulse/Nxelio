@@ -4,6 +4,7 @@ import { sendEmail } from "./resend";
 import { substituteMergeTags } from "./merge-tags";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import type { NewsletterBlock, NewsletterContent, NewsletterRow } from "@/lib/queries/newsletters";
 
@@ -258,6 +259,13 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
     title: `Newsletter "${n.title}" sent`,
     message: `Delivered to ${sent} of ${leads.length} recipients${failed ? ` (${failed} failed)` : ""}.`,
     link: "/newsletters",
+  });
+  await logAudit({
+    action: "newsletter.sent",
+    entityType: "newsletter",
+    entityId: n.id,
+    entityLabel: n.title,
+    metadata: { total: leads.length, sent, failed },
   });
 
   return { ok: true, total: leads.length, sent, failed, redirectedMessage: redirectedNote };

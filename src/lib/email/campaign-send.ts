@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getCampaignById, type CampaignRow } from "@/lib/queries/campaigns";
 import { getCurrentUserProfile } from "@/lib/queries/users";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
+import { logAudit } from "@/lib/queries/audit-log";
 import { parseCampaignSteps, sendCampaignStepToLead, scheduleCampaignFollowups, fromNameForWorkspace, AUDIENCE_COLS, type StepLead } from "@/lib/email/campaign-scheduler";
 import { revalidatePath } from "next/cache";
 
@@ -101,6 +102,13 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
     title: `Campaign "${campaign.campaign_name}" sent`,
     message: `${sent} sent${scheduled ? `, ${scheduled} follow-ups scheduled` : ""}${failed ? `, ${failed} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
     link: "/campaigns",
+  });
+  await logAudit({
+    action: "campaign.sent",
+    entityType: "campaign",
+    entityId: campaign.id,
+    entityLabel: campaign.campaign_name,
+    metadata: { sent, failed, skipped, scheduled },
   });
 
   revalidatePath("/campaigns");
