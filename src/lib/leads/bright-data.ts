@@ -52,15 +52,29 @@ async function brightDataSerp(query: string, start: number, timeoutMs: number): 
   }
 }
 
-/** Parse a LinkedIn SERP title like "Jane Doe - Marketing Manager - Acme | LinkedIn". */
+/**
+ * Parse a LinkedIn SERP title. Handles two shapes Google actually returns:
+ *   "Jane Doe - Marketing Manager - Acme | LinkedIn"   (title, company as separate segments)
+ *   "Jane Doe - Marketing Manager at Acme | LinkedIn"  (title and company combined in one segment)
+ */
 function parseLinkedInTitle(rawTitle: string, fallbackRole: string): { name: string; title: string; company: string } {
   const t = (rawTitle || "").replace(/\s*[|\-–]\s*LinkedIn\s*$/i, "").trim();
   const parts = t.split(/\s+[-–|]\s+/).map((p) => p.trim()).filter(Boolean);
-  return {
-    name: parts[0] || "N/A",
-    title: parts[1] || fallbackRole || "",
-    company: parts[2] || "",
-  };
+  const name = parts[0] || "N/A";
+  let title = parts[1] || fallbackRole || "";
+  let company = parts[2] || "";
+
+  // No separate company segment — LinkedIn commonly folds it into the title
+  // as "<Title> at <Company>" instead of a dash-delimited part.
+  if (!company && title) {
+    const atMatch = title.match(/^(.*?)\s+at\s+(.+)$/i);
+    if (atMatch) {
+      title = atMatch[1].trim();
+      company = atMatch[2].trim();
+    }
+  }
+
+  return { name, title, company };
 }
 
 /**

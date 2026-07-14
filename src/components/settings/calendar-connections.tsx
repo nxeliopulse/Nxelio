@@ -27,6 +27,7 @@ export function CalendarConnections({
   const [copied, setCopied] = useState(false);
   const [bookingUrl, setBookingUrl] = useState("");
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- derives a display URL from a prop, needs window.location
     if (bookingSlug) setBookingUrl(`${window.location.origin}/book/${bookingSlug}`);
   }, [bookingSlug]);
   function copyBooking() {
@@ -37,6 +38,7 @@ export function CalendarConnections({
   // Surface the OAuth redirect result (?connected=calendar / ?calendar_error=...).
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
     if (p.get("connected") === "calendar") setBanner({ kind: "ok", msg: "Calendar connected — availability will now sync." });
     const err = p.get("calendar_error");
     if (err) setBanner({ kind: "err", msg: err });

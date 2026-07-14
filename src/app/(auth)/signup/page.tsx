@@ -21,9 +21,10 @@ export default function SignupPage() {
   const [form, setForm]         = useState({ fullName:"", email:"", password:"" });
   const [error, setError]       = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
+  const [agreed, setAgreed]     = useState(false);
 
   const passOk = form.password.length >= 8;
-  const valid  = form.fullName.trim() !== "" && form.email.includes("@") && passOk;
+  const valid  = form.fullName.trim() !== "" && form.email.includes("@") && passOk && agreed;
 
   const focusStyle = (e: React.FocusEvent<HTMLInputElement>) => {
     e.currentTarget.style.borderColor = "#18A7B8";
@@ -117,20 +118,37 @@ export default function SignupPage() {
           </span>
         </div>
 
+        {/* Legal agreement — required checkbox */}
+        <label className="flex items-start gap-2.5 px-1 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="sr-only peer"
+          />
+          <span
+            className="mt-0.5 h-4 w-4 rounded flex items-center justify-center flex-shrink-0 transition-all border"
+            style={{
+              background: agreed ? "#18A7B8" : "transparent",
+              borderColor: agreed ? "#18A7B8" : "rgba(255,255,255,.25)",
+            }}
+          >
+            {agreed && <Check className="h-2.5 w-2.5 text-white" />}
+          </span>
+          <span className="text-xs leading-relaxed" style={{ color:"rgba(255,255,255,.5)" }}>
+            I agree to the{" "}
+            <Link href="/terms" onClick={(e) => e.stopPropagation()} className="hover:underline" style={{ color:"rgba(255,255,255,.75)" }}>Terms of Service</Link>
+            {" "}and{" "}
+            <Link href="/privacy" onClick={(e) => e.stopPropagation()} className="hover:underline" style={{ color:"rgba(255,255,255,.75)" }}>Privacy Policy</Link>.
+          </span>
+        </label>
+
         {/* Submit */}
         <button type="submit" disabled={!valid || loading}
           className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow:"0 4px 20px rgba(24,167,184,.3)" }}>
           {loading ? "Creating account…" : "Sign Up"}
         </button>
-
-        {/* Legal agreement */}
-        <p className="text-center text-xs leading-relaxed" style={{ color:"rgba(255,255,255,.35)" }}>
-          By signing up, you agree to our{" "}
-          <Link href="/terms" className="hover:underline" style={{ color:"rgba(255,255,255,.55)" }}>Terms of Service</Link>
-          {" "}and{" "}
-          <Link href="/privacy" className="hover:underline" style={{ color:"rgba(255,255,255,.55)" }}>Privacy Policy</Link>.
-        </p>
 
         {/* No credit card */}
         <p className="text-center text-xs font-medium" style={{ color:"rgba(255,255,255,.35)" }}>

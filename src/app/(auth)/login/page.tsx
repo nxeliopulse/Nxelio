@@ -26,6 +26,7 @@ function LoginForm() {
 
   useEffect(() => {
     const e = params.get("error");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
     if (e) setError(e === "invalid_link" ? "Your sign-in link is invalid or expired." : e);
   }, [params]);
 
@@ -52,7 +53,8 @@ function LoginForm() {
     const { error: loginError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
     setLoading(false);
     if (loginError) { setError(loginError.message); return; }
-    router.push("/dashboard");
+    // The platform admin account lands in the standalone admin panel, not the customer app.
+    router.push(form.email.trim().toLowerCase() === "admin@nxelio.com" ? "/admin" : "/dashboard");
     router.refresh();
   }
 

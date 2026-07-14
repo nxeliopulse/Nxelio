@@ -55,6 +55,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
 
   useEffect(() => {
     if (!detailUser) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting panel state when the selected user changes/closes
       setAuthInfo(null);
       setResetPw(null);
       setNavAccess({});

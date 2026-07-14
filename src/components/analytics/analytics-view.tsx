@@ -548,7 +548,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
   // Nxelio Copilot Chatbot States
   const [chatOpen,     setChatOpen]     = useState(false);
   const [chatInput,    setChatInput]    = useState("");
-  const [chatMessages, setChatMessages] = useState<Array<{ sender: "user" | "copilot"; text: string; data?: any }>>([
+  const [chatMessages, setChatMessages] = useState<Array<{ sender: "user" | "copilot"; text: string; data?: unknown }>>([
     { sender: "copilot", text: "Hello! I am your Nxelio Copilot. You can ask me to filter data, calculate metrics, or summarize insights. Try selecting one of the queries below!" }
   ]);
 
@@ -558,15 +558,17 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
 
   // Sync IQL query when switching tabs
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs derived query text whenever the active tab changes
     setIqlQuery(IQL_QUERIES[tab] || IQL_QUERIES.overview);
   }, [tab]);
 
   useEffect(()=>{
     if(prevRange.current===filters.range)return;
     prevRange.current=filters.range;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the custom-range modal when that option is selected
     if(filters.range==="custom"){setCustomOpen(true);return;}
     setLoading(true);
-    getAnalyticsStatsRanged(Number(filters.range) as any).then(setStats).finally(()=>setLoading(false));
+    getAnalyticsStatsRanged(Number(filters.range)).then(setStats).finally(()=>setLoading(false));
   },[filters.range]);
 
   async function applyCustom(){
@@ -640,8 +642,8 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             { sender: "copilot", text: "⚡ **Insight query run successfully** (No recognized filter conditions found. Rendered default layout projections)." }
           ]);
         }
-      } catch (err: any) {
-        setIqlError(err?.message || "Syntax Error: Unrecognized token on Insight Query projection pipeline.");
+      } catch (err) {
+        setIqlError(err instanceof Error ? err.message : "Syntax Error: Unrecognized token on Insight Query projection pipeline.");
       } finally {
         setLoading(false);
       }
@@ -1605,10 +1607,10 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
               <h4 className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">IQL Projection Reference</h4>
               <p className="text-slate-400 font-medium">This console compiles standard Nxelio IQL query directives. Try modifying lines like:</p>
               <code className="block bg-slate-900 border border-slate-800 p-2 rounded text-indigo-300 font-mono text-[10px]">
-                q = filter q by 'Region' == "West";<br/>
-                q = filter q by 'Stage' == "Proposal Sent";
+                q = filter q by &apos;Region&apos; == &quot;West&quot;;<br/>
+                q = filter q by &apos;Stage&apos; == &quot;Proposal Sent&quot;;
               </code>
-              <p className="text-[10px] text-slate-500 italic">Clicking "Run Query" dynamically updates the dashboard visualization parameters.</p>
+              <p className="text-[10px] text-slate-500 italic">Clicking &quot;Run Query&quot; dynamically updates the dashboard visualization parameters.</p>
             </div>
           </div>
         </div>
@@ -1622,7 +1624,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 flex items-center justify-between text-xs font-bold text-indigo-950 shadow-2xs">
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-indigo-600 animate-bounce" />
-              <span>Interactive Facet Filter Active: Only showing records matching <span className="bg-indigo-100 px-2 py-0.5 rounded-md border border-indigo-300 text-indigo-800">{facet.type} = "{facet.value}"</span></span>
+              <span>Interactive Facet Filter Active: Only showing records matching <span className="bg-indigo-100 px-2 py-0.5 rounded-md border border-indigo-300 text-indigo-800">{facet.type} = &quot;{facet.value}&quot;</span></span>
             </div>
             <button 
               onClick={()=>setFacet(null)} 

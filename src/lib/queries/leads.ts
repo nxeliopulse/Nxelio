@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
+import { archiveImportedLeads, markArchivedLeadsDeleted } from "@/lib/queries/lead-import-archive";
 import { revalidatePath } from "next/cache";
 import type { AiScoreResult } from "@/lib/ai/actions";
 
@@ -82,6 +83,7 @@ export async function deleteLead(id: string) {
   if (error) throw error;
   revalidatePath("/leads");
   await logAudit({ action: "lead.deleted", entityType: "lead", entityId: id });
+  await markArchivedLeadsDeleted([id]);
 }
 
 export async function bulkDeleteLeads(ids: string[]) {
@@ -90,6 +92,7 @@ export async function bulkDeleteLeads(ids: string[]) {
   if (error) throw error;
   revalidatePath("/leads");
   await logAudit({ action: "lead.bulk_deleted", entityType: "lead", metadata: { count: ids.length, ids } });
+  await markArchivedLeadsDeleted(ids);
 }
 
 export async function bulkInsertLeads(
@@ -145,7 +148,7 @@ export async function bulkInsertLeads(
 
   if (!rows.length) return { inserted: 0, duplicates };
 
-  const { data, error } = await supabase.from("leads").insert(rows).select("id");
+  const { data, error } = await supabase.from("leads").insert(rows).select();
   if (error) {
     console.error("bulkInsertLeads error:", error);
     return { inserted: 0, duplicates, error: error.message };
@@ -159,11 +162,13 @@ export async function bulkInsertLeads(
       message: opts?.defaultSource ? `Via ${opts.defaultSource}` : "Via import",
       link: "/leads",
     });
+    const sourceLabel = opts?.defaultSource ?? "Import";
     await logAudit({
-      action: opts?.defaultSource === "Buy Leads" ? "leads.bought" : "leads.imported",
+      action: sourceLabel === "Buy Leads" ? "leads.bought" : "leads.imported",
       entityType: "lead",
-      metadata: { count: inserted, duplicates, source: opts?.defaultSource ?? "Import" },
+      metadata: { count: inserted, duplicates, source: sourceLabel },
     });
+    await archiveImportedLeads((data as LeadRow[]) ?? [], sourceLabel);
   }
   return { inserted, duplicates };
 }

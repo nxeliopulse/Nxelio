@@ -366,7 +366,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
   }
 
   return (
-    <div className="flex items-start gap-0">
+    <div className="flex items-start gap-4">
     <div className={openLeadId ? "flex-1 min-w-0" : "max-w-[1600px] mx-auto w-full"}>
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
@@ -432,11 +432,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
         </div>
 
 
-        {/* Table with horizontal scroll */}
+        {/* Table — bounded to the viewport height so only rows scroll, toolbar/pagination stay in view */}
         <div className="relative">
-          <div ref={scrollRef} className="overflow-x-auto">
+          <div ref={scrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
             <table className="w-full text-sm min-w-[760px]">
-              <thead className="bg-slate-50 border-b border-slate-100">
+              <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
                   <th className="px-4 py-3 w-10">
                     <input

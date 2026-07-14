@@ -2535,3 +2535,90 @@ CREATE POLICY admin_select_audit_log ON audit_log FOR SELECT TO authenticated
   USING (get_current_user_role_id() = 1 AND workspace_id = get_current_workspace_id());
 
 -- Deliberately no UPDATE or DELETE policy — the log is immutable at the DB level.
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0060_lead_import_archive.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- Lead import archive — a permanent record of every lead ever imported into a
+-- workspace (CSV, LinkedIn search, Buy Leads, etc.), tied to the workspace and
+-- the user who imported it. Unlike the working `leads` table, rows here are
+-- NEVER deleted when the corresponding lead is deleted from `leads` — instead
+-- `deleted_from_leads_at` is stamped so there's a durable record that the
+-- import happened even after the lead itself is gone. See Privacy Policy
+-- Section 7 for the corresponding disclosure.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS lead_import_archive (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id          UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  imported_by_user_id   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  imported_by_name      TEXT,
+  source                TEXT,                 -- e.g. "Buy Leads", "CSV Upload", "LinkedIn Search"
+  original_lead_id      UUID,                  -- points at leads.id; NOT a FK (row may later be deleted)
+  full_name             TEXT,
+  email                 TEXT,
+  phone                 TEXT,
+  company_name          TEXT,
+  industry              TEXT,
+  interest_area         TEXT,
+  linkedin              TEXT,
+  website_url           TEXT,
+  imported_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_from_leads_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS lead_import_archive_workspace_idx ON lead_import_archive(workspace_id, imported_at DESC);
+CREATE INDEX IF NOT EXISTS lead_import_archive_original_lead_idx ON lead_import_archive(original_lead_id);
+
+ALTER TABLE lead_import_archive ENABLE ROW LEVEL SECURITY;
+
+-- Any authenticated user may archive an entry for their own workspace — the app
+-- writes via the admin client in practice, this is defense-in-depth only.
+DROP POLICY IF EXISTS ws_insert_lead_import_archive ON lead_import_archive;
+CREATE POLICY ws_insert_lead_import_archive ON lead_import_archive FOR INSERT TO authenticated
+  WITH CHECK (workspace_id = get_current_workspace_id());
+
+-- A workspace's own Super Admin can view its archive.
+DROP POLICY IF EXISTS admin_select_lead_import_archive ON lead_import_archive;
+CREATE POLICY admin_select_lead_import_archive ON lead_import_archive FOR SELECT TO authenticated
+  USING (get_current_user_role_id() = 1 AND workspace_id = get_current_workspace_id());
+
+-- Only the "deleted_from_leads_at" stamp may be updated (by the app's admin client) — no other mutation, no delete.
+DROP POLICY IF EXISTS ws_update_lead_import_archive ON lead_import_archive;
+CREATE POLICY ws_update_lead_import_archive ON lead_import_archive FOR UPDATE TO authenticated
+  USING (workspace_id = get_current_workspace_id())
+  WITH CHECK (workspace_id = get_current_workspace_id());
+
+-- Deliberately no DELETE policy — archive rows are permanent.
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0061_platform_vendor_subscriptions.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- Platform vendor subscriptions — Nxelio's OWN paid third-party accounts
+-- (Unipile, AnySite, Brevo, etc.), tracked manually by the platform admin since
+-- none of these vendors expose a billing/usage API we integrate with. Shown on
+-- the /admin panel's Overview. Not customer-facing, not workspace-scoped.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS platform_vendor_subscriptions (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vendor_name        TEXT NOT NULL,        -- e.g. "Unipile", "AnySite", "Brevo"
+  plan_name          TEXT,                 -- e.g. "Pro", "Pay-as-you-go"
+  monthly_cost_cents INTEGER,
+  renewal_date       DATE,
+  usage_notes        TEXT,                 -- free-text, e.g. "4,200 / 10,000 emails sent this cycle"
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS set_updated_at ON platform_vendor_subscriptions;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON platform_vendor_subscriptions
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- RLS enabled with NO policies for any role — only the service-role admin
+-- client (used exclusively by the /admin panel) can reach this table at all.
+ALTER TABLE platform_vendor_subscriptions ENABLE ROW LEVEL SECURITY;

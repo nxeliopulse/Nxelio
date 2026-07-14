@@ -7,12 +7,14 @@ import {
   Upload, Plus, Trash2, Users2, Link2, RefreshCw, ExternalLink, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
 import { bulkInsertLeads, type LeadRow } from "@/lib/queries/leads";
 import { importLinkedInLeads, hasLinkedInAccount } from "@/lib/leads/linkedin-import";
 import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outreach-accounts";
 import { searchBuyLeads, type GeneratedProspect } from "@/lib/leads/buy-leads";
+import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
+import { LocationSearchInput } from "@/components/leads/location-search-input";
 import { hasFeature } from "@/lib/queries/subscriptions";
 
 type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
@@ -827,15 +829,21 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Industry</label>
-          <Input value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })} placeholder="e.g. SaaS, Healthcare" />
+          <Select value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })}>
+            <option value="">Any industry</option>
+            {LINKEDIN_INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
+          </Select>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Job title / role</label>
-          <Input value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })} placeholder="e.g. Head of Marketing" />
+          <Select value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })}>
+            <option value="">Any role</option>
+            {COMMON_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          </Select>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
-          <Input value={buy.location} onChange={(e) => setBuy({ ...buy, location: e.target.value })} placeholder="e.g. United States" />
+          <LocationSearchInput value={buy.location} onChange={(v) => setBuy({ ...buy, location: v })} />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">How many (max 25)</label>
