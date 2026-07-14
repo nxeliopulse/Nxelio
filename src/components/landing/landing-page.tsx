@@ -94,19 +94,19 @@ const STEPS = [
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 const PLANS = [
   {
-    name:"Basic",    price:"8.99", credits:150,  trial:"7-day free trial",
+    name:"Basic",    price:"9.99", credits:200,  trial:"7-day free trial",
     color:"#18A7B8", bg:"#E0F7FA", border:"#B2EBF2", popular:false,
-    features:["150 AI credits / month","CSV lead import","Email campaigns","Smart Inbox","Capture forms","7-day free trial — no card needed"],
+    features:["200 AI credits / month","CSV lead import","Email campaigns","Smart Inbox","Capture forms","7-day free trial on monthly billing — card required, no charge until day 7"],
   },
   {
-    name:"Starter",  price:"59",   credits:1000, trial:null,
+    name:"Starter",  price:"69",   credits:1200, trial:null,
     color:"#7E57C2", bg:"#EDE7F6", border:"#7E57C2", popular:true,
-    features:["1,000 AI credits / month","Everything in Basic","Opportunities pipeline","Segments & filtering","Newsletters","Analytics dashboard"],
+    features:["1,200 AI credits / month","Everything in Basic","Opportunities pipeline","Segments & filtering","Newsletters","Analytics dashboard"],
   },
   {
-    name:"Pro",      price:"139",  credits:2500, trial:null,
+    name:"Pro",      price:"149",  credits:3000, trial:null,
     color:"#F4511E", bg:"#FFF0EE", border:"#FFCDD2", popular:false,
-    features:["2,500 AI credits / month","Everything in Starter","Priority support","Advanced analytics","Custom workflows","Dedicated onboarding"],
+    features:["3,000 AI credits / month","Everything in Starter","Priority support","Advanced analytics","Custom workflows","Dedicated onboarding"],
   },
 ];
 
@@ -121,8 +121,8 @@ const TESTIMONIALS = [
 // ─── FAQs ─────────────────────────────────────────────────────────────────────
 const FAQS = [
   { q:"What is Nxelio?",                       a:"Nxelio is a B2B revenue platform. It lets you import leads, run email campaigns, manage replies in a unified inbox, track deals through an opportunities pipeline, segment your contacts, send newsletters, and view analytics — all from one workspace.", pal: P.teal   },
-  { q:"How do AI credits work?",               a:"Each AI action (generating email copy, scoring a lead, enriching a contact) uses credits. Basic gives 150/month, Starter 1,000/month, Pro 2,500/month. Unused monthly credits reset at renewal.",                                                        pal: P.blue   },
-  { q:"Does Basic include a free trial?",      a:"Yes — Basic includes a 7-day free trial with 150 AI credits. No credit card required at signup. You get full access to leads, campaigns, inbox, and capture forms.",                                                                                     pal: P.violet },
+  { q:"How do AI credits work?",               a:"Each AI action (generating email copy, scoring a lead, enriching a contact) uses credits. Basic gives 200/month, Starter 1,200/month, Pro 3,000/month. Unused monthly credits reset at renewal.",                                                        pal: P.blue   },
+  { q:"Does Basic include a free trial?",      a:"Yes — Basic on monthly billing includes a 7-day free trial with 200 AI credits. A card is required to start the trial, but you won't be charged until day 7, and you can cancel anytime before then at no cost. Annual billing doesn't include a trial. You get full access to leads, campaigns, inbox, and capture forms.", pal: P.violet },
   { q:"How does the capture form work?",       a:"Go to Capture Form in settings, customise your form fields and branding, then publish. You get a public link (nxelio.ai/capture/your-slug) to share. Every submission lands directly in your Leads list.",                                              pal: P.amber  },
   { q:"Can I import my existing contacts?",    a:"Yes. Upload any CSV from Settings or Leads. Nxelio maps your columns automatically and imports every contact into your workspace instantly.",                                                                                                             pal: P.coral  },
   { q:"Is my data secure?",                    a:"Yes. Nxelio is built on Supabase with row-level security and workspace isolation. Your contacts, campaigns, and analytics are never shared across workspaces.",                                                                                          pal: P.green  },
@@ -1033,7 +1033,7 @@ function Pricing() {
                   <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color:plan.color }}>
                     <Zap className="h-3 w-3"/> {plan.credits.toLocaleString()} AI credits / month
                   </div>
-                  {plan.trial && (
+                  {plan.trial && !annual && (
                     <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
                       style={{ background:plan.bg, color:plan.color }}>
                       <CheckCircle className="h-3 w-3"/> {plan.trial}
@@ -1231,7 +1231,7 @@ function CTABanner({ onBookDemo }: { onBookDemo: () => void }) {
                 <Play className="h-4 w-4" style={{ color:"#18A7B8" }}/> Sign In
               </Link>
             </div>
-            <p className="mt-5 text-xs text-slate-400">Basic plan · 7-day free trial · 150 AI credits · Cancel anytime</p>
+            <p className="mt-5 text-xs text-slate-400">Basic plan · 7-day free trial · 200 AI credits · Cancel anytime</p>
           </div>
         </div>
       </div>

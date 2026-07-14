@@ -42,9 +42,8 @@ export async function POST(req: NextRequest) {
   const successUrl = `${appUrl}/checkout-return`;
   const cancelUrl  = `${appUrl}/billing?checkout=canceled`;
 
-  const cb = chargebee();
-
   try {
+    const cb = chargebee();
     let result: { hosted_page: { url: string; id: string } };
 
     if (sub?.chargebee_subscription_id) {

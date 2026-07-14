@@ -125,9 +125,9 @@ function LoginForm() {
           {loading ? "Signing in…" : "Sign In"}
         </button>
 
-        {/* No credit card */}
+        {/* Trial terms */}
         <p className="text-center text-xs font-medium" style={{ color:"rgba(255,255,255,.35)" }}>
-          ✓ No credit card required
+          ✓ No charge for 7 days · cancel anytime
         </p>
 
         {/* OAuth */}

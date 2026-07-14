@@ -29,9 +29,9 @@ Nxelio is a B2B revenue platform: leads, campaigns, inbox, pipeline, segments, n
 - Capture Forms: a branded public form that feeds new leads straight into the workspace.
 
 === PRICING ===
-- Basic: $8.99/mo, 150 AI credits/month, CSV lead import, email campaigns, smart inbox, capture forms, 7-day free trial (no credit card required).
-- Starter: $59/mo, 1,000 AI credits/month, everything in Basic plus Opportunities pipeline, Segments, Newsletters, Analytics dashboard. This is the most popular plan.
-- Pro: $139/mo, 2,500 AI credits/month, everything in Starter plus priority support, advanced analytics, custom workflows, dedicated onboarding.
+- Basic: $9.99/mo, 200 AI credits/month, CSV lead import, email campaigns, smart inbox, capture forms. Monthly billing includes a 7-day free trial (a card is required to start it, but there's no charge until day 7 and you can cancel anytime before then). Annual billing does not include a trial.
+- Starter: $69/mo, 1,200 AI credits/month, everything in Basic plus Opportunities pipeline, Segments, Newsletters, Analytics dashboard. This is the most popular plan.
+- Pro: $149/mo, 3,000 AI credits/month, everything in Starter plus priority support, advanced analytics, custom workflows, dedicated onboarding.
 - AI credits are consumed by AI actions (generating email copy, scoring a lead, enriching a contact). Unused monthly credits reset at renewal.
 - Plans can be canceled anytime from the billing dashboard, no cancellation fees.
 

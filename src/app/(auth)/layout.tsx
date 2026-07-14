@@ -93,7 +93,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                 style={{ background:"rgba(255,255,255,.25)" }}>
                 <Check className="h-3 w-3 text-white"/>
               </div>
-              <span className="text-xs text-white/70 font-medium">7-day free trial · No credit card required</span>
+              <span className="text-xs text-white/70 font-medium">7-day free trial · card required · no charge until day 7</span>
             </div>
           </div>
         </div>
