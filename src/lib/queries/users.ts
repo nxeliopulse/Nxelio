@@ -1,5 +1,6 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 
 export interface UserRow {
@@ -122,6 +123,7 @@ export async function updateUserStatus(userId: string, status: string) {
   const supabase = await createClient();
   await supabase.from("users").update({ status }).eq("user_id", userId);
   revalidatePath("/users");
+  await logAudit({ action: "user.status_updated", entityType: "user", entityId: userId, metadata: { status } });
 }
 
 export async function updateUserRole(userId: string, roleId: number, managerId: string | null) {
@@ -133,6 +135,7 @@ export async function updateUserRole(userId: string, roleId: number, managerId: 
   const supabase = await createClient();
   await supabase.from("users").update({ role_id: roleId, manager_id: managerId }).eq("user_id", userId);
   revalidatePath("/users");
+  await logAudit({ action: "user.role_updated", entityType: "user", entityId: userId, metadata: { roleId, managerId } });
 }
 
 export async function upsertPermission(userId: string, menuId: number, perms: { can_view?: boolean; can_create?: boolean; can_edit?: boolean; can_delete?: boolean; can_upload?: boolean }) {
@@ -144,6 +147,7 @@ export async function upsertPermission(userId: string, menuId: number, perms: { 
     { onConflict: "user_id,menu_id" }
   );
   revalidatePath("/users");
+  await logAudit({ action: "user.permission_updated", entityType: "user", entityId: userId, metadata: { menuId, ...perms } });
 }
 
 function generateTempPassword(): string {
@@ -228,6 +232,7 @@ export async function inviteUser(email: string, fullName: string, roleId: number
     .neq("id", inviterWorkspaceId);
 
   revalidatePath("/users");
+  await logAudit({ action: "user.invited", entityType: "user", entityId: created.id, entityLabel: email, metadata: { roleId } });
   return { user: { id: created.id, email }, tempPassword };
 }
 
@@ -239,6 +244,7 @@ export async function deleteUser(userId: string) {
   const admin = createAdminClient();
   await admin.auth.admin.deleteUser(userId);
   revalidatePath("/users");
+  await logAudit({ action: "user.deleted", entityType: "user", entityId: userId });
 }
 
 /**
@@ -255,6 +261,7 @@ export async function updateUserNavAccess(userId: string, navAccess: Record<stri
   if (error) throw error;
   revalidatePath("/users");
   revalidatePath("/", "layout");
+  await logAudit({ action: "user.nav_access_updated", entityType: "user", entityId: userId, metadata: navAccess });
 }
 
 /**
@@ -267,6 +274,7 @@ export async function resetUserPassword(userId: string): Promise<{ tempPassword:
 
   const tempPassword = generateTempPassword();
   await adminUpdateAuthPassword(userId, tempPassword);
+  await logAudit({ action: "user.password_reset", entityType: "user", entityId: userId });
   return { tempPassword };
 }
 

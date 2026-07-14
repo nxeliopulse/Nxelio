@@ -1,6 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 
 export interface WorkflowNode {
@@ -82,6 +83,7 @@ export async function createWorkflow(payload: Partial<WorkflowRow>) {
     .single();
   if (error) throw error;
   revalidatePath("/workflows");
+  await logAudit({ action: "workflow.created", entityType: "workflow", entityId: data.id, entityLabel: data.workflow_name });
   return data;
 }
 
@@ -98,6 +100,7 @@ export async function updateWorkflow(id: string, payload: Partial<WorkflowRow>) 
   if (error) throw error;
   revalidatePath("/workflows");
   revalidatePath("/workflows/builder");
+  await logAudit({ action: "workflow.updated", entityType: "workflow", entityId: id, metadata: updateRow });
 }
 
 export async function deleteWorkflow(id: string) {
@@ -105,6 +108,7 @@ export async function deleteWorkflow(id: string) {
   const { error } = await supabase.from("workflows").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/workflows");
+  await logAudit({ action: "workflow.deleted", entityType: "workflow", entityId: id });
 }
 
 export interface TestRunStep {

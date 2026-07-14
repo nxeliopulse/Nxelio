@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import { leadMatches, isRuleComplete, type EvalRule } from "@/lib/segments";
 import type { LeadRow } from "@/lib/queries/leads";
@@ -86,6 +87,7 @@ export async function createSegment(
   await materializeSegmentMembers(segment.id);
 
   revalidatePath("/segments");
+  await logAudit({ action: "segment.created", entityType: "segment", entityId: segment.id, entityLabel: segment.segment_name });
   return segment;
 }
 
@@ -113,6 +115,7 @@ export async function updateSegment(
   await materializeSegmentMembers(id);
 
   revalidatePath("/segments");
+  await logAudit({ action: "segment.updated", entityType: "segment", entityId: id, entityLabel: name });
   return { id };
 }
 
@@ -171,6 +174,7 @@ export async function deleteSegment(id: string) {
   const { error } = await supabase.from("segments").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/segments");
+  await logAudit({ action: "segment.deleted", entityType: "segment", entityId: id });
 }
 
 function csvEscape(val: unknown): string {

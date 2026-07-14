@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 
 export interface CampaignRow {
@@ -81,6 +82,7 @@ export async function createCampaign(payload: Partial<CampaignRow>) {
   // then shows up as a blank/"null" error instead of the actual DB message.
   if (error) throw new Error(error.message || "Couldn't create the campaign.");
   revalidatePath("/campaigns");
+  await logAudit({ action: "campaign.created", entityType: "campaign", entityId: data.id, entityLabel: data.campaign_name });
   return data;
 }
 
@@ -89,6 +91,7 @@ export async function updateCampaign(id: string, payload: Partial<CampaignRow>) 
   const { error } = await supabase.from("campaigns").update(payload).eq("id", id);
   if (error) throw new Error(error.message || "Couldn't update the campaign.");
   revalidatePath("/campaigns");
+  await logAudit({ action: "campaign.updated", entityType: "campaign", entityId: id, metadata: payload as Record<string, unknown> });
 }
 
 export async function deleteCampaign(id: string) {
@@ -96,6 +99,7 @@ export async function deleteCampaign(id: string) {
   const { error } = await supabase.from("campaigns").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/campaigns");
+  await logAudit({ action: "campaign.deleted", entityType: "campaign", entityId: id });
 }
 
 export async function setCampaignStatus(id: string, status: string) {
@@ -128,5 +132,6 @@ export async function duplicateCampaign(id: string) {
   const { data, error } = await supabase.from("campaigns").insert(copy).select().single();
   if (error) throw error;
   revalidatePath("/campaigns");
+  await logAudit({ action: "campaign.duplicated", entityType: "campaign", entityId: data.id, entityLabel: data.campaign_name, metadata: { duplicated_from: id } });
   return data;
 }

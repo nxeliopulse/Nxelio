@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeCode, fetchAccountEmail, type CalProvider } from "@/lib/calendar/providers";
+import { logAudit } from "@/lib/queries/audit-log";
 
 function isProvider(p: string): p is CalProvider {
   return p === "google" || p === "microsoft";
@@ -49,6 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
       { onConflict: "workspace_id,provider,email" }
     );
     if (error) return fail(error.message);
+    await logAudit({ action: "calendar.connected", entityType: "calendar_account", entityLabel: email ?? undefined, metadata: { provider } });
   } catch (e) {
     return fail(e instanceof Error ? e.message : "Calendar connection failed");
   }

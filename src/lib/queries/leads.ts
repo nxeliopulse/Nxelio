@@ -1,6 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import type { AiScoreResult } from "@/lib/ai/actions";
 
@@ -62,6 +63,7 @@ export async function createLead(payload: Partial<LeadRow>) {
   const { data, error } = await supabase.from("leads").insert(payload).select().single();
   if (error) throw error;
   revalidatePath("/leads");
+  await logAudit({ action: "lead.created", entityType: "lead", entityId: data.id, entityLabel: data.full_name || data.company_name || data.email });
   return data;
 }
 
@@ -71,6 +73,7 @@ export async function updateLead(id: string, payload: Partial<LeadRow>) {
   if (error) throw error;
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
+  await logAudit({ action: "lead.updated", entityType: "lead", entityId: id, metadata: payload as Record<string, unknown> });
 }
 
 export async function deleteLead(id: string) {
@@ -78,6 +81,7 @@ export async function deleteLead(id: string) {
   const { error } = await supabase.from("leads").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/leads");
+  await logAudit({ action: "lead.deleted", entityType: "lead", entityId: id });
 }
 
 export async function bulkDeleteLeads(ids: string[]) {
@@ -85,6 +89,7 @@ export async function bulkDeleteLeads(ids: string[]) {
   const { error } = await supabase.from("leads").delete().in("id", ids);
   if (error) throw error;
   revalidatePath("/leads");
+  await logAudit({ action: "lead.bulk_deleted", entityType: "lead", metadata: { count: ids.length, ids } });
 }
 
 export async function bulkInsertLeads(
@@ -153,6 +158,11 @@ export async function bulkInsertLeads(
       title: `${inserted} lead${inserted === 1 ? "" : "s"} imported`,
       message: opts?.defaultSource ? `Via ${opts.defaultSource}` : "Via import",
       link: "/leads",
+    });
+    await logAudit({
+      action: opts?.defaultSource === "Buy Leads" ? "leads.bought" : "leads.imported",
+      entityType: "lead",
+      metadata: { count: inserted, duplicates, source: opts?.defaultSource ?? "Import" },
     });
   }
   return { inserted, duplicates };

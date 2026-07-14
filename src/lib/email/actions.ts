@@ -7,6 +7,7 @@ import { substituteMergeTags } from "@/lib/email/merge-tags";
 import { getCurrentUserProfile } from "@/lib/queries/users";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 
 export async function getEmailStatus() {
@@ -80,6 +81,13 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
     title: `Email sent to ${lead.full_name || lead.company_name || lead.email}`,
     message: finalSubject,
     link: `/leads/${leadId}`,
+  });
+  await logAudit({
+    action: "lead.emailed",
+    entityType: "lead",
+    entityId: leadId,
+    entityLabel: lead.full_name || lead.company_name || lead.email || undefined,
+    metadata: { subject: finalSubject },
   });
 
   return { ok: true, redirectedTo: result.redirectedTo };

@@ -1,6 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
+import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import { CLOSED_STAGES, type OpportunityRow, type OpportunityStage, type PipelineStats } from "@/lib/opportunities";
 
@@ -86,6 +87,7 @@ export async function createOpportunityFromLead(input: CreateOpportunityInput): 
   revalidatePath("/opportunities");
   revalidatePath(`/leads/${input.leadId}`);
   revalidatePath("/dashboard");
+  await logAudit({ action: "opportunity.created", entityType: "opportunity", entityId: data.id, entityLabel: input.name, metadata: { deal_value: input.dealValue, lead_id: input.leadId } });
   return data as OpportunityRow;
 }
 
@@ -104,6 +106,7 @@ export async function moveOpportunityStage(id: string, stage: OpportunityStage):
   if (error) throw error;
   revalidatePath("/opportunities");
   revalidatePath("/dashboard");
+  await logAudit({ action: "opportunity.stage_moved", entityType: "opportunity", entityId: id, metadata: { stage } });
 }
 
 export interface UpdateOpportunityInput {
@@ -135,6 +138,7 @@ export async function updateOpportunity(id: string, input: UpdateOpportunityInpu
   if (error) throw error;
   revalidatePath("/opportunities");
   revalidatePath("/dashboard");
+  await logAudit({ action: "opportunity.updated", entityType: "opportunity", entityId: id, metadata: patch });
 }
 
 export async function deleteOpportunity(id: string): Promise<void> {
@@ -143,4 +147,5 @@ export async function deleteOpportunity(id: string): Promise<void> {
   if (error) throw error;
   revalidatePath("/opportunities");
   revalidatePath("/dashboard");
+  await logAudit({ action: "opportunity.deleted", entityType: "opportunity", entityId: id });
 }

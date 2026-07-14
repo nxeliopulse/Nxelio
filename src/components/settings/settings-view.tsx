@@ -1,9 +1,11 @@
 "use client";
 import { useState, useTransition, useEffect, type ReactNode } from "react";
-import { User, Bell, Key, ShieldCheck, Ban, CreditCard, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor, Plug } from "lucide-react";
+import { User, Bell, Key, ShieldCheck, Ban, CreditCard, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor, Plug, ScrollText } from "lucide-react";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
+import type { AuditLogRow } from "@/lib/queries/audit-log";
 import { ConnectorsView } from "@/components/settings/connectors-view";
+import { AuditLogView } from "@/components/settings/audit-log-view";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,6 +26,7 @@ const sections = [
   { id: "billing", label: "Billing", icon: <CreditCard className="h-4 w-4" /> },
   { id: "security", label: "Security", icon: <ShieldCheck className="h-4 w-4" /> },
 ];
+const AUDIT_SECTION = { id: "audit", label: "Audit Log", icon: <ScrollText className="h-4 w-4" /> };
 
 interface Profile {
   full_name: string;
@@ -43,19 +46,22 @@ interface Props {
   unipileConfigured: boolean;
   bookingSlug?: string | null;
   isSuperAdmin: boolean;
+  auditLog: AuditLogRow[];
 }
 
-export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin }: Props) {
+export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog }: Props) {
   const [active, setActive] = useState("profile");
+  const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
   // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar
   // (and the mailbox flow used ?section=email) — both now live under "connectors".
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get("section");
     const resolved = s === "calendar" || s === "email" ? "connectors" : s;
-    if (resolved && sections.some((sec) => sec.id === resolved)) {
+    if (resolved && visibleSections.some((sec) => sec.id === resolved)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
       setActive(resolved);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [pending, start] = useTransition();
   const [name, setName] = useState(profile?.full_name || "");
@@ -135,7 +141,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
       <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6">
         <Card className="p-2 h-fit">
           <ul className="space-y-0.5">
-            {sections.map((s) => (
+            {visibleSections.map((s) => (
               <li key={s.id}>
                 <button
                   onClick={() => setActive(s.id)}
@@ -438,6 +444,8 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
               </div>
             </Card>
           )}
+
+          {active === "audit" && isSuperAdmin && <AuditLogView entries={auditLog} />}
         </div>
       </div>
     </div>

@@ -366,7 +366,8 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto">
+    <div className="flex items-start gap-0">
+    <div className={openLeadId ? "flex-1 min-w-0" : "max-w-[1600px] mx-auto w-full"}>
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
           <p className="text-sm text-blue-900">
@@ -556,10 +557,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
 
       <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
 
-      {openLeadId && (
-        <LeadDetailSidebar data={openLeadData} loading={openLeadLoading} onClose={closeLead} />
-      )}
-
       {/* Column picker — fixed-position so the table's horizontal scroll never clips it */}
       {showCols && colsPos && (
         <>
@@ -717,6 +714,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
           </div>
         </div>
       )}
+    </div>
+
+    {openLeadId && (
+      <LeadDetailSidebar data={openLeadData} loading={openLeadLoading} onClose={closeLead} />
+    )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { getBlocklist } from "@/lib/queries/blocklist";
 import { getCalendarAccounts, getCalendarProviderStatus } from "@/lib/queries/calendar-accounts";
 import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach-accounts";
 import { getCurrentWorkspace } from "@/lib/queries/workspaces";
+import { getAuditLog } from "@/lib/queries/audit-log";
 import { SettingsView } from "@/components/settings/settings-view";
 
 export default async function SettingsPage() {
@@ -22,6 +23,7 @@ export default async function SettingsPage() {
   const linkedinAccounts = outreachAccounts.filter((a) => a.channel === "linkedin");
   const p = profile as { role_id?: number | null; roles?: { role_name?: string } | null } | null;
   const isSuperAdmin = p?.roles?.role_name === "Super Admin" || p?.role_id === 1;
+  const auditLog = isSuperAdmin ? await getAuditLog().catch(() => []) : [];
   return (
     <SettingsView
       profile={profile}
@@ -35,6 +37,7 @@ export default async function SettingsPage() {
       unipileConfigured={unipileConfigured}
       bookingSlug={workspace?.capture_slug ?? null}
       isSuperAdmin={isSuperAdmin}
+      auditLog={auditLog}
     />
   );
 }
