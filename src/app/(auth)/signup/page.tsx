@@ -53,7 +53,7 @@ export default function SignupPage() {
     <div>
       <h1 className="text-3xl font-black text-white mb-1">Sign up</h1>
       <p className="text-sm mb-8" style={{ color:"rgba(255,255,255,.45)" }}>
-        Start your 7-day free trial — no card needed
+        Start your 7-day free trial — card required, first charge after day 7
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-3.5">
@@ -150,9 +150,9 @@ export default function SignupPage() {
           {loading ? "Creating account…" : "Sign Up"}
         </button>
 
-        {/* No credit card */}
+        {/* Trial terms */}
         <p className="text-center text-xs font-medium" style={{ color:"rgba(255,255,255,.35)" }}>
-          ✓ No credit card required
+          ✓ No charge for 7 days · cancel anytime
         </p>
 
         {/* OAuth */}

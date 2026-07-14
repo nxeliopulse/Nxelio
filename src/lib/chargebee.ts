@@ -8,9 +8,9 @@ import { ChargeBee } from "chargebee-typescript";
 // Plan item-price IDs as configured in your Chargebee dashboard
 // (Product Catalog → Items → each item's price IDs).
 export const CHARGEBEE_PRICE_IDS: Record<string, Record<string, string>> = {
-  basic:   { monthly: "basic-USD-Monthly",   annual: "basic-USD-Yearly"   },
-  starter: { monthly: "starter-USD-Monthly", annual: "starter-USD-Yearly" },
-  pro:     { monthly: "pro-USD-Monthly",     annual: "pro-USD-Yearly"     },
+  basic:   { monthly: "basic-monthly-USD",   annual: "basic-yearly-USD"   },
+  starter: { monthly: "starter-monthly-USD", annual: "starter-yearly-USD" },
+  pro:     { monthly: "pro-monthly-USD",     annual: "pro-yearly-USD"     },
 };
 
 // Reverse map: Chargebee price ID → { planId, interval }
@@ -23,7 +23,7 @@ for (const [planId, intervals] of Object.entries(CHARGEBEE_PRICE_IDS)) {
 
 // Credits granted per plan (must match subscription_plans table)
 export const PLAN_CREDITS: Record<string, number> = {
-  basic: 500, starter: 3000, pro: 8000,
+  basic: 200, starter: 1200, pro: 3000,
 };
 
 function buildChargebeeClient() {

@@ -9,17 +9,17 @@ export async function isAiConfigured() {
   return aiConfigured;
 }
 
-/** Blocks an AI call before it runs if the workspace is out of credits this cycle. */
-async function assertCredits(): Promise<void> {
-  if (!(await canAfford(1))) {
+/** Blocks an AI call before it runs if the workspace can't afford this action's credit cost. */
+async function assertCredits(amount = 1): Promise<void> {
+  if (!(await canAfford(amount))) {
     throw new Error("You're out of AI credits for this billing cycle. Upgrade your plan for more.");
   }
 }
 
 /** Best-effort post-success deduction — a failure here shouldn't hide an AI result the user already paid API cost for. */
-async function chargeCredits(operationType: string, options?: { leadId?: string; campaignId?: string }): Promise<void> {
+async function chargeCredits(operationType: string, amount = 1, options?: { leadId?: string; campaignId?: string }): Promise<void> {
   try {
-    const res = await deductCredits(operationType, 1, options);
+    const res = await deductCredits(operationType, amount, options);
     if (!res.ok) console.error(`[ai/credits] deduct failed for ${operationType}:`, res.error);
   } catch (err) {
     console.error(`[ai/credits] deduct threw for ${operationType}:`, err);
@@ -40,7 +40,7 @@ export interface GeneratedEmail {
 }
 
 export async function generateEmailSequence(goal: string, audience?: string): Promise<GeneratedEmail[]> {
-  await assertCredits();
+  await assertCredits(3);
   const system = `You are an expert B2B sales copywriter. You write concise, personalized cold email sequences that get replies. Use merge tags like {{firstName}}, {{companyName}}, and {{industry}} where personalization helps. Keep each email under 120 words. Return ONLY valid JSON.`;
 
   const prompt = `Write a 3-step cold email sequence for this campaign goal: "${goal}"${audience ? `\nTarget audience: ${audience}` : ""}
@@ -55,7 +55,7 @@ Return JSON in exactly this shape:
 }`;
 
   const result = await aiJson<{ emails: GeneratedEmail[] }>({ system, prompt, temperature: 0.8 });
-  await chargeCredits("email_sequence_generation");
+  await chargeCredits("email_sequence_generation", 3);
   return result.emails || [];
 }
 
@@ -150,7 +150,7 @@ Return JSON in exactly this shape (all scores 0-100 integers):
     }
   }
 
-  await chargeCredits("lead_scoring", { leadId });
+  await chargeCredits("lead_scoring", 1, { leadId });
   return result;
 }
 
@@ -165,7 +165,7 @@ export interface AiCompanyIntel {
 }
 
 export async function generateCompanyIntel(leadId: string): Promise<AiCompanyIntel> {
-  await assertCredits();
+  await assertCredits(3);
   const lead = await getLeadById(leadId);
   if (!lead) throw new Error("Lead not found");
 
@@ -184,7 +184,7 @@ Return JSON:
 }`;
 
   const result = await aiJson<AiCompanyIntel>({ system, prompt, temperature: 0.6 });
-  await chargeCredits("company_intel", { leadId });
+  await chargeCredits("company_intel", 3, { leadId });
   return result;
 }
 
@@ -201,7 +201,7 @@ export interface AiContact {
 }
 
 export async function generateContactIntel(leadId: string): Promise<AiContact[]> {
-  await assertCredits();
+  await assertCredits(3);
   const lead = await getLeadById(leadId);
   if (!lead) throw new Error("Lead not found");
 
@@ -217,7 +217,7 @@ Return JSON:
 }`;
 
   const result = await aiJson<{ contacts: AiContact[] }>({ system, prompt, temperature: 0.6 });
-  await chargeCredits("contact_intel", { leadId });
+  await chargeCredits("contact_intel", 3, { leadId });
   return result.contacts || [];
 }
 
@@ -225,7 +225,7 @@ Return JSON:
 // AI Outreach Sequence — personalized to a specific lead
 // ============================================================================
 export async function generateLeadOutreach(leadId: string): Promise<GeneratedEmail[]> {
-  await assertCredits();
+  await assertCredits(2);
   const lead = await getLeadById(leadId);
   if (!lead) throw new Error("Lead not found");
 
@@ -249,7 +249,7 @@ Return JSON:
 }`;
 
   const result = await aiJson<{ emails: GeneratedEmail[] }>({ system, prompt, temperature: 0.8 });
-  await chargeCredits("lead_outreach_generation", { leadId });
+  await chargeCredits("lead_outreach_generation", 2, { leadId });
   return result.emails || [];
 }
 
@@ -296,7 +296,7 @@ Return JSON:
 }`;
 
   const result = await aiJson<AiNextStepsResult>({ system, prompt, temperature: 0.6 });
-  await chargeCredits("next_steps_generation", { leadId });
+  await chargeCredits("next_steps_generation", 1, { leadId });
   return result;
 }
 
@@ -333,7 +333,7 @@ export interface AiNewsletterResult {
 }
 
 export async function generateNewsletter(goal: string, audience?: string): Promise<AiNewsletterResult> {
-  await assertCredits();
+  await assertCredits(2);
   const system = `You are an expert newsletter designer and copywriter. You write engaging, valuable newsletter content AND lay it out using colorful, visually rich blocks — never a plain wall of text. Structure every newsletter as a mix of block types, matching the tone and color palette to the subject (e.g. a WhatsApp/messaging newsletter should read like a tech product update: punchy, modern, green/blue accents; a finance newsletter should feel trustworthy: navy/gold accents). Return ONLY valid JSON.`;
 
   const prompt = `Write a colorful, visually rich newsletter for this goal: "${goal}"${audience ? `\nTarget audience: ${audience}` : ""}
@@ -372,7 +372,7 @@ Use 8-12 blocks total, and include AT LEAST one "banner" and at least two "secti
     }
     return b;
   });
-  await chargeCredits("newsletter_generation");
+  await chargeCredits("newsletter_generation", 2);
   return result;
 }
 
@@ -380,12 +380,12 @@ Use 8-12 blocks total, and include AT LEAST one "banner" and at least two "secti
 // Single email regeneration / improvement
 // ============================================================================
 export async function improveEmail(currentBody: string, instruction: string): Promise<string> {
-  await assertCredits();
+  await assertCredits(2);
   const result = await aiChat({
     system: "You are an expert sales copywriter. Rewrite the email per the instruction. Keep merge tags like {{firstName}}. Return only the rewritten email body, no preamble.",
     prompt: `Current email:\n${currentBody}\n\nInstruction: ${instruction}`,
     temperature: 0.7,
   });
-  await chargeCredits("email_improvement");
+  await chargeCredits("email_improvement", 2);
   return result;
 }

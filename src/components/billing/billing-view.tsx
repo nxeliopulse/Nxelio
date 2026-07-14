@@ -6,7 +6,9 @@ import {
   Check, X, Sparkles, CreditCard, Users2, Send,
   Zap, Crown, Rocket, Lock, AlertTriangle, Clock,
   TrendingUp, ExternalLink, Loader2, PartyPopper,
+  Search, Reply,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +51,7 @@ const PLAN_DESC: Record<string, string> = {
 
 const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
   basic: [
-    { label: "500 AI credits / mo",      included: true  },
+    { label: "200 AI credits / mo",      included: true  },
     { label: "Import your own leads",    included: true  },
     { label: "Core workflows",           included: true  },
     { label: "Enrichment + scoring",     included: false },
@@ -59,7 +61,7 @@ const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
     { label: "Reply tracking",           included: false },
   ],
   starter: [
-    { label: "3,000 AI credits / mo",    included: true  },
+    { label: "1,200 AI credits / mo",    included: true  },
     { label: "Automated lead discovery", included: true  },
     { label: "Full enrichment + scoring",included: true  },
     { label: "LinkedIn outreach",        included: true  },
@@ -69,7 +71,7 @@ const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
     { label: "Priority support",         included: false },
   ],
   pro: [
-    { label: "8,000 AI credits / mo",    included: true  },
+    { label: "3,000 AI credits / mo",    included: true  },
     { label: "Everything in Starter",    included: true  },
     { label: "Reply tracking",           included: true  },
     { label: "Meetings & calendar",      included: true  },
@@ -283,12 +285,12 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
                 )}
               </div>
               <h2 className="text-4xl font-bold">
-                {sub ? fmtCents(sub.plan.monthly_price_cents) : "$8.99"}
+                {sub ? fmtCents(sub.plan.monthly_price_cents) : "$9.99"}
                 <span className="text-xl font-normal text-blue-100">/mo</span>
               </h2>
               <p className="text-blue-100 mt-2 max-w-md text-sm">
                 {status === "trialing"
-                  ? "You're in your 7-day free trial. No card required — pick a plan when you're ready."
+                  ? "You're in your 7-day free trial. No charge until your trial ends — cancel anytime before then."
                   : `${sub?.plan.name ?? "Basic"} plan · renews ${sub?.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "—"}`}
               </p>
             </div>
@@ -459,19 +461,29 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount }:
 
         {/* Feature gate notes */}
         <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4">
-            <Lock className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-amber-900">Lead Discovery is Starter+</p>
-              <p className="text-xs text-amber-700 mt-0.5">Phase 01 discovery is off on Basic. Upload your own lists or upgrade.</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div className="h-11 w-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Search className="h-5 w-5" />
+              </div>
+              <Link href="#plans" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors shrink-0">
+                <Lock className="h-3 w-3" />Upgrade
+              </Link>
             </div>
+            <p className="text-sm font-bold text-slate-900 mb-1">Lead Discovery</p>
+            <p className="text-xs text-slate-500">Automatically find real prospects by industry, role, and location. Starter plan and up.</p>
           </div>
-          <div className="flex items-start gap-3 bg-purple-50 border border-purple-100 rounded-xl p-4">
-            <Lock className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-purple-900">Reply Tracking is Pro only</p>
-              <p className="text-xs text-purple-700 mt-0.5">Opens, clicks, and reply inbox — upgrade to Pro to unlock.</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div className="h-11 w-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Reply className="h-5 w-5" />
+              </div>
+              <Link href="#plans" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors shrink-0">
+                <Lock className="h-3 w-3" />Upgrade
+              </Link>
             </div>
+            <p className="text-sm font-bold text-slate-900 mb-1">Reply Tracking</p>
+            <p className="text-xs text-slate-500">See every open, click, and reply in one inbox. Pro plan only.</p>
           </div>
         </div>
       </div>

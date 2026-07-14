@@ -146,7 +146,7 @@ async function handleSubscriptionUpsert(content: Record<string, unknown>) {
     planId,
     billingInterval,
     status:                 mapStatus(String(cbSub.status ?? "active")),
-    creditsTotal:           PLAN_CREDITS[planId] ?? 150,
+    creditsTotal:           PLAN_CREDITS[planId] ?? PLAN_CREDITS.basic,
     currentPeriodStart:     new Date((cbSub.current_term_start as number) * 1000),
     currentPeriodEnd:       new Date((cbSub.current_term_end   as number) * 1000),
     trialEndsAt:            cbSub.trial_end ? new Date((cbSub.trial_end as number) * 1000) : null,

@@ -24,14 +24,14 @@ const PLANS: {
   {
     id: "basic",
     name: "Basic",
-    monthly: 19,
-    annual: 15.20,
-    credits: 500,
+    monthly: 9.99,
+    annual: 7.99,
+    credits: 200,
     trial: "7-day free trial",
     color: "#06B6D4",
     icon: <Zap size={16} />,
     features: [
-      "500 AI credits / month",
+      "200 AI credits / month",
       "CSV import",
       "Core workflows",
       "Email campaigns",
@@ -41,13 +41,13 @@ const PLANS: {
     id: "starter",
     name: "Starter",
     badge: "Most Popular",
-    monthly: 89,
-    annual: 71.20,
-    credits: 3000,
+    monthly: 69,
+    annual: 55.20,
+    credits: 1200,
     color: "#8B5CF6",
     icon: <Star size={16} />,
     features: [
-      "3,000 AI credits / month",
+      "1,200 AI credits / month",
       "Lead discovery & enrichment",
       "AI lead scoring",
       "LinkedIn outreach",
@@ -58,13 +58,13 @@ const PLANS: {
   {
     id: "pro",
     name: "Pro",
-    monthly: 159,
-    annual: 127.20,
-    credits: 8000,
+    monthly: 149,
+    annual: 119.20,
+    credits: 3000,
     color: "#10B981",
     icon: <Shield size={16} />,
     features: [
-      "8,000 AI credits / month",
+      "3,000 AI credits / month",
       "Everything in Starter",
       "Reply tracking",
       "Meetings & calendar",
@@ -186,7 +186,7 @@ export function SubscriptionGate() {
               </div>
 
               <p className="font-bold text-white mb-0.5">{plan.name}</p>
-              {plan.trial && (
+              {plan.trial && interval === "monthly" && (
                 <p className="text-[11px] mb-2" style={{ color: plan.color }}>{plan.trial}</p>
               )}
 
@@ -217,7 +217,7 @@ export function SubscriptionGate() {
           style={{ background: `linear-gradient(135deg,${selectedPlan.color},${selectedPlan.color}99)`, boxShadow: `0 4px 20px ${selectedPlan.color}44` }}>
           {pending
             ? <><Loader2 size={16} className="animate-spin" /> Redirecting to checkout…</>
-            : <><CreditCard size={16} /> {selectedPlan.trial ? `Start ${selectedPlan.trial}` : `Subscribe to ${selectedPlan.name}`} <ChevronRight size={15} /></>
+            : <><CreditCard size={16} /> {selectedPlan.trial && interval === "monthly" ? `Start ${selectedPlan.trial}` : `Subscribe to ${selectedPlan.name}`} <ChevronRight size={15} /></>
           }
         </button>
 
@@ -229,7 +229,7 @@ export function SubscriptionGate() {
         )}
 
         <p className="text-center text-[11px]" style={{ color: "rgba(255,255,255,.25)" }}>
-          Secured by Chargebee · Cancel anytime · No charge during trial
+          Secured by Chargebee · Cancel anytime{selectedPlan.trial && interval === "monthly" ? " · No charge during trial" : ""}
         </p>
       </div>
 
