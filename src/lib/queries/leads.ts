@@ -26,6 +26,8 @@ export interface LeadRow {
   owner_id: string | null;
   created_at: string;
   updated_at: string;
+  /** Computed values from custom AI columns, keyed by ai_column_definitions.id. */
+  custom_fields: Record<string, { value: string; updated_at: string }> | null;
 }
 
 export async function getLeads(): Promise<LeadRow[]> {

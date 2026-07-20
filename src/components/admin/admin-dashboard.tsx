@@ -1,21 +1,24 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Archive, CreditCard, Plug } from "lucide-react";
+import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles } from "lucide-react";
 import { platformAdminSignOut } from "@/lib/queries/platform-admin";
 import { OverviewTab } from "@/components/admin/overview-tab";
 import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
 import { AdminLeadArchiveView } from "@/components/admin/lead-archive-view";
 import { VendorSubscriptionsTab } from "@/components/admin/vendor-subscriptions-tab";
+import { AiProviderTab } from "@/components/admin/ai-provider-tab";
 import type { PlatformOverviewStats, HotCustomerRow, SubscriptionRow } from "@/lib/queries/platform-overview";
 import type { LeadArchiveRow } from "@/lib/queries/lead-import-archive";
 import type { VendorSubscriptionRow } from "@/lib/queries/platform-vendor-subscriptions";
+import type { AiProviderStatus } from "@/lib/queries/ai-provider-settings";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "subscriptions", label: "Subscriptions", icon: CreditCard },
   { id: "leads", label: "Leads Archive", icon: Archive },
   { id: "vendors", label: "Our Vendor Subscriptions", icon: Plug },
+  { id: "ai-provider", label: "AI Provider", icon: Sparkles },
 ] as const;
 
 export function AdminDashboard({
@@ -24,12 +27,14 @@ export function AdminDashboard({
   subscriptions,
   leadArchive,
   vendorSubscriptions,
+  aiProviderStatus,
 }: {
   stats: PlatformOverviewStats;
   hotCustomers: HotCustomerRow[];
   subscriptions: SubscriptionRow[];
   leadArchive: (LeadArchiveRow & { workspace_name: string | null })[];
   vendorSubscriptions: VendorSubscriptionRow[];
+  aiProviderStatus: AiProviderStatus;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
@@ -76,6 +81,7 @@ export function AdminDashboard({
       {tab === "subscriptions" && <SubscriptionsTab rows={subscriptions} />}
       {tab === "leads" && <AdminLeadArchiveView rows={leadArchive} />}
       {tab === "vendors" && <VendorSubscriptionsTab rows={vendorSubscriptions} />}
+      {tab === "ai-provider" && <AiProviderTab status={aiProviderStatus} />}
     </div>
   );
 }

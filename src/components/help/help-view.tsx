@@ -86,7 +86,7 @@ const faqs = [
   },
   {
     q: "Where do I configure AI?",
-    a: "AI is powered by Groq. Set your GROQ_API_KEY environment variable in your hosting platform (or .env.local for development). Settings > API Keys shows whether AI is connected. AI features automatically use the connected model across Lead Detail, Campaign Builder, and Inbox.",
+    a: "AI runs on either OpenAI or Groq. Your Super Admin picks which provider is active in the Admin panel's AI Provider screen. Settings > API Keys shows whether AI is connected. AI features automatically use whichever provider is active across Lead Detail, Campaign Builder, and Inbox.",
   },
   {
     q: "How does lead scoring work?",

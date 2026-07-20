@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, Tag, Share2, CalendarPlus, X, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, CalendarPlus, X, Sparkles, Loader2, MoreVertical, Play, type LucideIcon } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +12,11 @@ import { cn } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { LeadDetailSidebar } from "@/components/leads/lead-detail-sidebar";
+import { AiColumnModal } from "@/components/leads/ai-column-modal";
 import { getLeadDetail } from "@/lib/queries/lead-detail";
 import type { Activity } from "@/components/leads/lead-detail-view";
 import { deleteLead, bulkDeleteLeads, type LeadRow } from "@/lib/queries/leads";
+import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
 const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | "success" | "purple"> = {
   New: "blue",
@@ -66,9 +68,13 @@ interface Props {
   initialSearch?: string;
   /** When landing directly on /leads/[id], opens the sidebar pre-loaded with this lead — avoids a second fetch/flash. */
   initialSelectedLead?: { lead: LeadRow; activities: Activity[] } | null;
+  /** Saved Clay-style custom AI columns for this workspace, rendered after the built-in columns. */
+  aiColumns?: AiColumnDefinitionRow[];
+  /** Workspace's own saved AI column templates (user-created, distinct from the built-in library). */
+  aiColumnSavedTemplates?: AiColumnSavedTemplateRow[];
 }
 
-export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelectedLead }: Props) {
+export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelectedLead, aiColumns = [], aiColumnSavedTemplates = [] }: Props) {
   const { confirm } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -90,6 +96,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
 
   async function openLead(id: string) {
     if (id === openLeadId) return;
+    setShowAiColumnModal(false);
     setOpenLeadId(id);
     setOpenLeadData(null);
     setOpenLeadLoading(true);
@@ -179,6 +186,58 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
 
   const visibleCols = COLUMNS.filter((c) => cols[c.key]);
 
+  // Clay-style custom AI columns — creation/run/delete + per-row single-cell generation.
+  const [showAiColumnModal, setShowAiColumnModal] = useState(false);
+  const [aiColMenu, setAiColMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const [runningColumnId, setRunningColumnId] = useState<string | null>(null);
+  const [runningCellKey, setRunningCellKey] = useState<string | null>(null);
+  // Live progress while a "Run on all leads" bulk job is in flight — polled from the
+  // server since runAiColumn itself is one long request with no incremental callback.
+  const [runProgress, setRunProgress] = useState<{ columnId: string; done: number; total: number } | null>(null);
+
+  function openAiColMenu(e: React.MouseEvent<HTMLButtonElement>, id: string) {
+    const r = e.currentTarget.getBoundingClientRect();
+    setAiColMenu({ id, top: r.bottom + 6, left: r.left });
+  }
+
+  function runAiColumnOnAll(columnId: string) {
+    setAiColMenu(null);
+    setRunningColumnId(columnId);
+    setRunProgress({ columnId, done: 0, total: leads.length });
+
+    const poll = setInterval(async () => {
+      const p = await getAiColumnProgress(columnId);
+      setRunProgress({ columnId, ...p });
+    }, 1200);
+
+    start(async () => {
+      await runAiColumn(columnId);
+      clearInterval(poll);
+      setRunningColumnId(null);
+      setRunProgress(null);
+      router.refresh();
+    });
+  }
+
+  async function handleDeleteAiColumn(columnId: string) {
+    setAiColMenu(null);
+    if (!(await confirm({ title: "Delete AI column?", message: "This removes the column and its generated values for every lead.", confirmLabel: "Delete", danger: true }))) return;
+    start(async () => {
+      await deleteAiColumn(columnId);
+      router.refresh();
+    });
+  }
+
+  function runAiColumnOnRow(columnId: string, leadId: string) {
+    const key = `${columnId}:${leadId}`;
+    setRunningCellKey(key);
+    start(async () => {
+      await runAiColumn(columnId, [leadId]);
+      setRunningCellKey(null);
+      router.refresh();
+    });
+  }
+
   const activeColumnFilterKeys = (Object.keys(columnFilters) as ColKey[]).filter((k) => columnFilters[k]);
 
   const filtered = leads.filter((l) => {
@@ -221,6 +280,39 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
     if (!full) return { first: l.company_name || "—", last: "" };
     const parts = full.split(/\s+/);
     return { first: parts[0], last: parts.slice(1).join(" ") };
+  }
+
+  /** Clay-style compact status badge for AI column results — booleans and AnySite email
+   *  lookups render as an icon + short label instead of raw text, which also reads
+   *  better in a narrow column when the table is squeezed (e.g. AI Assistant open). */
+  function renderAiColumnCellValue(col: AiColumnDefinitionRow, value: string) {
+    if (col.action_type === "anysite_email") {
+      const isEmail = /\S+@\S+\.\S+/.test(value);
+      return isEmail ? (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5 max-w-full">
+          <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">{value}</span>
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2 py-0.5 max-w-full">
+          <XCircle className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">{value || "Not found"}</span>
+        </span>
+      );
+    }
+    if (col.output_type === "boolean") {
+      const isYes = /^\s*(yes|true)\b/i.test(value);
+      return isYes ? (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
+          <CheckCircle2 className="h-3 w-3" /> Yes
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
+          <XCircle className="h-3 w-3" /> No
+        </span>
+      );
+    }
+    return <span className="block max-w-[260px] truncate text-slate-700" title={value}>{value || "—"}</span>;
   }
 
   function emailProvider(email: string | null): { label: string; kind: "google" | "microsoft" | "yahoo" | "other" | "none" } {
@@ -367,7 +459,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
 
   return (
     <div className="flex items-start gap-4">
-    <div className={openLeadId ? "flex-1 min-w-0" : "max-w-[1600px] mx-auto w-full"}>
+    <div className={openLeadId || showAiColumnModal ? "flex-1 min-w-0" : "max-w-[1600px] mx-auto w-full"}>
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
           <p className="text-sm text-blue-900">
@@ -477,21 +569,57 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
                       </th>
                     );
                   })}
-                  <th className="px-4 py-3 w-10 text-right">
-                    <button
-                      onClick={openColsMenu}
-                      title="Customize columns"
-                      className="p-1 rounded-md hover:bg-slate-200/70"
-                    >
-                      <Settings2 className="h-4 w-4 text-slate-400 hover:text-slate-700" />
-                    </button>
+                  {aiColumns.map((col) => {
+                    const running = runProgress?.columnId === col.id;
+                    const pct = running && runProgress.total > 0 ? Math.round((runProgress.done / runProgress.total) * 100) : 0;
+                    return (
+                      <th key={col.id} className="px-3 py-3 font-semibold w-[200px] max-w-[200px]">
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                          <span className="truncate whitespace-nowrap" title={col.name}>{col.name}</span>
+                          <button
+                            onClick={(e) => openAiColMenu(e, col.id)}
+                            title="Column actions"
+                            className="p-0.5 rounded hover:bg-slate-200/70 flex-shrink-0 ml-auto"
+                          >
+                            <MoreVertical className="h-3 w-3 text-slate-400" />
+                          </button>
+                        </span>
+                        {running && (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <div className="flex-1 h-[3px] rounded-full bg-slate-100 overflow-hidden">
+                              <div className="h-full bg-blue-500 transition-[width] duration-500 rounded-full" style={{ width: `${Math.max(pct, 4)}%` }} />
+                            </div>
+                            <span className="text-[10px] font-normal normal-case text-slate-400 tabular-nums flex-shrink-0">{pct}%</span>
+                          </div>
+                        )}
+                      </th>
+                    );
+                  })}
+                  <th className="px-4 py-3 w-16 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        onClick={() => { closeLead(); setShowAiColumnModal(true); }}
+                        title="Add AI column"
+                        className="p-1 rounded-md hover:bg-blue-50"
+                      >
+                        <Plus className="h-4 w-4 text-slate-400 hover:text-blue-600" />
+                      </button>
+                      <button
+                        onClick={openColsMenu}
+                        title="Customize columns"
+                        className="p-1 rounded-md hover:bg-slate-200/70"
+                      >
+                        <Settings2 className="h-4 w-4 text-slate-400 hover:text-slate-700" />
+                      </button>
+                    </div>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={visibleCols.length + aiColumns.length + 2} className="px-4 py-16 text-center text-slate-500">
                       No leads yet. Click <strong>Add Leads</strong> to import from LinkedIn, social, or a CSV.
                     </td>
                   </tr>
@@ -519,6 +647,27 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
                         {renderCell(c.key, l, safePage * PAGE_SIZE + i + 1)}
                       </td>
                     ))}
+                    {aiColumns.map((col) => {
+                      const cellKey = `${col.id}:${l.id}`;
+                      const computed = l.custom_fields?.[col.id];
+                      const running = runningCellKey === cellKey || runningColumnId === col.id;
+                      return (
+                        <td key={col.id} className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          {running ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
+                          ) : computed ? (
+                            renderAiColumnCellValue(col, computed.value)
+                          ) : (
+                            <button
+                              onClick={() => runAiColumnOnRow(col.id, l.id)}
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              <Play className="h-3 w-3" /> Generate
+                            </button>
+                          )}
+                        </td>
+                      );
+                    })}
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleDelete(l.id)}
@@ -556,6 +705,30 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
       </Card>
 
       <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
+
+      {/* AI column header menu — run on all rows, or delete the column */}
+      {aiColMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setAiColMenu(null)} />
+          <div
+            className="fixed z-50 w-48 rounded-xl border border-slate-200 bg-white shadow-xl p-1"
+            style={{ top: aiColMenu.top, left: aiColMenu.left }}
+          >
+            <button
+              onClick={() => runAiColumnOnAll(aiColMenu.id)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
+            >
+              <Play className="h-3.5 w-3.5" /> Run on all leads
+            </button>
+            <button
+              onClick={() => handleDeleteAiColumn(aiColMenu.id)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete column
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Column picker — fixed-position so the table's horizontal scroll never clips it */}
       {showCols && colsPos && (
@@ -716,7 +889,16 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
       )}
     </div>
 
-    {openLeadId && (
+    {showAiColumnModal && (
+      <AiColumnModal
+        open={showAiColumnModal}
+        onClose={() => setShowAiColumnModal(false)}
+        onCreated={() => router.refresh()}
+        savedTemplates={aiColumnSavedTemplates}
+      />
+    )}
+
+    {openLeadId && !showAiColumnModal && (
       <LeadDetailSidebar data={openLeadData} loading={openLeadLoading} onClose={closeLead} />
     )}
     </div>

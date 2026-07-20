@@ -10,10 +10,7 @@ import { getUsers } from "@/lib/queries/users";
 import { sendLeadEmail } from "@/lib/email/actions";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
-
-const API_KEY = process.env.AI_API_KEY;
-const BASE_URL = process.env.AI_BASE_URL || "https://api.groq.com/openai/v1";
-const MODEL = process.env.AI_MODEL || "llama-3.3-70b-versatile";
+import { resolveAiConfig } from "@/lib/ai/provider";
 
 export interface AssistantMessage {
   role: "user" | "assistant";
@@ -506,14 +503,14 @@ function summarizeAction(name: string, args: Record<string, unknown>): string {
 // (e.g. Groq's Llama fallback) has no equivalent on other providers like OpenAI.
 const FALLBACK_MODEL = process.env.AI_FALLBACK_MODEL;
 
-async function chatCompletion(body: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false; status: number; text: string }> {
+async function chatCompletion(apiKey: string, baseUrl: string, body: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false; status: number; text: string }> {
   let lastStatus = 0;
   let lastText = "";
   let triedFallback = false;
   for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await fetch(`${BASE_URL}/chat/completions`, {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     if (res.ok) return { ok: true, data: await res.json() };
@@ -583,7 +580,8 @@ function isOffTopic(history: AssistantMessage[]): boolean {
 // Main entry
 // ---------------------------------------------------------------------------
 export async function runAssistant(history: AssistantMessage[]): Promise<AssistantResult> {
-  if (!API_KEY) return { reply: "", actions: [], error: "AI isn't enabled on this environment. An admin needs to add the AI_API_KEY (and AI_MODEL) environment variables to the deployment, then redeploy." };
+  const { apiKey, baseUrl, model, provider } = await resolveAiConfig();
+  if (!apiKey) return { reply: "", actions: [], error: `AI isn't enabled on this environment. An admin needs to add the ${provider === "groq" ? "GROQ_API_KEY" : "OPENAI_API_KEY"} environment variable to the deployment (or switch providers in the Super Admin panel), then redeploy.` };
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -603,7 +601,7 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
     if (charged) return;
     charged = true;
     try {
-      const res = await deductCredits("ai_assistant", 1, { metadata: { model: MODEL } });
+      const res = await deductCredits("ai_assistant", 1, { metadata: { model } });
       if (!res.ok) console.error("[ai_assistant] credit deduct failed:", res.error);
     } catch (err) {
       console.error("[ai_assistant] credit deduct threw:", err);
@@ -644,8 +642,8 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
   }
 
   for (let turn = 0; turn < 6; turn++) {
-    const res = await chatCompletion({
-      model: MODEL, messages, tools: TOOLS, tool_choice: "auto",
+    const res = await chatCompletion(apiKey, baseUrl, {
+      model, messages, tools: TOOLS, tool_choice: "auto",
       parallel_tool_calls: false, temperature: 0.4, max_tokens: 1500,
     });
 

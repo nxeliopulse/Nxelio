@@ -190,50 +190,77 @@ async function adminUpdateAuthPassword(userId: string, password: string): Promis
   }
 }
 
-export async function inviteUser(email: string, fullName: string, roleId: number, _managerId: string | null) {
+export interface InviteUserResult {
+  ok: boolean;
+  user?: { id: string; email: string };
+  tempPassword?: string;
+  error?: string;
+}
+
+/**
+ * Next.js redacts thrown Server Action errors in production builds down to a
+ * generic "error occurred in Server Components render" message — so real,
+ * actionable errors (like "this email is already registered elsewhere") never
+ * reach the admin. Everything below is caught and returned as plain data
+ * instead of thrown, so the real message actually shows up in the UI.
+ */
+export async function inviteUser(email: string, fullName: string, roleId: number, _managerId: string | null): Promise<InviteUserResult> {
   void _managerId;
-  const admin = createAdminClient();
+  try {
+    const admin = createAdminClient();
 
-  // 1. Only a Super Admin may invite users; scope to their workspace.
-  const { workspaceId: inviterWorkspaceId } = await requireSuperAdmin();
+    // 1. Only a Super Admin may invite users; scope to their workspace.
+    const { workspaceId: inviterWorkspaceId } = await requireSuperAdmin();
 
-  // Only allow assigning a role that actually exists (was hardcoded to [1,2,3],
-  // which silently rejected any role added later, e.g. Reviewer).
-  const { data: role } = await admin.from("roles").select("role_id").eq("role_id", roleId).single();
-  if (!role) throw new Error("Invalid role");
+    // Only allow assigning a role that actually exists (was hardcoded to [1,2,3],
+    // which silently rejected any role added later, e.g. Reviewer).
+    const { data: role } = await admin.from("roles").select("role_id").eq("role_id", roleId).single();
+    if (!role) return { ok: false, error: "Invalid role" };
 
-  // 2. Create the auth user via direct REST API (guarantees password is set)
-  const tempPassword = generateTempPassword();
-  const created = await adminCreateAuthUser(email, tempPassword, fullName);
+    // Supabase Auth requires every email to be globally unique across the whole
+    // project — a person can't have a separate account per workspace. Catch
+    // this specific, predictable case with a clear message instead of letting
+    // the raw Auth API error surface (or get redacted by Next.js in prod).
+    const { data: existing } = await admin.from("users").select("workspace_id").eq("email", email).maybeSingle();
+    if (existing) {
+      return { ok: false, error: "This email is already registered to another account. Each email can only belong to one workspace — use a different email (e.g. a \"+\" alias) to invite the same person elsewhere." };
+    }
 
-  // 3. Defensively re-set the password right after — guarantees it sticks
-  //    even if any trigger somehow interfered with the create flow
-  await adminUpdateAuthPassword(created.id, tempPassword);
+    // 2. Create the auth user via direct REST API (guarantees password is set)
+    const tempPassword = generateTempPassword();
+    const created = await adminCreateAuthUser(email, tempPassword, fullName);
 
-  // 4. Upsert public.users into the inviter's workspace
-  const { error: upsertError } = await admin.from("users").upsert(
-    {
-      user_id: created.id,
-      full_name: fullName,
-      email,
-      role_id: roleId,
-      status: "ACTIVE",
-      workspace_id: inviterWorkspaceId,
-    },
-    { onConflict: "user_id" }
-  );
-  if (upsertError) throw upsertError;
+    // 3. Defensively re-set the password right after — guarantees it sticks
+    //    even if any trigger somehow interfered with the create flow
+    await adminUpdateAuthPassword(created.id, tempPassword);
 
-  // 5. Delete orphan workspace that the signup trigger may have created
-  await admin
-    .from("workspaces")
-    .delete()
-    .eq("owner_id", created.id)
-    .neq("id", inviterWorkspaceId);
+    // 4. Upsert public.users into the inviter's workspace
+    const { error: upsertError } = await admin.from("users").upsert(
+      {
+        user_id: created.id,
+        full_name: fullName,
+        email,
+        role_id: roleId,
+        status: "ACTIVE",
+        workspace_id: inviterWorkspaceId,
+      },
+      { onConflict: "user_id" }
+    );
+    if (upsertError) return { ok: false, error: upsertError.message };
 
-  revalidatePath("/users");
-  await logAudit({ action: "user.invited", entityType: "user", entityId: created.id, entityLabel: email, metadata: { roleId } });
-  return { user: { id: created.id, email }, tempPassword };
+    // 5. Delete orphan workspace that the signup trigger may have created
+    await admin
+      .from("workspaces")
+      .delete()
+      .eq("owner_id", created.id)
+      .neq("id", inviterWorkspaceId);
+
+    revalidatePath("/users");
+    await logAudit({ action: "user.invited", entityType: "user", entityId: created.id, entityLabel: email, metadata: { roleId } });
+    return { ok: true, user: { id: created.id, email }, tempPassword };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Couldn't create the user." };
+  }
 }
 
 export async function deleteUser(userId: string) {

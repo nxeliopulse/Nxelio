@@ -1,18 +1,19 @@
 import { getLeads, getLeadStats } from "@/lib/queries/leads";
 import { getCampaignRecipients } from "@/lib/queries/campaigns";
+import { getAiColumns, getAiColumnSavedTemplates } from "@/lib/queries/ai-columns";
 import { LeadsTable } from "@/components/leads/leads-table";
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ campaign?: string; q?: string }> }) {
   const { campaign, q } = await searchParams;
-  const [leads, stats] = await Promise.all([getLeads(), getLeadStats()]);
+  const [leads, stats, aiColumns, aiColumnSavedTemplates] = await Promise.all([getLeads(), getLeadStats(), getAiColumns(), getAiColumnSavedTemplates()]);
 
   // When opened from a campaign's "View report", show just that campaign's recipients.
   if (campaign) {
     const { name, leadIds } = await getCampaignRecipients(campaign);
     const idSet = new Set(leadIds);
     const filtered = leads.filter((l) => idSet.has(l.id));
-    return <LeadsTable leads={filtered} stats={stats} campaignFilter={{ id: campaign, name: name || "Campaign" }} />;
+    return <LeadsTable leads={filtered} stats={stats} campaignFilter={{ id: campaign, name: name || "Campaign" }} aiColumns={aiColumns} aiColumnSavedTemplates={aiColumnSavedTemplates} />;
   }
 
-  return <LeadsTable leads={leads} stats={stats} initialSearch={q} />;
+  return <LeadsTable leads={leads} stats={stats} initialSearch={q} aiColumns={aiColumns} aiColumnSavedTemplates={aiColumnSavedTemplates} />;
 }

@@ -1,9 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
-
-const API_KEY = process.env.AI_API_KEY;
-const BASE_URL = process.env.AI_BASE_URL || "https://api.groq.com/openai/v1";
-const MODEL = process.env.AI_MODEL || "llama-3.3-70b-versatile";
+import { resolveAiConfig } from "@/lib/ai/provider";
 
 export interface SupportMessage {
   role: "user" | "assistant";
@@ -54,13 +51,13 @@ You are NOT the data assistant. Decline these and redirect briefly:
   {"answer": "<your help text>", "links": [{"label": "Go to Leads", "href": "/leads"}]}
 - "links" is optional; include 1-3 only when genuinely helpful. hrefs must be real app paths from the list above.`;
 
-async function call(messages: { role: string; content: string }[]): Promise<{ ok: true; content: string } | { ok: false; status: number; text: string }> {
+async function call(apiKey: string, baseUrl: string, model: string, messages: { role: string; content: string }[]): Promise<{ ok: true; content: string } | { ok: false; status: number; text: string }> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await fetch(`${BASE_URL}/chat/completions`, {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         messages,
         temperature: 0.3,
         max_tokens: 800,
@@ -85,7 +82,8 @@ async function call(messages: { role: string; content: string }[]): Promise<{ ok
 }
 
 export async function runSupport(history: SupportMessage[]): Promise<SupportResult> {
-  if (!API_KEY) {
+  const { apiKey, baseUrl, model } = await resolveAiConfig();
+  if (!apiKey) {
     return {
       reply: "Support chat isn't configured on this environment yet. Meanwhile, the Help & Support page in the sidebar has guides.",
       links: [{ label: "Open Help center", href: "/help" }],
@@ -101,7 +99,7 @@ export async function runSupport(history: SupportMessage[]): Promise<SupportResu
     ...history.slice(-10).map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  const res = await call(messages);
+  const res = await call(apiKey, baseUrl, model, messages);
   if (!res.ok) {
     const friendly = res.status === 429
       ? "Our help bot is busy right now — please try again in a minute, or browse the Help center."
