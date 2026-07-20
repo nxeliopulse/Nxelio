@@ -329,8 +329,16 @@ function saveCfg(c:PanelCfg){try{localStorage.setItem("nx-v2-cfg",JSON.stringify
 
 // ── AI Discovery Insights helper ────────────────────────────────────────────────
 const ICLR:Record<string,string>={positive:"#15803D",info:"#0176D3",attention:"#B45309",warning:"#B91C1C"};
-const IBCG:Record<string,string>={positive:"#F0FDF4",info:"#EFF6FF",attention:"#FFFBEB",warning:"#FEF2F2"};
-const IBRD:Record<string,string>={positive:"#BBF7D0",info:"#BFDBFE",attention:"#FEF3C7",warning:"#FEE2E2"};
+// Tailwind class pairs (light+dark) for the insight card background/border —
+// kept separate from the inline-style IBCG/IBRD maps above because inline
+// `style` colors can't respond to `dark:` and render unreadable under forced
+// dark-mode browser extensions.
+const IBG_CLASS:Record<string,string>={
+  positive:  "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900",
+  info:      "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900",
+  attention: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900",
+  warning:   "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900",
+};
 
 function computeAIInsights(s:AnalyticsStats){
   const r:Array<{type:string;icon:React.ReactNode;title:string;body:string;recommendation:string}>=[];
@@ -899,15 +907,15 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
 
       case "ov-insights": return(
         <div className="space-y-2.5">
-          {insights.length===0&&<p className="text-xs text-center py-6 text-slate-400">Add data to calculate insights.</p>}
+          {insights.length===0&&<p className="text-xs text-center py-6 text-slate-400 dark:text-slate-400">Add data to calculate insights.</p>}
           {insights.map((ins,i)=>(
-            <div key={i} className="rounded-xl border p-3" style={{borderColor:IBRD[ins.type]??BORDER,background:IBCG[ins.type]??"#FFF"}}>
+            <div key={i} className={cn("rounded-xl border p-3", IBG_CLASS[ins.type]??"bg-white dark:bg-slate-100 border-slate-200 dark:border-slate-200")}>
               <div className="flex items-center gap-2 mb-1">
-                <span style={{color:ICLR[ins.type]}} className="bg-white/80 p-1 rounded-md shadow-2xs">{ins.icon}</span>
-                <span className="text-xs font-bold text-slate-800">{ins.title}</span>
+                <span style={{color:ICLR[ins.type]}} className="bg-white/80 dark:bg-slate-50/60 p-1 rounded-md shadow-2xs">{ins.icon}</span>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-800">{ins.title}</span>
               </div>
-              <p className="text-[11px] leading-relaxed text-slate-600 mb-1">{ins.body}</p>
-              <div className="text-[10px] text-slate-400 font-bold border-t border-dashed mt-1.5 pt-1.5 flex items-center gap-1">
+              <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-600 mb-1">{ins.body}</p>
+              <div className="text-[10px] text-slate-400 dark:text-slate-400 font-bold border-t border-dashed border-slate-300 dark:border-slate-300 mt-1.5 pt-1.5 flex items-center gap-1">
                 <Sparkles size={10} className="text-[#0176D3]"/> Rec: <span className="text-[#0176D3] hover:underline cursor-pointer">{ins.recommendation}</span>
               </div>
             </div>
@@ -1373,7 +1381,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
     <div style={{margin:"-20px -24px",minHeight:"100vh"}} className={cn(presentMode?"p-8":"", "font-sans text-slate-800 bg-slate-50 dark:bg-slate-950")}>
 
       {/* ── Header Toolbar ─────────────────────────────────────────────────── */}
-      <div className="shadow-xs sticky top-0 z-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+      <div className="shadow-xs sticky top-0 z-20 bg-white dark:bg-slate-50 border-b border-slate-200 dark:border-slate-100">
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-3.5 flex-wrap gap-4">
           <div className="flex items-center gap-3">
@@ -1384,10 +1392,10 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-black text-sm tracking-tight text-slate-900 dark:text-slate-50 uppercase">Nxelio Intelligence Hub</h1>
+                <h1 className="font-black text-sm tracking-tight text-slate-900 dark:text-slate-900 uppercase">Nxelio Intelligence Hub</h1>
                 <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-sm bg-indigo-600 text-white shadow-2xs">AI POWERED</span>
               </div>
-              <p style={{fontSize:11}} className="font-bold flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <p style={{fontSize:11}} className="font-bold flex items-center gap-1.5 text-slate-500 dark:text-slate-500">
                 Dashboards <ChevronDown size={10}/> <span className="text-[#0176D3] hover:underline cursor-pointer">Sales Performance Overview</span>
               </p>
             </div>
@@ -1401,15 +1409,15 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             <div className="relative">
               <button 
                 onClick={()=>setViewsOpen(!viewsOpen)} 
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all bg-white dark:bg-slate-100 hover:bg-slate-50 dark:hover:bg-slate-200 border-slate-200 dark:border-slate-200 text-slate-800 dark:text-slate-800 cursor-pointer"
               >
                 <Layers size={12} className="text-[#0176D3]"/>
                 <span>View: {activeViewName}</span>
                 <ChevronDown size={10} className="text-slate-400"/>
               </button>
               {viewsOpen && (
-                <div className="absolute top-[38px] left-0 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl py-1.5 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <p className="px-3 py-1 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-slate-700 pb-1.5 mb-1.5">Saved Analytics Views</p>
+                <div className="absolute top-[38px] left-0 w-64 bg-white dark:bg-slate-100 border border-slate-200 dark:border-slate-200 rounded-lg shadow-xl py-1.5 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <p className="px-3 py-1 text-[10px] font-extrabold text-slate-400 dark:text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-200 pb-1.5 mb-1.5">Saved Analytics Views</p>
                   {savedViews.map((view, i) => (
                     <button
                       key={i}
@@ -1418,7 +1426,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
                         setActiveViewName(view.name);
                         setViewsOpen(false);
                       }}
-                      className={cn("w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold flex items-center justify-between cursor-pointer", activeViewName === view.name ? "text-[#0176D3] bg-blue-50/50 dark:bg-blue-950/20" : "text-slate-600 dark:text-slate-350")}
+                      className={cn("w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-200 font-semibold flex items-center justify-between cursor-pointer", activeViewName === view.name ? "text-[#0176D3] bg-blue-50/50 dark:bg-blue-950/20" : "text-slate-600 dark:text-slate-350")}
                     >
                       <span>{view.name}</span>
                       {activeViewName === view.name && <CheckCircle2 size={12} className="text-[#0176D3]"/>}
@@ -1431,7 +1439,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             {/* IQL Editor Toggle */}
             <button 
               onClick={()=>setIqlMode(!iqlMode)} 
-              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", iqlMode?"bg-indigo-600 text-white border-indigo-700":"bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700")}
+              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", iqlMode?"bg-indigo-600 text-white border-indigo-700":"bg-white dark:bg-slate-100 text-slate-700 dark:text-slate-700 border-slate-200 dark:border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-200")}
             >
               <Code2 size={12}/>{iqlMode?"Hide Editor":"Insight Query Studio"}
             </button>
@@ -1439,18 +1447,18 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             {/* Present Mode */}
             <button 
               onClick={()=>setPresentMode(!presentMode)} 
-              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", presentMode?"bg-slate-800 dark:bg-slate-900 text-white border-slate-900 dark:border-slate-950":"bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700")}
+              className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", presentMode?"bg-slate-800 dark:bg-slate-50 text-white border-slate-900 dark:border-slate-950":"bg-white dark:bg-slate-100 text-slate-700 dark:text-slate-700 border-slate-200 dark:border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-200")}
             >
               <Eye size={12}/>{presentMode?"Dashboard View":"Present"}
             </button>
 
             {/* Customize */}
-            <button onClick={()=>setCustomizing(p=>!p)} className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", customizing?"bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800":"bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700")}>
+            <button onClick={()=>setCustomizing(p=>!p)} className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", customizing?"bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800":"bg-white dark:bg-slate-100 text-slate-700 dark:text-slate-700 border-slate-200 dark:border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-200")}>
               <Settings2 size={12}/>{customizing?"Editing Grid":"Edit Dashboard Layout"}
             </button>
 
             {/* Export */}
-            <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 cursor-pointer">
+            <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all bg-white dark:bg-slate-100 hover:bg-slate-50 dark:hover:bg-slate-200 text-slate-700 dark:text-slate-700 border-slate-200 dark:border-slate-200 cursor-pointer">
               <Download size={12}/>CSV Export
             </button>
           </div>
@@ -1458,15 +1466,15 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
 
         {/* Global Filter Bar */}
         {!presentMode && (
-          <div className="px-6 py-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/10 flex items-center gap-3 flex-wrap text-xs font-bold text-slate-700 dark:text-slate-200">
-            <span className="flex items-center gap-1 text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mr-1">
+          <div className="px-6 py-2 border-t border-slate-200 dark:border-slate-100 bg-slate-50/70 dark:bg-slate-50/10 flex items-center gap-3 flex-wrap text-xs font-bold text-slate-700 dark:text-slate-700">
+            <span className="flex items-center gap-1 text-slate-400 dark:text-slate-400 uppercase tracking-wider text-[10px] mr-1">
               <Layers size={11} className="text-[#0176D3]"/> Global Filters
             </span>
 
             {/* Range */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2.5 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-100 border border-slate-200 dark:border-slate-200 rounded-md px-2.5 py-1.5 shadow-2xs">
               <Clock size={11} className="text-slate-400"/>
-              <select value={filters.range} onChange={e=>setFilters(prev=>({...prev,range:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 pr-1">
+              <select value={filters.range} onChange={e=>setFilters(prev=>({...prev,range:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-700 pr-1">
                 <option value="7">Last 7 Days</option>
                 <option value="14">Last 14 Days</option>
                 <option value="30">Last 30 Days</option>
@@ -1476,16 +1484,16 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             </div>
 
             {/* Region */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2.5 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-100 border border-slate-200 dark:border-slate-200 rounded-md px-2.5 py-1.5 shadow-2xs">
               <Globe size={11} className="text-slate-400"/>
               <span className="text-slate-400 font-medium">Region:</span>
-              <select value={filters.region} onChange={e=>setFilters(prev=>({...prev,region:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 pr-1">
+              <select value={filters.region} onChange={e=>setFilters(prev=>({...prev,region:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-700 pr-1">
                 {REGIONS.map(r=><option key={r} value={r}>{r}</option>)}
               </select>
             </div>
 
             {/* Owner */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2.5 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-100 border border-slate-200 dark:border-slate-200 rounded-md px-2.5 py-1.5 shadow-2xs">
               <Users size={11} className="text-slate-400"/>
               <span className="text-slate-400 font-medium">Owner:</span>
               <select value={filters.owner} onChange={e=>setFilters(prev=>({...prev,owner:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-[#0176D3] pr-1">
@@ -1494,28 +1502,28 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             </div>
 
             {/* Industry */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2.5 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-100 border border-slate-200 dark:border-slate-200 rounded-md px-2.5 py-1.5 shadow-2xs">
               <Layers size={11} className="text-slate-400"/>
               <span className="text-slate-400 font-medium">Industry:</span>
-              <select value={filters.industry} onChange={e=>setFilters(prev=>({...prev,industry:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 pr-1">
+              <select value={filters.industry} onChange={e=>setFilters(prev=>({...prev,industry:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-700 pr-1">
                 {INDUSTRIES.map(i=><option key={i} value={i}>{i}</option>)}
               </select>
             </div>
 
             {/* Lead Source */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2.5 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-100 border border-slate-200 dark:border-slate-200 rounded-md px-2.5 py-1.5 shadow-2xs">
               <Globe size={11} className="text-slate-400"/>
               <span className="text-slate-400 font-medium">Source:</span>
-              <select value={filters.leadSource} onChange={e=>setFilters(prev=>({...prev,leadSource:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 pr-1">
+              <select value={filters.leadSource} onChange={e=>setFilters(prev=>({...prev,leadSource:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-700 pr-1">
                 {LEAD_SOURCES.map(l=><option key={l} value={l}>{l}</option>)}
               </select>
             </div>
 
             {/* Stage */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2.5 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-100 border border-slate-200 dark:border-slate-200 rounded-md px-2.5 py-1.5 shadow-2xs">
               <Target size={11} className="text-slate-400"/>
               <span className="text-slate-400 font-medium">Stage:</span>
-              <select value={filters.stage} onChange={e=>setFilters(prev=>({...prev,stage:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 pr-1">
+              <select value={filters.stage} onChange={e=>setFilters(prev=>({...prev,stage:e.target.value}))} className="bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-700 pr-1">
                 {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -1533,10 +1541,10 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
         )}
 
         {/* Tab Navigation */}
-        <div className="flex items-center px-4 pt-1.5 pb-0 gap-1 border-t border-slate-200 dark:border-slate-800 bg-slate-50/30">
+        <div className="flex items-center px-4 pt-1.5 pb-0 gap-1 border-t border-slate-200 dark:border-slate-100 bg-slate-50/30">
           {TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
-              className={cn("px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all relative border-b-2 uppercase tracking-wide cursor-pointer", tab===t.id?"border-[#0176D3] text-[#0176D3] bg-white dark:bg-slate-800 shadow-2xs":"border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-slate-100/50 dark:hover:bg-slate-800/50")}>
+              className={cn("px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all relative border-b-2 uppercase tracking-wide cursor-pointer", tab===t.id?"border-[#0176D3] text-[#0176D3] bg-white dark:bg-slate-100 shadow-2xs":"border-transparent text-slate-500 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-800 hover:bg-slate-100/50 dark:hover:bg-slate-100/50")}>
               {t.label}
               {tab===t.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0176D3]"/>}
             </button>
