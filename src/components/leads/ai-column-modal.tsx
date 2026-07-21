@@ -3,13 +3,14 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Sparkles, LayoutTemplate, Settings2, Loader2, Play, Check, X, Star, Trash2, SearchCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  aiColumnTemplates, AI_COLUMN_TEMPLATE_CATEGORIES, AI_COLUMN_VARIABLES, AI_COLUMN_OUTPUT_TYPE_LABELS,
+  aiColumnTemplates, AI_COLUMN_TEMPLATE_CATEGORIES, AI_COLUMN_VARIABLES,
   detectAiColumnActionType,
   type AiColumnTemplate, type AiColumnTemplateCategory, type AiColumnOutputType,
 } from "@/lib/leads/ai-column-templates";
-import { createAiColumn, previewAiColumn, runAiColumn, deleteAiColumnSavedTemplate, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
+import { createAiColumn, previewAiColumn, runAiColumn, deleteAiColumnSavedTemplate, generateAiColumnMeta, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
 type Step = "templates" | "configure";
+type ConfigureTab = "generate" | "configure";
 
 interface Props {
   open: boolean;
@@ -25,7 +26,8 @@ interface Props {
  * same pattern already used for the lead-detail panel.
  */
 export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props) {
-  const [step, setStep] = useState<Step>("templates");
+  const [step, setStep] = useState<Step>("configure");
+  const [configureTab, setConfigureTab] = useState<ConfigureTab>("generate");
   const [category, setCategory] = useState<"All" | AiColumnTemplateCategory>("All");
 
   const [name, setName] = useState("");
@@ -40,6 +42,7 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [generatingMeta, setGeneratingMeta] = useState(false);
 
   const detectedAction = useMemo(() => detectAiColumnActionType(prompt), [prompt]);
 
@@ -62,7 +65,8 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
   }, []);
 
   function reset() {
-    setStep("templates");
+    setStep("configure");
+    setConfigureTab("generate");
     setCategory("All");
     setName("");
     setDescription("");
@@ -86,6 +90,7 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
     setPrompt(t.promptTemplate);
     setOutputType(t.outputType);
     setSourceTemplateId(t.id);
+    setConfigureTab("generate");
     setStep("configure");
   }
 
@@ -95,6 +100,7 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
     setPrompt(t.prompt_template || "");
     setOutputType(t.output_type);
     setSourceTemplateId(null);
+    setConfigureTab("generate");
     setStep("configure");
   }
 
@@ -104,7 +110,22 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
     setPrompt("");
     setOutputType("text");
     setSourceTemplateId(null);
+    setConfigureTab("generate");
     setStep("configure");
+  }
+
+  function goToConfigure() {
+    if (!prompt.trim()) return;
+    setGeneratingMeta(true);
+    startTransition(async () => {
+      // Column name/description are AI-generated from the intent text — the user
+      // never has to type them themselves, matching how Clay names its columns.
+      const meta = await generateAiColumnMeta(prompt);
+      setName(meta.name);
+      setDescription(meta.description);
+      setGeneratingMeta(false);
+      setConfigureTab("configure");
+    });
   }
 
   function runPreview() {
@@ -159,7 +180,9 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
       <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-white/95 backdrop-blur">
         <div className="flex items-center gap-2">
           <div className="rounded-lg bg-blue-50 p-1.5"><Sparkles className="h-4 w-4 text-blue-600" /></div>
-          <h2 className="font-semibold text-slate-900">{step === "templates" ? "Add an AI column" : "Configure column"}</h2>
+          <h2 className="font-semibold text-slate-900">
+            {step === "templates" ? "Add an AI column" : configureTab === "generate" ? "Use AI" : "Configure column"}
+          </h2>
         </div>
         <button onClick={handleClose} className="p-1 rounded-md hover:bg-slate-100"><X className="h-4 w-4 text-slate-500" /></button>
       </div>
@@ -247,101 +270,132 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
       )}
 
       {step === "configure" && (
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Column name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Verified email"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Description <span className="text-slate-400">(optional)</span></label>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What this column is for"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Prompt</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
-              placeholder="e.g. Find the verified email using anysite — or Guess the seniority level for {{full_name}} at {{company_name}}"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 font-mono"
-            />
-            {detectedAction === "anysite_email" ? (
-              <p className="text-xs text-cyan-700 bg-cyan-50 rounded-lg px-2.5 py-1.5 mt-1.5 inline-flex items-center gap-1.5">
-                <SearchCheck className="h-3.5 w-3.5" /> Detected: this will run a real AnySite lookup on each lead&apos;s LinkedIn URL — not AI-generated text.
-              </p>
-            ) : (
-              <p className="text-xs text-slate-400 mt-1">
-                Insert lead fields with <code className="bg-slate-100 px-1 rounded">{"{{field}}"}</code>: {AI_COLUMN_VARIABLES.map((v) => `{{${v}}}`).join(", ")}
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Output type</label>
-            <select
-              value={outputType}
-              onChange={(e) => setOutputType(e.target.value as AiColumnOutputType)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400"
-            >
-              {(Object.keys(AI_COLUMN_OUTPUT_TYPE_LABELS) as AiColumnOutputType[]).map((k) => (
-                <option key={k} value={k}>{AI_COLUMN_OUTPUT_TYPE_LABELS[k]}</option>
-              ))}
-            </select>
+        <div>
+          <div className="px-5 pt-4">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+              <button
+                onClick={() => setConfigureTab("generate")}
+                className={`rounded-md py-1.5 text-sm font-medium transition-colors ${
+                  configureTab === "generate" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Generate
+              </button>
+              <button
+                onClick={() => setConfigureTab("configure")}
+                className={`rounded-md py-1.5 text-sm font-medium transition-colors ${
+                  configureTab === "configure" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Configure
+              </button>
+            </div>
           </div>
 
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-slate-600">Try on 5 rows</p>
-              <Button size="sm" variant="outline" onClick={runPreview} disabled={!prompt.trim() || previewLoading}>
-                {previewLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} Run preview
-              </Button>
-            </div>
-            {previewError && <p className="text-xs text-red-600">{previewError}</p>}
-            {preview && (
-              <div className="space-y-1.5">
-                {preview.length === 0 && <p className="text-xs text-slate-500">No leads yet to preview against.</p>}
-                {preview.map((r) => (
-                  <div key={r.leadId} className="flex items-start justify-between gap-3 rounded-lg bg-white px-2.5 py-1.5 text-xs">
-                    <span className="text-slate-500 flex-shrink-0">{r.label}</span>
-                    <span className="text-slate-900 text-right">{r.value || "—"}</span>
-                  </div>
-                ))}
+          {configureTab === "generate" && (
+            <div className="p-5 space-y-3">
+              <div>
+                <h3 className="font-semibold text-slate-900 text-sm">What would you like AI to do?</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Describe what this column should generate or look up for each lead. Mention &quot;AnySite&quot; + &quot;email&quot; to run a real verified-email lookup instead of AI text.
+                </p>
               </div>
-            )}
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={saveAsTemplate}
-              onChange={(e) => setSaveAsTemplate(e.target.checked)}
-              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            />
-            Also save as a reusable template (shows under &quot;My templates&quot; next time)
-          </label>
-
-          {saveError && <p className="text-xs text-red-600">{saveError}</p>}
-
-          <div className="flex flex-col gap-2 pt-2">
-            <button onClick={() => setStep("templates")} className="text-xs text-slate-500 hover:text-slate-700 text-left">← Back to templates</button>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => save(false)} disabled={!name.trim() || !prompt.trim() || pending} className="flex-1">
-                {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Save column
-              </Button>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={9}
+                placeholder="E.g., Guess the seniority level for {{full_name}} at {{company_name}} — or Find the verified email using anysite"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-400">
+                  Insert lead fields with <code className="bg-slate-100 px-1 rounded">{"{{field}}"}</code>
+                </p>
+                <Button size="sm" onClick={goToConfigure} disabled={!prompt.trim() || generatingMeta}>
+                  {generatingMeta ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Generate
+                </Button>
+              </div>
+              <button onClick={() => setStep("templates")} className="text-xs text-slate-500 hover:text-slate-700">← Back to templates</button>
             </div>
-            <Button size="sm" onClick={() => save(true)} disabled={!name.trim() || !prompt.trim() || pending} className="w-full">
-              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Save & run on all leads
-            </Button>
-          </div>
+          )}
+
+          {configureTab === "configure" && (
+            <div className="p-5 space-y-4">
+              <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">AI-named column</p>
+                </div>
+                <p className="text-sm font-medium text-slate-900 mt-1">{name || "Untitled column"}</p>
+                {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-600">Prompt</label>
+                  <button onClick={() => setConfigureTab("generate")} className="text-xs text-blue-600 hover:text-blue-800">Edit in Generate</button>
+                </div>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  rows={5}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 font-mono"
+                />
+                {detectedAction === "anysite_email" ? (
+                  <p className="text-xs text-cyan-700 bg-cyan-50 rounded-lg px-2.5 py-1.5 mt-1.5 inline-flex items-center gap-1.5">
+                    <SearchCheck className="h-3.5 w-3.5" /> Detected: this will run a real AnySite lookup on each lead&apos;s LinkedIn URL — not AI-generated text.
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Fields available: {AI_COLUMN_VARIABLES.map((v) => `{{${v}}}`).join(", ")}
+                  </p>
+                )}
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-slate-600">Try on 5 rows</p>
+                  <Button size="sm" variant="outline" onClick={runPreview} disabled={!prompt.trim() || previewLoading}>
+                    {previewLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} Run preview
+                  </Button>
+                </div>
+                {previewError && <p className="text-xs text-red-600">{previewError}</p>}
+                {preview && (
+                  <div className="space-y-1.5">
+                    {preview.length === 0 && <p className="text-xs text-slate-500">No leads yet to preview against.</p>}
+                    {preview.map((r) => (
+                      <div key={r.leadId} className="flex items-start justify-between gap-3 rounded-lg bg-white px-2.5 py-1.5 text-xs">
+                        <span className="text-slate-500 flex-shrink-0">{r.label}</span>
+                        <span className="text-slate-900 text-right">{r.value || "—"}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={saveAsTemplate}
+                  onChange={(e) => setSaveAsTemplate(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Also save as a reusable template (shows under &quot;My templates&quot; next time)
+              </label>
+
+              {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+
+              <div className="flex flex-col gap-2 pt-2">
+                <button onClick={() => setConfigureTab("generate")} className="text-xs text-slate-500 hover:text-slate-700 text-left">← Back to Generate</button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => save(false)} disabled={!name.trim() || !prompt.trim() || pending} className="flex-1">
+                    {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Save column
+                  </Button>
+                </div>
+                <Button size="sm" onClick={() => save(true)} disabled={!name.trim() || !prompt.trim() || pending} className="w-full">
+                  {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Save & run on all leads
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

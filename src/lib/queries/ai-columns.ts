@@ -1,7 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { getLeads } from "@/lib/queries/leads";
-import { aiChat } from "@/lib/ai/client";
+import { aiChat, aiJson } from "@/lib/ai/client";
 import { findEmailByLinkedIn, findEmailsByLinkedIn } from "@/lib/leads/anysite";
 import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 import { buildAiColumnPrompt, detectAiColumnActionType, type AiColumnOutputType, type AiColumnActionType } from "@/lib/leads/ai-column-templates";
@@ -36,6 +36,28 @@ export async function getAiColumnProgress(columnId: string): Promise<{ done: num
   const leads = await getLeads();
   const done = leads.filter((l) => l.custom_fields && l.custom_fields[columnId] !== undefined).length;
   return { done, total: leads.length };
+}
+
+/** Generates a short column name + one-line description from the user's free-text
+ *  intent, so they never have to type those themselves — mirrors Clay's "Use AI"
+ *  flow where the column label comes from the AI, not a manual field. */
+export async function generateAiColumnMeta(promptText: string): Promise<{ name: string; description: string }> {
+  const fallback = { name: "New AI column", description: promptText.slice(0, 80) };
+  if (!promptText.trim()) return fallback;
+  try {
+    const result = await aiJson<{ name?: string; description?: string }>({
+      system: "You name spreadsheet columns. Given a user's instruction for what a column should generate or look up, respond with JSON {\"name\": \"...\", \"description\": \"...\"}. name: 2-4 words, Title Case, no punctuation. description: one short sentence explaining what the column does.",
+      prompt: promptText,
+      temperature: 0.3,
+      maxTokens: 100,
+    });
+    return {
+      name: result.name?.trim() || fallback.name,
+      description: result.description?.trim() || fallback.description,
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 export async function getAiColumns(): Promise<AiColumnDefinitionRow[]> {
@@ -132,7 +154,15 @@ async function computeAiColumnValue(
     return result.ok && result.email ? { ok: true, value: result.email } : { ok: false, value: result.error || "No email found" };
   }
   const prompt = buildAiColumnPrompt(promptTemplate, lead);
-  const value = (await aiChat({ prompt, temperature: 0.3, maxTokens: 120 })).trim();
+  const raw = (await aiChat({
+    system: "You are filling in a single spreadsheet cell. Respond with ONLY the answer itself — no explanation, no reasoning, no caveats, no extra sentences. Base your answer strictly on the information given in the prompt. If the prompt doesn't give you enough real information to answer (e.g. it asks for a fact — like a birthdate, age, or private detail — that was never provided and can't be inferred from what was given), respond with exactly \"Not found\". Never invent or guess a specific fact you don't actually have.",
+    prompt,
+    temperature: 0.3,
+    maxTokens: 120,
+  })).trim();
+  // Defense in depth: if the model ignored the instruction and wrote a long
+  // explanation anyway, that's a sign it didn't actually have the answer.
+  const value = raw.split(/\s+/).length > 40 ? "Not found" : raw;
   return { ok: true, value };
 }
 
