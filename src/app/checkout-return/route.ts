@@ -11,8 +11,9 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { chargebee, PRICE_ID_TO_PLAN, PLAN_CREDITS } from "@/lib/chargebee";
+import { chargebee, PRICE_ID_TO_PLAN, PLAN_CREDITS, PLAN_LEADS } from "@/lib/chargebee";
 import { syncSubscriptionFromChargebee } from "@/lib/queries/subscriptions";
+import { finalizePendingPromotion } from "@/lib/queries/promotions";
 import type { PlanId, BillingInterval } from "@/lib/queries/subscriptions";
 
 function mapStatus(s: string): "trialing" | "active" | "past_due" | "canceled" {
@@ -82,6 +83,7 @@ export async function GET(req: NextRequest) {
           billingInterval:          parsed.interval as BillingInterval,
           status:                   mapStatus(cbSub.status),
           creditsTotal:             PLAN_CREDITS[parsed.planId] ?? 0,
+          leadsTotal:               PLAN_LEADS[parsed.planId] ?? 0,
           currentPeriodStart:       cbSub.current_term_start
                                       ? new Date(cbSub.current_term_start * 1000) : now,
           currentPeriodEnd:         cbSub.current_term_end
@@ -92,6 +94,11 @@ export async function GET(req: NextRequest) {
           chargebeeCustomerId:      cbCustomer?.id ?? profile.workspace_id,
           chargebeeSubscriptionId:  cbSub.id,
           chargebeePlanId:          itemPriceId,
+        });
+
+        await finalizePendingPromotion(profile.workspace_id, {
+          hostedPageId: hostedPageId,
+          chargebeeSubscriptionId: cbSub.id,
         });
       }
     }

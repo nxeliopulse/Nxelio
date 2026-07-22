@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { chargebee, PRICE_ID_TO_PLAN, PLAN_CREDITS } from "@/lib/chargebee";
+import { chargebee, PRICE_ID_TO_PLAN, PLAN_CREDITS, PLAN_LEADS } from "@/lib/chargebee";
 import { syncSubscriptionFromChargebee } from "@/lib/queries/subscriptions";
 import type { PlanId, BillingInterval, SubscriptionStatus } from "@/lib/queries/subscriptions";
 
@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
 
     const { planId, interval } = parsed;
     const creditsTotal = PLAN_CREDITS[planId] ?? 0;
+    const leadsTotal = PLAN_LEADS[planId] ?? 0;
     const planName = planId.charAt(0).toUpperCase() + planId.slice(1);
 
     const now = new Date();
@@ -94,6 +95,7 @@ export async function POST(req: NextRequest) {
       billingInterval:          interval as BillingInterval,
       status:                   mapChargebeeStatus(cbSub.status ?? "active"),
       creditsTotal,
+      leadsTotal,
       currentPeriodStart:       periodStart,
       currentPeriodEnd:         periodEnd,
       trialEndsAt:              cbSub.trial_end ? new Date(cbSub.trial_end * 1000) : null,

@@ -17,7 +17,8 @@ import {
   type BillingInterval,
   type SubscriptionStatus,
 } from "@/lib/queries/subscriptions";
-import { PRICE_ID_TO_PLAN, PLAN_CREDITS } from "@/lib/chargebee";
+import { PRICE_ID_TO_PLAN, PLAN_CREDITS, PLAN_LEADS } from "@/lib/chargebee";
+import { finalizePendingPromotion } from "@/lib/queries/promotions";
 
 // Verify the Basic Auth header Chargebee sends with every webhook
 function verifyBasicAuth(req: NextRequest): boolean {
@@ -147,6 +148,7 @@ async function handleSubscriptionUpsert(content: Record<string, unknown>) {
     billingInterval,
     status:                 mapStatus(String(cbSub.status ?? "active")),
     creditsTotal:           PLAN_CREDITS[planId] ?? PLAN_CREDITS.basic,
+    leadsTotal:             PLAN_LEADS[planId] ?? 0,
     currentPeriodStart:     new Date((cbSub.current_term_start as number) * 1000),
     currentPeriodEnd:       new Date((cbSub.current_term_end   as number) * 1000),
     trialEndsAt:            cbSub.trial_end ? new Date((cbSub.trial_end as number) * 1000) : null,
@@ -154,6 +156,8 @@ async function handleSubscriptionUpsert(content: Record<string, unknown>) {
     chargebeeSubscriptionId: String(cbSub.id),
     chargebeePlanId,
   });
+
+  await finalizePendingPromotion(workspaceId, { chargebeeSubscriptionId: String(cbSub.id) });
 }
 
 async function handleRenewal(content: Record<string, unknown>) {

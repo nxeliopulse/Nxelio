@@ -50,17 +50,26 @@ export async function canAfford(amount = 1): Promise<boolean> {
   return sub.credits_remaining >= amount;
 }
 
-export async function getCreditHistory(limit = 50) {
+export async function canAffordLeads(amount = 1): Promise<boolean> {
+  const sub = await getSubscription();
+  if (!sub) return false;
+  if (sub.status !== "active" && sub.status !== "trialing") return false;
+  return sub.leads_remaining + sub.topup_leads_remaining >= amount;
+}
+
+export async function getCreditHistory(limit = 50, resourceType?: "credits" | "leads") {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("credit_ledger")
-    .select("id, operation_type, credits_delta, status, created_at, metadata")
+    .select("id, operation_type, credits_delta, resource_type, status, created_at, metadata")
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (resourceType) query = query.eq("resource_type", resourceType);
+  const { data } = await query;
   return data ?? [];
 }
 
-// ── Credit deduction ──────────────────────────────────────────────────────────
+// ── Credit / lead deduction ────────────────────────────────────────────────────
 
 export async function deductCredits(
   operationType: string,
@@ -88,6 +97,29 @@ export async function deductCredits(
   return data as DeductResult;
 }
 
+/** Deducts from the monthly lead-discovery allowance first, then purchased top-up leads. */
+export async function deductLeads(
+  amount = 1,
+  metadata: Record<string, unknown> = {}
+): Promise<DeductResult> {
+  const supabase = await createClient();
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("workspace_id")
+    .single();
+  if (!profile) return { ok: false, error: "User profile not found" };
+
+  const { data, error } = await supabase.rpc("deduct_leads", {
+    p_workspace_id: profile.workspace_id,
+    p_amount:       amount,
+    p_metadata:     metadata,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return data as DeductResult;
+}
+
 // ── Admin helpers (webhook handler) ──────────────────────────────────────────
 
 export interface SyncPayload {
@@ -96,6 +128,7 @@ export interface SyncPayload {
   billingInterval: BillingInterval;
   status: SubscriptionStatus;
   creditsTotal: number;
+  leadsTotal: number;
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
   trialEndsAt?: Date | null;
@@ -109,7 +142,7 @@ export async function syncSubscriptionFromChargebee(payload: SyncPayload): Promi
 
   const { data: existing } = await admin
     .from("subscriptions")
-    .select("credits_remaining, credits_total, plan_id")
+    .select("credits_remaining, credits_total, leads_remaining, leads_total, plan_id")
     .eq("workspace_id", payload.workspaceId)
     .single();
 
@@ -117,6 +150,9 @@ export async function syncSubscriptionFromChargebee(payload: SyncPayload): Promi
   const creditsRemaining = planChanged || !existing
     ? payload.creditsTotal
     : existing.credits_remaining;
+  const leadsRemaining = planChanged || !existing
+    ? payload.leadsTotal
+    : existing.leads_remaining;
 
   await admin.from("subscriptions").upsert(
     {
@@ -126,6 +162,8 @@ export async function syncSubscriptionFromChargebee(payload: SyncPayload): Promi
       status:                    payload.status,
       credits_remaining:         creditsRemaining,
       credits_total:             payload.creditsTotal,
+      leads_remaining:           leadsRemaining,
+      leads_total:               payload.leadsTotal,
       trial_ends_at:             payload.trialEndsAt?.toISOString() ?? null,
       current_period_start:      payload.currentPeriodStart.toISOString(),
       current_period_end:        payload.currentPeriodEnd.toISOString(),
@@ -149,9 +187,21 @@ export async function syncSubscriptionFromChargebee(payload: SyncPayload): Promi
         subscription_id: sub.id,
         operation_type:  "plan_change",
         credits_delta:   payload.creditsTotal,
+        resource_type:   "credits",
         status:          "completed",
         metadata:        { from: existing?.plan_id, to: payload.planId },
       });
+      if (payload.leadsTotal > 0) {
+        await admin.from("credit_ledger").insert({
+          workspace_id:    payload.workspaceId,
+          subscription_id: sub.id,
+          operation_type:  "plan_change",
+          credits_delta:   payload.leadsTotal,
+          resource_type:   "leads",
+          status:          "completed",
+          metadata:        { from: existing?.plan_id, to: payload.planId },
+        });
+      }
     }
   }
 }

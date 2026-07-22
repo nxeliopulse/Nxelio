@@ -26,6 +26,7 @@ export interface SubscriptionPlan {
   monthly_price_cents: number;
   annual_price_cents: number;
   credits_per_cycle: number;
+  leads_per_cycle: number;
   trial_days: number;
   features: PlanFeatures;
   sort_order: number;
@@ -42,6 +43,9 @@ export interface Subscription {
   current_period_end: string;
   credits_remaining: number;
   credits_total: number;
+  leads_remaining: number;
+  leads_total: number;
+  topup_leads_remaining: number;
   low_balance_notified_at: string | null;
   chargebee_customer_id: string | null;
   chargebee_subscription_id: string | null;
@@ -73,4 +77,28 @@ export function trialDaysLeft(sub: Subscription): number {
   if (sub.status !== "trialing" || !sub.trial_ends_at) return 0;
   const ms = new Date(sub.trial_ends_at).getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / 86_400_000));
+}
+
+export function isLowOnLeads(sub: Subscription): boolean {
+  if (sub.leads_total === 0) return false;
+  return sub.leads_remaining / sub.leads_total <= LOW_BALANCE_THRESHOLD;
+}
+
+export function totalLeadsAvailable(sub: Subscription): number {
+  return sub.leads_remaining + sub.topup_leads_remaining;
+}
+
+// ── Promotions ────────────────────────────────────────────────────────────────
+
+export type PromotionCategory = "referral" | "launch" | "seasonal" | "student" | "general";
+
+export interface PromoValidationResult {
+  ok: boolean;
+  error?: string;
+  redemptionId?: string;
+  promotionId?: string;
+  chargebeeCouponId?: string | null;
+  bonusCredits?: number;
+  bonusLeads?: number;
+  description?: string | null;
 }

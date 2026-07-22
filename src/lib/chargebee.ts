@@ -21,10 +21,19 @@ for (const [planId, intervals] of Object.entries(CHARGEBEE_PRICE_IDS)) {
   }
 }
 
-// Credits granted per plan (must match subscription_plans table)
+// Credits granted per plan (must match subscription_plans.credits_per_cycle)
 export const PLAN_CREDITS: Record<string, number> = {
-  basic: 200, starter: 1200, pro: 3000,
+  basic: 200, starter: 300, pro: 1000,
 };
+
+// AI-discovered leads granted per plan (must match subscription_plans.leads_per_cycle)
+export const PLAN_LEADS: Record<string, number> = {
+  basic: 0, starter: 300, pro: 1000,
+};
+
+// Lead top-up: one-time purchase, same for every plan.
+export const LEAD_TOPUP_PRICE_CENTS = 14900; // $149.00
+export const LEAD_TOPUP_LEADS = 1000;
 
 function buildChargebeeClient() {
   const site   = process.env.CHARGEBEE_SITE;
