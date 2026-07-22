@@ -124,7 +124,7 @@ export interface GeneratedOutreachStep {
 }
 
 export async function isOutreachAiConfigured() {
-  return aiConfigured;
+  return aiConfigured();
 }
 
 /**

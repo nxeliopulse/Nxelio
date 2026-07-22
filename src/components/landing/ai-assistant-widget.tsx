@@ -39,6 +39,7 @@ export function AiAssistantWidget() {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time browser feature detection on mount
     setSpeechOutputSupported(typeof window !== "undefined" && "speechSynthesis" in window);
     const SR = typeof window !== "undefined"
       ? (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition
@@ -61,6 +62,7 @@ export function AiAssistantWidget() {
   useEffect(() => {
     if (!open) {
       recognitionRef.current?.stop();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- stopping in-flight mic/voice when the panel closes
       setListening(false);
       if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
       setSpeakingIndex(null);

@@ -23,6 +23,7 @@ function WelcomeBanner() {
 
   useEffect(() => {
     if (params.get("welcome") === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time reveal driven by a URL param on mount
       setVisible(true);
       // Strip the param so a refresh doesn't re-show it
       router.replace("/dashboard", { scroll: false });
@@ -138,6 +139,7 @@ export function DashboardView({
   const [customizing, setCustomizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydrate from localStorage on mount
   useEffect(() => { setVis(loadVis()); }, []);
 
   // Build dynamic AI suggestions from real stats

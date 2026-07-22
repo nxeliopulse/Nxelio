@@ -1,8 +1,9 @@
 "use client";
 import { useState, useTransition, useEffect, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { User, Bell, Key, ShieldCheck, Ban, CreditCard, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor, Plug, ScrollText } from "lucide-react";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
-import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
+import { syncOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type { AuditLogRow } from "@/lib/queries/audit-log";
 import { ConnectorsView } from "@/components/settings/connectors-view";
 import { AuditLogView } from "@/components/settings/audit-log-view";
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog }: Props) {
+  const router = useRouter();
   const [active, setActive] = useState("profile");
   const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
   // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar
@@ -61,6 +63,20 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
       setActive(resolved);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // After the Unipile mailbox/LinkedIn connect redirect lands back here
+  // (?connected=email|linkedin), pull the newly-authorized account into our DB
+  // and refresh — otherwise this page keeps showing "not connected" until a
+  // manual reload, even though the connection actually succeeded.
+  useEffect(() => {
+    const connected = new URLSearchParams(window.location.search).get("connected");
+    if (connected !== "email" && connected !== "linkedin") return;
+    syncOutreachAccounts().then(() => {
+      window.history.replaceState(null, "", "/settings?section=connectors");
+      router.refresh();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [pending, start] = useTransition();

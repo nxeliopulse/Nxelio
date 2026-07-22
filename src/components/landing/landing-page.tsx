@@ -1130,7 +1130,7 @@ function Testimonials() {
               <div className="flex gap-0.5 mb-4">
                 {[...Array(5)].map((_,i)=><Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400"/>)}
               </div>
-              <p className="text-slate-600 text-base leading-relaxed italic mb-6">"{t.quote}"</p>
+              <p className="text-slate-600 text-base leading-relaxed italic mb-6">&quot;{t.quote}&quot;</p>
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
                   style={{ background:t.color }}>

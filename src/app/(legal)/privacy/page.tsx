@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: "Privacy Policy — Nxelio" };
 
 export default function PrivacyPage() {
   return (
-    <LegalShell title="Privacy Policy" updated="July 13, 2026" active="privacy">
+    <LegalShell title="Privacy Policy" updated="July 14, 2026" active="privacy">
       <p>
         Nxelio (&quot;Nxelio&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides an AI-powered sales
         engagement and lead-nurturing platform (the &quot;Service&quot;). This Privacy Policy explains what
@@ -112,18 +112,34 @@ export default function PrivacyPage() {
       <p>
         We retain account and Customer Data for as long as your workspace remains active, or as needed to
         provide the Service, comply with legal obligations, resolve disputes, and enforce our agreements. You
-        may delete individual leads, campaigns, or other records at any time within the Service. Deleting your
-        workspace or account removes the associated Customer Data from active systems, subject to residual
-        copies retained temporarily in backups for a limited period before they are purged in the normal course
-        of business.
+        may delete individual leads, campaigns, or other records at any time within the Service, and doing so
+        removes them from the active, working views of the Service (e.g., your Leads table).
+      </p>
+      <p>
+        <strong>Lead import record.</strong> Separately, when a lead is imported or added into the Service
+        (for example, via CSV upload, LinkedIn search, or a lead-discovery search), we retain a permanent
+        internal record of that import — including the lead&apos;s contact details, when it was imported, and
+        which workspace/user imported it — for recordkeeping, audit, billing verification, and abuse-prevention
+        purposes. <strong>This import record is retained even after the corresponding lead is deleted from your
+        working Leads table</strong>; deleting a lead stops it from appearing in your active workspace but does
+        not erase this internal import record. If you are a California resident and wish to request deletion of
+        this internal record specifically, contact us using the details in Section 12, and we will evaluate the
+        request consistent with applicable law and our legitimate recordkeeping needs.
+      </p>
+      <p>
+        Deleting your workspace or account removes the associated Customer Data from the Service&apos;s active,
+        customer-facing systems (aside from the lead import record described above), subject to residual copies
+        retained temporarily in backups for a limited period before they are purged in the normal course of
+        business.
       </p>
 
       <h2>8. Your Customer Data</h2>
       <p>
-        You retain all ownership rights to the Customer Data you upload to the Service. We access Customer Data
-        only as needed to provide the Service, respond to your support requests, or as required by law. Your
-        workspace&apos;s Customer Data is logically isolated from other customers&apos; workspaces and is never
-        shared across workspaces.
+        You retain all ownership rights to the Customer Data you upload to the Service. Your workspace&apos;s
+        Customer Data is logically isolated from other <em>customers&apos;</em> workspaces within the
+        customer-facing product — one customer can never see another customer&apos;s data. Nxelio personnel
+        access Customer Data only as needed to provide the Service, respond to your support requests, maintain
+        the lead import record described in Section 7, or as required by law.
       </p>
 
       <h2>9. Security</h2>

@@ -1,10 +1,11 @@
 import "server-only";
+import { resolveAiConfig } from "@/lib/ai/provider";
 
-const API_KEY = process.env.AI_API_KEY;
-const BASE_URL = process.env.AI_BASE_URL || "https://api.groq.com/openai/v1";
-const MODEL = process.env.AI_MODEL || "llama-3.3-70b-versatile";
-
-export const aiConfigured = Boolean(API_KEY);
+/** Whether the currently active provider (OpenAI/Groq, per the Super Admin panel) has an API key configured. */
+export async function aiConfigured(): Promise<boolean> {
+  const { apiKey } = await resolveAiConfig();
+  return Boolean(apiKey);
+}
 
 interface ChatOptions {
   system?: string;
@@ -15,24 +16,26 @@ interface ChatOptions {
 }
 
 /**
- * Calls any OpenAI-compatible chat completions endpoint (Groq, DeepSeek, OpenAI...).
- * Swap provider by changing AI_API_KEY / AI_BASE_URL / AI_MODEL env vars — no code change.
+ * Calls any OpenAI-compatible chat completions endpoint (Groq, OpenAI...).
+ * Which provider/model is used is resolved at request time from the platform-wide
+ * AI Provider setting (Super Admin panel) — see src/lib/ai/provider.ts.
  */
 export async function aiChat({ system, prompt, json = false, temperature = 0.7, maxTokens = 2048 }: ChatOptions): Promise<string> {
-  if (!API_KEY) throw new Error("AI not configured — set AI_API_KEY env var");
+  const { apiKey, baseUrl, model } = await resolveAiConfig();
+  if (!apiKey) throw new Error("AI not configured — set the active provider's API key env var");
 
   const messages: { role: string; content: string }[] = [];
   if (system) messages.push({ role: "system", content: system });
   messages.push({ role: "user", content: prompt });
 
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       messages,
       temperature,
       max_tokens: maxTokens,

@@ -55,6 +55,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
 
   useEffect(() => {
     if (!detailUser) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting panel state when the selected user changes/closes
       setAuthInfo(null);
       setResetPw(null);
       setNavAccess({});
@@ -74,14 +75,11 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
     setError(null); setSuccess(null);
     if (!form.fullName || !form.email) { setError("Name and email required"); return; }
     start(async () => {
-      try {
-        const result = await inviteUser(form.email, form.fullName, form.roleId, null);
-        setSuccess(`User created. Temp password: ${result.tempPassword}`);
-        const defaultRole = roles.find((r) => r.role_name === "Sales Admin")?.role_id ?? 3;
-        setForm({ fullName: "", email: "", roleId: defaultRole });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed");
-      }
+      const result = await inviteUser(form.email, form.fullName, form.roleId, null);
+      if (!result.ok) { setError(result.error || "Failed"); return; }
+      setSuccess(`User created. Temp password: ${result.tempPassword}`);
+      const defaultRole = roles.find((r) => r.role_name === "Sales Admin")?.role_id ?? 3;
+      setForm({ fullName: "", email: "", roleId: defaultRole });
     });
   }
 

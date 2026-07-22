@@ -6,7 +6,7 @@ import { NEWSLETTER_IMAGE_TOPICS, pickImageForTopic } from "@/lib/newsletter-ima
 import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 
 export async function isAiConfigured() {
-  return aiConfigured;
+  return aiConfigured();
 }
 
 /** Blocks an AI call before it runs if the workspace can't afford this action's credit cost. */

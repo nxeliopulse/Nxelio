@@ -1,0 +1,97 @@
+/**
+ * Fixed option lists for the Buy Leads form. Bright Data's search here is a
+ * plain Google "site:linkedin.com/in ..." query — it has no industry/role
+ * taxonomy of its own — so we constrain input to LinkedIn's real company
+ * industry categories and common decision-maker titles. This keeps the search
+ * terms meaningful (matching words that actually appear on real profiles)
+ * instead of letting a typo or made-up industry return zero results.
+ */
+
+// LinkedIn's standard company "Industry" taxonomy (the categories LinkedIn
+// itself assigns to company pages), trimmed to the ones relevant for B2B
+// prospecting.
+export const LINKEDIN_INDUSTRIES = [
+  "Software Development",
+  "IT Services and IT Consulting",
+  "Computer and Network Security",
+  "Technology, Information and Internet",
+  "Financial Services",
+  "Banking",
+  "Investment Management",
+  "Insurance",
+  "Accounting",
+  "Venture Capital and Private Equity",
+  "Hospital & Health Care",
+  "Medical Practice",
+  "Pharmaceuticals",
+  "Biotechnology",
+  "Retail",
+  "E-commerce",
+  "Consumer Goods",
+  "Apparel & Fashion",
+  "Food & Beverages",
+  "Manufacturing",
+  "Industrial Automation",
+  "Automotive",
+  "Construction",
+  "Real Estate",
+  "Logistics and Supply Chain",
+  "Transportation, Logistics and Storage",
+  "Telecommunications",
+  "Marketing and Advertising",
+  "Public Relations and Communications",
+  "Media Production",
+  "Entertainment",
+  "Education",
+  "E-learning",
+  "Higher Education",
+  "Non-profit Organizations",
+  "Government Administration",
+  "Legal Services",
+  "Human Resources",
+  "Staffing and Recruiting",
+  "Management Consulting",
+  "Business Consulting and Services",
+  "Hospitality",
+  "Travel Arrangements",
+  "Restaurants",
+  "Energy",
+  "Oil & Gas",
+  "Renewable Energy",
+  "Agriculture",
+  "Environmental Services",
+] as const;
+
+// Common decision-maker / buyer-persona job titles for B2B outreach.
+export const COMMON_ROLES = [
+  "CEO",
+  "COO",
+  "CFO",
+  "CTO",
+  "CMO",
+  "CIO",
+  "Founder",
+  "Co-Founder",
+  "President",
+  "VP of Sales",
+  "VP of Marketing",
+  "VP of Engineering",
+  "VP of Product",
+  "VP of Operations",
+  "Head of Sales",
+  "Head of Marketing",
+  "Head of Growth",
+  "Head of Product",
+  "Head of Engineering",
+  "Head of Customer Success",
+  "Director of Sales",
+  "Director of Marketing",
+  "Director of Operations",
+  "Director of Business Development",
+  "Sales Manager",
+  "Marketing Manager",
+  "Product Manager",
+  "Business Development Manager",
+  "IT Manager",
+  "Procurement Manager",
+] as const;

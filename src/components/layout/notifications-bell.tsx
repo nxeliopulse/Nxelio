@@ -45,6 +45,7 @@ export function NotificationsBell() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time fetch + populate on mount
     refresh();
   }, []);
 

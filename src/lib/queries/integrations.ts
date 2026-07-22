@@ -1,4 +1,5 @@
 "use server";
+import { resolveAiConfig } from "@/lib/ai/provider";
 
 export interface IntegrationStatus {
   name: string;
@@ -15,12 +16,13 @@ function mask(key: string | undefined): string | undefined {
 }
 
 export async function getIntegrationStatuses(): Promise<IntegrationStatus[]> {
+  const { apiKey, provider } = await resolveAiConfig();
   return [
     {
-      name: "AI Provider (Groq)",
-      description: "Lead scoring + email generation",
-      configured: Boolean(process.env.AI_API_KEY),
-      maskedKey: mask(process.env.AI_API_KEY),
+      name: `AI Provider (${provider === "groq" ? "Groq" : "OpenAI"})`,
+      description: "Lead scoring + email generation — set in Admin > AI Provider",
+      configured: Boolean(apiKey),
+      maskedKey: mask(apiKey),
       emoji: "🤖",
     },
     {

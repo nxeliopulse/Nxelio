@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0061_promotions_leads.sql
+-- 0066_promotions_leads.sql
 --
 -- Three things in one migration:
 -- 1. Reprice + restructure feature gates: Basic $15.99/mo now unlocks

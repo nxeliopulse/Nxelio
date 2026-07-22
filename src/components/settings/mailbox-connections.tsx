@@ -29,7 +29,7 @@ export function MailboxConnections({
     setError(null);
     setConnecting(true);
     try {
-      const res = await connectOutreachAccount("email");
+      const res = await connectOutreachAccount("email", "/settings?section=connectors");
       if (res.ok && res.url) {
         window.open(res.url, "_blank", "noopener");
       } else {

@@ -1,8 +1,5 @@
 "use server";
-
-const API_KEY = process.env.AI_API_KEY;
-const BASE_URL = process.env.AI_BASE_URL || "https://api.groq.com/openai/v1";
-const MODEL = process.env.AI_MODEL || "llama-3.3-70b-versatile";
+import { resolveAiConfig } from "@/lib/ai/provider";
 
 export interface LandingChatMessage {
   role: "user" | "assistant";
@@ -49,13 +46,13 @@ Nxelio is built on Supabase with row-level security and full workspace isolation
 - If asked something totally unrelated to Nxelio (coding help, world facts, personal advice, etc.), politely decline and steer back: "I'm just here to help with questions about Nxelio — is there anything about the product I can help with?"
 - Never invent pricing, features, or statistics beyond what's listed above. If you don't know something, say a team member can answer that on a demo call.`;
 
-async function call(messages: { role: string; content: string }[]): Promise<{ ok: true; content: string } | { ok: false; status: number }> {
+async function call(apiKey: string, baseUrl: string, model: string, messages: { role: string; content: string }[]): Promise<{ ok: true; content: string } | { ok: false; status: number }> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await fetch(`${BASE_URL}/chat/completions`, {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         messages,
         temperature: 0.5,
         max_tokens: 300,
@@ -77,7 +74,8 @@ async function call(messages: { role: string; content: string }[]): Promise<{ ok
 /** Public, unauthenticated Q&A chat for the marketing landing page. No workspace/credit
  *  gating — bounded instead by trimming history and message length below. */
 export async function askLandingAssistant(history: LandingChatMessage[]): Promise<LandingChatResult> {
-  if (!API_KEY) {
+  const { apiKey, baseUrl, model } = await resolveAiConfig();
+  if (!apiKey) {
     return { reply: "Our AI assistant isn't available right now, but I'd love to show you around — try booking a demo instead!" };
   }
 
@@ -88,7 +86,7 @@ export async function askLandingAssistant(history: LandingChatMessage[]): Promis
   if (trimmed.length === 0) return { reply: "" };
 
   const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...trimmed];
-  const res = await call(messages);
+  const res = await call(apiKey, baseUrl, model, messages);
   if (!res.ok) {
     return {
       reply: res.status === 429

@@ -41,9 +41,13 @@ export async function getOutreachAccounts(): Promise<OutreachAccountRow[]> {
 /**
  * Returns a Unipile hosted-auth URL the user opens to connect a mailbox or
  * LinkedIn account. After they authorize, Unipile redirects back to
- * /outreach?connected=<channel>, and we call syncOutreachAccounts() to store it.
+ * `returnTo` (defaults to /outreach) with `?connected=<channel>` appended, and
+ * the landing page calls syncOutreachAccounts() to store it. Pass the actual
+ * page the user initiated the connect from (e.g. Settings > Connectors) so
+ * they land back where they started already showing the fresh connection,
+ * instead of on an unrelated page that never gets revalidated.
  */
-export async function connectOutreachAccount(channel: "email" | "linkedin"): Promise<{ ok: boolean; url?: string; error?: string }> {
+export async function connectOutreachAccount(channel: "email" | "linkedin", returnTo = "/outreach"): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
     await requireSuperAdmin();
   } catch (err) {
@@ -71,11 +75,12 @@ export async function connectOutreachAccount(channel: "email" | "linkedin"): Pro
 
   // expires 1 hour out; computed without Date.now() to satisfy lint-free server code
   const expiresOn = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const sep = returnTo.includes("?") ? "&" : "?";
   try {
     const { url } = await createHostedAuthLink({
       providers: channel,
-      successUrl: `${appUrl()}/outreach?connected=${channel}`,
-      failureUrl: `${appUrl()}/outreach?connect_error=1`,
+      successUrl: `${appUrl()}${returnTo}${sep}connected=${channel}`,
+      failureUrl: `${appUrl()}${returnTo}${sep}connect_error=1`,
       name: wsId,
       expiresOn,
     });

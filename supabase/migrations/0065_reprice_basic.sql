@@ -1,5 +1,5 @@
 -- ============================================================
--- 0060_reprice_basic.sql
+-- 0065_reprice_basic.sql
 -- Basic plan: $9.99/mo -> $14.99/mo, $95.90/yr -> $143.90/yr
 -- (20% annual discount convention preserved). Credits (200/mo)
 -- and Starter/Pro plans are unaffected.

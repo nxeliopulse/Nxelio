@@ -25,6 +25,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   // "expanded" choice ("0") overrides the collapsed default.
   useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydrate from localStorage on mount
       if (localStorage.getItem(STORAGE_KEY) === "0") setCollapsedState(false);
     } catch {}
   }, []);

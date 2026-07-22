@@ -2611,12 +2611,11 @@ CREATE POLICY admin_select_audit_log ON audit_log FOR SELECT TO authenticated
 -- Deliberately no UPDATE or DELETE policy — the log is immutable at the DB level.
 
 
-
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0060_reprice_basic.sql
+-- >>> FILE: 0065_reprice_basic.sql
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 -- ============================================================
--- 0060_reprice_basic.sql
+-- 0065_reprice_basic.sql
 -- Basic plan: $9.99/mo -> $14.99/mo, $95.90/yr -> $143.90/yr
 -- (20% annual discount convention preserved). Credits (200/mo)
 -- and Starter/Pro plans are unaffected.
@@ -2630,10 +2629,10 @@ WHERE id = 'basic';
 
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0061_promotions_leads.sql
+-- >>> FILE: 0066_promotions_leads.sql
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 -- ============================================================================
--- 0061_promotions_leads.sql
+-- 0066_promotions_leads.sql
 --
 -- Three things in one migration:
 -- 1. Reprice + restructure feature gates: Basic $15.99/mo now unlocks
@@ -3032,10 +3031,10 @@ CREATE POLICY promotion_redemptions_workspace_read
 
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0062_reprice_basic_1499.sql
+-- >>> FILE: 0067_reprice_basic_1499.sql
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 -- ============================================================
--- 0062_reprice_basic_1499.sql
+-- 0067_reprice_basic_1499.sql
 -- Basic plan: $15.99/mo -> $14.99/mo, $153.50/yr -> $143.90/yr
 -- (20% annual discount convention preserved). Credits (200/mo)
 -- and Starter/Pro plans are unaffected.
@@ -3045,3 +3044,207 @@ UPDATE subscription_plans
 SET monthly_price_cents = 1499,
     annual_price_cents  = 14390
 WHERE id = 'basic';
+
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0060_lead_import_archive.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- Lead import archive — a permanent record of every lead ever imported into a
+-- workspace (CSV, LinkedIn search, Buy Leads, etc.), tied to the workspace and
+-- the user who imported it. Unlike the working `leads` table, rows here are
+-- NEVER deleted when the corresponding lead is deleted from `leads` — instead
+-- `deleted_from_leads_at` is stamped so there's a durable record that the
+-- import happened even after the lead itself is gone. See Privacy Policy
+-- Section 7 for the corresponding disclosure.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS lead_import_archive (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id          UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  imported_by_user_id   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  imported_by_name      TEXT,
+  source                TEXT,                 -- e.g. "Buy Leads", "CSV Upload", "LinkedIn Search"
+  original_lead_id      UUID,                  -- points at leads.id; NOT a FK (row may later be deleted)
+  full_name             TEXT,
+  email                 TEXT,
+  phone                 TEXT,
+  company_name          TEXT,
+  industry              TEXT,
+  interest_area         TEXT,
+  linkedin              TEXT,
+  website_url           TEXT,
+  imported_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_from_leads_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS lead_import_archive_workspace_idx ON lead_import_archive(workspace_id, imported_at DESC);
+CREATE INDEX IF NOT EXISTS lead_import_archive_original_lead_idx ON lead_import_archive(original_lead_id);
+
+ALTER TABLE lead_import_archive ENABLE ROW LEVEL SECURITY;
+
+-- Any authenticated user may archive an entry for their own workspace — the app
+-- writes via the admin client in practice, this is defense-in-depth only.
+DROP POLICY IF EXISTS ws_insert_lead_import_archive ON lead_import_archive;
+CREATE POLICY ws_insert_lead_import_archive ON lead_import_archive FOR INSERT TO authenticated
+  WITH CHECK (workspace_id = get_current_workspace_id());
+
+-- A workspace's own Super Admin can view its archive.
+DROP POLICY IF EXISTS admin_select_lead_import_archive ON lead_import_archive;
+CREATE POLICY admin_select_lead_import_archive ON lead_import_archive FOR SELECT TO authenticated
+  USING (get_current_user_role_id() = 1 AND workspace_id = get_current_workspace_id());
+
+-- Only the "deleted_from_leads_at" stamp may be updated (by the app's admin client) — no other mutation, no delete.
+DROP POLICY IF EXISTS ws_update_lead_import_archive ON lead_import_archive;
+CREATE POLICY ws_update_lead_import_archive ON lead_import_archive FOR UPDATE TO authenticated
+  USING (workspace_id = get_current_workspace_id())
+  WITH CHECK (workspace_id = get_current_workspace_id());
+
+-- Deliberately no DELETE policy — archive rows are permanent.
+
+
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- >>> FILE: 0061_platform_vendor_subscriptions.sql
+-- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+-- ============================================================================
+-- Platform vendor subscriptions — Nxelio's OWN paid third-party accounts
+-- (Unipile, AnySite, Brevo, etc.), tracked manually by the platform admin since
+-- none of these vendors expose a billing/usage API we integrate with. Shown on
+-- the /admin panel's Overview. Not customer-facing, not workspace-scoped.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS platform_vendor_subscriptions (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vendor_name        TEXT NOT NULL,        -- e.g. "Unipile", "AnySite", "Brevo"
+  plan_name          TEXT,                 -- e.g. "Pro", "Pay-as-you-go"
+  monthly_cost_cents INTEGER,
+  renewal_date       DATE,
+  usage_notes        TEXT,                 -- free-text, e.g. "4,200 / 10,000 emails sent this cycle"
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS set_updated_at ON platform_vendor_subscriptions;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON platform_vendor_subscriptions
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- RLS enabled with NO policies for any role — only the service-role admin
+-- client (used exclusively by the /admin panel) can reach this table at all.
+ALTER TABLE platform_vendor_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- AI provider settings — platform-wide (not per-workspace), Super Admin panel
+-- (/admin) only. Lets the platform admin toggle which AI provider (OpenAI or
+-- Groq) powers every AI feature across the whole app.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ai_provider_settings (
+  id               INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- single-row table
+  active_provider  TEXT NOT NULL DEFAULT 'openai' CHECK (active_provider IN ('openai', 'groq')),
+  updated_by       UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO ai_provider_settings (id, active_provider)
+VALUES (1, 'openai')
+ON CONFLICT (id) DO NOTHING;
+
+-- RLS enabled with NO policies for any role — only the service-role admin
+-- client (used exclusively by the /admin panel and the AI client resolver)
+-- can reach this table at all.
+ALTER TABLE ai_provider_settings ENABLE ROW LEVEL SECURITY;
+-- ============================================================================
+-- Clay-style custom AI columns for the Leads table. A saved column = a reusable
+-- AI prompt (with {{field}} placeholders pulled from the lead's own data) that
+-- gets run per-lead; the computed value is cached on the lead itself so it
+-- renders instantly afterwards instead of re-calling the AI on every page view.
+-- ============================================================================
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS custom_fields JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+CREATE TABLE IF NOT EXISTS ai_column_definitions (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id       UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name               TEXT NOT NULL,
+  description        TEXT,
+  prompt_template    TEXT NOT NULL,        -- e.g. "Guess the seniority level for {{full_name}} at {{company_name}}"
+  output_type        TEXT NOT NULL DEFAULT 'text' CHECK (output_type IN ('text', 'number', 'email', 'url', 'boolean')),
+  source_template_id TEXT,                 -- id from the static template library this was created from, if any
+  column_order       INTEGER NOT NULL DEFAULT 0,
+  created_by         UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ai_column_definitions_workspace_idx ON ai_column_definitions(workspace_id, column_order);
+
+DROP TRIGGER IF EXISTS set_updated_at ON ai_column_definitions;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON ai_column_definitions
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS auto_workspace_trigger ON ai_column_definitions;
+CREATE TRIGGER auto_workspace_trigger BEFORE INSERT ON ai_column_definitions
+  FOR EACH ROW EXECUTE FUNCTION set_workspace_from_user();
+
+ALTER TABLE ai_column_definitions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ws_select_ai_column_definitions ON ai_column_definitions;
+CREATE POLICY ws_select_ai_column_definitions ON ai_column_definitions FOR SELECT TO authenticated
+  USING (workspace_id = get_current_workspace_id());
+
+DROP POLICY IF EXISTS ws_insert_ai_column_definitions ON ai_column_definitions;
+CREATE POLICY ws_insert_ai_column_definitions ON ai_column_definitions FOR INSERT TO authenticated
+  WITH CHECK (workspace_id = get_current_workspace_id());
+
+DROP POLICY IF EXISTS ws_update_ai_column_definitions ON ai_column_definitions;
+CREATE POLICY ws_update_ai_column_definitions ON ai_column_definitions FOR UPDATE TO authenticated
+  USING (workspace_id = get_current_workspace_id());
+
+DROP POLICY IF EXISTS ws_delete_ai_column_definitions ON ai_column_definitions;
+CREATE POLICY ws_delete_ai_column_definitions ON ai_column_definitions FOR DELETE TO authenticated
+  USING (workspace_id = get_current_workspace_id());
+
+-- ============================================================================
+-- AI columns, part 2 — "action" columns that call a real integration instead of
+-- generating AI text. Today the only wired-up action is a real AnySite email
+-- lookup (find_email_by_url), reusing the same integration already used by the
+-- lead sidebar's "Find email" button. Also adds a workspace-level saved-template
+-- library so a user's own column configs can be reused later, alongside the
+-- static built-in template gallery.
+-- ============================================================================
+
+ALTER TABLE ai_column_definitions
+  ADD COLUMN IF NOT EXISTS action_type TEXT NOT NULL DEFAULT 'ai_text' CHECK (action_type IN ('ai_text', 'anysite_email'));
+
+CREATE TABLE IF NOT EXISTS ai_column_saved_templates (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id    UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  description     TEXT,
+  prompt_template TEXT,                  -- null/empty for action columns that don't need one (e.g. anysite_email)
+  output_type     TEXT NOT NULL DEFAULT 'text' CHECK (output_type IN ('text', 'number', 'email', 'url', 'boolean')),
+  action_type     TEXT NOT NULL DEFAULT 'ai_text' CHECK (action_type IN ('ai_text', 'anysite_email')),
+  created_by      UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ai_column_saved_templates_workspace_idx ON ai_column_saved_templates(workspace_id, created_at DESC);
+
+DROP TRIGGER IF EXISTS auto_workspace_trigger ON ai_column_saved_templates;
+CREATE TRIGGER auto_workspace_trigger BEFORE INSERT ON ai_column_saved_templates
+  FOR EACH ROW EXECUTE FUNCTION set_workspace_from_user();
+
+ALTER TABLE ai_column_saved_templates ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ws_select_ai_column_saved_templates ON ai_column_saved_templates;
+CREATE POLICY ws_select_ai_column_saved_templates ON ai_column_saved_templates FOR SELECT TO authenticated
+  USING (workspace_id = get_current_workspace_id());
+
+DROP POLICY IF EXISTS ws_insert_ai_column_saved_templates ON ai_column_saved_templates;
+CREATE POLICY ws_insert_ai_column_saved_templates ON ai_column_saved_templates FOR INSERT TO authenticated
+  WITH CHECK (workspace_id = get_current_workspace_id());
+
+DROP POLICY IF EXISTS ws_delete_ai_column_saved_templates ON ai_column_saved_templates;
+CREATE POLICY ws_delete_ai_column_saved_templates ON ai_column_saved_templates FOR DELETE TO authenticated
+  USING (workspace_id = get_current_workspace_id());

@@ -36,7 +36,7 @@ export function LeadDetailSidebar({
 
   return (
     <div
-      className={`sticky top-4 h-[calc(100vh-2rem)] w-[520px] flex-shrink-0 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg transition-transform duration-200 ease-out ${mounted ? "translate-x-0" : "translate-x-8 opacity-0"}`}
+      className={`sticky top-0 h-[calc(100vh-1rem)] w-[520px] flex-shrink-0 overflow-y-auto scrollbar-hide rounded-xl border border-slate-200 bg-white shadow-lg transition-transform duration-200 ease-out ${mounted ? "translate-x-0" : "translate-x-8 opacity-0"}`}
     >
       <div className="p-5">
         {loading || !data?.lead ? (

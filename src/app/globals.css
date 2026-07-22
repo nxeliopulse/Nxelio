@@ -604,3 +604,12 @@ html, body {
     opacity: 1 !important; transform: none !important; transition: none !important;
   }
 }
+
+/* Keeps scroll behavior but hides the visible scrollbar track/thumb. */
+.scrollbar-hide {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* old Edge/IE */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;              /* Chrome/Safari/new Edge */
+}
