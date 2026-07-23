@@ -602,9 +602,8 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
       </div>
 
       {/* ── Need More Leads? ────────────────────────────────────── */}
-      <Card className="p-5 sm:p-6 mb-6 overflow-hidden relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 via-white to-teal-50" />
-        <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+      <Card className="p-5 sm:p-6 mb-6 border-l-4 border-l-emerald-500">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
           <div className="flex items-start sm:items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0">
               <Target className="h-7 w-7" />
@@ -622,21 +621,21 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
           </Button>
         </div>
         {!hasPortal && (
-          <p className="relative text-xs text-slate-500 mt-3">Subscribe to a plan first to add a payment method.</p>
+          <p className="text-xs text-slate-500 mt-3">Subscribe to a plan first to add a payment method.</p>
         )}
         {hasPortal && currentPlanId === "basic" && (
-          <p className="relative text-xs text-amber-600 mt-3">Lead Top-Ups are available on Starter and Pro plans — upgrade to buy extra leads.</p>
+          <p className="text-xs text-amber-600 mt-3">Lead Top-Ups are available on Starter and Pro plans — upgrade to buy extra leads.</p>
         )}
         {hasPortal && currentPlanId !== "basic" && !canBuyTopUp && (
-          <p className="relative text-xs text-amber-600 mt-3">You&apos;ve already bought a top-up this month — you can buy another starting next month.</p>
+          <p className="text-xs text-amber-600 mt-3">You&apos;ve already bought a top-up this month — you can buy another starting next month.</p>
         )}
         {topupMessage && (
-          <p className={`relative text-sm mt-4 rounded-lg px-4 py-2.5 ${topupMessage.ok ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+          <p className={`text-sm mt-4 rounded-lg px-4 py-2.5 ${topupMessage.ok ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
             {topupMessage.text}
           </p>
         )}
         {leadTopUpHistory.length > 0 && (
-          <div className="relative mt-5 pt-4 border-t border-slate-200/70">
+          <div className="mt-5 pt-4 border-t border-slate-200/70">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Top-up history</p>
             <ul className="space-y-1.5">
               {leadTopUpHistory.map((t) => (
