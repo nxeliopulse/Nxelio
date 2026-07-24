@@ -132,12 +132,12 @@ export interface SyncPayload {
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
   trialEndsAt?: Date | null;
-  chargebeeCustomerId: string;
-  chargebeeSubscriptionId: string;
-  chargebeePlanId: string;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  stripePriceId: string;
 }
 
-export async function syncSubscriptionFromChargebee(payload: SyncPayload): Promise<void> {
+export async function syncSubscriptionFromStripe(payload: SyncPayload): Promise<void> {
   const admin = createAdminClient();
 
   const { data: existing } = await admin
@@ -167,9 +167,9 @@ export async function syncSubscriptionFromChargebee(payload: SyncPayload): Promi
       trial_ends_at:             payload.trialEndsAt?.toISOString() ?? null,
       current_period_start:      payload.currentPeriodStart.toISOString(),
       current_period_end:        payload.currentPeriodEnd.toISOString(),
-      chargebee_customer_id:     payload.chargebeeCustomerId,
-      chargebee_subscription_id: payload.chargebeeSubscriptionId,
-      chargebee_plan_id:         payload.chargebeePlanId,
+      stripe_customer_id:     payload.stripeCustomerId,
+      stripe_subscription_id: payload.stripeSubscriptionId,
+      stripe_price_id:        payload.stripePriceId,
     },
     { onConflict: "workspace_id" }
   );
@@ -211,14 +211,14 @@ export async function resetCycleCredits(workspaceId: string): Promise<void> {
   await admin.rpc("reset_subscription_cycle", { p_workspace_id: workspaceId });
 }
 
-export async function workspaceByChargebeeCustomer(
-  chargebeeCustomerId: string
+export async function workspaceByStripeCustomer(
+  stripeCustomerId: string
 ): Promise<string | null> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("subscriptions")
     .select("workspace_id")
-    .eq("chargebee_customer_id", chargebeeCustomerId)
+    .eq("stripe_customer_id", stripeCustomerId)
     .single();
   return data?.workspace_id ?? null;
 }

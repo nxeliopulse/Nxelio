@@ -13,7 +13,8 @@ interface PromotionRow {
   category: string | null;
   discount_type: "percentage" | "fixed_amount" | null;
   discount_value: number | null;
-  chargebee_coupon_id: string | null;
+  stripe_coupon_id: string | null;
+  stripe_promotion_code_id: string | null;
   bonus_credits: number;
   bonus_leads: number;
   applicable_plans: string[] | null;
@@ -75,7 +76,8 @@ export async function previewPromoCode(code: string, planId: PlanId): Promise<Pr
   return {
     ok: true,
     promotionId: promo.id,
-    chargebeeCouponId: promo.chargebee_coupon_id,
+    stripeCouponId: promo.stripe_coupon_id,
+    stripePromotionCodeId: promo.stripe_promotion_code_id,
     bonusCredits: promo.bonus_credits,
     bonusLeads: promo.bonus_leads,
     description: promo.description,
@@ -84,8 +86,8 @@ export async function previewPromoCode(code: string, planId: PlanId): Promise<Pr
 
 /**
  * Authoritative validate-and-reserve — called from checkout/route.ts right
- * before the Chargebee hosted-page call. Creates (or reuses, if an earlier
- * attempt was abandoned) a 'pending' promotion_redemptions row.
+ * before the Stripe Checkout Session is created. Creates (or reuses, if an
+ * earlier attempt was abandoned) a 'pending' promotion_redemptions row.
  */
 export async function startPromoRedemption(
   workspaceId: string,
@@ -101,28 +103,30 @@ export async function startPromoRedemption(
   if (error) return { ok: false, error: error.message };
   const result = data as {
     ok: boolean; error?: string; redemption_id?: string; promotion_id?: string;
-    chargebee_coupon_id?: string | null; bonus_credits?: number; bonus_leads?: number; description?: string | null;
+    stripe_coupon_id?: string | null; stripe_promotion_code_id?: string | null;
+    bonus_credits?: number; bonus_leads?: number; description?: string | null;
   };
   if (!result.ok) return { ok: false, error: result.error };
   return {
     ok: true,
     redemptionId: result.redemption_id,
     promotionId: result.promotion_id,
-    chargebeeCouponId: result.chargebee_coupon_id,
+    stripeCouponId: result.stripe_coupon_id,
+    stripePromotionCodeId: result.stripe_promotion_code_id,
     bonusCredits: result.bonus_credits,
     bonusLeads: result.bonus_leads,
     description: result.description,
   };
 }
 
-/** Tags a pending redemption with the Chargebee hosted-page id, so finalize can target it precisely. */
-export async function attachHostedPageToRedemption(redemptionId: string, hostedPageId: string): Promise<void> {
+/** Tags a pending redemption with the Stripe Checkout Session id, so finalize can target it precisely. */
+export async function attachCheckoutSessionToRedemption(redemptionId: string, checkoutSessionId: string): Promise<void> {
   const admin = createAdminClient();
-  await admin.from("promotion_redemptions").update({ chargebee_hosted_page_id: hostedPageId }).eq("id", redemptionId);
+  await admin.from("promotion_redemptions").update({ stripe_checkout_session_id: checkoutSessionId }).eq("id", redemptionId);
 }
 
 /**
- * Called AFTER Chargebee confirms the subscription actually went through
+ * Called AFTER Stripe confirms the subscription actually went through
  * (checkout-return, and the webhook as a reconciliation fallback). Grants
  * bonus credits/leads and marks the redemption completed. A no-op
  * ({applied:false}) if there's no pending redemption for this workspace —
@@ -130,13 +134,13 @@ export async function attachHostedPageToRedemption(redemptionId: string, hostedP
  */
 export async function finalizePendingPromotion(
   workspaceId: string,
-  opts: { hostedPageId?: string; chargebeeSubscriptionId?: string } = {}
+  opts: { checkoutSessionId?: string; stripeSubscriptionId?: string } = {}
 ): Promise<{ ok: boolean; applied: boolean; bonusCredits?: number; bonusLeads?: number }> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("redeem_promotion_finalize", {
     p_workspace_id: workspaceId,
-    p_hosted_page_id: opts.hostedPageId ?? null,
-    p_chargebee_subscription_id: opts.chargebeeSubscriptionId ?? null,
+    p_checkout_session_id: opts.checkoutSessionId ?? null,
+    p_stripe_subscription_id: opts.stripeSubscriptionId ?? null,
   });
   if (error) {
     console.error("[finalizePendingPromotion]", error.message);

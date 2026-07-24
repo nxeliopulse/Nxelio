@@ -2,7 +2,7 @@ import Nylas from "nylas";
 
 /**
  * Nylas singleton client (server-only). Lazily created so build-time imports
- * don't blow up when NYLAS_API_KEY isn't set — same pattern as chargebee.ts.
+ * don't blow up when NYLAS_API_KEY isn't set — same pattern as stripe.ts.
  */
 let _client: Nylas | null = null;
 

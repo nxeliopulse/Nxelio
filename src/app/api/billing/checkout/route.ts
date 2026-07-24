@@ -1,12 +1,14 @@
 /**
  * POST /api/billing/checkout
- * Creates a Chargebee hosted checkout page and returns the redirect URL.
- * Stripe is the payment gateway inside Chargebee — no Stripe calls here.
+ * New subscribers get a Stripe Checkout Session URL to redirect to.
+ * Existing subscribers upgrading are updated directly via the Stripe API
+ * (proration, no redirect needed) and immediately synced to our DB.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { chargebee, CHARGEBEE_PRICE_IDS } from "@/lib/chargebee";
-import { startPromoRedemption, attachHostedPageToRedemption } from "@/lib/queries/promotions";
+import { stripe, STRIPE_PRICE_IDS, PLAN_CREDITS, PLAN_LEADS } from "@/lib/stripe";
+import { startPromoRedemption, attachCheckoutSessionToRedemption, finalizePendingPromotion } from "@/lib/queries/promotions";
+import { syncSubscriptionFromStripe } from "@/lib/queries/subscriptions";
 import type { BillingInterval, PlanId } from "@/lib/queries/subscriptions";
 
 const PLAN_ORDER: Record<string, number> = { basic: 0, starter: 1, pro: 2 };
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
   const [{ data: profile }, { data: sub }] = await Promise.all([
     supabase.from("users").select("workspace_id, full_name").eq("user_id", user.id).single(),
     supabase.from("subscriptions")
-      .select("chargebee_customer_id, chargebee_subscription_id, plan_id")
+      .select("stripe_customer_id, stripe_subscription_id, plan_id")
       .single(),
   ]);
 
@@ -34,8 +36,8 @@ export async function POST(req: NextRequest) {
     promoCode?: string;
   };
 
-  const itemPriceId = CHARGEBEE_PRICE_IDS[planId]?.[billingInterval];
-  if (!itemPriceId) {
+  const priceId = STRIPE_PRICE_IDS[planId]?.[billingInterval];
+  if (!priceId) {
     return NextResponse.json({ error: "Invalid plan or interval" }, { status: 400 });
   }
 
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Downgrades aren't available. Please contact support if you need to change to a lower plan." }, { status: 400 });
   }
 
-  // Validate + reserve the promo code BEFORE touching Chargebee at all — fail
+  // Validate + reserve the promo code BEFORE touching Stripe at all — fail
   // fast with no wasted API call and no lingering redemption row on a bad code.
   let promo: Awaited<ReturnType<typeof startPromoRedemption>> | null = null;
   if (promoCode?.trim()) {
@@ -59,51 +61,76 @@ export async function POST(req: NextRequest) {
   // /checkout-return syncs the subscription server-side before redirecting to
   // /dashboard, so AppLayout's getSubscription() sees the row and the gate
   // never reappears after a successful checkout.
-  const successUrl = `${appUrl}/checkout-return`;
+  const successUrl = `${appUrl}/checkout-return?session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl  = `${appUrl}/billing?checkout=canceled`;
 
+  // Prefer the customer-facing Promotion Code (what Stripe's discounts param
+  // expects for a code a customer would type); fall back to the raw Coupon.
+  const discounts = promo?.stripePromotionCodeId
+    ? [{ promotion_code: promo.stripePromotionCodeId }]
+    : promo?.stripeCouponId
+      ? [{ coupon: promo.stripeCouponId }]
+      : undefined;
+
   try {
-    const cb = chargebee();
-    let result: { hosted_page: { url: string; id: string } };
+    const sc = stripe();
 
-    const couponIds = promo?.chargebeeCouponId ? [promo.chargebeeCouponId] : undefined;
+    if (sub?.stripe_subscription_id) {
+      // Existing subscriber — upgrade only (downgrades are blocked above).
+      // Stripe doesn't need a redirect for this: update the subscription's
+      // price directly with proration, then sync our DB immediately so the
+      // credit/lead bump is instant rather than waiting on the webhook.
+      const current = await sc.subscriptions.retrieve(sub.stripe_subscription_id);
+      const itemId = current.items.data[0]?.id;
 
-    if (sub?.chargebee_subscription_id) {
-      // Existing subscriber — upgrade only (downgrades are blocked above)
-      result = await cb.hosted_page
-        .checkout_existing_for_items({
-          subscription: { id: sub.chargebee_subscription_id },
-          subscription_items: [{ item_price_id: itemPriceId, quantity: 1 }],
-          redirect_url:        successUrl,
-          cancel_url:          cancelUrl,
-          ...(couponIds ? { coupon_ids: couponIds } : {}),
-        })
-        .request();
-    } else {
-      // New subscriber — create customer + subscription
-      result = await cb.hosted_page
-        .checkout_new_for_items({
-          subscription_items: [{ item_price_id: itemPriceId, quantity: 1 }],
-          customer: {
-            id:    profile.workspace_id, // use workspace_id as Chargebee customer id
-            email: user.email,
-            ...(profile.full_name ? { first_name: profile.full_name.split(" ")[0], last_name: profile.full_name.split(" ").slice(1).join(" ") } : {}),
-          },
-          redirect_url: successUrl,
-          cancel_url:   cancelUrl,
-          ...(couponIds ? { coupon_ids: couponIds } : {}),
-          // Pass workspace_id via customer.cf_workspace_id custom field in Chargebee
-          // (add a "cf_workspace_id" customer custom field in Chargebee dashboard)
+      const updated = await sc.subscriptions.update(sub.stripe_subscription_id, {
+        items: [{ id: itemId, price: priceId }],
+        proration_behavior: "create_prorations",
+        ...(discounts ? { discounts } : {}),
+      });
 
-        })
-        .request();
+      await syncSubscriptionFromStripe({
+        workspaceId:          profile.workspace_id,
+        planId,
+        billingInterval,
+        status:               updated.status === "trialing" ? "trialing" : "active",
+        creditsTotal:         PLAN_CREDITS[planId] ?? 0,
+        leadsTotal:           PLAN_LEADS[planId] ?? 0,
+        currentPeriodStart:   new Date(updated.items.data[0].current_period_start * 1000),
+        currentPeriodEnd:     new Date(updated.items.data[0].current_period_end * 1000),
+        stripeCustomerId:     sub.stripe_customer_id ?? String(updated.customer),
+        stripeSubscriptionId: updated.id,
+        stripePriceId:        priceId,
+      });
+
+      if (promo?.redemptionId) {
+        await finalizePendingPromotion(profile.workspace_id, { stripeSubscriptionId: updated.id });
+      }
+
+      return NextResponse.json({ url: `${appUrl}/billing?upgraded=1` });
     }
 
-    if (promo?.redemptionId) {
-      await attachHostedPageToRedemption(promo.redemptionId, result.hosted_page.id);
+    // New subscriber — Stripe Checkout creates the customer + subscription.
+    // managed_payments is disabled here to match the "Pick what you need"
+    // choice made in the Stripe dashboard setup — Managed Payments otherwise
+    // requires a tax code on every product and adds a 3.5% surcharge we don't want.
+    const session = await sc.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      customer_email: user.email,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: { workspace_id: profile.workspace_id },
+      subscription_data: { metadata: { workspace_id: profile.workspace_id } },
+      managed_payments: { enabled: false },
+      ...(discounts ? { discounts } : {}),
+    });
+
+    if (promo?.redemptionId && session.id) {
+      await attachCheckoutSessionToRedemption(promo.redemptionId, session.id);
     }
 
-    return NextResponse.json({ url: result.hosted_page.url });
+    return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     const msg = err instanceof Error
       ? err.message

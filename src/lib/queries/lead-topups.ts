@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { chargebee, LEAD_TOPUP_PRICE_CENTS, LEAD_TOPUP_LEADS } from "@/lib/chargebee";
+import { stripe, LEAD_TOPUP_PRICE_CENTS, LEAD_TOPUP_LEADS } from "@/lib/stripe";
 
 export interface LeadTopUpResult {
   ok: boolean;
@@ -47,11 +47,12 @@ export async function canPurchaseLeadTopUpThisMonth(): Promise<boolean> {
 }
 
 /**
- * Charges the workspace's card on file (via Chargebee, no hosted-page
- * redirect needed) for a one-time $149 / 1,000-lead top-up, then instantly
- * grants the leads. Starter and Pro plans only (Basic has no lead-discovery
- * allowance to top up) — limited to ONE top-up per calendar month; buying
- * another requires waiting until next month.
+ * Charges the workspace's card on file (via a Stripe PaymentIntent against
+ * the customer's default payment method, no checkout redirect needed) for a
+ * one-time $149 / 1,000-lead top-up, then instantly grants the leads.
+ * Starter and Pro plans only (Basic has no lead-discovery allowance to top
+ * up) — limited to ONE top-up per calendar month; buying another requires
+ * waiting until next month.
  */
 export async function purchaseLeadTopUp(): Promise<LeadTopUpResult> {
   const supabase = await createClient();
@@ -61,11 +62,11 @@ export async function purchaseLeadTopUp(): Promise<LeadTopUpResult> {
 
   const { data: sub } = await supabase
     .from("subscriptions")
-    .select("chargebee_customer_id, status, plan_id")
+    .select("stripe_customer_id, status, plan_id")
     .eq("workspace_id", profile.workspace_id)
     .single();
 
-  if (!sub?.chargebee_customer_id) {
+  if (!sub?.stripe_customer_id) {
     return { ok: false, error: "No payment method on file — subscribe to a plan first." };
   }
   if (sub.status !== "active" && sub.status !== "trialing") {
@@ -86,18 +87,30 @@ export async function purchaseLeadTopUp(): Promise<LeadTopUpResult> {
     return { ok: false, error: "You've already purchased a lead top-up this month. You can buy another starting next month." };
   }
 
-  let invoiceId: string;
+  let paymentIntentId: string;
   try {
-    const cb = chargebee();
-    const result = await cb.invoice
-      .charge({
-        customer_id: sub.chargebee_customer_id,
-        amount: LEAD_TOPUP_PRICE_CENTS,
-        currency_code: "USD",
-        description: `${LEAD_TOPUP_LEADS.toLocaleString()} Lead Top-Up`,
-      })
-      .request();
-    invoiceId = (result as unknown as { invoice: { id: string } }).invoice.id;
+    const sc = stripe();
+    const customer = await sc.customers.retrieve(sub.stripe_customer_id);
+    const defaultPm = !("deleted" in customer)
+      ? (typeof customer.invoice_settings.default_payment_method === "string"
+          ? customer.invoice_settings.default_payment_method
+          : customer.invoice_settings.default_payment_method?.id)
+      : undefined;
+
+    if (!defaultPm) {
+      return { ok: false, error: "No payment method on file — add a card in the billing portal first." };
+    }
+
+    const paymentIntent = await sc.paymentIntents.create({
+      amount: LEAD_TOPUP_PRICE_CENTS,
+      currency: "usd",
+      customer: sub.stripe_customer_id,
+      payment_method: defaultPm,
+      off_session: true,
+      confirm: true,
+      description: `${LEAD_TOPUP_LEADS.toLocaleString()} Lead Top-Up`,
+    });
+    paymentIntentId = paymentIntent.id;
   } catch (err: unknown) {
     const msg = err instanceof Error
       ? err.message
@@ -112,14 +125,14 @@ export async function purchaseLeadTopUp(): Promise<LeadTopUpResult> {
     p_workspace_id: profile.workspace_id,
     p_leads: LEAD_TOPUP_LEADS,
     p_price_cents: LEAD_TOPUP_PRICE_CENTS,
-    p_chargebee_invoice_id: invoiceId,
+    p_stripe_payment_intent_id: paymentIntentId,
   });
 
   if (error) {
     // Charge succeeded but the grant failed to record — surface this loudly,
     // don't silently eat a paid-for-but-ungranted top-up.
-    console.error("[purchaseLeadTopUp] charge succeeded but grant failed:", error.message, { invoiceId });
-    return { ok: false, error: "Payment succeeded but we couldn't add your leads — contact support with invoice " + invoiceId };
+    console.error("[purchaseLeadTopUp] charge succeeded but grant failed:", error.message, { paymentIntentId });
+    return { ok: false, error: "Payment succeeded but we couldn't add your leads — contact support with payment " + paymentIntentId };
   }
 
   const result = data as { ok: boolean; topup_leads_remaining?: number };
@@ -130,7 +143,7 @@ export interface LeadTopUpHistoryEntry {
   id: string;
   quantity: number;
   price_cents: number;
-  chargebee_invoice_id: string | null;
+  stripe_payment_intent_id: string | null;
   created_at: string;
 }
 
@@ -139,7 +152,7 @@ export async function getLeadTopUpHistory(limit = 20): Promise<LeadTopUpHistoryE
   const supabase = await createClient();
   const { data } = await supabase
     .from("credit_top_ups")
-    .select("id, quantity, price_cents, chargebee_invoice_id, created_at")
+    .select("id, quantity, price_cents, stripe_payment_intent_id, created_at")
     .eq("resource_type", "leads")
     .order("created_at", { ascending: false })
     .limit(limit);

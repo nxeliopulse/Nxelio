@@ -292,7 +292,7 @@ export function SubscriptionGate() {
         )}
 
         <p className="text-center text-[11px]" style={{ color: "rgba(255,255,255,.25)" }}>
-          Secured by Chargebee · Cancel anytime{selectedPlan.trial && interval === "monthly" ? " · No charge during trial" : ""}
+          Secured by Stripe · Cancel anytime{selectedPlan.trial && interval === "monthly" ? " · No charge during trial" : ""}
         </p>
       </div>
 

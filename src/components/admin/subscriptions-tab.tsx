@@ -16,7 +16,7 @@ export function SubscriptionsTab({ rows }: { rows: SubscriptionRow[] }) {
     <div className="rounded-xl border border-slate-800 overflow-hidden">
       <div className="p-4 border-b border-slate-800">
         <h3 className="font-semibold text-white">Customer Subscriptions</h3>
-        <p className="text-xs text-slate-400 mt-0.5">View-only — billed and managed via Chargebee.</p>
+        <p className="text-xs text-slate-400 mt-0.5">View-only — billed and managed via Stripe.</p>
       </div>
       <div className="overflow-x-auto max-h-[calc(100vh-320px)] overflow-y-auto scrollbar-hide">
         <table className="w-full text-sm min-w-[800px]">
@@ -28,7 +28,7 @@ export function SubscriptionsTab({ rows }: { rows: SubscriptionRow[] }) {
               <th className="px-4 py-2.5 font-semibold">Status</th>
               <th className="px-4 py-2.5 font-semibold">Credits</th>
               <th className="px-4 py-2.5 font-semibold">Renews</th>
-              <th className="px-4 py-2.5 font-semibold">Chargebee ID</th>
+              <th className="px-4 py-2.5 font-semibold">Stripe ID</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
@@ -47,7 +47,7 @@ export function SubscriptionsTab({ rows }: { rows: SubscriptionRow[] }) {
                 </td>
                 <td className="px-4 py-2.5 text-slate-400 tabular-nums">{r.credits_remaining} / {r.credits_total}</td>
                 <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">{formatDate(r.current_period_end)}</td>
-                <td className="px-4 py-2.5 text-slate-500 font-mono text-xs">{r.chargebee_customer_id || "—"}</td>
+                <td className="px-4 py-2.5 text-slate-500 font-mono text-xs">{r.stripe_customer_id || "—"}</td>
               </tr>
             ))}
           </tbody>

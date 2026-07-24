@@ -117,34 +117,18 @@ function CheckoutSuccessWatcher({
   useEffect(() => {
     if (searchParams.get("checkout") !== "success") return;
 
-    const hostedPageId = searchParams.get("id");
-
-    // Read the plan the user clicked before redirect (stored in goCheckout)
-    const pendingPlanId = sessionStorage.getItem("cb_pending_plan") ?? "";
-    sessionStorage.removeItem("cb_pending_plan");
+    // Read the plan the user clicked before redirect (stored in goCheckout).
+    // The actual subscription sync already happened server-side in
+    // /checkout-return before this page ever loaded — this just picks the
+    // right name/credits for the success modal.
+    const pendingPlanId = sessionStorage.getItem("pending_plan") ?? "";
+    sessionStorage.removeItem("pending_plan");
 
     const plan = plans.find((p) => p.id === pendingPlanId);
     const planName = plan?.name ?? (pendingPlanId ? pendingPlanId.charAt(0).toUpperCase() + pendingPlanId.slice(1) : "new");
     const credits = plan?.credits_per_cycle ?? 0;
 
-    // Sync DB from Chargebee (also works on localhost — no webhook needed)
-    if (hostedPageId) {
-      fetch("/api/billing/sync-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hostedPageId }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          // Use API-confirmed values if available
-          const confirmedName = data.planName ?? planName;
-          const confirmedCredits = data.creditsTotal ?? credits;
-          onSuccess(confirmedName, confirmedCredits);
-        })
-        .catch(() => onSuccess(planName, credits));
-    } else {
-      onSuccess(planName, credits);
-    }
+    onSuccess(planName, credits);
 
     router.replace("/billing");
     router.refresh();
@@ -179,7 +163,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
   const pct           = credPct(credRemaining, credTotal);
   const low           = isLow(credRemaining, credTotal);
   const daysLeft      = trialDaysLeft(sub?.trial_ends_at ?? null);
-  const hasPortal     = Boolean(sub?.chargebee_customer_id);
+  const hasPortal     = Boolean(sub?.stripe_customer_id);
 
   const leadsRemaining = sub?.leads_remaining ?? 0;
   const leadsTotal     = sub?.leads_total     ?? 0;
@@ -205,7 +189,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
       const json = await res.json();
       if (!res.ok || json.error) { setCheckoutError(json.error ?? "Checkout failed"); setTermsOpen(false); return; }
       // Store the selected plan so the success popup shows the correct name
-      sessionStorage.setItem("cb_pending_plan", planId);
+      sessionStorage.setItem("pending_plan", planId);
       window.location.href = json.url;
     });
   }
@@ -681,7 +665,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-semibold text-slate-900">Payment methods & invoices</h3>
-            <p className="text-sm text-slate-500">Managed securely through Chargebee + Stripe</p>
+            <p className="text-sm text-slate-500">Managed securely through Stripe</p>
           </div>
           {hasPortal ? (
             <Button variant="outline" onClick={goPortal} disabled={portalPending}>
@@ -700,7 +684,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
               <CreditCard className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-900">Billing managed via Chargebee</p>
+              <p className="text-sm font-medium text-slate-900">Billing managed via Stripe</p>
               <p className="text-xs text-slate-500 mt-0.5">Open the portal to view invoices, update cards, or change your plan.</p>
             </div>
             <Button variant="outline" size="sm" className="ml-auto" onClick={goPortal} disabled={portalPending}>
@@ -712,7 +696,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
           <div className="rounded-lg border border-dashed border-slate-200 p-8 text-center">
             <CreditCard className="h-8 w-8 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-medium text-slate-700">No card on file</p>
-            <p className="text-xs text-slate-500 mt-1">Subscribe to a plan to add a payment method via Chargebee.</p>
+            <p className="text-xs text-slate-500 mt-1">Subscribe to a plan to add a payment method via Stripe.</p>
           </div>
         )}
       </Card>

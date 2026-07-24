@@ -47,9 +47,9 @@ export interface Subscription {
   leads_total: number;
   topup_leads_remaining: number;
   low_balance_notified_at: string | null;
-  chargebee_customer_id: string | null;
-  chargebee_subscription_id: string | null;
-  chargebee_plan_id: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
   created_at: string;
 }
 
@@ -97,7 +97,8 @@ export interface PromoValidationResult {
   error?: string;
   redemptionId?: string;
   promotionId?: string;
-  chargebeeCouponId?: string | null;
+  stripeCouponId?: string | null;
+  stripePromotionCodeId?: string | null;
   bonusCredits?: number;
   bonusLeads?: number;
   description?: string | null;
