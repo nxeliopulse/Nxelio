@@ -118,7 +118,7 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
           <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-4 text-white">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="h-4 w-4" />
-              <p className="font-semibold text-sm">AI Credits</p>
+              <p className="font-semibold text-sm">Subscription and Payments</p>
             </div>
             <p className="text-xs text-blue-100 mb-2">
               {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} used` : "Loading..."}

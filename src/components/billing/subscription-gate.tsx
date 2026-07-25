@@ -5,6 +5,7 @@ import {
   Mail, BarChart2, Users, Calendar, Link,
   ChevronRight, Loader2,
 } from "lucide-react";
+import { PlanTermsModal } from "@/components/billing/plan-terms-modal";
 
 type PlanId = "basic" | "starter" | "pro";
 type Interval = "monthly" | "annual";
@@ -16,6 +17,7 @@ const PLANS: {
   monthly: number;
   annual: number;
   credits: number;
+  leads: number;
   trial?: string;
   color: string;
   icon: React.ReactNode;
@@ -24,17 +26,20 @@ const PLANS: {
   {
     id: "basic",
     name: "Basic",
-    monthly: 9.99,
-    annual: 7.99,
+    monthly: 14.99,
+    annual: 11.99,
     credits: 200,
+    leads: 0,
     trial: "7-day free trial",
     color: "#06B6D4",
     icon: <Zap size={16} />,
     features: [
-      "200 AI credits / month",
-      "CSV import",
-      "Core workflows",
-      "Email campaigns",
+      "Bring your own leads (CSV import)",
+      "AI enrichment & scoring",
+      "Email + LinkedIn outreach",
+      "Reply tracking",
+      "Meetings & calendar sync",
+      "Standard support",
     ],
   },
   {
@@ -43,16 +48,15 @@ const PLANS: {
     badge: "Most Popular",
     monthly: 69,
     annual: 55.20,
-    credits: 1200,
+    credits: 300,
+    leads: 300,
     color: "#8B5CF6",
     icon: <Star size={16} />,
     features: [
-      "1,200 AI credits / month",
-      "Lead discovery & enrichment",
-      "AI lead scoring",
-      "LinkedIn outreach",
-      "CRM export",
-      "Opportunities pipeline",
+      "Everything in Basic",
+      "Automated lead discovery",
+      "300 AI-discovered leads / month",
+      "300 AI credits / month",
     ],
   },
   {
@@ -60,14 +64,14 @@ const PLANS: {
     name: "Pro",
     monthly: 149,
     annual: 119.20,
-    credits: 3000,
+    credits: 1000,
+    leads: 1000,
     color: "#10B981",
     icon: <Shield size={16} />,
     features: [
-      "3,000 AI credits / month",
       "Everything in Starter",
-      "Reply tracking",
-      "Meetings & calendar",
+      "1,000 AI-discovered leads / month",
+      "1,000 AI credits / month",
       "Priority support",
     ],
   },
@@ -78,6 +82,28 @@ export function SubscriptionGate() {
   const [interval, setInterval]   = useState<Interval>("monthly");
   const [pending, setPending]      = useState(false);
   const [error, setError]          = useState<string | null>(null);
+  const [promoCode, setPromoCode]     = useState("");
+  const [promoChecking, setPromoChecking] = useState(false);
+  const [promoResult, setPromoResult]     = useState<{ ok: boolean; error?: string; description?: string | null } | null>(null);
+  const [termsOpen, setTermsOpen] = useState(false);
+
+  async function applyPromo() {
+    if (!promoCode.trim()) return;
+    setPromoChecking(true);
+    setPromoResult(null);
+    try {
+      const res = await fetch("/api/billing/validate-promo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: promoCode, planId: selected }),
+      });
+      setPromoResult(await res.json());
+    } catch {
+      setPromoResult({ ok: false, error: "Couldn't check that code — try again." });
+    } finally {
+      setPromoChecking(false);
+    }
+  }
 
   async function startCheckout() {
     setPending(true);
@@ -86,7 +112,11 @@ export function SubscriptionGate() {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: selected, billingInterval: interval }),
+        body: JSON.stringify({
+          planId: selected,
+          billingInterval: interval,
+          promoCode: promoResult?.ok ? promoCode : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || "Couldn't start checkout");
@@ -190,9 +220,15 @@ export function SubscriptionGate() {
                 <p className="text-[11px] mb-2" style={{ color: plan.color }}>{plan.trial}</p>
               )}
 
-              <div className="mb-4">
+              <div className="mb-1">
                 <span className="text-2xl font-black text-white">${displayPrice.toFixed(displayPrice % 1 === 0 ? 0 : 2)}</span>
                 <span className="text-xs ml-1" style={{ color: "rgba(255,255,255,.35)" }}>/mo</span>
+              </div>
+              <div className="mb-4 flex flex-col gap-0.5">
+                <span className="text-[11px]" style={{ color: "rgba(255,255,255,.4)" }}>{plan.credits.toLocaleString()} AI credits / mo</span>
+                {plan.leads > 0 && (
+                  <span className="text-[11px]" style={{ color: "rgba(255,255,255,.4)" }}>{plan.leads.toLocaleString()} AI-discovered leads / mo</span>
+                )}
               </div>
 
               <ul className="space-y-1.5">
@@ -208,10 +244,37 @@ export function SubscriptionGate() {
         })}
       </div>
 
+      {/* Promo code */}
+      <div className="w-full max-w-sm mb-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={promoCode}
+            onChange={e => { setPromoCode(e.target.value); setPromoResult(null); }}
+            onKeyDown={e => e.key === "Enter" && applyPromo()}
+            placeholder="Promo code (optional)"
+            className="flex-1 px-3.5 py-2.5 rounded-xl text-sm text-white placeholder-white/30 outline-none transition-all"
+            style={{ background: "rgba(255,255,255,.06)", border: "1.5px solid rgba(255,255,255,.1)" }}
+          />
+          <button
+            onClick={applyPromo}
+            disabled={promoChecking || !promoCode.trim()}
+            className="px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
+            style={{ background: "rgba(255,255,255,.08)", border: "1.5px solid rgba(255,255,255,.12)" }}>
+            {promoChecking ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
+          </button>
+        </div>
+        {promoResult && (
+          <p className="mt-2 text-xs px-3.5" style={{ color: promoResult.ok ? "#34D399" : "#f87171" }}>
+            {promoResult.ok ? (promoResult.description || "Code applied!") : promoResult.error}
+          </p>
+        )}
+      </div>
+
       {/* CTA */}
       <div className="w-full max-w-sm space-y-3">
         <button
-          onClick={startCheckout}
+          onClick={() => setTermsOpen(true)}
           disabled={pending}
           className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ background: `linear-gradient(135deg,${selectedPlan.color},${selectedPlan.color}99)`, boxShadow: `0 4px 20px ${selectedPlan.color}44` }}>
@@ -229,7 +292,7 @@ export function SubscriptionGate() {
         )}
 
         <p className="text-center text-[11px]" style={{ color: "rgba(255,255,255,.25)" }}>
-          Secured by Chargebee · Cancel anytime{selectedPlan.trial && interval === "monthly" ? " · No charge during trial" : ""}
+          Secured by Stripe · Cancel anytime{selectedPlan.trial && interval === "monthly" ? " · No charge during trial" : ""}
         </p>
       </div>
 
@@ -248,6 +311,14 @@ export function SubscriptionGate() {
           </span>
         ))}
       </div>
+
+      <PlanTermsModal
+        open={termsOpen}
+        planName={selectedPlan.name}
+        onClose={() => setTermsOpen(false)}
+        onConfirm={() => { setTermsOpen(false); startCheckout(); }}
+        confirming={pending}
+      />
     </div>
   );
 }

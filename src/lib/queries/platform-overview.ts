@@ -19,7 +19,7 @@ export interface SubscriptionRow {
   credits_remaining: number;
   credits_total: number;
   current_period_end: string;
-  chargebee_customer_id: string | null;
+  stripe_customer_id: string | null;
 }
 
 export interface HotCustomerRow {
@@ -70,12 +70,12 @@ export async function getAllSubscriptions(): Promise<SubscriptionRow[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("subscriptions")
-    .select("workspace_id, plan_id, billing_interval, status, credits_remaining, credits_total, current_period_end, chargebee_customer_id, workspaces(name), subscription_plans(name)")
+    .select("workspace_id, plan_id, billing_interval, status, credits_remaining, credits_total, current_period_end, stripe_customer_id, workspaces(name), subscription_plans(name)")
     .order("current_period_end", { ascending: true });
 
   return ((data as unknown as Array<{
     workspace_id: string; plan_id: string; billing_interval: string; status: string;
-    credits_remaining: number; credits_total: number; current_period_end: string; chargebee_customer_id: string | null;
+    credits_remaining: number; credits_total: number; current_period_end: string; stripe_customer_id: string | null;
     workspaces: { name: string } | null; subscription_plans: { name: string } | null;
   }>) || []).map((r) => ({
     workspace_id: r.workspace_id,
@@ -87,7 +87,7 @@ export async function getAllSubscriptions(): Promise<SubscriptionRow[]> {
     credits_remaining: r.credits_remaining,
     credits_total: r.credits_total,
     current_period_end: r.current_period_end,
-    chargebee_customer_id: r.chargebee_customer_id,
+    stripe_customer_id: r.stripe_customer_id,
   }));
 }
 

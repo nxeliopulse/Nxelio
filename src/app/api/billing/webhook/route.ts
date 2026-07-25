@@ -1,124 +1,165 @@
 /**
  * POST /api/billing/webhook
- * Receives Chargebee webhook events and keeps our subscriptions table in sync.
+ * Receives Stripe webhook events and keeps our subscriptions table in sync.
  *
- * Security: Chargebee uses HTTP Basic Auth on webhooks.
- * In the Chargebee dashboard → Settings → Webhooks, set:
- *   Username: webhook
- *   Password: <CHARGEBEE_WEBHOOK_PASSWORD env var>
+ * Security: every payload is signed. Verified with stripe.webhooks.constructEvent()
+ * using the raw request body and STRIPE_WEBHOOK_SECRET (the `stripe listen`
+ * signing secret locally, or the registered endpoint's secret in production).
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import {
-  syncSubscriptionFromChargebee,
+  syncSubscriptionFromStripe,
   resetCycleCredits,
-  workspaceByChargebeeCustomer,
+  workspaceByStripeCustomer,
   type PlanId,
   type BillingInterval,
   type SubscriptionStatus,
 } from "@/lib/queries/subscriptions";
-import { PRICE_ID_TO_PLAN, PLAN_CREDITS } from "@/lib/chargebee";
+import { stripe, PRICE_ID_TO_PLAN, PLAN_CREDITS, PLAN_LEADS } from "@/lib/stripe";
+import { finalizePendingPromotion } from "@/lib/queries/promotions";
+import type Stripe from "stripe";
 
-// Verify the Basic Auth header Chargebee sends with every webhook
-function verifyBasicAuth(req: NextRequest): boolean {
-  const password = process.env.CHARGEBEE_WEBHOOK_PASSWORD;
-  if (!password) return true; // skip check in dev if not set
-
-  const authHeader = req.headers.get("authorization") ?? "";
-  if (!authHeader.startsWith("Basic ")) return false;
-
-  const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf-8");
-  // Expected format: "webhook:<password>"
-  return decoded === `webhook:${password}`;
-}
-
-// Map Chargebee subscription status → our status
-function mapStatus(cbStatus: string): SubscriptionStatus {
-  switch (cbStatus) {
-    case "in_trial":   return "trialing";
-    case "active":     return "active";
-    case "future":     return "active";
-    case "paused":     return "past_due";
-    case "non_renewing": return "active"; // still active until period end
-    case "cancelled":  return "canceled";
-    default:           return "active";
+// Map Stripe subscription status → our status
+function mapStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
+  switch (status) {
+    case "trialing":            return "trialing";
+    case "active":               return "active";
+    case "past_due":
+    case "unpaid":
+    case "incomplete":
+    case "incomplete_expired":  return "past_due";
+    case "canceled":             return "canceled";
+    default:                     return "active";
   }
 }
 
-// Extract our planId + billingInterval from the Chargebee subscription object
-function resolvePlan(cbSub: Record<string, unknown>): {
-  planId: PlanId;
-  billingInterval: BillingInterval;
-  chargebeePlanId: string;
-} {
-  // Chargebee Product Catalog v2 uses subscription_items
-  const items = cbSub.subscription_items as Array<{ item_price_id: string }> | undefined;
-  const priceId = items?.[0]?.item_price_id ?? (cbSub.plan_id as string) ?? "";
-
+// Extract our planId + billingInterval from the Stripe subscription's price
+function resolvePlan(sub: Stripe.Subscription): { planId: PlanId; billingInterval: BillingInterval; priceId: string } {
+  const priceId = sub.items.data[0]?.price.id ?? "";
   const mapped = PRICE_ID_TO_PLAN[priceId];
   if (mapped) {
-    return {
-      planId:          mapped.planId as PlanId,
-      billingInterval: mapped.interval as BillingInterval,
-      chargebeePlanId: priceId,
-    };
+    return { planId: mapped.planId as PlanId, billingInterval: mapped.interval as BillingInterval, priceId };
   }
+  return { planId: "basic", billingInterval: "monthly", priceId };
+}
 
-  // Fallback: parse by convention "{planId}-{interval}-USD"
-  const parts = priceId.toLowerCase().split("-");
-  const planId = (["basic", "starter", "pro"].find(p => parts.includes(p)) ?? "basic") as PlanId;
-  const billingInterval: BillingInterval = parts.includes("annual") ? "annual" : "monthly";
-  return { planId, billingInterval, chargebeePlanId: priceId };
+function customerId(sub: Stripe.Subscription): string {
+  return typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+}
+
+async function resolveWorkspace(sub: Stripe.Subscription): Promise<string | null> {
+  // 1. metadata.workspace_id, set at checkout creation (subscription_data.metadata)
+  if (sub.metadata?.workspace_id) return sub.metadata.workspace_id;
+  // 2. Look up by stored stripe_customer_id
+  return workspaceByStripeCustomer(customerId(sub));
+}
+
+async function upsertFromSubscription(sub: Stripe.Subscription) {
+  const workspaceId = await resolveWorkspace(sub);
+  if (!workspaceId) return;
+
+  const { planId, billingInterval, priceId } = resolvePlan(sub);
+  const item = sub.items.data[0];
+
+  await syncSubscriptionFromStripe({
+    workspaceId,
+    planId,
+    billingInterval,
+    status:               mapStatus(sub.status),
+    creditsTotal:         PLAN_CREDITS[planId] ?? PLAN_CREDITS.basic,
+    leadsTotal:           PLAN_LEADS[planId] ?? 0,
+    currentPeriodStart:   new Date(item.current_period_start * 1000),
+    currentPeriodEnd:     new Date(item.current_period_end * 1000),
+    trialEndsAt:          sub.trial_end ? new Date(sub.trial_end * 1000) : null,
+    stripeCustomerId:     customerId(sub),
+    stripeSubscriptionId: sub.id,
+    stripePriceId:        priceId,
+  });
+
+  await finalizePendingPromotion(workspaceId, { stripeSubscriptionId: sub.id });
 }
 
 export async function POST(req: NextRequest) {
-  if (!verifyBasicAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const signature     = req.headers.get("stripe-signature");
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const rawBody        = await req.text();
+
+  let event: Stripe.Event;
+  try {
+    if (!signature || !webhookSecret) throw new Error("Missing signature or STRIPE_WEBHOOK_SECRET");
+    event = stripe().webhooks.constructEvent(rawBody, signature, webhookSecret);
+  } catch (err) {
+    console.error("[billing/webhook] signature verification failed:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const eventType = body.event_type as string;
-  const content   = body.content as Record<string, unknown>;
-
-  console.log("[billing/webhook]", eventType);
+  console.log("[billing/webhook]", event.type);
 
   try {
-    switch (eventType) {
-      case "subscription_created":
-      case "subscription_activated":
-      case "subscription_changed":
-      case "subscription_reactivated": {
-        await handleSubscriptionUpsert(content);
+    switch (event.type) {
+      // New subscriber's Checkout Session finished — fetch the subscription
+      // it created and sync it (checkout-return usually beats this, but the
+      // webhook is the reconciliation fallback for e.g. closed-tab cases).
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.subscription) {
+          const subId = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
+          const sub = await stripe().subscriptions.retrieve(subId);
+          await upsertFromSubscription(sub);
+        }
         break;
       }
-      case "subscription_renewed": {
-        await handleRenewal(content);
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        await upsertFromSubscription(event.data.object as Stripe.Subscription);
         break;
       }
-      case "subscription_cancelled":
-      case "subscription_deleted": {
-        await handleCancellation(content);
+      case "customer.subscription.deleted": {
+        const sub = event.data.object as Stripe.Subscription;
+        const workspaceId = await resolveWorkspace(sub);
+        if (workspaceId) {
+          const admin = createAdminClient();
+          await admin.from("subscriptions")
+            .update({ status: "canceled", updated_at: new Date().toISOString() })
+            .eq("workspace_id", workspaceId);
+        }
         break;
       }
-      case "payment_failed": {
-        await handlePaymentFailed(content);
+      // A renewal's invoice being paid — reset the cycle's credit/lead
+      // allowance. subscription_cycle is Stripe's billing_reason for
+      // recurring renewals specifically (not the first invoice, not a
+      // plan-change proration invoice).
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subRef = invoice.parent?.subscription_details?.subscription;
+        if (invoice.billing_reason === "subscription_cycle" && subRef) {
+          const subId = typeof subRef === "string" ? subRef : subRef.id;
+          const sub = await stripe().subscriptions.retrieve(subId);
+          const workspaceId = await resolveWorkspace(sub);
+          if (workspaceId) await resetCycleCredits(workspaceId);
+          await upsertFromSubscription(sub);
+        }
         break;
       }
-      case "payment_succeeded": {
-        // A recovered payment doesn't always come with a subscription_reactivated
-        // event — re-sync directly from whatever status Chargebee reports so a
-        // workspace can't get stuck at past_due after paying.
-        await handlePaymentSucceeded(content);
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subRef = invoice.parent?.subscription_details?.subscription;
+        if (subRef) {
+          const subId = typeof subRef === "string" ? subRef : subRef.id;
+          const sub = await stripe().subscriptions.retrieve(subId);
+          const workspaceId = await resolveWorkspace(sub);
+          if (workspaceId) {
+            const admin = createAdminClient();
+            await admin.from("subscriptions")
+              .update({ status: "past_due", updated_at: new Date().toISOString() })
+              .eq("workspace_id", workspaceId);
+          }
+        }
         break;
       }
       default:
-        // Unknown event — acknowledge without processing
+        // Unknown/unhandled event — acknowledge without processing
         break;
     }
   } catch (err) {
@@ -127,96 +168,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ received: true });
-}
-
-// ── Event handlers ────────────────────────────────────────────────────────────
-
-async function handleSubscriptionUpsert(content: Record<string, unknown>) {
-  const cbSub      = content.subscription as Record<string, unknown>;
-  const cbCustomer = content.customer    as Record<string, unknown> | undefined;
-
-  const customerId = String(cbSub.customer_id ?? cbCustomer?.id ?? "");
-  const workspaceId = await resolveWorkspace(cbSub, customerId);
-  if (!workspaceId) return;
-
-  const { planId, billingInterval, chargebeePlanId } = resolvePlan(cbSub);
-
-  await syncSubscriptionFromChargebee({
-    workspaceId,
-    planId,
-    billingInterval,
-    status:                 mapStatus(String(cbSub.status ?? "active")),
-    creditsTotal:           PLAN_CREDITS[planId] ?? PLAN_CREDITS.basic,
-    currentPeriodStart:     new Date((cbSub.current_term_start as number) * 1000),
-    currentPeriodEnd:       new Date((cbSub.current_term_end   as number) * 1000),
-    trialEndsAt:            cbSub.trial_end ? new Date((cbSub.trial_end as number) * 1000) : null,
-    chargebeeCustomerId:    customerId,
-    chargebeeSubscriptionId: String(cbSub.id),
-    chargebeePlanId,
-  });
-}
-
-async function handleRenewal(content: Record<string, unknown>) {
-  const cbSub      = content.subscription as Record<string, unknown>;
-  const customerId = String(cbSub.customer_id ?? "");
-  const workspaceId = await resolveWorkspace(cbSub, customerId);
-  if (!workspaceId) return;
-
-  // Reset credits for the new cycle
-  await resetCycleCredits(workspaceId);
-
-  // Also sync any plan/period changes that came with the renewal
-  await handleSubscriptionUpsert(content);
-}
-
-async function handleCancellation(content: Record<string, unknown>) {
-  const cbSub      = content.subscription as Record<string, unknown>;
-  const customerId = String(cbSub.customer_id ?? "");
-  const workspaceId = await resolveWorkspace(cbSub, customerId);
-  if (!workspaceId) return;
-
-  const admin = createAdminClient();
-  await admin
-    .from("subscriptions")
-    .update({ status: "canceled", updated_at: new Date().toISOString() })
-    .eq("workspace_id", workspaceId);
-}
-
-async function handlePaymentSucceeded(content: Record<string, unknown>) {
-  // Not every payment_succeeded payload includes the subscription object
-  // (e.g. one-off invoices) — only re-sync when it does.
-  if (!content.subscription) return;
-  await handleSubscriptionUpsert(content);
-}
-
-async function handlePaymentFailed(content: Record<string, unknown>) {
-  const cbSub      = content.subscription as Record<string, unknown>;
-  const customerId = String(cbSub.customer_id ?? "");
-  const workspaceId = await resolveWorkspace(cbSub, customerId);
-  if (!workspaceId) return;
-
-  const admin = createAdminClient();
-  await admin
-    .from("subscriptions")
-    .update({ status: "past_due", updated_at: new Date().toISOString() })
-    .eq("workspace_id", workspaceId);
-}
-
-// ── Workspace resolution ──────────────────────────────────────────────────────
-
-async function resolveWorkspace(
-  cbSub: Record<string, unknown>,
-  customerId: string
-): Promise<string | null> {
-  // 1. Check metadata.workspace_id (set at checkout creation)
-  const meta = cbSub.meta_data as Record<string, string> | undefined;
-  if (meta?.workspace_id) return meta.workspace_id;
-
-  // 2. The customer ID is set to workspace_id at checkout (new subscriptions)
-  if (customerId && customerId.length === 36) return customerId;
-
-  // 3. Look up by stored chargebee_customer_id
-  if (customerId) return workspaceByChargebeeCustomer(customerId);
-
-  return null;
 }

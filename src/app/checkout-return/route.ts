@@ -1,7 +1,7 @@
 /**
- * GET /checkout-return?id=<hostedPageId>
+ * GET /checkout-return?session_id=<checkoutSessionId>
  *
- * Chargebee's success redirect lands here. We sync the subscription
+ * Stripe's success redirect lands here. We sync the subscription
  * server-side (so the DB row exists before AppLayout's getSubscription()
  * runs) then send the user to the dashboard.
  *
@@ -11,25 +11,28 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { chargebee, PRICE_ID_TO_PLAN, PLAN_CREDITS } from "@/lib/chargebee";
-import { syncSubscriptionFromChargebee } from "@/lib/queries/subscriptions";
+import { stripe, PRICE_ID_TO_PLAN, PLAN_CREDITS, PLAN_LEADS } from "@/lib/stripe";
+import { syncSubscriptionFromStripe } from "@/lib/queries/subscriptions";
+import { finalizePendingPromotion } from "@/lib/queries/promotions";
 import type { PlanId, BillingInterval } from "@/lib/queries/subscriptions";
+import type Stripe from "stripe";
 
-function mapStatus(s: string): "trialing" | "active" | "past_due" | "canceled" {
+function mapStatus(s: Stripe.Subscription.Status): "trialing" | "active" | "past_due" | "canceled" {
   switch (s) {
-    case "in_trial":    return "trialing";
-    case "cancelled":   return "canceled";
-    case "paused":      return "past_due";
-    default:            return "active";
+    case "trialing":  return "trialing";
+    case "canceled":  return "canceled";
+    case "past_due":
+    case "unpaid":    return "past_due";
+    default:          return "active";
   }
 }
 
 export async function GET(req: NextRequest) {
-  const origin       = new URL(req.url).origin;
-  const hostedPageId = new URL(req.url).searchParams.get("id");
+  const origin        = new URL(req.url).origin;
+  const checkoutSessionId = new URL(req.url).searchParams.get("session_id");
 
-  // No hosted page ID → just send to dashboard (webhook may have already synced)
-  if (!hostedPageId) {
+  // No session ID → just send to dashboard (webhook may have already synced)
+  if (!checkoutSessionId) {
     return NextResponse.redirect(`${origin}/dashboard`);
   }
 
@@ -51,52 +54,42 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const cb = chargebee();
-    const result = await cb.hosted_page.retrieve(hostedPageId).request();
-    const hp = result.hosted_page as {
-      state: string;
-      content?: {
-        subscription?: {
-          id: string;
-          status: string;
-          current_term_start?: number;
-          current_term_end?: number;
-          trial_end?: number | null;
-          subscription_items?: Array<{ item_price_id: string }>;
-        };
-        customer?: { id: string };
-      };
-    };
+    const sc = stripe();
+    const session = await sc.checkout.sessions.retrieve(checkoutSessionId, {
+      expand: ["subscription"],
+    });
 
-    if (hp.state === "succeeded" && hp.content?.subscription) {
-      const cbSub      = hp.content.subscription;
-      const cbCustomer = hp.content.customer;
-      const itemPriceId = cbSub.subscription_items?.[0]?.item_price_id ?? "";
-      const parsed      = PRICE_ID_TO_PLAN[itemPriceId];
+    if (session.payment_status === "paid" && session.subscription) {
+      const stripeSub    = session.subscription as Stripe.Subscription;
+      const stripeCustomerId = typeof session.customer === "string" ? session.customer : session.customer?.id ?? profile.workspace_id;
+      const priceId       = stripeSub.items.data[0]?.price.id ?? "";
+      const parsed         = PRICE_ID_TO_PLAN[priceId];
 
       if (parsed) {
-        const now = new Date();
-        await syncSubscriptionFromChargebee({
-          workspaceId:              profile.workspace_id,
-          planId:                   parsed.planId as PlanId,
-          billingInterval:          parsed.interval as BillingInterval,
-          status:                   mapStatus(cbSub.status),
-          creditsTotal:             PLAN_CREDITS[parsed.planId] ?? 0,
-          currentPeriodStart:       cbSub.current_term_start
-                                      ? new Date(cbSub.current_term_start * 1000) : now,
-          currentPeriodEnd:         cbSub.current_term_end
-                                      ? new Date(cbSub.current_term_end * 1000)
-                                      : new Date(now.getTime() + 30 * 86_400_000),
-          trialEndsAt:              cbSub.trial_end
-                                      ? new Date(cbSub.trial_end * 1000) : null,
-          chargebeeCustomerId:      cbCustomer?.id ?? profile.workspace_id,
-          chargebeeSubscriptionId:  cbSub.id,
-          chargebeePlanId:          itemPriceId,
+        const item = stripeSub.items.data[0];
+        await syncSubscriptionFromStripe({
+          workspaceId:          profile.workspace_id,
+          planId:               parsed.planId as PlanId,
+          billingInterval:      parsed.interval as BillingInterval,
+          status:               mapStatus(stripeSub.status),
+          creditsTotal:         PLAN_CREDITS[parsed.planId] ?? 0,
+          leadsTotal:           PLAN_LEADS[parsed.planId] ?? 0,
+          currentPeriodStart:   new Date(item.current_period_start * 1000),
+          currentPeriodEnd:     new Date(item.current_period_end * 1000),
+          trialEndsAt:          stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000) : null,
+          stripeCustomerId,
+          stripeSubscriptionId: stripeSub.id,
+          stripePriceId:        priceId,
+        });
+
+        await finalizePendingPromotion(profile.workspace_id, {
+          checkoutSessionId,
+          stripeSubscriptionId: stripeSub.id,
         });
       }
     }
   } catch (err) {
-    // Sync failed — log and continue. The Chargebee webhook will reconcile.
+    // Sync failed — log and continue. The Stripe webhook will reconcile.
     console.error("[checkout-return] sync error:", err);
   }
 

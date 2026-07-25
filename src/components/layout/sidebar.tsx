@@ -132,7 +132,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             <div className="flex justify-center">
               <Link
                 href="/billing"
-                title={credits ? `AI Credits — ${credits.used}/${credits.total} used` : "AI Credits"}
+                title={credits ? `Subscription and Payments — ${credits.used}/${credits.total} used` : "Subscription and Payments"}
                 className="flex items-center justify-center h-11 w-11 rounded-2xl bg-white/15 text-white hover:bg-white/20 transition-colors ring-1 ring-white/20"
               >
                 <Sparkles className="h-5 w-5" />
@@ -142,7 +142,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             <div className="bg-white/10 rounded-2xl p-4 text-white overflow-hidden ring-1 ring-white/15">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="h-4 w-4 flex-shrink-0" />
-                <p className="font-semibold text-sm whitespace-nowrap">AI Credits</p>
+                <p className="font-semibold text-sm">Subscription and Payments</p>
               </div>
               <p className="text-xs text-white/60 mb-2 whitespace-nowrap">
                 {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} used` : "Loading..."}
