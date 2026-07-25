@@ -3,7 +3,7 @@ import { useRef, useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   X, Search, Megaphone, Video, FileSpreadsheet, Pencil, ShoppingCart,
-  ArrowLeft, ArrowRight, Loader2, CheckCircle2, AlertCircle, AlertTriangle,
+  ArrowLeft, ArrowRight, Loader2, Check, CheckCircle2, AlertCircle, AlertTriangle,
   Upload, Plus, Trash2, Users2, Link2, RefreshCw, ExternalLink, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -421,19 +421,24 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
                 const Icon = s.icon;
                 const active = source === s.id;
                 const sourceLocked = isLocked(s.id);
-                return (
+
+                const card = (
                   <button
-                    key={s.id}
                     onClick={() => chooseSource(s.id)}
-                    className={`relative text-left rounded-xl border p-4 transition-all ${
+                    className={`relative w-full text-left rounded-[11px] p-4 transition-all ${
                       sourceLocked
-                        ? "border-slate-200 bg-slate-50 opacity-70 cursor-not-allowed"
-                        : active ? "border-blue-500 ring-2 ring-blue-100 dark:ring-blue-500/20 bg-blue-50/40 dark:bg-blue-500/15" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        ? "border-2 border-slate-200 bg-slate-50 opacity-70 cursor-not-allowed"
+                        : active ? "bg-blue-50 dark:bg-blue-500/15 shadow-md" : "border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                     }`}
                   >
+                    {active && !sourceLocked && (
+                      <span className="absolute top-3 right-3 h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center">
+                        <Check className="h-3.5 w-3.5 text-white" />
+                      </span>
+                    )}
                     {sourceLocked ? (
                       <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-slate-400 text-white rounded-full px-2 py-0.5">Upgrade</span>
-                    ) : s.badge && (
+                    ) : !active && s.badge && (
                       <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white rounded-full px-2 py-0.5">{s.badge}</span>
                     )}
                     <div className={`h-10 w-10 rounded-lg flex items-center justify-center mb-3 ${s.color}`}>
@@ -443,6 +448,17 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
                     <p className="text-xs text-slate-500 mt-0.5">{sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}</p>
                   </button>
                 );
+
+                // Selected card gets the same bright gradient-border technique used on
+                // the AI Assistant panel (blue → indigo), just a thicker frame (3px vs 1.5px).
+                if (active && !sourceLocked) {
+                  return (
+                    <div key={s.id} className="rounded-xl p-[3px]" style={{ background: "linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)" }}>
+                      {card}
+                    </div>
+                  );
+                }
+                return <div key={s.id}>{card}</div>;
               })}
             </div>
           )}

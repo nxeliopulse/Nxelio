@@ -3,7 +3,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, Check } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { signUpDirect } from "@/lib/queries/auth";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 
@@ -40,13 +39,9 @@ export default function SignupPage() {
     if (!valid) return;
     setError(null); setLoading(true);
     const result = await signUpDirect({ email: form.email, password: form.password, fullName: form.fullName });
-    if (!result.ok) { setLoading(false); setError(result.error || "Signup failed"); return; }
-    const supabase = createClient();
-    const { error: loginError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
     setLoading(false);
-    if (loginError) { setError("Account created — please log in."); router.push("/login"); return; }
-    router.push("/dashboard");
-    router.refresh();
+    if (!result.ok) { setError(result.error || "Signup failed"); return; }
+    router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
   }
 
   return (

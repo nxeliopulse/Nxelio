@@ -24,7 +24,7 @@ export function LinkedInConnections({
     setError(null);
     setConnecting(true);
     try {
-      const res = await connectOutreachAccount("linkedin", "/settings?section=connectors");
+      const res = await connectOutreachAccount("linkedin", "/settings?section=linkedin");
       if (res.ok && res.url) {
         window.open(res.url, "_blank", "noopener");
       } else {

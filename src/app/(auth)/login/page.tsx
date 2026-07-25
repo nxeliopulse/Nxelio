@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
+import { sendVerificationCode } from "@/lib/queries/email-verification";
 
 const INPUT = {
   className: "w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 outline-none transition-all",
@@ -26,8 +27,13 @@ function LoginForm() {
 
   useEffect(() => {
     const e = params.get("error");
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
+    const verifiedEmail = params.get("email");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from URL params on mount
     if (e) setError(e === "invalid_link" ? "Your sign-in link is invalid or expired." : e);
+    if (params.get("verified") === "1") {
+      setNotice("Email verified — sign in below.");
+      if (verifiedEmail) setForm((f) => ({ ...f, email: verifiedEmail }));
+    }
   }, [params]);
 
   async function handleForgotPassword() {
@@ -51,8 +57,23 @@ function LoginForm() {
     setError(null); setLoading(true);
     const supabase = createClient();
     const { error: loginError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
+
+    if (loginError) {
+      // Unconfirmed account — send a fresh code and hand off to the verify screen
+      // instead of just showing an error the user can't act on.
+      const unconfirmed = loginError.code === "email_not_confirmed" || /email not confirmed/i.test(loginError.message);
+      if (unconfirmed) {
+        await sendVerificationCode(form.email);
+        setLoading(false);
+        router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
+        return;
+      }
+      setLoading(false);
+      setError(loginError.message);
+      return;
+    }
+
     setLoading(false);
-    if (loginError) { setError(loginError.message); return; }
     // The platform admin account lands in the standalone admin panel, not the customer app.
     router.push(form.email.trim().toLowerCase() === "admin@nxelio.com" ? "/admin" : "/dashboard");
     router.refresh();

@@ -1,31 +1,28 @@
 "use client";
 import { useState, useTransition, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { User, Bell, Key, ShieldCheck, Ban, CreditCard, Check, Trash2, AlertCircle, CheckCircle2, ExternalLink, Sparkles, Palette, Sun, Moon, Monitor, Plug, ScrollText } from "lucide-react";
+import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Sun, Moon, Monitor, Mail, Calendar, ScrollText } from "lucide-react";
+import { Linkedin } from "@/components/outreach/linkedin-icon";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 import { syncOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type { AuditLogRow } from "@/lib/queries/audit-log";
-import { ConnectorsView } from "@/components/settings/connectors-view";
+import { EmailConnectorView, LinkedInConnectorView, CalendarConnectorView } from "@/components/settings/connectors-view";
 import { AuditLogView } from "@/components/settings/audit-log-view";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { updateProfile, updatePassword } from "@/lib/queries/profile";
 import { addBlocklistEntry, removeBlocklistEntry, type BlocklistEntry } from "@/lib/queries/blocklist";
 import { getStoredTheme, applyTheme, type Theme } from "@/lib/theme";
-import type { IntegrationStatus } from "@/lib/queries/integrations";
 
 const sections = [
   { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
   { id: "appearance", label: "Appearance", icon: <Palette className="h-4 w-4" /> },
-  { id: "connectors", label: "Connectors", icon: <Plug className="h-4 w-4" /> },
-  { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
-  { id: "api", label: "API Keys", icon: <Key className="h-4 w-4" /> },
+  { id: "email", label: "Email", icon: <Mail className="h-4 w-4" /> },
+  { id: "linkedin", label: "LinkedIn", icon: <Linkedin className="h-4 w-4" /> },
+  { id: "calendar", label: "Calendar", icon: <Calendar className="h-4 w-4" /> },
   { id: "blocklist", label: "Blocklist", icon: <Ban className="h-4 w-4" /> },
-  { id: "billing", label: "Billing", icon: <CreditCard className="h-4 w-4" /> },
-  { id: "security", label: "Security", icon: <ShieldCheck className="h-4 w-4" /> },
 ];
 const AUDIT_SECTION = { id: "audit", label: "Audit Log", icon: <ScrollText className="h-4 w-4" /> };
 
@@ -37,7 +34,6 @@ interface Profile {
 
 interface Props {
   profile: Profile | null;
-  integrations: IntegrationStatus[];
   emailDomain: { verified: boolean; from: string; provider?: "brevo" | "none" };
   blocklist: BlocklistEntry[];
   calendarAccounts: CalendarAccountRow[];
@@ -50,18 +46,18 @@ interface Props {
   auditLog: AuditLogRow[];
 }
 
-export function SettingsView({ profile, integrations, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog }: Props) {
+export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog }: Props) {
   const router = useRouter();
   const [active, setActive] = useState("profile");
   const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
-  // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar
-  // (and the mailbox flow used ?section=email) — both now live under "connectors".
+  // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar,
+  // and the mailbox/LinkedIn connect flow uses ?section=email / ?section=linkedin — each
+  // is now its own tab id, so no resolution/remapping is needed.
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get("section");
-    const resolved = s === "calendar" || s === "email" ? "connectors" : s;
-    if (resolved && visibleSections.some((sec) => sec.id === resolved)) {
+    if (s && visibleSections.some((sec) => sec.id === s)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
-      setActive(resolved);
+      setActive(s);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -74,7 +70,7 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
     const connected = new URLSearchParams(window.location.search).get("connected");
     if (connected !== "email" && connected !== "linkedin") return;
     syncOutreachAccounts().then(() => {
-      window.history.replaceState(null, "", "/settings?section=connectors");
+      window.history.replaceState(null, "", `/settings?section=${connected}`);
       router.refresh();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,10 +88,6 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
 
   const [blockInput, setBlockInput] = useState("");
   const [blockErr, setBlockErr] = useState<string | null>(null);
-
-  const [notifs, setNotifs] = useState<Record<string, boolean>>({
-    hot: true, completion: true, replies: true, digest: true, errors: false, scoring: false,
-  });
 
   const [theme, setThemeState] = useState<Theme>("system");
   // Read the saved theme after mount (localStorage is client-only).
@@ -266,94 +258,30 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
             </Card>
           )}
 
-          {active === "connectors" && (
-            <ConnectorsView
+          {active === "email" && (
+            <EmailConnectorView
               isSuperAdmin={isSuperAdmin}
               emailSendingActive={emailDomain.verified}
               mailboxAccounts={mailboxAccounts}
+              connectorReady={unipileConfigured}
+            />
+          )}
+
+          {active === "linkedin" && (
+            <LinkedInConnectorView
+              isSuperAdmin={isSuperAdmin}
               linkedinAccounts={linkedinAccounts}
               connectorReady={unipileConfigured}
+            />
+          )}
+
+          {active === "calendar" && (
+            <CalendarConnectorView
+              isSuperAdmin={isSuperAdmin}
               calendarAccounts={calendarAccounts}
               calendarProviderStatus={calendarProviderStatus}
               bookingSlug={bookingSlug}
             />
-          )}
-
-          {active === "notifications" && (
-            <Card className="p-6">
-              <h3 className="font-semibold text-slate-900 mb-1">Notification preferences</h3>
-              <p className="text-sm text-slate-500 mb-5">Choose what you want to be notified about</p>
-              <div className="space-y-3">
-                {[
-                  { key: "hot", label: "Hot lead alerts", desc: "When a lead score crosses 80" },
-                  { key: "completion", label: "Campaign completion", desc: "When a campaign finishes sending" },
-                  { key: "replies", label: "New replies in inbox", desc: "Email notification for new replies" },
-                  { key: "digest", label: "Weekly performance digest", desc: "Summary every Monday morning" },
-                  { key: "errors", label: "Workflow errors", desc: "When an automation fails" },
-                  { key: "scoring", label: "AI scoring updates", desc: "When AI re-scores major prospects" },
-                ].map((n) => (
-                  <label key={n.key} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 cursor-pointer">
-                    <div>
-                      <p className="font-medium text-slate-900">{n.label}</p>
-                      <p className="text-sm text-slate-500">{n.desc}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setNotifs({ ...notifs, [n.key]: !notifs[n.key] })}
-                      className={`relative h-6 w-11 rounded-full transition-colors ${notifs[n.key] ? "bg-blue-600" : "bg-slate-300"}`}
-                    >
-                      <span className={`absolute top-0.5 ${notifs[n.key] ? "right-0.5" : "left-0.5"} h-5 w-5 rounded-full bg-white shadow transition`} />
-                    </button>
-                  </label>
-                ))}
-              </div>
-              <p className="text-xs text-slate-400 mt-4">Notification preferences are saved to your browser. Server-side persistence coming next.</p>
-            </Card>
-          )}
-
-          {active === "api" && (
-            <Card className="p-6">
-              <h3 className="font-semibold text-slate-900 mb-1">Integrations</h3>
-              <p className="text-sm text-slate-500 mb-3">Connected services — keys are stored as server-only env vars</p>
-
-              <p className="text-sm text-slate-600 leading-relaxed mb-5 bg-slate-50 border border-slate-100 rounded-lg p-3">
-                Nxelio connects with these services to power AI, send emails, store data, and sync with your CRM. Keys are stored as server-only env vars and never exposed to the browser. Connect or rotate keys here, or in your hosting platform (Vercel) for production.
-              </p>
-
-              <div className="space-y-3">
-                {integrations.map((k) => {
-                  const notes: Record<string, string> = {
-                    "AI Provider (Groq)": "Powers lead scoring, email writing, and prospect insights",
-                    "Brevo (Email)": "Sends OTP emails, campaign emails, and notifications",
-                    "Supabase": "Database, authentication, and file storage",
-                    "HubSpot CRM": "Sync leads and campaigns with your CRM (optional)",
-                  };
-                  const note = notes[k.name];
-                  return (
-                    <div key={k.name} className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center text-lg">{k.emoji}</div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-slate-900">{k.name}</p>
-                            {k.configured ? <Badge variant="success"><Check className="h-2.5 w-2.5" /> Connected</Badge> : <Badge variant="default">Not connected</Badge>}
-                          </div>
-                          <p className="text-xs text-slate-500">{k.description}</p>
-                          {note && <p className="text-xs italic text-slate-500 mt-1">{note}</p>}
-                          {k.maskedKey && <code className="text-xs text-slate-400 font-mono mt-1 inline-block">{k.maskedKey}</code>}
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon" disabled><ExternalLink className="h-4 w-4" /></Button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-5 p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-2 text-sm text-blue-900">
-                <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>To rotate a key, edit <code className="font-mono text-xs bg-white px-1 py-0.5 rounded">.env.local</code> and restart the server. Production keys live in your hosting platform&apos;s env settings.</span>
-              </div>
-            </Card>
           )}
 
           {active === "blocklist" && (
@@ -388,76 +316,6 @@ export function SettingsView({ profile, integrations, emailDomain, blocklist, ca
                   ))}
                 </div>
               )}
-            </Card>
-          )}
-
-          {active === "billing" && (
-            <>
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h3 className="font-semibold text-slate-900">Current plan</h3>
-                    <p className="text-sm text-slate-500">Manage your subscription</p>
-                  </div>
-                  <Badge variant="purple">Free</Badge>
-                </div>
-                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-6 text-white">
-                  <p className="text-sm text-blue-100">Free Plan</p>
-                  <p className="text-3xl font-bold mt-1">$0<span className="text-base font-normal text-blue-100">/mo</span></p>
-                  <p className="text-sm text-blue-100 mt-2">Up to 1,000 leads · 5,000 AI credits/mo</p>
-                  <Button variant="outline" className="mt-4 bg-white">Upgrade to Pro</Button>
-                </div>
-              </Card>
-              <Card className="p-6">
-                <h3 className="font-semibold text-slate-900 mb-3">Usage</h3>
-                <div className="space-y-3">
-                  {[
-                    { label: "AI credits used", used: 47, total: 5000 },
-                    { label: "Emails sent", used: 3, total: 25000 },
-                    { label: "Active leads", used: 10, total: 1000 },
-                  ].map((u) => (
-                    <div key={u.label}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-slate-700">{u.label}</span>
-                        <span className="text-slate-500">{u.used.toLocaleString()} / {u.total.toLocaleString()}</span>
-                      </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-600 rounded-full" style={{ width: `${(u.used / u.total) * 100}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </>
-          )}
-
-          {active === "security" && (
-            <Card className="p-6">
-              <h3 className="font-semibold text-slate-900 mb-1">Security</h3>
-              <p className="text-sm text-slate-500 mb-5">Multi-factor authentication and session management</p>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
-                  <div>
-                    <p className="font-semibold text-slate-900">Email OTP verification</p>
-                    <p className="text-sm text-slate-500">Available via Supabase Auth (signInWithOtp)</p>
-                  </div>
-                  <Badge variant="success">Available</Badge>
-                </div>
-                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
-                  <div>
-                    <p className="font-semibold text-slate-900">Authenticator app (TOTP)</p>
-                    <p className="text-sm text-slate-500">Use Google Authenticator or Authy</p>
-                  </div>
-                  <Button variant="outline" disabled>Enable (coming soon)</Button>
-                </div>
-                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
-                  <div>
-                    <p className="font-semibold text-slate-900">Session management</p>
-                    <p className="text-sm text-slate-500">Managed by Supabase Auth — log out from any device via topbar</p>
-                  </div>
-                  <Badge variant="default">Active</Badge>
-                </div>
-              </div>
             </Card>
           )}
 

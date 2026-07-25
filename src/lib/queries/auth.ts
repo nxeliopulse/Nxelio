@@ -1,13 +1,17 @@
 "use server";
 import { sendEmail } from "@/lib/email/resend";
+import { sendVerificationCode } from "@/lib/queries/email-verification";
 
 /**
- * Direct signup that skips Supabase's own email-confirmation step (auto-confirmed).
+ * Direct signup. Creates the auth account UNCONFIRMED — the user must enter the
+ * 6-digit code emailed to them (see email-verification.ts) before Supabase will
+ * let them sign in at all (it rejects password sign-in for unconfirmed accounts
+ * with `email_not_confirmed`, which the login page catches and redirects on).
  * Uses the Supabase auth admin REST API directly so the password is reliably
  * persisted (the SDK has been flaky on Next 16/Turbopack).
  */
 export async function signUpDirect(args: { email: string; password: string; fullName: string }): Promise<{ ok: boolean; error?: string }> {
-  // 1. Create the auth user (auto-confirmed)
+  // 1. Create the auth user (unconfirmed — see verification flow above)
   const createRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users`, {
     method: "POST",
     headers: {
@@ -18,7 +22,7 @@ export async function signUpDirect(args: { email: string; password: string; full
     body: JSON.stringify({
       email: args.email,
       password: args.password,
-      email_confirm: true,
+      email_confirm: false,
       user_metadata: { full_name: args.fullName },
     }),
   });
@@ -51,13 +55,17 @@ export async function signUpDirect(args: { email: string; password: string; full
           <p style="margin:0 0 4px"><strong>Name:</strong> ${escapeHtml(args.fullName)}</p>
           <p style="margin:0 0 4px"><strong>Email:</strong> ${escapeHtml(args.email)}</p>
           <p style="margin:0 0 4px"><strong>User ID:</strong> <code style="font-size:12px">${newUserId}</code></p>
-          <p style="margin:16px 0 0;color:#64748b;font-size:13px">A fresh workspace was created. The user can log in immediately with the password they entered.</p>
+          <p style="margin:16px 0 0;color:#64748b;font-size:13px">A fresh workspace was created. The user still needs to verify their email before they can log in.</p>
         </div>
       </div>`,
     });
   } catch {
     // Swallow notification errors — signup itself should succeed regardless.
   }
+
+  // 4. Send the verification code — the user can't sign in until they enter it.
+  const codeResult = await sendVerificationCode(args.email, args.fullName);
+  if (!codeResult.ok) return { ok: false, error: codeResult.error || "Couldn't send the verification email" };
 
   return { ok: true };
 }

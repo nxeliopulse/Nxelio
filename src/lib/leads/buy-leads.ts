@@ -1,8 +1,23 @@
 "use server";
 import { aiJson } from "@/lib/ai/client";
-import { brightDataConfigured, brightDataSearchPeople } from "@/lib/leads/bright-data";
+import { brightDataConfigured, brightDataSearchPeople, brightDataFindCompanyWebsite } from "@/lib/leads/bright-data";
 import { anysiteConfigured, findEmailsByLinkedIn } from "@/lib/leads/anysite";
+import { guessAndVerifyEmail } from "@/lib/leads/email-guess";
 import { hasFeature } from "@/lib/queries/subscriptions";
+
+/** Runs `fn` over `items` with at most `concurrency` in flight at once. */
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let i = 0;
+  async function worker() {
+    while (i < items.length) {
+      const idx = i++;
+      results[idx] = await fn(items[idx]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
 
 export interface BuyCriteria {
   industry: string;
@@ -55,6 +70,19 @@ export async function searchBuyLeads(criteria: BuyCriteria): Promise<BuyLeadsRes
         email: p.email || "",
       }));
 
+      // Company website — free, reuses the same Bright Data credentials as the
+      // people search. One lookup per UNIQUE company (leads sharing an employer
+      // share the result) instead of one per prospect.
+      const companyNames = [...new Set(prospects.map((p) => p.company_name).filter(Boolean))];
+      const websiteByCompany = new Map<string, string | null>();
+      await mapWithConcurrency(companyNames, 5, async (name) => {
+        websiteByCompany.set(name, await brightDataFindCompanyWebsite(name));
+      });
+      prospects = prospects.map((p) => ({
+        ...p,
+        website_url: (p.company_name && websiteByCompany.get(p.company_name)) || p.website_url,
+      }));
+
       // Enrich real LinkedIn profiles with an email via Anysite, when configured.
       // Never fabricated — a lookup miss just leaves email empty.
       if (anysiteConfigured) {
@@ -70,6 +98,25 @@ export async function searchBuyLeads(criteria: BuyCriteria): Promise<BuyLeadsRes
         // Log misses so we can debug
         found.forEach((result, url) => {
           if (!result.ok) console.log(`[buy-leads] Miss: ${url} → ${result.error}`);
+        });
+      }
+
+      // Free fallback: for anyone AnySite (or no AnySite) still left without an
+      // email, try the pattern-guess + SMTP-verify method against their company
+      // website. See email-guess.ts for the serverless/port-25 caveat — this
+      // step is a no-op (fails closed, never fabricates) wherever outbound SMTP
+      // isn't reachable, e.g. on Vercel.
+      const stillMissing = prospects.filter((p) => !p.email && p.website_url && p.full_name);
+      if (stillMissing.length) {
+        const guesses = await mapWithConcurrency(stillMissing, 5, async (p) => {
+          const r = await guessAndVerifyEmail(p.full_name, p.website_url);
+          return { key: p.linkedin || p.full_name, result: r };
+        });
+        const guessByKey = new Map(guesses.map((g) => [g.key, g.result]));
+        prospects = prospects.map((p) => {
+          if (p.email) return p;
+          const g = guessByKey.get(p.linkedin || p.full_name);
+          return g?.ok && g.email ? { ...p, email: g.email } : p;
         });
       }
 

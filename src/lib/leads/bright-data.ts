@@ -128,3 +128,36 @@ export async function brightDataSearchPeople(criteria: {
   if (!prospects.length) return { ok: false, prospects: [], error: "No LinkedIn profiles found. Try broader criteria." };
   return { ok: true, prospects };
 }
+
+// Search-result domains that are never a company's own website — directories,
+// social networks, and aggregators that just happen to rank for a company name.
+const NON_COMPANY_DOMAINS = new Set([
+  "linkedin.com", "facebook.com", "twitter.com", "x.com", "instagram.com",
+  "indeed.com", "glassdoor.com", "wikipedia.org", "crunchbase.com",
+  "zoominfo.com", "bloomberg.com", "youtube.com", "github.com",
+  "yelp.com", "google.com", "apple.com", "wellfound.com", "pitchbook.com",
+]);
+
+/**
+ * Finds a company's real website by searching for its name — reuses the same
+ * Bright Data zone/credentials as the people search (no separate product/cost).
+ * Free-associates nothing: returns null rather than guessing when no plausible
+ * company-owned domain shows up in the first page of results.
+ */
+export async function brightDataFindCompanyWebsite(companyName: string): Promise<string | null> {
+  if (!API_KEY || !companyName.trim()) return null;
+  try {
+    const organic = await brightDataSerp(`"${companyName}" official website`, 0, 30_000);
+    for (const r of organic) {
+      const link = (r.link || "").trim();
+      if (!/^https?:\/\//i.test(link)) continue;
+      let host = "";
+      try { host = new URL(link).hostname.replace(/^www\./, "").toLowerCase(); } catch { continue; }
+      if (!host || [...NON_COMPANY_DOMAINS].some((d) => host === d || host.endsWith(`.${d}`))) continue;
+      return `https://${host}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
