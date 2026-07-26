@@ -115,7 +115,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
                 <span className="font-bold text-white text-base tracking-tight">
                   Nxelio
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">AI Engagement</span>
+                <span className="text-[10px] text-white/80 font-bold uppercase tracking-widest mt-0.5">AI Engagement</span>
               </span>
             )}
           </button>
@@ -123,13 +123,13 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
 
         <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-5", collapsed ? "px-2" : "px-3")}>
           <div>
-            {!collapsed && <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Main Menu</p>}
+            {!collapsed && <p className="px-3 mb-2 text-[10px] font-extrabold uppercase tracking-wider text-white/85">Main Menu</p>}
             <ul className="space-y-1">{main.map((item) => renderItem(item, false))}</ul>
           </div>
 
           {admin.length > 0 && (
             <div>
-              {!collapsed && <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Admin</p>}
+              {!collapsed && <p className="px-3 mb-2 text-[10px] font-extrabold uppercase tracking-wider text-white/85">Admin</p>}
               <ul className="space-y-1">{admin.map((item) => renderItem(item, true))}</ul>
             </div>
           )}

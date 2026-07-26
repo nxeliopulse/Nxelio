@@ -108,6 +108,16 @@ html.dark[data-dark-preset="emerald"] {
 }
 
 /* Accent Color Customizations */
+html[data-accent-color="black"] {
+  --primary: #22252a;
+  --color-blue-50: #f4f4f6;
+  --color-blue-100: #e4e4e7;
+  --color-blue-500: #3f4247;
+  --color-blue-600: #22252a;
+  --color-blue-700: #16181c;
+  --color-teal-600: #22252a;
+  --color-emerald-600: #22252a;
+}
 html[data-accent-color="blue"] {
   --primary: #2563eb;
   --color-blue-50: #eff6ff;

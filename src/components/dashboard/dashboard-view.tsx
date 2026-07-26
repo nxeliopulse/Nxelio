@@ -50,8 +50,30 @@ function WelcomeBanner() {
   );
 }
 
-const BLUE   = "#2563eb";
-const INDIGO = "#4f46e5";
+function useAccentColors() {
+  const [colors, setColors] = useState({ blue: "#2563eb", indigo: "#4f46e5" });
+
+  useEffect(() => {
+    function update() {
+      if (typeof window === "undefined") return;
+      const root = document.documentElement;
+      const primary = getComputedStyle(root).getPropertyValue("--primary").trim() || "#2563eb";
+      const blue600 = getComputedStyle(root).getPropertyValue("--color-blue-600").trim() || primary;
+      const blue700 = getComputedStyle(root).getPropertyValue("--color-blue-700").trim() || primary;
+      setColors({ blue: blue600, indigo: blue700 });
+    }
+
+    update();
+
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-accent-color", "class"] });
+
+    return () => observer.disconnect();
+  }, []);
+
+  return colors;
+}
+
 const GRAY   = "#94a3b8";
 const ORANGE = "#f59e0b";
 
@@ -138,6 +160,7 @@ export function DashboardView({
   onboardingStatus?: OnboardingStatus;
 }) {
   const router = useRouter();
+  const { blue: BLUE, indigo: INDIGO } = useAccentColors();
   const { toggle: toggleAssistant, setSuggestions } = useAssistant();
   const [vis, setVis] = useState<Visibility>(DEFAULT_VIS);
   const [customizing, setCustomizing] = useState(false);
@@ -381,7 +404,7 @@ export function DashboardView({
                   <CardTitle className="text-base font-semibold">Top Automations</CardTitle>
                   <p className="text-xs text-slate-400 mt-0.5">Best performers</p>
                 </div>
-                <button suppressHydrationWarning onClick={() => router.push("/campaigns")} className="text-xs font-medium text-blue-600 hover:underline mt-1">View All</button>
+                <button suppressHydrationWarning onClick={() => router.push("/campaigns")} className="text-xs font-semibold text-[var(--primary)] hover:underline mt-1">View All</button>
               </CardHeader>
               <CardContent className="pt-2 space-y-4">
                 {topAutomations.length === 0 ? (
@@ -426,7 +449,7 @@ export function DashboardView({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-1">
                 <CardTitle className="text-base font-semibold">Recent Campaigns</CardTitle>
-                <button onClick={() => router.push("/campaigns")} className="text-xs font-medium text-blue-600 hover:underline">View All</button>
+                <button onClick={() => router.push("/campaigns")} className="text-xs font-semibold text-[var(--primary)] hover:underline">View All</button>
               </CardHeader>
               <CardContent className="pt-2">
                 {recentCampaigns.length === 0 ? (
@@ -487,7 +510,7 @@ export function DashboardView({
                   <button
                     onClick={toggleAssistant}
                     className="w-full rounded-xl h-11 text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90 shadow-sm"
-                    style={{ background: "linear-gradient(to right, #1d4ed8, #2563eb, #4f46e5)" }}
+                    style={{ background: `linear-gradient(to right, ${BLUE}, ${INDIGO})` }}
                   >
                     <Sparkles className="h-4 w-4" />
                     AI Assistant

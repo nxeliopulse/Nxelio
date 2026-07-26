@@ -114,6 +114,7 @@ function CustomSelect<T extends string>({
 }
 
 const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
+  { id: "black", name: "Onyx Black", bg: "bg-[#22252a]" },
   { id: "blue", name: "Blue", bg: "bg-blue-600" },
   { id: "indigo", name: "Indigo", bg: "bg-indigo-600" },
   { id: "purple", name: "Purple", bg: "bg-purple-600" },
