@@ -377,14 +377,16 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                     <td className="px-5 py-4 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(s.created_at)}</td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => handleRefresh(s.id, s.segment_name)}
-                          disabled={pending}
-                          title="Refresh contacts"
-                          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                        </button>
+                        {s.segment_type !== "Static" && (
+                          <button
+                            onClick={() => handleRefresh(s.id, s.segment_name)}
+                            disabled={pending}
+                            title="Refresh contacts"
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                          </button>
+                        )}
                         <Link
                           href={`/segments/builder?id=${s.id}`}
                           title="Edit Segment"

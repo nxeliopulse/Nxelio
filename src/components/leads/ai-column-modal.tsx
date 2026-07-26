@@ -22,8 +22,7 @@ interface Props {
 /**
  * Docked sidebar panel — a real sibling column next to the leads table (not a
  * centered modal popup), matching the Clay-style "Use AI" panel that slides in
- * alongside the table instead of covering it. See LeadDetailSidebar for the
- * same pattern already used for the lead-detail panel.
+ * alongside the table instead of covering it.
  */
 export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props) {
   const [step, setStep] = useState<Step>("configure");
@@ -50,7 +49,7 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
   useEffect(() => {
     // Animate in on the next frame instead of at initial (unmounted) state — the
     // parent only mounts this component while `open` is true, so this always runs
-    // exactly once per open (matches LeadDetailSidebar's identical pattern).
+    // exactly once per open.
     const t = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(t);
   }, []);

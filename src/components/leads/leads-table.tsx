@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, CalendarPlus, X, Sparkles, Loader2, MoreVertical, Play, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, type LucideIcon } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,11 +11,9 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
-import { LeadDetailSidebar } from "@/components/leads/lead-detail-sidebar";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
-import { getLeadDetail } from "@/lib/queries/lead-detail";
-import type { Activity } from "@/components/leads/lead-detail-view";
 import { deleteLead, bulkDeleteLeads, type LeadRow } from "@/lib/queries/leads";
+import { createStaticSegment } from "@/lib/queries/segments";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
 const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | "success" | "purple"> = {
@@ -66,16 +64,14 @@ interface Props {
   campaignFilter?: { id: string; name: string };
   /** Pre-populate the search box (from global search). */
   initialSearch?: string;
-  /** When landing directly on /leads/[id], opens the sidebar pre-loaded with this lead — avoids a second fetch/flash. */
-  initialSelectedLead?: { lead: LeadRow; activities: Activity[] } | null;
   /** Saved Clay-style custom AI columns for this workspace, rendered after the built-in columns. */
   aiColumns?: AiColumnDefinitionRow[];
   /** Workspace's own saved AI column templates (user-created, distinct from the built-in library). */
   aiColumnSavedTemplates?: AiColumnSavedTemplateRow[];
 }
 
-export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelectedLead, aiColumns = [], aiColumnSavedTemplates = [] }: Props) {
-  const { confirm } = useFeedback();
+export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [] }: Props) {
+  const { confirm, prompt, toast } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
@@ -87,53 +83,12 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
   const [showWizard, setShowWizard] = useState(false);
   const [page, setPage] = useState(0);
 
-  // Lead detail sidebar — opens over the table instead of navigating to /leads/[id].
-  // The URL still updates (via raw history push, not router.push) so the lead stays
-  // linkable/bookmarkable without remounting this table and losing filter/page state.
-  const [openLeadId, setOpenLeadId] = useState<string | null>(initialSelectedLead?.lead.id ?? null);
-  const [openLeadData, setOpenLeadData] = useState<{ lead: LeadRow; activities: Activity[] } | null>(initialSelectedLead ?? null);
-  const [openLeadLoading, setOpenLeadLoading] = useState(false);
-
-  async function openLead(id: string) {
-    if (id === openLeadId) return;
-    setShowAiColumnModal(false);
-    setOpenLeadId(id);
-    setOpenLeadData(null);
-    setOpenLeadLoading(true);
-    window.history.pushState(null, "", `/leads/${id}`);
-    const { lead, activities } = await getLeadDetail(id);
-    setOpenLeadLoading(false);
-    if (lead) setOpenLeadData({ lead: lead as LeadRow, activities: activities as Activity[] });
+  // Clicking a lead navigates to its own full page (/leads/[id]) — matches how
+  // campaign-detail-view.tsx gives each campaign a real standalone page instead
+  // of an overlay on the list.
+  function openLead(id: string) {
+    router.push(`/leads/${id}`);
   }
-
-  function closeLead() {
-    setOpenLeadId(null);
-    setOpenLeadData(null);
-    window.history.pushState(null, "", "/leads");
-  }
-
-  useEffect(() => {
-    function onPopState() {
-      const m = window.location.pathname.match(/^\/leads\/([^/]+)$/);
-      if (m) {
-        const id = m[1];
-        if (id !== openLeadId) {
-          setOpenLeadId(id);
-          setOpenLeadData(null);
-          setOpenLeadLoading(true);
-          getLeadDetail(id).then(({ lead, activities }) => {
-            setOpenLeadLoading(false);
-            if (lead) setOpenLeadData({ lead: lead as LeadRow, activities: activities as Activity[] });
-          });
-        }
-      } else {
-        setOpenLeadId(null);
-        setOpenLeadData(null);
-      }
-    }
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, [openLeadId]);
   const [sort, setSort] = useState<"none" | "name" | "score" | "newest">("none");
   const scrollRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 15;
@@ -386,6 +341,24 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
     });
   }
 
+  async function handleCreateSegment() {
+    const name = await prompt({
+      title: "Create segment",
+      message: `Create a segment with the ${selected.length} selected lead${selected.length === 1 ? "" : "s"}?`,
+      label: "Segment name",
+      placeholder: "e.g. Q3 conference leads",
+      confirmLabel: "Create",
+      required: true,
+    });
+    if (name === null) return;
+    const ids = [...selected];
+    setSelected([]);
+    start(async () => {
+      await createStaticSegment(name, "", ids);
+      toast(`Segment "${name}" created with ${ids.length} lead${ids.length === 1 ? "" : "s"}`, "success");
+    });
+  }
+
   async function handleDelete(id: string) {
     if (!(await confirm({ title: "Delete lead?", message: "Delete this lead?", confirmLabel: "Delete", danger: true }))) return;
     start(async () => {
@@ -459,7 +432,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
 
   return (
     <div className="flex items-start gap-4">
-    <div className={openLeadId || showAiColumnModal ? "flex-1 min-w-0" : "max-w-[1600px] mx-auto w-full"}>
+    <div className={showAiColumnModal ? "flex-1 min-w-0" : "max-w-[1600px] mx-auto w-full"}>
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
           <p className="text-sm text-blue-900">
@@ -523,7 +496,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { closeLead(); setShowAiColumnModal(true); }}
+              onClick={() => setShowAiColumnModal(true)}
               className="rounded-xl gap-1 font-semibold h-8 text-xs px-2.5 border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex-shrink-0"
               title="Use AI column enrichment"
             >
@@ -899,10 +872,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
             </span>
             <span className="h-5 w-px bg-white/20" />
             <button
-              onClick={() => router.push(`/meetings?leads=${selected.join(",")}`)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+              onClick={handleCreateSegment}
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white text-blue-600 hover:bg-blue-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
             >
-              <CalendarPlus className="h-3.5 w-3.5" /> Schedule meeting
+              <Layers3 className="h-3.5 w-3.5" /> Create segment
             </button>
             <button
               onClick={handleBulkDelete}
@@ -931,9 +905,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
       />
     )}
 
-    {openLeadId && !showAiColumnModal && (
-      <LeadDetailSidebar data={openLeadData} loading={openLeadLoading} onClose={closeLead} />
-    )}
     </div>
   );
 }

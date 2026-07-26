@@ -14,6 +14,17 @@ export async function getOpportunities(): Promise<OpportunityRow[]> {
   return (data as OpportunityRow[]) || [];
 }
 
+/** A single lead's opportunities, newest-first — for the lead detail page's related list. */
+export async function getOpportunitiesForLead(leadId: string): Promise<OpportunityRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("opportunities")
+    .select("*")
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false });
+  return (data as OpportunityRow[]) || [];
+}
+
 export async function getPipelineStats(): Promise<PipelineStats> {
   const supabase = await createClient();
   const { data } = await supabase.from("opportunities").select("deal_value, stage");

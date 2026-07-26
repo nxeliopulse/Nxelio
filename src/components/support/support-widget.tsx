@@ -70,7 +70,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
         <div className={`fixed inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-24 z-50 w-full sm:w-[384px] sm:max-w-[92vw] transition-[right] duration-300 ease-in-out ${assistantOpen ? "sm:right-[424px]" : "sm:right-6"}`}>
           <div className="lp-anim-pop origin-bottom sm:origin-bottom-right bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[78vh] sm:max-h-[70vh] overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 text-white p-5">
+            <div className="bg-[var(--primary)] text-white p-5">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   {view === "chat" && (
@@ -87,7 +87,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                 </button>
               </div>
               <h2 className="mt-3 text-xl font-bold">Hi there 👋</h2>
-              <p className="text-blue-100 text-sm">How can we help you use Nxelio?</p>
+              <p className="text-white/80 text-sm">How can we help you use Nxelio?</p>
             </div>
 
             {/* Body */}
@@ -96,7 +96,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                 <>
                   <button
                     onClick={() => { setView("chat"); setTimeout(() => inputRef.current?.focus(), 50); }}
-                    className="w-full bg-white rounded-xl border border-slate-200 p-4 text-left shadow-sm hover:border-blue-300 hover:shadow transition-all flex items-center justify-between gap-3"
+                    className="w-full bg-white rounded-xl border border-slate-200 p-4 text-left shadow-sm hover:border-[var(--primary)] hover:shadow transition-all flex items-center justify-between gap-3"
                   >
                     <div>
                       <p className="font-semibold text-slate-900 text-sm">Ask a question...</p>
@@ -112,10 +112,10 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                         <button
                           key={topic.label}
                           onClick={() => ask(topic.question)}
-                          className="w-full bg-white rounded-xl border border-slate-200 p-3 text-left hover:border-blue-300 hover:bg-blue-50/50 transition-all flex items-center justify-between group"
+                          className="w-full bg-white rounded-xl border border-slate-200 p-3 text-left hover:border-[var(--primary)] hover:bg-slate-50 transition-all flex items-center justify-between group"
                         >
                           <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{topic.label}</span>
-                          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600" />
+                          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[var(--primary)]" />
                         </button>
                       ))}
                     </div>
@@ -125,7 +125,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                 <div className="space-y-3">
                   {chat.map((msg, idx) => (
                     <div key={idx} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                      <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${msg.role === "user" ? "bg-blue-600 text-white" : "bg-white text-slate-800 border border-slate-200 shadow-xs"}`}>
+                      <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${msg.role === "user" ? "bg-[var(--primary)] text-white" : "bg-white text-slate-800 border border-slate-200 shadow-xs"}`}>
                         <p className="whitespace-pre-wrap font-medium">{msg.content}</p>
                         {msg.links && msg.links.length > 0 && (
                           <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-1">
@@ -133,7 +133,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                               <button
                                 key={link.href}
                                 onClick={() => goTo(link.href)}
-                                className="w-full flex items-center justify-between text-xs font-bold text-blue-600 hover:underline"
+                                className="w-full flex items-center justify-between text-xs font-bold text-[var(--primary)] hover:underline"
                               >
                                 <span>{link.label}</span>
                                 <ChevronRight className="h-3 w-3" />
@@ -146,7 +146,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                   ))}
                   {pending && (
                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 p-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" /> Finding answer...
+                      <Loader2 className="h-4 w-4 animate-spin text-[var(--primary)]" /> Finding answer...
                     </div>
                   )}
                 </div>
@@ -165,13 +165,13 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                   placeholder="Ask any question..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 />
                 <button
                   type="submit"
                   disabled={pending || !input.trim()}
                   aria-label="Send"
-                  className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center disabled:opacity-40 hover:bg-blue-700 transition-colors flex-shrink-0"
+                  className="h-10 w-10 rounded-xl bg-[var(--primary)] text-white flex items-center justify-center disabled:opacity-40 hover:opacity-90 transition-opacity flex-shrink-0"
                 >
                   <Send className="h-4 w-4" />
                 </button>
@@ -182,13 +182,13 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
         </div>
       )}
 
-      {/* Circular support FAB — bottom-right, brand blue with the app mark */}
+      {/* Circular support FAB — bottom-right, brand primary accent with the app mark */}
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close support" : "Open support"}
         title="Help & Support"
         suppressHydrationWarning
-        className={`fixed bottom-6 z-40 h-14 w-14 rounded-full bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/40 flex items-center justify-center hover:scale-105 active:scale-95 transition-[right,transform] duration-300 ease-in-out ${assistantOpen ? (assistantExpanded ? "right-6 sm:right-[564px]" : "right-6 sm:right-[424px]") : "right-6"}`}
+        className={`fixed bottom-6 z-40 h-14 w-14 rounded-full bg-[var(--primary)] text-white shadow-xl shadow-black/20 flex items-center justify-center hover:scale-105 active:scale-95 transition-[right,transform] duration-300 ease-in-out ${assistantOpen ? (assistantExpanded ? "right-6 sm:right-[564px]" : "right-6 sm:right-[424px]") : "right-6"}`}
       >
         {open ? <X className="h-6 w-6" /> : <span className="text-[26px] font-bold leading-none" aria-hidden="true">?</span>}
       </button>

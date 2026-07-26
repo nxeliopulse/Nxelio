@@ -77,65 +77,61 @@ const TOKENS = {
     hoverBg: "#F1F5F9",
     suggBg: "#F8FAFC",
     suggBorder: "#E2E8F0",
-    suggHoverBg: "#eff6ff",
-    suggHoverBorder: "#2563eb",
+    suggHoverBg: "var(--color-blue-50, #eff6ff)",
+    suggHoverBorder: "var(--primary, #2563eb)",
     textPrimary: "#0F172A",
     textSecondary: "#64748B",
     textMuted: "#94A3B8",
     iconColor: "#64748B",
-    appsPillBg: "#eff6ff",
-    appsPillBorder: "#bfdbfe",
-    appsPillActiveBg: "#dbeafe",
-    appsPillActiveBorder: "#2563eb",
+    appsPillBg: "var(--color-blue-50, #eff6ff)",
+    appsPillBorder: "var(--color-blue-200, #bfdbfe)",
+    appsPillActiveBg: "var(--color-blue-100, #dbeafe)",
+    appsPillActiveBorder: "var(--primary, #2563eb)",
     historyActiveBg: "#F1F5F9",
     historyHoverBg: "#F8FAFC",
   },
   dark: {
     panel: "#0F172A",
-    panelBorder: "rgba(37,99,235,0.2)",
-    headerBorder: "rgba(37,99,235,0.2)",
+    panelBorder: "rgba(255,255,255,0.1)",
+    headerBorder: "rgba(255,255,255,0.1)",
     msgAi: "#1E293B",
     msgAiBorder: "rgba(255,255,255,0.1)",
     msgAiText: "#f1f5f9",
     msgErr: "rgba(239,68,68,0.18)",
-    msgErrBorder: "rgba(239,68,68,0.4)",
-    msgErrText: "#fecaca",
-    approvalBg: "rgba(245,158,11,0.08)",
+    msgErrBorder: "rgba(239,68,68,0.3)",
+    msgErrText: "#fca5a5",
+    approvalBg: "rgba(245,158,11,0.12)",
     approvalBorder: "rgba(245,158,11,0.3)",
     approvalText: "#fde68a",
-    inputBg: "rgba(255,255,255,0.04)",
-    inputBorder: "rgba(37,99,235,0.3)",
+    inputBg: "#1E293B",
+    inputBorder: "rgba(255,255,255,0.12)",
     dropdownBg: "#1E293B",
-    dropdownBorder: "rgba(37,99,235,0.3)",
-    hoverBg: "rgba(255,255,255,0.06)",
-    suggBg: "rgba(37,99,235,0.05)",
-    suggBorder: "rgba(37,99,235,0.25)",
-    suggHoverBg: "rgba(37,99,235,0.12)",
-    suggHoverBorder: "rgba(37,99,235,0.6)",
-    textPrimary: "#ffffff",
-    textSecondary: "#94a3b8",
+    dropdownBorder: "rgba(255,255,255,0.12)",
+    hoverBg: "rgba(255,255,255,0.08)",
+    suggBg: "#1E293B",
+    suggBorder: "rgba(255,255,255,0.1)",
+    suggHoverBg: "rgba(255,255,255,0.12)",
+    suggHoverBorder: "var(--primary, #3b82f6)",
+    textPrimary: "#F8FAFC",
+    textSecondary: "#94A3B8",
     textMuted: "#64748B",
-    iconColor: "#94a3b8",
-    appsPillBg: "rgba(37,99,235,0.1)",
-    appsPillBorder: "rgba(37,99,235,0.4)",
-    appsPillActiveBg: "rgba(37,99,235,0.2)",
-    appsPillActiveBorder: "rgba(37,99,235,0.8)",
+    iconColor: "#94A3B8",
+    appsPillBg: "rgba(255,255,255,0.08)",
+    appsPillBorder: "rgba(255,255,255,0.15)",
+    appsPillActiveBg: "rgba(255,255,255,0.15)",
+    appsPillActiveBorder: "var(--primary, #3b82f6)",
     historyActiveBg: "rgba(255,255,255,0.1)",
-    historyHoverBg: "rgba(255,255,255,0.04)",
+    historyHoverBg: "rgba(255,255,255,0.06)",
   },
 };
 
-const PRIMARY = "#2563eb";
-const PURPLE = "#4f46e5";
-const AMBER = "#F59E0B";
-
 export function AssistantWidget({
-  open,
+  open = false,
   onClose,
   onExpandChange,
 }: {
-  open: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onClose?: () => void;
   onExpandChange?: (expanded: boolean) => void;
 }) {
   const { suggestions: ctxSuggestions } = useAssistant();
@@ -150,6 +146,7 @@ export function AssistantWidget({
   const [userName, setUserName] = useState("there");
   const [expanded, setExpanded] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [accentColors, setAccentColors] = useState({ primary: "#2563eb", purple: "#4f46e5" });
   const [pending, start] = useTransition();
 
   const [showMention, setShowMention] = useState(false);
@@ -164,16 +161,26 @@ export function AssistantWidget({
   const mentionRef = useRef<HTMLDivElement>(null);
   const appsRef = useRef<HTMLDivElement>(null);
 
-  // Sync with app theme (.dark class on <html>)
+  // Sync with app theme (.dark class and data-accent-color on <html>)
   useEffect(() => {
-    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    const check = () => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+      const root = document.documentElement;
+      const p = getComputedStyle(root).getPropertyValue("--primary").trim() || "#2563eb";
+      const b600 = getComputedStyle(root).getPropertyValue("--color-blue-600").trim() || p;
+      const b700 = getComputedStyle(root).getPropertyValue("--color-blue-700").trim() || p;
+      setAccentColors({ primary: b600, purple: b700 });
+    };
     check();
     const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-accent-color"] });
     return () => observer.disconnect();
   }, []);
 
   const T = isDark ? TOKENS.dark : TOKENS.light;
+  const PRIMARY = accentColors.primary;
+  const PURPLE = accentColors.purple;
+  const AMBER = "#d97706";
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data }) => {

@@ -368,7 +368,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
       skipped = 0;
       // Real (Bright Data) prospects carry a LinkedIn URL; AI samples carry a placeholder
       // website. Neither carries an email, so they're never accidentally auto-emailed.
-      const buyLabel = buySource === "brightdata" ? "Purchased Leads (Bright Data)" : "Purchased Leads (sample)";
+      const buyLabel = buySource === "brightdata" ? "Purchased Leads (BILEADS Kit)" : "Purchased Leads (sample)";
       payload = (buyResults ?? []).map((p) => ({
         full_name: (p.full_name || "").slice(0, 150) || null,
         company_name: (p.company_name || "").slice(0, 200) || null,
@@ -919,7 +919,7 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, max
           : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
       </Button>
 
-      <p className="text-xs text-slate-500">Sourced from public LinkedIn profiles via Bright Data — each lead includes a LinkedIn URL, with an email attached where one is found.</p>
+      <p className="text-xs text-slate-500">Sourced from public LinkedIn profiles via BILEADS Kit — each lead includes a LinkedIn URL, with an email attached where one is found.</p>
 
       {results && isReal && (
         <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">

@@ -31,7 +31,7 @@ Nxelio is an AI-powered lead nurturing & customer-engagement platform (B2B). Scr
 - Templates (/templates): reusable email templates with variables like {{firstName}}, {{companyName}}.
 - Workflows (/workflows): a visual automation builder. (Its "Test run" is a simulation/preview.)
 - Analytics (/analytics): funnel, engagement charts, and campaign metrics.
-- Admin → User Management (/users): invite users; roles are Super Admin, Sales Admin, Marketing Admin; Super Admins can set per-tab permission overrides and reset passwords.
+- Admin → Administration (/users): invite users; roles are Super Admin, Sales Admin, Marketing Admin; Super Admins can set per-tab permission overrides and reset passwords.
 - Admin → Capture Form (/capture-form): your workspace's public lead-capture URL.
 - Admin → Settings (/settings): profile, password, email accounts, notification preferences, API keys, blocklist.
 - AI Assistant (blue "AI Assistant" button, top-right): a different tool that reads and acts on your LIVE workspace data (create/update/delete leads, campaigns, etc.) with admin approval.

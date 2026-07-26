@@ -24,7 +24,7 @@ export default async function BillingPage() {
           <ShieldAlert className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
           <div>
             <p className="font-semibold text-slate-900">You don&apos;t have access to this page</p>
-            <p className="text-sm text-slate-500 mt-1">Ask a Super Admin to grant you access to Subscription in User Management.</p>
+            <p className="text-sm text-slate-500 mt-1">Ask a Super Admin to grant you access to Subscription in Administration.</p>
           </div>
         </Card>
       </div>

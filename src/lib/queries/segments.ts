@@ -132,13 +132,49 @@ export async function previewSegmentCount(rules: EvalRule[], logic: "AND" | "OR"
 }
 
 /**
+ * Creates a "Static" segment from an explicit, manually-picked set of leads
+ * (e.g. the leads table's bulk "Create segment" action) — no rules, membership
+ * never changes on its own. Kept separate from createSegment() because a
+ * Static segment must never be re-evaluated by materializeSegmentMembers()
+ * (see the segment_type guard there), which would otherwise wipe this exact
+ * hand-picked list back down to whatever a (nonexistent) rule set matches.
+ */
+export async function createStaticSegment(name: string, description: string, leadIds: string[]) {
+  const supabase = await createClient();
+  const { data: segment, error } = await supabase
+    .from("segments")
+    .insert({ segment_name: name, description, segment_type: "Static", status: "Active", logic_type: "AND" })
+    .select()
+    .single();
+  if (error) throw error;
+
+  if (leadIds.length > 0) {
+    const { error: memberErr } = await supabase
+      .from("segment_members")
+      .insert(leadIds.map((lead_id) => ({ segment_id: segment.id, lead_id })));
+    if (memberErr) throw memberErr;
+  }
+
+  revalidatePath("/segments");
+  revalidatePath("/leads");
+  await logAudit({ action: "segment.created", entityType: "segment", entityId: segment.id, entityLabel: segment.segment_name, metadata: { type: "Static", count: leadIds.length } });
+  return segment;
+}
+
+/**
  * Recomputes a segment's membership from its stored rules: matches every lead in
  * the workspace and rewrites segment_members. Returns the new member count.
+ * No-ops for "Static" segments (see createStaticSegment) — their membership is
+ * a manually-picked list, not something a rule set should ever recompute.
  */
 export async function materializeSegmentMembers(segmentId: string): Promise<number> {
   const supabase = await createClient();
 
-  const { data: segment } = await supabase.from("segments").select("logic_type").eq("id", segmentId).single();
+  const { data: segment } = await supabase.from("segments").select("logic_type, segment_type").eq("id", segmentId).single();
+  if (segment?.segment_type === "Static") {
+    const { count } = await supabase.from("segment_members").select("*", { count: "exact", head: true }).eq("segment_id", segmentId);
+    return count || 0;
+  }
   const logic: "AND" | "OR" = segment?.logic_type === "OR" ? "OR" : "AND";
 
   const { data: rules } = await supabase

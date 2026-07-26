@@ -48,6 +48,35 @@ export async function getCampaignById(id: string): Promise<CampaignRow | null> {
   return data;
 }
 
+export interface LeadCampaignSummary {
+  id: string;
+  campaign_name: string;
+  status: string;
+  approval_status: string;
+}
+
+/** Every campaign that has actually sent this lead something — derived from
+ *  inbox_messages (each real send is logged there with campaign_id + lead_id),
+ *  not from audience targeting rules, so this only lists campaigns the lead
+ *  was genuinely part of. */
+export async function getCampaignsForLead(leadId: string): Promise<LeadCampaignSummary[]> {
+  const supabase = await createClient();
+  const { data: rows } = await supabase
+    .from("inbox_messages")
+    .select("campaign_id")
+    .eq("lead_id", leadId)
+    .eq("direction", "outbound")
+    .not("campaign_id", "is", null);
+  const campaignIds = [...new Set((rows || []).map((r) => r.campaign_id as string))];
+  if (!campaignIds.length) return [];
+
+  const { data: campaigns } = await supabase
+    .from("campaigns")
+    .select("id, campaign_name, status, approval_status")
+    .in("id", campaignIds);
+  return (campaigns as LeadCampaignSummary[]) || [];
+}
+
 /** Count of follow-up steps queued but not yet sent for this campaign. */
 export async function getCampaignPendingCount(campaignId: string): Promise<number> {
   const supabase = await createClient();

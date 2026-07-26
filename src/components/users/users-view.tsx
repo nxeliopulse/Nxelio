@@ -31,7 +31,7 @@ const roleVariant: Record<string, "purple" | "pink" | "blue" | "default"> = {
 };
 
 const roleAccessSummary: Record<string, string[]> = {
-  "Super Admin": ["All workspace screens", "User Management", "Capture Form", "Billing & Integrations"],
+  "Super Admin": ["All workspace screens", "Administration", "Capture Form", "Billing & Integrations"],
   "Sales Admin": ["Dashboard", "Leads", "Campaigns", "Inbox", "Workflows", "Analytics", "Templates"],
   "Marketing Admin": ["Dashboard", "Segments", "Newsletters", "Workflows", "Analytics", "Templates"],
 };
@@ -145,7 +145,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
   return (
     <div className="max-w-[1600px] mx-auto">
       <PageHeader
-        title="User Management"
+        title="Administration"
         description="Click any user to view details or reset their password."
         actions={isAdmin ? <Button onClick={() => { setShowInvite(true); setError(null); setSuccess(null); }}><Plus className="h-4 w-4" /> Create User</Button> : null}
       />

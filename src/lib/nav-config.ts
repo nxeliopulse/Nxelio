@@ -37,7 +37,7 @@ export const navMainItems: NavItem[] = [
 ];
 
 export const navAdminItems: NavItem[] = [
-  { label: "User Management", href: "/users", icon: UserCog, roles: SUPER },
+  { label: "Administration", href: "/users", icon: UserCog, roles: SUPER },
   { label: "Capture Form", href: "/capture-form", icon: Link2, roles: SUPER },
   { label: "Settings", href: "/settings", icon: Settings, roles: ALL },
   { label: "Subscription", href: "/billing", icon: CreditCard, roles: ALL },

@@ -55,6 +55,18 @@ export async function getMeetings(): Promise<MeetingRow[]> {
   return (data as unknown as MeetingRow[]) ?? [];
 }
 
+/** A single lead's meetings, newest-first — for the lead detail page's related list. */
+export async function getMeetingsForLead(leadId: string): Promise<MeetingRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meetings")
+    .select(SELECT)
+    .eq("lead_id", leadId)
+    .order("start_at", { ascending: false });
+  if (error) return [];
+  return (data as unknown as MeetingRow[]) ?? [];
+}
+
 export async function createMeeting(input: MeetingInput): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const { error } = await supabase.from("meetings").insert({
