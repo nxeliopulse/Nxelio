@@ -117,16 +117,16 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
         <div className="p-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
           <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-4 text-white">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4" />
-              <p className="font-semibold text-sm">Subscription and Payments</p>
+              <Sparkles className="h-4.5 w-4.5" />
+              <p className="font-bold text-base tracking-tight">AI Credits</p>
             </div>
-            <p className="text-xs text-blue-100 mb-2">
+            <p className="text-sm font-medium text-white/90 mb-2.5">
               {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} used` : "Loading..."}
             </p>
-            <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div className="h-2 bg-white/20 rounded-full overflow-hidden mb-3">
               <div className="h-full bg-white rounded-full transition-all" style={{ width: credits ? `${Math.min(100, Math.round((credits.used / credits.total) * 100))}%` : "0%" }} />
             </div>
-            <Link href="/billing" onClick={onClose} className="mt-3 text-xs font-medium text-white/90 hover:text-white inline-block">Upgrade plan →</Link>
+            <Link href="/billing" onClick={onClose} className="text-xs font-semibold text-white/90 hover:text-white underline-offset-2 hover:underline inline-block">Upgrade plan →</Link>
           </div>
 
           <Link href="/help" onClick={onClose} className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">

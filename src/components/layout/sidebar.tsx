@@ -136,35 +136,40 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
         </nav>
 
         <div className={cn("py-3 space-y-2 flex-shrink-0", collapsed ? "px-2" : "px-3")}>
-          {/* Bottom Upgrade CTA card — hidden once already on the top plan, or if
-              this user has been denied Subscription access in User Management. */}
-          {canViewBilling && nextPlan && (collapsed ? (
+          {/* AI Credits Widget */}
+          {!canViewBilling ? null : collapsed ? (
             <div className="flex justify-center">
               <Link
                 href="/billing"
-                title={`Upgrade to ${nextPlan}`}
-                className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-colors"
+                title={credits ? `AI Credits — ${credits.used}/${credits.total} used` : "AI Credits"}
+                className="flex items-center justify-center h-11 w-11 rounded-2xl bg-white/15 text-white hover:bg-white/20 transition-colors ring-1 ring-white/20"
               >
-                <Sparkles className="h-4.5 w-4.5" />
+                <Sparkles className="h-5 w-5" />
               </Link>
             </div>
           ) : (
-            <div className="bg-white/15 rounded-xl p-3 text-white overflow-hidden border border-white/20">
-              <div className="flex items-center gap-1.5 mb-1 text-white">
-                <Sparkles className="h-4 w-4 flex-shrink-0" />
-                <p className="font-bold text-xs">Upgrade to {nextPlan}</p>
+            <div className="bg-white/15 rounded-2xl p-4 text-white overflow-hidden ring-1 ring-white/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-4.5 w-4.5 flex-shrink-0" />
+                <p className="font-bold text-base tracking-tight">AI Credits</p>
               </div>
-              <p className="text-[11px] text-white/70 mb-2 leading-tight">
-                {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} credits used` : "Unlock full CRM features"}
+              <p className="text-sm font-medium text-white/90 mb-2.5 whitespace-nowrap">
+                {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} used` : "Loading..."}
               </p>
+              <div className="h-2 bg-white/25 rounded-full overflow-hidden mb-3">
+                <div
+                  className="h-full bg-white rounded-full transition-all"
+                  style={{ width: credits ? `${Math.min(100, Math.round((credits.used / credits.total) * 100))}%` : "0%" }}
+                />
+              </div>
               <Link
                 href="/billing"
-                className="block text-center w-full py-1.5 rounded-lg bg-white hover:bg-white/90 text-[var(--primary)] font-semibold text-xs transition-colors"
+                className="inline-block text-xs font-semibold text-white/90 hover:text-white underline-offset-2 hover:underline whitespace-nowrap"
               >
-                Learn more
+                Upgrade plan →
               </Link>
             </div>
-          ))}
+          )}
 
           {/* Help & support */}
           {collapsed ? (
