@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   description: "AI-powered customer engagement and lead nurturing platform",
 };
 
-// Runs before paint to set the theme class, avoiding a light flash on load.
-const themeScript = `(function(){try{var t=localStorage.getItem('theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
+// Runs before paint to set appearance attributes and theme class, avoiding flash on load.
+const themeScript = `(function(){try{var raw=localStorage.getItem('nxelio_appearance');var s=raw?JSON.parse(raw):{};var theme=s.theme||localStorage.getItem('theme')||'system';var d=theme==='dark'||(theme==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var root=document.documentElement;if(d)root.classList.add('dark');else root.classList.remove('dark');if(s.fontSize)root.setAttribute('data-font-size',s.fontSize);if(s.fontStyle)root.setAttribute('data-font-style',s.fontStyle);if(s.pointerCursors!==undefined)root.setAttribute('data-pointer-cursors',s.pointerCursors?'true':'false');if(s.underlineLinks!==undefined)root.setAttribute('data-underline-links',s.underlineLinks?'true':'false');if(s.lightPreset)root.setAttribute('data-light-preset',s.lightPreset);if(s.darkPreset)root.setAttribute('data-dark-preset',s.darkPreset);if(s.accentColor)root.setAttribute('data-accent-color',s.accentColor);if(s.sidebarBadgeStyle)root.setAttribute('data-sidebar-badge',s.sidebarBadgeStyle);if(s.sidebarDensity)root.setAttribute('data-sidebar-density',s.sidebarDensity);}catch(e){}})();`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

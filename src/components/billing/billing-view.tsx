@@ -6,7 +6,7 @@ import {
   Check, X, Sparkles, CreditCard, Users2, Send,
   Zap, Crown, Rocket, Lock, AlertTriangle, Clock,
   TrendingUp, ExternalLink, Loader2, PartyPopper,
-  Search, Reply, Target, Ticket, ShoppingCart, Gift,
+  Search, Reply, Target, Ticket, Gift,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,6 @@ import type {
   SubscriptionWithPlan, SubscriptionPlan, BillingInterval,
 } from "@/lib/queries/subscription-types";
 import type { PromotionHistoryEntry } from "@/lib/queries/promotions";
-import type { LeadTopUpHistoryEntry } from "@/lib/queries/lead-topups";
 import { PlanTermsModal } from "@/components/billing/plan-terms-modal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -65,15 +64,15 @@ const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
   ],
   starter: [
     { label: "Everything in Basic",      included: true  },
-    { label: "300 AI credits / mo",      included: true  },
+    { label: "700 AI credits / mo",      included: true  },
     { label: "Automated lead discovery", included: true  },
-    { label: "300 AI-discovered leads / mo", included: true  },
+    { label: "1,000 AI-discovered leads / mo", included: true  },
     { label: "Priority support",         included: false },
   ],
   pro: [
     { label: "Everything in Starter",    included: true  },
-    { label: "1,000 AI credits / mo",    included: true  },
-    { label: "1,000 AI-discovered leads / mo", included: true  },
+    { label: "1,500 AI credits / mo",    included: true  },
+    { label: "2,000 AI-discovered leads / mo", included: true  },
     { label: "Priority support",         included: true  },
   ],
 };
@@ -97,8 +96,6 @@ interface Props {
   leadsCount: number;
   sentCount: number;
   promotionHistory: PromotionHistoryEntry[];
-  leadTopUpHistory: LeadTopUpHistoryEntry[];
-  canBuyTopUp: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -137,18 +134,16 @@ function CheckoutSuccessWatcher({
   return null;
 }
 
-export function BillingView({ subscription: sub, plans, leadsCount, sentCount, promotionHistory, leadTopUpHistory, canBuyTopUp }: Props) {
+export function BillingView({ subscription: sub, plans, leadsCount, sentCount, promotionHistory }: Props) {
   const router = useRouter();
   const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [checkoutPending, startCheckout] = useTransition();
   const [portalPending, startPortal] = useTransition();
-  const [topupPending, startTopup] = useTransition();
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successPlanName, setSuccessPlanName] = useState("");
   const [successCredits, setSuccessCredits] = useState(0);
-  const [topupMessage, setTopupMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [promoChecking, setPromoChecking] = useState(false);
   const [promoResult, setPromoResult] = useState<{ ok: boolean; error?: string; description?: string | null } | null>(null);
@@ -167,7 +162,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
 
   const leadsRemaining = sub?.leads_remaining ?? 0;
   const leadsTotal     = sub?.leads_total     ?? 0;
-  const topupLeads     = sub?.topup_leads_remaining ?? 0;
   const leadsPct       = credPct(leadsRemaining, leadsTotal);
 
   const planOrder: Record<string, number> = { basic: 0, starter: 1, pro: 2 };
@@ -210,17 +204,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
       const json = await res.json();
       if (!res.ok || json.error) { setCheckoutError(json.error ?? "Portal failed"); return; }
       window.location.href = json.url;
-    });
-  }
-
-  function buyLeadTopUp() {
-    setTopupMessage(null);
-    startTopup(async () => {
-      const res = await fetch("/api/billing/lead-topup", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok || json.error) { setTopupMessage({ ok: false, text: json.error ?? "Purchase failed" }); return; }
-      setTopupMessage({ ok: true, text: `${json.leadsGranted.toLocaleString()} leads added — you now have ${json.topupLeadsRemaining.toLocaleString()} top-up leads available.` });
-      router.refresh();
     });
   }
 
@@ -348,6 +331,14 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                 </Button>
               )}
               <Button
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                onClick={() => setCancelOpen(true)}
+              >
+                <X className="h-4 w-4" />
+                Cancel subscription
+              </Button>
+              <Button
                 className="bg-white text-blue-700 hover:bg-blue-50"
                 onClick={() => {
                   const next = plans.find(p => planOrder[p.id] > planOrder[currentPlanId]);
@@ -394,7 +385,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
               </div>
               <span className="text-sm font-mono text-slate-700">
                 {leadsRemaining.toLocaleString()} / {leadsTotal.toLocaleString()} remaining
-                {topupLeads > 0 && <span className="text-emerald-600"> + {topupLeads.toLocaleString()} top-up</span>}
               </span>
             </div>
             <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
@@ -470,7 +460,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                   onChange={(e) => { setPromoCode(e.target.value); setPromoResult(null); }}
                   onKeyDown={(e) => e.key === "Enter" && applyPromo(plans.find(p => planOrder[p.id] > planOrder[currentPlanId])?.id ?? "starter")}
                   placeholder="Promo code"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm border border-slate-200 outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm bg-white text-slate-900 placeholder:text-slate-400 border border-slate-200 outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
                 />
               </div>
               <Button
@@ -585,54 +575,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
         </div>
       </div>
 
-      {/* ── Need More Leads? ────────────────────────────────────── */}
-      <Card className="p-5 sm:p-6 mb-6 border-l-4 border-l-emerald-500">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-          <div className="flex items-start sm:items-center gap-4">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0">
-              <Target className="h-7 w-7" />
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-slate-900">Need More Leads?</h3>
-              <p className="text-sm text-slate-600 max-w-md">
-                Buy 1,000 extra AI-discovered leads for a one-time $149 — on Starter or Pro (monthly or annual), no upgrade required beyond that. Added instantly, kept separate from your monthly allowance until you use them. Limited to one top-up per calendar month.
-              </p>
-            </div>
-          </div>
-          <Button onClick={buyLeadTopUp} disabled={topupPending || !hasPortal || currentPlanId === "basic" || !canBuyTopUp} className="w-full md:w-auto shrink-0">
-            {topupPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
-            Buy 1,000 leads — $149
-          </Button>
-        </div>
-        {!hasPortal && (
-          <p className="text-xs text-slate-500 mt-3">Subscribe to a plan first to add a payment method.</p>
-        )}
-        {hasPortal && currentPlanId === "basic" && (
-          <p className="text-xs text-amber-600 mt-3">Lead Top-Ups are available on Starter and Pro plans — upgrade to buy extra leads.</p>
-        )}
-        {hasPortal && currentPlanId !== "basic" && !canBuyTopUp && (
-          <p className="text-xs text-amber-600 mt-3">You&apos;ve already bought a top-up this month — you can buy another starting next month.</p>
-        )}
-        {topupMessage && (
-          <p className={`text-sm mt-4 rounded-lg px-4 py-2.5 ${topupMessage.ok ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
-            {topupMessage.text}
-          </p>
-        )}
-        {leadTopUpHistory.length > 0 && (
-          <div className="mt-5 pt-4 border-t border-slate-200/70">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Top-up history</p>
-            <ul className="space-y-1.5">
-              {leadTopUpHistory.map((t) => (
-                <li key={t.id} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-700">{t.quantity.toLocaleString()} leads</span>
-                  <span className="text-slate-400">{fmtCents(t.price_cents)} · {new Date(t.created_at).toLocaleDateString()}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </Card>
-
       {/* ── Promotion history ───────────────────────────────────── */}
       {promotionHistory.length > 0 && (
         <Card className="p-6 mb-6">
@@ -700,15 +642,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
           </div>
         )}
       </Card>
-
-      <div className="text-center py-4">
-        <button
-          onClick={() => setCancelOpen(true)}
-          className="text-sm text-slate-400 hover:text-red-600 underline underline-offset-4"
-        >
-          Cancel subscription
-        </button>
-      </div>
 
       {/* ── Success modal ─────────────────────────────────────── */}
       <Modal open={successOpen} onClose={() => setSuccessOpen(false)} title="" size="sm">

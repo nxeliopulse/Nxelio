@@ -99,14 +99,14 @@ const PLANS = [
     features:["Bring your own leads (CSV import)","AI lead enrichment","AI lead scoring","Email outreach","LinkedIn outreach","Reply tracking","Meetings & calendar sync","Core workflows","Standard support","7-day free trial on monthly billing — card required, no charge until day 7"],
   },
   {
-    name:"Starter",  price:"69",   credits:300,  leads:300,  trial:null,
+    name:"Starter",  price:"149.99", credits:700,  leads:1000, trial:null,
     color:"#7E57C2", bg:"#EDE7F6", border:"#7E57C2", popular:true,
-    features:["Everything in Basic","300 AI-discovered leads / month","Automated lead discovery","300 AI credits / month"],
+    features:["Everything in Basic","1,000 AI-discovered leads / month","Automated lead discovery","700 AI credits / month"],
   },
   {
-    name:"Pro",      price:"149",  credits:1000, leads:1000, trial:null,
+    name:"Pro",      price:"299.99", credits:1500, leads:2000, trial:null,
     color:"#F4511E", bg:"#FFF0EE", border:"#FFCDD2", popular:false,
-    features:["Everything in Starter","1,000 AI-discovered leads / month","1,000 AI credits / month","Priority support"],
+    features:["Everything in Starter","2,000 AI-discovered leads / month","1,500 AI credits / month","Priority support"],
   },
 ];
 
@@ -122,13 +122,11 @@ const TESTIMONIALS = [
 const FAQS = [
   { q:"What is Nxelio?",                       a:"Nxelio is a B2B revenue platform. It lets you import leads, run email campaigns, manage replies in a unified inbox, track deals through an opportunities pipeline, segment your contacts, send newsletters, and view analytics — all from one workspace.", pal: P.teal   },
   { q:"What's the difference between Basic, Starter, and Pro?",
-    a:"Basic ($14.99/mo) gives you the full outreach toolkit — AI enrichment, scoring, email + LinkedIn outreach, reply tracking, and meetings — for leads you bring in yourself (CSV import). Starter ($69/mo) adds automated lead discovery, so Nxelio finds new leads for you (300/month), plus a bigger AI-credit allowance (300/month). Pro ($149/mo) raises both to 1,000/month and adds priority support. Every plan includes the same core feature set — higher tiers mainly unlock automated discovery and more monthly volume.", pal: P.violet },
+    a:"Basic ($14.99/mo) gives you the full outreach toolkit — AI enrichment, scoring, email + LinkedIn outreach, reply tracking, and meetings — for leads you bring in yourself (CSV import). Starter ($149.99/mo) adds automated lead discovery, so Nxelio finds new leads for you (1,000/month), plus a bigger AI-credit allowance (300/month). Pro ($299.99/mo) raises discovery to 2,000/month and AI credits to 1,000/month, and adds priority support. Every plan includes the same core feature set — higher tiers mainly unlock automated discovery and more monthly volume.", pal: P.violet },
   { q:"How do AI credits work?",               a:"Each AI action (generating email copy, scoring a lead, enriching a contact) uses credits. Basic gives 200/month, Starter 300/month, Pro 1,000/month. Unused monthly credits reset at renewal — they don't roll over.", pal: P.blue   },
   { q:"What's the difference between lead discovery and enrichment/scoring?",
     a:"Discovery is Nxelio finding brand-new leads for you automatically (Starter and Pro only — Basic brings your own via CSV). Enrichment and scoring work on leads you already have, regardless of how they got there — enrichment fills in company/contact details, scoring ranks how promising a lead is. Enrichment and scoring are included on every plan, including Basic.", pal: P.coral  },
   { q:"What is reply tracking?",               a:"Reply tracking shows you opens, clicks, and replies on every email you send, right in your Smart Inbox — so you always know who's engaging before you follow up. It's included on every plan.", pal: P.green  },
-  { q:"What are Lead Top-Ups, and can I buy leads without upgrading?",
-    a:"A Lead Top-Up is a one-time purchase of 1,000 extra AI-discovered leads for $149, available on Starter and Pro (monthly or annual billing) — no plan change required beyond already being on one of those tiers. It's not available on Basic, since Basic doesn't include automated lead discovery. Purchased leads are added to your account instantly and tracked separately from your monthly plan allowance, so they never expire when your monthly leads reset — only when you actually use them. Limited to one top-up per calendar month; if you need more, you can buy another starting the following month.", pal: P.amber  },
   { q:"How do promo codes and coupons work?",  a:"Enter a code at checkout or when upgrading your plan. Depending on the code, it can apply a percentage or fixed-amount discount to your subscription price, grant bonus AI credits, grant bonus leads, or some combination — we'll show you exactly what a code does before you confirm. Each code can only be redeemed once per account, and every redemption is recorded in your billing history.", pal: P.pink },
   { q:"Does Basic include a free trial?",      a:"Yes — Basic on monthly billing includes a 7-day free trial with 200 AI credits. A card is required to start the trial, but you won't be charged until day 7, and you can cancel anytime before then at no cost. Annual billing doesn't include a trial. You get full access to leads, campaigns, inbox, and capture forms during the trial.", pal: P.orange },
   { q:"How does annual billing work?",         a:"Switching to annual billing gets you 20% off every plan, billed once a year instead of monthly. All the same features and monthly credit/lead allowances apply — the discount is purely on price.", pal: P.teal   },
@@ -1015,7 +1013,7 @@ function Pricing() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
           {PLANS.map((plan) => {
             const price = annual
-              ? (Number(plan.price) * 0.8).toFixed(Number(plan.price) < 10 ? 2 : 0)
+              ? (Number(plan.price) * 0.8).toFixed(2)
               : plan.price;
 
             return (
@@ -1079,27 +1077,8 @@ function Pricing() {
             );
           })}
         </div>
-        {/* Need More Leads? */}
-        <div className="mt-10 rounded-3xl border p-8 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6"
-          style={{ background:"linear-gradient(135deg,#EDE7F6,#E0F7FA)", borderColor:"#D1C4E9" }}>
-          <div className="text-center sm:text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-3"
-              style={{ background:"white", color:"#7E57C2" }}>
-              <Target className="h-3 w-3"/> Need More Leads?
-            </div>
-            <h3 className="text-2xl font-black text-slate-900 mb-1.5">Running low before your next renewal?</h3>
-            <p className="text-sm text-slate-600 max-w-md">
-              Buy 1,000 extra AI-discovered leads for a one-time $149 — on Starter or Pro. Added instantly and kept separate from your monthly allowance. Limited to one top-up per calendar month.
-            </p>
-          </div>
-          <Link href="/signup"
-            className="shrink-0 inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl font-bold text-sm text-white transition-all hover:scale-[1.02]"
-            style={{ background:"linear-gradient(135deg,#7E57C2,#18A7B8)", boxShadow:"0 8px 24px rgba(126,87,194,.35)" }}>
-            Get Started <ArrowRight className="h-4 w-4"/>
-          </Link>
-        </div>
         <p className="text-center text-sm text-slate-400 mt-6">
-          Manage top-ups, promo codes, and billing anytime from your billing dashboard.
+          Manage promo codes and billing anytime from your billing dashboard.
         </p>
       </div>
     </section>

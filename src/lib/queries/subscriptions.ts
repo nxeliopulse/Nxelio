@@ -54,7 +54,7 @@ export async function canAffordLeads(amount = 1): Promise<boolean> {
   const sub = await getSubscription();
   if (!sub) return false;
   if (sub.status !== "active" && sub.status !== "trialing") return false;
-  return sub.leads_remaining + sub.topup_leads_remaining >= amount;
+  return sub.leads_remaining >= amount;
 }
 
 export async function getCreditHistory(limit = 50, resourceType?: "credits" | "leads") {
@@ -97,7 +97,7 @@ export async function deductCredits(
   return data as DeductResult;
 }
 
-/** Deducts from the monthly lead-discovery allowance first, then purchased top-up leads. */
+/** Deducts from the monthly lead-discovery allowance. */
 export async function deductLeads(
   amount = 1,
   metadata: Record<string, unknown> = {}
