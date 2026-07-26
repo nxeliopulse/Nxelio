@@ -6,6 +6,7 @@ import { getCurrentUserProfile } from "@/lib/queries/users";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { parseCampaignSteps, sendCampaignStepToLead, scheduleCampaignFollowups, fromNameForWorkspace, AUDIENCE_COLS, type StepLead } from "@/lib/email/campaign-scheduler";
+import { consumeSendQuota } from "@/lib/outreach/send-quota";
 import { revalidatePath } from "next/cache";
 
 const MAX_PER_SEND = 300;
@@ -16,6 +17,8 @@ export interface CampaignSendResult {
   failed: number;
   skipped: number;
   scheduled: number;
+  /** Leads held back by today's daily sending limit — queued to send once quota frees up. */
+  deferred?: number;
   simulated?: boolean;
   error?: string;
 }
@@ -65,12 +68,20 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
   // From Name recipients see = the workspace's company name (or "Nxelio").
   const fromName = await fromNameForWorkspace(supabase, workspaceId);
 
-  let sent = 0, failed = 0, skipped = 0, scheduled = 0, simulated = false;
+  let sent = 0, failed = 0, skipped = 0, scheduled = 0, deferred = 0, simulated = false;
   let lastError: string | undefined;
   const launchMs = Date.now();
   const hasFollowups = steps.length > 1;
 
-  for (const lead of leads.slice(0, MAX_PER_SEND)) {
+  // Daily sending limit (Settings > Email / LinkedIn — opt-in, see migration
+  // 0070). No limit configured for this channel → allowedNow === batch.length,
+  // i.e. today's existing unthrottled behavior, unchanged.
+  const batch = leads.slice(0, MAX_PER_SEND);
+  const allowedNow = await consumeSendQuota(supabase, workspaceId, step1.channel, batch.length);
+  const sendNow = batch.slice(0, allowedNow);
+  const deferToday = batch.slice(allowedNow);
+
+  for (const lead of sendNow) {
     const r = await sendCampaignStepToLead(supabase, { campaignId, workspaceId, lead, subject: step1.subject, body: step1.body, senderName, fromName, channel: step1.channel, action: step1.action });
     if (r.ok) { sent++; if (r.simulated) simulated = true; }
     else if (r.skipped) { skipped++; lastError = r.error || lastError; }
@@ -80,6 +91,27 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
     if (hasFollowups) {
       await scheduleCampaignFollowups(supabase, { campaignId, workspaceId, leadId: lead.id, steps, launchMs });
       scheduled += steps.length - 1;
+    }
+  }
+
+  // Leads beyond today's quota: queue their opener as a step-1 job instead of
+  // sending it now, so the per-minute cron delivers it once quota frees up
+  // rather than silently dropping them. Follow-ups still queue relative to
+  // launch, same as sent/skipped/failed leads above.
+  if (deferToday.length) {
+    await supabase.from("campaign_jobs").insert(deferToday.map((lead) => ({
+      campaign_id: campaignId, workspace_id: workspaceId, lead_id: lead.id,
+      step_order: 1, channel: step1.channel, action: step1.action,
+      subject: step1.subject, body: step1.body,
+      run_at: new Date(launchMs + 24 * 60 * 60 * 1000).toISOString(),
+      status: "pending",
+    })));
+    deferred = deferToday.length;
+    if (hasFollowups) {
+      for (const lead of deferToday) {
+        await scheduleCampaignFollowups(supabase, { campaignId, workspaceId, leadId: lead.id, steps, launchMs });
+        scheduled += steps.length - 1;
+      }
     }
   }
 
@@ -101,7 +133,7 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
   await notifyCurrentUser({
     type: "email",
     title: `Campaign "${campaign.campaign_name}" sent`,
-    message: `${sent} sent${scheduled ? `, ${scheduled} follow-ups scheduled` : ""}${failed ? `, ${failed} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}.`,
+    message: `${sent} sent${scheduled ? `, ${scheduled} follow-ups scheduled` : ""}${failed ? `, ${failed} failed` : ""}${skipped ? `, ${skipped} skipped` : ""}${deferred ? `, ${deferred} queued for tomorrow (daily limit reached)` : ""}.`,
     link: "/campaigns",
   });
   await logAudit({
@@ -109,14 +141,16 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
     entityType: "campaign",
     entityId: campaign.id,
     entityLabel: campaign.campaign_name,
-    metadata: { sent, failed, skipped, scheduled },
+    metadata: { sent, failed, skipped, scheduled, deferred },
   });
 
   revalidatePath("/campaigns");
   revalidatePath(`/campaigns/${campaignId}`);
   const channelLabel = step1.channel === "linkedin" ? "LinkedIn messages" : "emails";
-  const noneSentError = lastError ? `No ${channelLabel} were sent — ${lastError}` : `No ${channelLabel} were sent.`;
-  return { ok: sent > 0, sent, failed, skipped, scheduled, simulated, error: sent === 0 ? noneSentError : undefined };
+  const noneSentError = deferred
+    ? `Today's ${channelLabel} sending limit is already reached — all ${deferred} will send automatically once it resets.`
+    : lastError ? `No ${channelLabel} were sent — ${lastError}` : `No ${channelLabel} were sent.`;
+  return { ok: sent > 0 || deferred > 0, sent, failed, skipped, scheduled, deferred, simulated, error: sent === 0 && deferred === 0 ? noneSentError : undefined };
 }
 
 /**

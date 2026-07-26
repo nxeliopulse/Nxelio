@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { MailboxConnections } from "@/components/settings/mailbox-connections";
 import { LinkedInConnections } from "@/components/settings/linkedin-connections";
 import { CalendarConnections } from "@/components/settings/calendar-connections";
+import { SendLimitPanel } from "@/components/settings/send-limit-panel";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
+import type { SendLimitRow } from "@/lib/queries/outreach-send-limits";
 
 /**
  * Split into three separate connector panels (Email / LinkedIn / Calendar) —
@@ -31,12 +33,14 @@ export function EmailConnectorView({
   emailSendingActive,
   mailboxAccounts,
   connectorReady,
+  sendLimit,
 }: {
   isSuperAdmin: boolean;
   /** Whether outbound email is actually reaching real recipients (vs. simulated) — never names the backend vendor. */
   emailSendingActive: boolean;
   mailboxAccounts: OutreachAccountRow[];
   connectorReady: boolean;
+  sendLimit: SendLimitRow | null;
 }) {
   return (
     <div className="space-y-4">
@@ -65,6 +69,7 @@ export function EmailConnectorView({
 
         <fieldset disabled={!isSuperAdmin} className={!isSuperAdmin ? "opacity-60 pointer-events-none" : ""}>
           <MailboxConnections accounts={mailboxAccounts} unipileConfigured={connectorReady} />
+          <SendLimitPanel channel="email" initial={sendLimit} label="emails" />
         </fieldset>
       </Card>
     </div>
@@ -75,10 +80,12 @@ export function LinkedInConnectorView({
   isSuperAdmin,
   linkedinAccounts,
   connectorReady,
+  sendLimit,
 }: {
   isSuperAdmin: boolean;
   linkedinAccounts: OutreachAccountRow[];
   connectorReady: boolean;
+  sendLimit: SendLimitRow | null;
 }) {
   return (
     <div className="space-y-4">
@@ -93,6 +100,7 @@ export function LinkedInConnectorView({
         </div>
         <fieldset disabled={!isSuperAdmin} className={!isSuperAdmin ? "opacity-60 pointer-events-none" : ""}>
           <LinkedInConnections accounts={linkedinAccounts} connectorReady={connectorReady} />
+          <SendLimitPanel channel="linkedin" initial={sendLimit} label="LinkedIn actions" />
         </fieldset>
       </Card>
     </div>

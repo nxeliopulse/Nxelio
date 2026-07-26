@@ -154,7 +154,10 @@ export function CampaignDetailView({
     setSending(true);
     try {
       const res = await sendCampaign(campaign.id);
-      if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
+      if (res.ok) {
+        toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.deferred ? `, ${res.deferred} queued for tomorrow (daily limit reached)` : ""}${res.simulated ? " (simulated)" : ""}.`, "success");
+        router.refresh();
+      }
       else toast(res.error || "No emails were sent.", "error");
     } catch (err) {
       toast(err instanceof Error ? err.message : "Send failed. Try again.", "error");

@@ -305,6 +305,34 @@ html, body {
   .lp-progress-active { animation: none; }
 }
 
+/* Dual-handle range slider (DualRangeSlider) — two overlapping native
+   <input type="range"> elements share one visible track, so only the thumbs
+   themselves need custom styling; the native track is hidden. */
+.lp-range-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  background: #1d4ed8;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.lp-range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  background: #1d4ed8;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.lp-range-thumb::-webkit-slider-runnable-track { -webkit-appearance: none; background: transparent; }
+.lp-range-thumb::-moz-range-track { background: transparent; }
+
 /* ============================================================================
    Nxelio Landing Page — additional animations
    ============================================================================ */

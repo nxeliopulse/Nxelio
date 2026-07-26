@@ -7,6 +7,7 @@ import { parseDelay, delayToMinutes } from "@/lib/sequence-delay";
 import {
   unipileConfigured, unipileResolveProfile, unipileSendInvite, unipileSendLinkedInMessage,
 } from "@/lib/outreach/unipile";
+import { consumeSendQuota } from "@/lib/outreach/send-quota";
 
 // Loosely-typed client — both the authenticated and admin clients expose the same query API.
 type Db = SupabaseClient;
@@ -243,7 +244,7 @@ export async function fromNameForWorkspace(db: Db, workspaceId: string): Promise
   }
 }
 
-export interface CampaignProcessResult { processed: number; sent: number; failed: number; skipped: number }
+export interface CampaignProcessResult { processed: number; sent: number; failed: number; skipped: number; deferred: number }
 
 /**
  * Drains due campaign follow-up jobs. Called by the per-minute cron alongside
@@ -253,7 +254,7 @@ export interface CampaignProcessResult { processed: number; sent: number; failed
 export async function processDueCampaignJobs(limit = 50): Promise<CampaignProcessResult> {
   const db = createAdminClient();
   const nowIso = new Date().toISOString();
-  const result: CampaignProcessResult = { processed: 0, sent: 0, failed: 0, skipped: 0 };
+  const result: CampaignProcessResult = { processed: 0, sent: 0, failed: 0, skipped: 0, deferred: 0 };
 
   const { data: jobs } = await db
     .from("campaign_jobs")
@@ -349,13 +350,24 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
     }
 
     const wsId = (campaign.workspace_id as string) || (job.workspace_id as string);
+    const jobChannel: StepChannel = (job.channel as StepChannel) || "email";
+
+    // Daily sending limit (Settings > Email / LinkedIn, opt-in — see migration
+    // 0070). No limit configured → always granted, i.e. unchanged behavior.
+    const granted = await consumeSendQuota(db, wsId, jobChannel, 1);
+    if (granted < 1) {
+      await db.from("campaign_jobs").update({ run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), updated_at: nowIso }).eq("id", job.id);
+      result.deferred++;
+      continue;
+    }
+
     const r = await sendCampaignStepToLead(db, {
       campaignId: job.campaign_id,
       workspaceId: wsId,
       lead: lead as unknown as StepLead,
       subject: job.subject || "",
       body: job.body || "",
-      channel: (job.channel as StepChannel) || "email",
+      channel: jobChannel,
       action: (job.action as StepAction) || "email",
       fromName: await getFromName(wsId),
     });

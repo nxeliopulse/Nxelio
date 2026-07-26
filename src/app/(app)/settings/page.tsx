@@ -5,10 +5,11 @@ import { getCalendarAccounts, getCalendarProviderStatus } from "@/lib/queries/ca
 import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach-accounts";
 import { getCurrentWorkspace } from "@/lib/queries/workspaces";
 import { getAuditLog } from "@/lib/queries/audit-log";
+import { getSendLimit } from "@/lib/queries/outreach-send-limits";
 import { SettingsView } from "@/components/settings/settings-view";
 
 export default async function SettingsPage() {
-  const [profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, outreachAccounts, unipileConfigured, workspace] = await Promise.all([
+  const [profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, outreachAccounts, unipileConfigured, workspace, emailSendLimit, linkedinSendLimit] = await Promise.all([
     getCurrentUserProfile(),
     getEmailDomainStatus(),
     getBlocklist(),
@@ -17,6 +18,8 @@ export default async function SettingsPage() {
     getOutreachAccounts(),
     isUnipileConfigured(),
     getCurrentWorkspace(),
+    getSendLimit("email"),
+    getSendLimit("linkedin"),
   ]);
   const mailboxAccounts = outreachAccounts.filter((a) => a.channel === "email");
   const linkedinAccounts = outreachAccounts.filter((a) => a.channel === "linkedin");
@@ -36,6 +39,8 @@ export default async function SettingsPage() {
       bookingSlug={workspace?.capture_slug ?? null}
       isSuperAdmin={isSuperAdmin}
       auditLog={auditLog}
+      emailSendLimit={emailSendLimit}
+      linkedinSendLimit={linkedinSendLimit}
     />
   );
 }

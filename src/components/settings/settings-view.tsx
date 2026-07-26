@@ -6,6 +6,7 @@ import { Linkedin } from "@/components/outreach/linkedin-icon";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 import { syncOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type { AuditLogRow } from "@/lib/queries/audit-log";
+import type { SendLimitRow } from "@/lib/queries/outreach-send-limits";
 import { EmailConnectorView, LinkedInConnectorView, CalendarConnectorView } from "@/components/settings/connectors-view";
 import { AuditLogView } from "@/components/settings/audit-log-view";
 import { Input, Select } from "@/components/ui/input";
@@ -44,9 +45,11 @@ interface Props {
   bookingSlug?: string | null;
   isSuperAdmin: boolean;
   auditLog: AuditLogRow[];
+  emailSendLimit: SendLimitRow | null;
+  linkedinSendLimit: SendLimitRow | null;
 }
 
-export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog }: Props) {
+export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit }: Props) {
   const router = useRouter();
   const [active, setActive] = useState("profile");
   const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
@@ -264,6 +267,7 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
               emailSendingActive={emailDomain.verified}
               mailboxAccounts={mailboxAccounts}
               connectorReady={unipileConfigured}
+              sendLimit={emailSendLimit}
             />
           )}
 
@@ -272,6 +276,7 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
               isSuperAdmin={isSuperAdmin}
               linkedinAccounts={linkedinAccounts}
               connectorReady={unipileConfigured}
+              sendLimit={linkedinSendLimit}
             />
           )}
 
