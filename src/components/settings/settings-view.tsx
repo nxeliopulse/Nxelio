@@ -6,6 +6,7 @@ import { Linkedin } from "@/components/outreach/linkedin-icon";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 import { syncOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type { AuditLogRow } from "@/lib/queries/audit-log";
+import type { SendLimitRow } from "@/lib/queries/outreach-send-limits";
 import { EmailConnectorView, LinkedInConnectorView, CalendarConnectorView } from "@/components/settings/connectors-view";
 import { AuditLogView } from "@/components/settings/audit-log-view";
 import { Input, Select } from "@/components/ui/input";
@@ -57,6 +58,8 @@ interface Props {
   bookingSlug?: string | null;
   isSuperAdmin: boolean;
   auditLog: AuditLogRow[];
+  emailSendLimit: SendLimitRow | null;
+  linkedinSendLimit: SendLimitRow | null;
 }
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -119,7 +122,7 @@ const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
   { id: "amber", name: "Amber", bg: "bg-amber-600" },
 ];
 
-export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog }: Props) {
+export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit }: Props) {
   const router = useRouter();
   const [active, setActive] = useState("profile");
   const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
@@ -127,9 +130,11 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get("section");
     if (s && visibleSections.some((sec) => sec.id === s)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
       setActive(s);
     }
-  }, [visibleSections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount; visibleSections is derived from a prop that doesn't change after mount
+  }, []);
 
   useEffect(() => {
     const connected = new URLSearchParams(window.location.search).get("connected");
@@ -159,6 +164,7 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
   const [showSidebarModal, setShowSidebarModal] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from localStorage on mount (SSR has no access to it)
     setAppearance(getStoredAppearance());
   }, []);
 
@@ -532,6 +538,7 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
               emailSendingActive={emailDomain.verified}
               mailboxAccounts={mailboxAccounts}
               connectorReady={unipileConfigured}
+              sendLimit={emailSendLimit}
             />
           )}
 
@@ -540,6 +547,7 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
               isSuperAdmin={isSuperAdmin}
               linkedinAccounts={linkedinAccounts}
               connectorReady={unipileConfigured}
+              sendLimit={linkedinSendLimit}
             />
           )}
 

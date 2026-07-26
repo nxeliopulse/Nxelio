@@ -23,7 +23,6 @@ function LoginForm() {
   const [error, setError]         = useState<string | null>(null);
   const [notice, setNotice]       = useState<string | null>(null);
   const [loading, setLoading]     = useState(false);
-  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     const e = params.get("error");
@@ -34,20 +33,10 @@ function LoginForm() {
       setNotice("Email verified — sign in below.");
       if (verifiedEmail) setForm((f) => ({ ...f, email: verifiedEmail }));
     }
+    if (params.get("reset") === "1") {
+      setNotice("Password updated — sign in with your new password.");
+    }
   }, [params]);
-
-  async function handleForgotPassword() {
-    setError(null); setNotice(null);
-    if (!form.email.includes("@")) { setError('Enter your email first, then click "Forgot password?"'); return; }
-    setResetting(true);
-    const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(form.email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
-    });
-    setResetting(false);
-    if (resetError) { setError(resetError.message); return; }
-    setNotice(`Reset link sent to ${form.email}. Check your inbox.`);
-  }
 
   const valid = form.email.includes("@") && form.password.length >= 6;
 
@@ -134,11 +123,12 @@ function LoginForm() {
 
         {/* Forgot */}
         <div className="flex justify-end">
-          <button type="button" onClick={handleForgotPassword} disabled={resetting}
-            className="text-xs font-semibold hover:underline disabled:opacity-50 transition-colors"
+          <Link
+            href={`/forgot-password${form.email.includes("@") ? `?email=${encodeURIComponent(form.email)}` : ""}`}
+            className="text-xs font-semibold hover:underline transition-colors"
             style={{ color:"#18A7B8" }}>
-            {resetting ? "Sending…" : "Forgot password?"}
-          </button>
+            Forgot password?
+          </Link>
         </div>
 
         {/* Submit */}
