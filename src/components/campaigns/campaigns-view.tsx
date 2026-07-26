@@ -52,7 +52,7 @@ export function CampaignsView({
   isApprover: boolean;
   owners: Record<string, string>;
 }) {
-  const { confirm, toast } = useFeedback();
+  const { confirm, toast, prompt } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [search, setSearch] = useState("");
@@ -162,9 +162,16 @@ export function CampaignsView({
       }
     });
   }
-  function handleSendBack(r: UnifiedRow) {
+  async function handleSendBack(r: UnifiedRow) {
     setOpenId(null);
-    const comment = window.prompt(`Why is "${r.name}" being sent back to draft?`);
+    const comment = await prompt({
+      title: "Send back to draft",
+      message: `Why is "${r.name}" being sent back to draft?`,
+      label: "Reason",
+      placeholder: "e.g. Needs a subject line change",
+      confirmLabel: "Send back",
+      required: true,
+    });
     if (comment === null) return;
     start(async () => {
       try {

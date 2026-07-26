@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type ToastType = "success" | "error" | "info";
 
@@ -20,11 +21,27 @@ export interface ConfirmOptions {
   danger?: boolean;
 }
 
+export interface PromptOptions {
+  title?: string;
+  /** Optional helper text shown above the input */
+  message?: string;
+  /** Label for the input field itself */
+  label?: string;
+  placeholder?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  /** Blocks submitting until at least one non-whitespace character is entered */
+  required?: boolean;
+}
+
 interface FeedbackContextValue {
   /** Show a transient in-app toast (replaces window.alert). */
   toast: (message: string, type?: ToastType) => void;
   /** Show an in-app confirm dialog (replaces window.confirm). Resolves true/false. */
   confirm: (opts: ConfirmOptions | string) => Promise<boolean>;
+  /** Show an in-app text-input dialog (replaces window.prompt). Resolves the entered
+   *  text, or null if canceled. */
+  prompt: (opts: PromptOptions | string) => Promise<string | null>;
 }
 
 const FeedbackContext = createContext<FeedbackContextValue | null>(null);
@@ -44,6 +61,8 @@ const toastStyles: Record<ToastType, { icon: React.ReactNode; ring: string }> = 
 export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [confirmState, setConfirmState] = useState<{ opts: ConfirmOptions; resolve: (v: boolean) => void } | null>(null);
+  const [promptState, setPromptState] = useState<{ opts: PromptOptions; resolve: (v: string | null) => void } | null>(null);
+  const [promptValue, setPromptValue] = useState("");
   const idRef = useRef(0);
 
   const dismiss = useCallback((id: number) => {
@@ -61,13 +80,29 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
     return new Promise<boolean>((resolve) => setConfirmState({ opts: o, resolve }));
   }, []);
 
+  const prompt = useCallback((opts: PromptOptions | string) => {
+    const o: PromptOptions = typeof opts === "string" ? { message: opts } : opts;
+    setPromptValue("");
+    return new Promise<string | null>((resolve) => setPromptState({ opts: o, resolve }));
+  }, []);
+
   function settle(v: boolean) {
     confirmState?.resolve(v);
     setConfirmState(null);
   }
 
+  function settlePrompt(v: string | null) {
+    promptState?.resolve(v);
+    setPromptState(null);
+  }
+
+  function submitPrompt() {
+    if (promptState?.opts.required && !promptValue.trim()) return;
+    settlePrompt(promptValue);
+  }
+
   return (
-    <FeedbackContext.Provider value={{ toast, confirm }}>
+    <FeedbackContext.Provider value={{ toast, confirm, prompt }}>
       {children}
 
       {/* Toast stack */}
@@ -113,6 +148,40 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
               </Button>
               <Button variant={confirmState.opts.danger ? "danger" : "primary"} onClick={() => settle(true)}>
                 {confirmState.opts.confirmLabel || "Confirm"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prompt dialog (replaces window.prompt) */}
+      {promptState && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => settlePrompt(null)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{ animation: "lp-toast-in .18s ease-out" }}
+            className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-5"
+          >
+            <p className="font-semibold text-slate-900">{promptState.opts.title || "Add a note"}</p>
+            {promptState.opts.message && <p className="text-sm text-slate-600 mt-1">{promptState.opts.message}</p>}
+            <div className="mt-3">
+              {promptState.opts.label && <label className="block text-xs font-medium text-slate-600 mb-1">{promptState.opts.label}</label>}
+              <Input
+                autoFocus
+                value={promptValue}
+                onChange={(e) => setPromptValue(e.target.value)}
+                placeholder={promptState.opts.placeholder}
+                onKeyDown={(e) => { if (e.key === "Enter") submitPrompt(); if (e.key === "Escape") settlePrompt(null); }}
+              />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => settlePrompt(null)}>
+                {promptState.opts.cancelLabel || "Cancel"}
+              </Button>
+              <Button onClick={submitPrompt} disabled={Boolean(promptState.opts.required) && !promptValue.trim()}>
+                {promptState.opts.confirmLabel || "Submit"}
               </Button>
             </div>
           </div>
