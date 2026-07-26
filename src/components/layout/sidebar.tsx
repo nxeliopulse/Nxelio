@@ -81,76 +81,78 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
   return (
     <aside
       className={cn(
-        "hidden lg:flex h-screen sticky top-0 bg-blue-600 overflow-hidden transition-[width] duration-300 ease-in-out flex-shrink-0",
+        "hidden lg:flex h-screen sticky top-0 bg-[#1a2027] overflow-hidden transition-[width] duration-300 ease-in-out flex-shrink-0 z-40",
         collapsed ? COLLAPSED : EXPANDED
       )}
     >
       <div className="w-full flex flex-col h-full">
-        {/* Header */}
-        <div className={cn("h-16 flex items-center flex-shrink-0", collapsed ? "justify-center px-2" : "px-4")}>
+        {/* Header Logo */}
+        <div className={cn("h-14 flex items-center flex-shrink-0", collapsed ? "justify-center px-2" : "px-4")}>
           <button
             type="button"
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             suppressHydrationWarning
-            className="flex items-center gap-2.5 group"
+            className="flex items-center gap-2.5 group w-full"
           >
-            <span className="relative h-11 w-11 rounded-2xl bg-white/15 flex items-center justify-center ring-1 ring-white/20 flex-shrink-0 group-hover:bg-white/20 transition-colors">
-              <LogoMark className="h-[22px] w-[22px] text-white transition-opacity group-hover:opacity-0" />
-              <PanelLeftClose className={cn("absolute h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity", collapsed && "hidden")} />
-              <PanelLeftOpen className={cn("absolute h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity", !collapsed && "hidden")} />
+            <span className="relative h-9 w-9 rounded-xl bg-orange-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+              <LogoMark className="h-5 w-5 text-white" />
+              <PanelLeftClose className={cn("absolute h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity", collapsed && "hidden")} />
+              <PanelLeftOpen className={cn("absolute h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity", !collapsed && "hidden")} />
             </span>
             {!collapsed && (
               <span className="flex flex-col leading-none whitespace-nowrap text-left">
-                <span className="font-bold text-white text-lg tracking-tight">
+                <span className="font-bold text-white text-base tracking-tight">
                   Nxelio
                 </span>
-                <span className="text-[10px] text-white/50 font-medium uppercase tracking-[0.12em]">AI Engagement</span>
+                <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">AI Engagement</span>
               </span>
             )}
           </button>
         </div>
 
-        <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-6", collapsed ? "px-2" : "px-3")}>
+        <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-5", collapsed ? "px-2" : "px-3")}>
           <div>
-            {!collapsed && <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">Workspace</p>}
-            <ul className="space-y-1.5">{main.map((item) => renderItem(item, false))}</ul>
+            {!collapsed && <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Main Menu</p>}
+            <ul className="space-y-1">{main.map((item) => renderItem(item, false))}</ul>
           </div>
 
           {admin.length > 0 && (
             <div>
-              {!collapsed && <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">Admin</p>}
-              <ul className="space-y-1.5">{admin.map((item) => renderItem(item, true))}</ul>
+              {!collapsed && <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Admin</p>}
+              <ul className="space-y-1">{admin.map((item) => renderItem(item, true))}</ul>
             </div>
           )}
         </nav>
 
+        {/* Bottom Upgrade CTA card */}
         <div className={cn("py-3 space-y-2 flex-shrink-0", collapsed ? "px-2" : "px-3")}>
-          {/* AI credits */}
           {collapsed ? (
             <div className="flex justify-center">
               <Link
                 href="/billing"
-                title={credits ? `Subscription and Payments — ${credits.used}/${credits.total} used` : "Subscription and Payments"}
-                className="flex items-center justify-center h-11 w-11 rounded-2xl bg-white/15 text-white hover:bg-white/20 transition-colors ring-1 ring-white/20"
+                title="Upgrade to Starter"
+                className="flex items-center justify-center h-10 w-10 rounded-xl bg-teal-600 hover:bg-teal-500 text-white transition-colors"
               >
-                <Sparkles className="h-5 w-5" />
+                <Sparkles className="h-4.5 w-4.5" />
               </Link>
             </div>
           ) : (
-            <div className="bg-white/10 rounded-2xl p-4 text-white overflow-hidden ring-1 ring-white/15">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="bg-[#0f4d4a] rounded-xl p-3 text-white overflow-hidden border border-[#186a66]">
+              <div className="flex items-center gap-1.5 mb-1 text-teal-200">
                 <Sparkles className="h-4 w-4 flex-shrink-0" />
-                <p className="font-semibold text-sm">Subscription and Payments</p>
+                <p className="font-bold text-xs">Upgrade to Starter</p>
               </div>
-              <p className="text-xs text-white/60 mb-2 whitespace-nowrap">
-                {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} used` : "Loading..."}
+              <p className="text-[11px] text-teal-100/70 mb-2 leading-tight">
+                {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} credits used` : "Unlock full CRM features"}
               </p>
-              <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-                <div className="h-full bg-white rounded-full transition-all" style={{ width: credits ? `${Math.min(100, Math.round((credits.used / credits.total) * 100))}%` : "0%" }} />
-              </div>
-              <Link href="/billing" className="mt-3 inline-block text-xs font-medium text-white/70 hover:text-white whitespace-nowrap">Upgrade plan →</Link>
+              <Link
+                href="/billing"
+                className="block text-center w-full py-1.5 rounded-lg bg-white hover:bg-teal-50 text-teal-900 font-semibold text-xs transition-colors"
+              >
+                Learn more
+              </Link>
             </div>
           )}
 
@@ -160,17 +162,17 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
               <Link
                 href="/help"
                 title="Help & Support"
-                className="flex items-center justify-center h-11 w-11 rounded-2xl text-white/50 hover:bg-white/10 hover:text-white transition-colors"
+                className="flex items-center justify-center h-10 w-10 rounded-xl text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
               >
-                <HelpCircle className="h-5 w-5" />
+                <HelpCircle className="h-4.5 w-4.5" />
               </Link>
             </div>
           ) : (
             <Link
               href="/help"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
             >
-              <HelpCircle className="h-5 w-5 flex-shrink-0" />
+              <HelpCircle className="h-4 w-4 flex-shrink-0" />
               <span className="whitespace-nowrap">Help &amp; Support</span>
             </Link>
           )}

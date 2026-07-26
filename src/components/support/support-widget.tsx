@@ -197,6 +197,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close support" : "Open support"}
         title="Help & Support"
+        suppressHydrationWarning
         className={`fixed bottom-6 z-40 h-14 w-14 rounded-full bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/40 flex items-center justify-center hover:scale-105 active:scale-95 transition-[right,transform] duration-300 ease-in-out ${assistantOpen ? (assistantExpanded ? "right-6 sm:right-[564px]" : "right-6 sm:right-[424px]") : "right-6"}`}
       >
         {open ? <X className="h-6 w-6" /> : <span className="text-[26px] font-bold leading-none" aria-hidden="true">?</span>}
