@@ -41,13 +41,13 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   }
 
   return (
-    <header className="h-14 bg-[#1e242b] border-b border-[#2d3540] px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-3 sticky top-0 z-30 text-slate-200 shadow-sm">
+    <header className="h-14 bg-[var(--primary)] border-b border-white/10 px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-3 sticky top-0 z-30 text-white shadow-sm">
       {/* Left side: hamburger (mobile) */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {/* Hamburger — mobile/tablet only */}
         <button
           onClick={toggleMobile}
-          className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 text-slate-300 flex-shrink-0"
+          className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 text-white/80 flex-shrink-0"
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
@@ -59,9 +59,9 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         {/* Upgrade pill */}
         <Link
           href="/billing"
-          className="hidden sm:flex items-center gap-1 px-3 py-1 rounded-full bg-[#2b323c] hover:bg-[#3a4451] border border-[#3a4451] text-xs font-medium text-slate-200 hover:text-white transition-colors"
+          className="hidden sm:flex items-center gap-1 px-3 py-1 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-medium text-white transition-colors"
         >
-          <ArrowUpRight className="h-3.5 w-3.5 text-amber-400" />
+          <ArrowUpRight className="h-3.5 w-3.5 text-amber-300" />
           <span>Upgrade</span>
         </Link>
 
@@ -69,7 +69,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <button
           onClick={() => router.push("/meetings")}
           title="Phone / Calling"
-          className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+          className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
           <Phone className="h-4 w-4" />
         </button>
@@ -78,7 +78,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <button
           onClick={() => router.push("/settings?section=email")}
           title="App Marketplace & Integrations"
-          className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+          className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
           <ShoppingBag className="h-4 w-4" />
         </button>
@@ -87,7 +87,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <Link
           href="/help"
           title="Help & Support"
-          className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+          className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
           <HelpCircle className="h-4 w-4" />
         </Link>
@@ -96,24 +96,22 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <Link
           href="/settings"
           title="Settings"
-          className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+          className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
           <Settings className="h-4 w-4" />
         </Link>
 
         {/* Notifications bell */}
-        <NotificationsBell className="h-8 w-8 rounded-full bg-[#2b323c] hover:bg-[#3a4451] border border-[#3a4451] text-slate-300" />
+        <NotificationsBell className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white" />
 
-        <div className="h-4 w-px bg-[#3a4451] mx-0.5" />
+        <div className="h-4 w-px bg-white/20 mx-0.5" />
 
         {/* AI Assistant button */}
         <button
           onClick={onToggleAssistant}
           aria-label={assistantOpen ? "Close AI assistant" : "Open AI assistant"}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-white transition-all ${
-            assistantOpen
-              ? "bg-blue-600 ring-2 ring-blue-400"
-              : "bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:brightness-110"
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-[var(--primary)] bg-white hover:bg-white/90 transition-all ${
+            assistantOpen ? "ring-2 ring-white/70" : ""
           }`}
         >
           <Sparkles className="h-3.5 w-3.5" />
@@ -124,15 +122,15 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         <div className="relative" ref={ref}>
           <button
             onClick={() => setOpen(!open)}
-            className="flex items-center gap-2 pl-1 pr-1.5 py-1 rounded-lg hover:bg-white/10 text-slate-200 transition-colors"
+            className="flex items-center gap-2 pl-1 pr-1.5 py-1 rounded-lg hover:bg-white/10 text-white/90 transition-colors"
           >
             <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
               {initials}
             </div>
-            <span className="hidden lg:inline-block text-xs font-medium max-w-[100px] truncate text-slate-200">
+            <span className="hidden lg:inline-block text-xs font-medium max-w-[100px] truncate text-white/90">
               {userName}
             </span>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+            <ChevronDown className="h-3.5 w-3.5 text-white/70 flex-shrink-0" />
           </button>
 
           {open && (

@@ -28,7 +28,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   underlineLinks: false,
   lightPreset: "light",
   darkPreset: "dark",
-  accentColor: "blue",
+  accentColor: "teal",
   sidebarBadgeStyle: "default",
   sidebarDensity: "default",
 };
@@ -79,7 +79,7 @@ export function applyAppearance(settings: AppearanceSettings) {
   root.setAttribute("data-underline-links", settings.underlineLinks ? "true" : "false");
   root.setAttribute("data-light-preset", settings.lightPreset || "light");
   root.setAttribute("data-dark-preset", settings.darkPreset || "dark");
-  root.setAttribute("data-accent-color", settings.accentColor || "blue");
+  root.setAttribute("data-accent-color", settings.accentColor || "teal");
   root.setAttribute("data-sidebar-badge", settings.sidebarBadgeStyle || "default");
   root.setAttribute("data-sidebar-density", settings.sidebarDensity || "default");
 }

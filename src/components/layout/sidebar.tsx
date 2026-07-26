@@ -90,7 +90,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
   return (
     <aside
       className={cn(
-        "hidden lg:flex h-screen sticky top-0 bg-[#1a2027] overflow-hidden transition-[width] duration-300 ease-in-out flex-shrink-0 z-40",
+        "hidden lg:flex h-screen sticky top-0 bg-[var(--primary)] overflow-hidden transition-[width] duration-300 ease-in-out flex-shrink-0 z-40",
         collapsed ? COLLAPSED : EXPANDED
       )}
     >
@@ -143,23 +143,23 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
               <Link
                 href="/billing"
                 title={`Upgrade to ${nextPlan}`}
-                className="flex items-center justify-center h-10 w-10 rounded-xl bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+                className="flex items-center justify-center h-10 w-10 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-colors"
               >
                 <Sparkles className="h-4.5 w-4.5" />
               </Link>
             </div>
           ) : (
-            <div className="bg-[#0f4d4a] rounded-xl p-3 text-white overflow-hidden border border-[#186a66]">
-              <div className="flex items-center gap-1.5 mb-1 text-teal-200">
+            <div className="bg-white/15 rounded-xl p-3 text-white overflow-hidden border border-white/20">
+              <div className="flex items-center gap-1.5 mb-1 text-white">
                 <Sparkles className="h-4 w-4 flex-shrink-0" />
                 <p className="font-bold text-xs">Upgrade to {nextPlan}</p>
               </div>
-              <p className="text-[11px] text-teal-100/70 mb-2 leading-tight">
+              <p className="text-[11px] text-white/70 mb-2 leading-tight">
                 {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} credits used` : "Unlock full CRM features"}
               </p>
               <Link
                 href="/billing"
-                className="block text-center w-full py-1.5 rounded-lg bg-white hover:bg-teal-50 text-teal-900 font-semibold text-xs transition-colors"
+                className="block text-center w-full py-1.5 rounded-lg bg-white hover:bg-white/90 text-[var(--primary)] font-semibold text-xs transition-colors"
               >
                 Learn more
               </Link>
