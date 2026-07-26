@@ -2,8 +2,8 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  CheckCircle2, Circle, Clock, Flame, LayoutGrid, Lightbulb,
-  Mail, MailOpen, MoreHorizontal, Sliders, Sparkles, Target, TrendingUp,
+  CalendarDays, CheckCircle2, CheckSquare, Circle, Clock, Flame, LayoutGrid, Lightbulb,
+  Mail, MailOpen, MoreHorizontal, Plus, Radio, Settings, Sliders, Sparkles, Target, TrendingUp,
   Users2, Zap, X,
 } from "lucide-react";
 import { useAssistant, DEFAULT_SUGGESTIONS } from "@/components/layout/assistant-context";
@@ -57,6 +57,9 @@ const ORANGE = "#f59e0b";
 
 // ── Widget registry ──────────────────────────────────────────────────────────
 const WIDGET_DEFS = [
+  { id: "meetings",         label: "Meetings Schedule",     desc: "Calendar meetings and timeline" },
+  { id: "tasks",            label: "Tasks & To-Dos",        desc: "Open and completed task list" },
+  { id: "activity_feed",    label: "Activity Feed",         desc: "Real-time engagement activity timeline" },
   { id: "kpi",              label: "KPI Overview",          desc: "Key metrics at a glance" },
   { id: "campaign_perf",    label: "Campaign Performance",  desc: "Opens, clicks & conversions trend" },
   { id: "campaign_types",   label: "Campaign Types",        desc: "Distribution donut chart" },
@@ -75,6 +78,7 @@ type WidgetId = (typeof WIDGET_DEFS)[number]["id"];
 type Visibility = Record<WidgetId, boolean>;
 
 const DEFAULT_VIS: Visibility = {
+  meetings: true, tasks: true, activity_feed: true,
   kpi: true, campaign_perf: true, campaign_types: true,
   top_automations: true, audience_growth: true, recent_campaigns: true,
   ai_insights: true, getting_started: true,

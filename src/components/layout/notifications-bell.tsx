@@ -11,6 +11,7 @@ import {
   type NotificationRow,
 } from "@/lib/queries/notifications";
 import { useFeedback } from "@/components/ui/feedback";
+import { cn } from "@/lib/utils";
 
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -26,7 +27,7 @@ function relativeTime(iso: string): string {
   return `${day}d ago`;
 }
 
-export function NotificationsBell() {
+export function NotificationsBell({ className }: { className?: string }) {
   const router = useRouter();
   const { confirm } = useFeedback();
   const [open, setOpen] = useState(false);
@@ -57,38 +58,30 @@ export function NotificationsBell() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  async function handleItemClick(n: NotificationRow) {
-    if (!n.is_read) {
-      try {
-        await markNotificationRead(n.id);
-      } catch {
-        // ignore
-      }
-    }
+  function handleItemClick(n: NotificationRow) {
+    // Close + navigate immediately — don't make the click wait on a network
+    // round trip. The read-receipt write happens in the background.
     setOpen(false);
-    if (n.link) {
-      router.push(n.link);
+    if (n.link) router.push(n.link);
+
+    if (!n.is_read) {
+      setItems((prev) => prev.map((it) => (it.id === n.id ? { ...it, is_read: true } : it)));
+      setUnread((prev) => Math.max(0, prev - 1));
+      markNotificationRead(n.id).catch(() => refresh());
     }
-    refresh();
   }
 
-  async function handleMarkAll() {
-    try {
-      await markAllRead();
-    } catch {
-      // ignore
-    }
-    refresh();
+  function handleMarkAll() {
+    setItems((prev) => prev.map((it) => ({ ...it, is_read: true })));
+    setUnread(0);
+    markAllRead().catch(() => refresh());
   }
 
   async function handleClearAll() {
     if (!(await confirm({ title: "Clear all notifications?", message: "This removes every notification. This can't be undone.", confirmLabel: "Clear all", danger: true }))) return;
-    try {
-      await clearAllNotifications();
-    } catch {
-      // ignore
-    }
-    refresh();
+    setItems([]);
+    setUnread(0);
+    clearAllNotifications().catch(() => refresh());
   }
 
   const countLabel = unread >= 10 ? "9+" : String(unread);
@@ -97,9 +90,13 @@ export function NotificationsBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative h-10 w-10 rounded-2xl bg-white border border-slate-100 shadow-[0_2px_8px_rgba(17,12,46,0.05)] hover:bg-slate-50 flex items-center justify-center text-slate-600"
+        className={cn(
+          "relative flex items-center justify-center transition-colors",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-1 focus-visible:ring-offset-[#1e242b]",
+          className || "h-8 w-8 rounded-lg bg-[#2b323c] hover:bg-[#3a4451] border border-[#3a4451] text-slate-300 hover:text-white"
+        )}
       >
-        <Bell className="h-4.5 w-4.5" />
+        <Bell className="h-4 w-4" />
         {unread > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
             {countLabel}
@@ -108,7 +105,7 @@ export function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden z-40">
+        <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 w-80 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <p className="text-sm font-semibold text-slate-900">Notifications</p>
             <div className="flex items-center gap-3">
