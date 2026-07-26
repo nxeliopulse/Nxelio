@@ -64,14 +64,14 @@ const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
   ],
   starter: [
     { label: "Everything in Basic",      included: true  },
-    { label: "300 AI credits / mo",      included: true  },
+    { label: "700 AI credits / mo",      included: true  },
     { label: "Automated lead discovery", included: true  },
     { label: "1,000 AI-discovered leads / mo", included: true  },
     { label: "Priority support",         included: false },
   ],
   pro: [
     { label: "Everything in Starter",    included: true  },
-    { label: "1,000 AI credits / mo",    included: true  },
+    { label: "1,500 AI credits / mo",    included: true  },
     { label: "2,000 AI-discovered leads / mo", included: true  },
     { label: "Priority support",         included: true  },
   ],
@@ -330,6 +330,14 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                   Manage billing
                 </Button>
               )}
+              <Button
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                onClick={() => setCancelOpen(true)}
+              >
+                <X className="h-4 w-4" />
+                Cancel subscription
+              </Button>
               <Button
                 className="bg-white text-blue-700 hover:bg-blue-50"
                 onClick={() => {
@@ -634,15 +642,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
           </div>
         )}
       </Card>
-
-      <div className="text-center py-4">
-        <button
-          onClick={() => setCancelOpen(true)}
-          className="text-sm text-slate-400 hover:text-red-600 underline underline-offset-4"
-        >
-          Cancel subscription
-        </button>
-      </div>
 
       {/* ── Success modal ─────────────────────────────────────── */}
       <Modal open={successOpen} onClose={() => setSuccessOpen(false)} title="" size="sm">

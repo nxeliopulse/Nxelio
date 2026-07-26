@@ -21,7 +21,7 @@ for (const [planId, intervals] of Object.entries(STRIPE_PRICE_IDS)) {
 
 // Credits granted per plan (must match subscription_plans.credits_per_cycle)
 export const PLAN_CREDITS: Record<string, number> = {
-  basic: 200, starter: 300, pro: 1000,
+  basic: 200, starter: 700, pro: 1500,
 };
 
 // AI-discovered leads granted per plan (must match subscription_plans.leads_per_cycle)

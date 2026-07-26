@@ -27,8 +27,8 @@ Nxelio is a B2B revenue platform: leads, campaigns, inbox, pipeline, segments, n
 
 === PRICING ===
 - Basic: $14.99/mo, 200 AI credits/month, bring-your-own-leads (CSV import) — but includes the full toolkit: AI lead enrichment, AI lead scoring, email outreach, LinkedIn outreach, reply tracking, meetings & calendar sync, core workflows, and standard support. No automated lead discovery. Monthly billing includes a 7-day free trial (a card is required to start it, but there's no charge until day 7 and you can cancel anytime before then). Annual billing does not include a trial.
-- Starter: $149.99/mo, everything in Basic plus automated lead discovery (1,000 AI-discovered leads/month) and 300 AI credits/month. This is the most popular plan.
-- Pro: $299.99/mo, everything in Starter but with 2,000 AI-discovered leads/month and 1,000 AI credits/month, plus priority support.
+- Starter: $149.99/mo, everything in Basic plus automated lead discovery (1,000 AI-discovered leads/month) and 700 AI credits/month. This is the most popular plan.
+- Pro: $299.99/mo, everything in Starter but with 2,000 AI-discovered leads/month and 1,500 AI credits/month, plus priority support.
 - AI credits are consumed by AI actions (generating email copy, scoring a lead, enriching a contact). Unused monthly credits reset at renewal and don't roll over.
 - AI-discovered leads are a separate allowance from AI credits, specifically for the automated lead-discovery feature (Starter/Pro only).
 - Promo codes can be applied at checkout or when upgrading — they can discount the price, grant bonus AI credits, grant bonus leads, or combine several of these, depending on the code.

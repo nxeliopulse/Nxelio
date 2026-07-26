@@ -99,14 +99,14 @@ const PLANS = [
     features:["Bring your own leads (CSV import)","AI lead enrichment","AI lead scoring","Email outreach","LinkedIn outreach","Reply tracking","Meetings & calendar sync","Core workflows","Standard support","7-day free trial on monthly billing — card required, no charge until day 7"],
   },
   {
-    name:"Starter",  price:"149.99", credits:300,  leads:1000, trial:null,
+    name:"Starter",  price:"149.99", credits:700,  leads:1000, trial:null,
     color:"#7E57C2", bg:"#EDE7F6", border:"#7E57C2", popular:true,
-    features:["Everything in Basic","1,000 AI-discovered leads / month","Automated lead discovery","300 AI credits / month"],
+    features:["Everything in Basic","1,000 AI-discovered leads / month","Automated lead discovery","700 AI credits / month"],
   },
   {
-    name:"Pro",      price:"299.99", credits:1000, leads:2000, trial:null,
+    name:"Pro",      price:"299.99", credits:1500, leads:2000, trial:null,
     color:"#F4511E", bg:"#FFF0EE", border:"#FFCDD2", popular:false,
-    features:["Everything in Starter","2,000 AI-discovered leads / month","1,000 AI credits / month","Priority support"],
+    features:["Everything in Starter","2,000 AI-discovered leads / month","1,500 AI credits / month","Priority support"],
   },
 ];
 
