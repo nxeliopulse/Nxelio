@@ -45,7 +45,6 @@ export interface Subscription {
   credits_total: number;
   leads_remaining: number;
   leads_total: number;
-  topup_leads_remaining: number;
   low_balance_notified_at: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
@@ -85,7 +84,7 @@ export function isLowOnLeads(sub: Subscription): boolean {
 }
 
 export function totalLeadsAvailable(sub: Subscription): number {
-  return sub.leads_remaining + sub.topup_leads_remaining;
+  return sub.leads_remaining;
 }
 
 // ── Promotions ────────────────────────────────────────────────────────────────

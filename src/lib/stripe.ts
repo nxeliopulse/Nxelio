@@ -7,8 +7,8 @@ import Stripe from "stripe";
 // (Product catalog → each product's Monthly/Yearly price).
 export const STRIPE_PRICE_IDS: Record<string, Record<string, string>> = {
   basic:   { monthly: "price_1TwhzACRKbhmPQVVA1kOwaAT", annual: "price_1TwiGNCRKbhmPQVV9IMpDS5b" },
-  starter: { monthly: "price_1TwiJPCRKbhmPQVVJ8qPQt6C", annual: "price_1TwiK2CRKbhmPQVV42BISuGM" },
-  pro:     { monthly: "price_1TwiL4CRKbhmPQVVSQFBYCQf", annual: "price_1TwiLWCRKbhmPQVVaxin5CSm" },
+  starter: { monthly: "price_1TxMCLCRKbhmPQVVLqm7C8wB", annual: "price_1TxMDGCRKbhmPQVVepAnhyPm" },
+  pro:     { monthly: "price_1TxMDyCRKbhmPQVVeVUe7cPB", annual: "price_1TxMERCRKbhmPQVVtuXpQ9BJ" },
 };
 
 // Reverse map: Stripe price ID → { planId, interval }
@@ -26,12 +26,8 @@ export const PLAN_CREDITS: Record<string, number> = {
 
 // AI-discovered leads granted per plan (must match subscription_plans.leads_per_cycle)
 export const PLAN_LEADS: Record<string, number> = {
-  basic: 0, starter: 300, pro: 1000,
+  basic: 0, starter: 1000, pro: 2000,
 };
-
-// Lead top-up: one-time purchase, same for every plan.
-export const LEAD_TOPUP_PRICE_CENTS = 14900; // $149.00
-export const LEAD_TOPUP_LEADS = 1000;
 
 function buildStripeClient() {
   const apiKey = process.env.STRIPE_SECRET_KEY;

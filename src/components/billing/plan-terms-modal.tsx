@@ -55,11 +55,7 @@ export function PlanTermsModal({ open, planName, onClose, onConfirm, confirming 
           </div>
           <div>
             <p className="font-semibold text-slate-900">Credits &amp; leads</p>
-            <p className="text-slate-600">Your monthly AI credit and lead allowances reset every billing cycle — unused amounts don&apos;t roll over. Purchased Lead Top-Ups are the exception: they never expire on the monthly reset, only when used.</p>
-          </div>
-          <div>
-            <p className="font-semibold text-slate-900">Lead Top-Ups</p>
-            <p className="text-slate-600">A one-time, non-refundable purchase, limited to one per calendar month.</p>
+            <p className="text-slate-600">Your monthly AI credit and lead allowances reset every billing cycle — unused amounts don&apos;t roll over.</p>
           </div>
           <div>
             <p className="font-semibold text-slate-900">Promo codes</p>
