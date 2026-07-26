@@ -117,6 +117,7 @@ const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
   { id: "blue", name: "Blue", bg: "bg-blue-600" },
   { id: "indigo", name: "Indigo", bg: "bg-indigo-600" },
   { id: "purple", name: "Purple", bg: "bg-purple-600" },
+  { id: "teal", name: "Cyan Teal", bg: "bg-[#18A7B8]" },
   { id: "emerald", name: "Emerald", bg: "bg-emerald-600" },
   { id: "rose", name: "Rose", bg: "bg-rose-600" },
   { id: "amber", name: "Amber", bg: "bg-amber-600" },
@@ -220,7 +221,6 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
     start(async () => { await removeBlocklistEntry(id); });
   }
 
-  const initials = (profile?.full_name || "?").split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
   const roleName = profile?.roles?.role_name || "—";
 
   return (
@@ -254,14 +254,6 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
 
                 {profileMsg && <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-700 mb-4"><CheckCircle2 className="h-4 w-4 mt-0.5" />{profileMsg}</div>}
                 {profileErr && <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-4"><AlertCircle className="h-4 w-4 mt-0.5" />{profileErr}</div>}
-
-                <div className="flex items-center gap-4 mb-5 pb-5 border-b border-slate-100">
-                  <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-xl flex items-center justify-center">{initials}</div>
-                  <div>
-                    <Button variant="outline" size="sm">Upload photo</Button>
-                    <p className="text-xs text-slate-500 mt-2">JPG, PNG, max 2MB</p>
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>

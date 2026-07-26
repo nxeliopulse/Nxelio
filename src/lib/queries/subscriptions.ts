@@ -57,6 +57,14 @@ export async function canAffordLeads(amount = 1): Promise<boolean> {
   return sub.leads_remaining >= amount;
 }
 
+/** Buy Leads' per-request cap: at most 100 in one go, further capped by
+ *  whatever's actually left on the plan this cycle. */
+export async function getMaxBuyLeadsCount(): Promise<number> {
+  const sub = await getSubscription();
+  if (!sub) return 100;
+  return Math.max(1, Math.min(100, sub.leads_remaining));
+}
+
 export async function getCreditHistory(limit = 50, resourceType?: "credits" | "leads") {
   const supabase = await createClient();
   let query = supabase

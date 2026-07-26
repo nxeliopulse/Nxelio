@@ -106,6 +106,8 @@ html[data-accent-color="indigo"] {
   --color-blue-500: #6366f1;
   --color-blue-600: #4f46e5;
   --color-blue-700: #4338ca;
+  --color-teal-600: #4f46e5;
+  --color-emerald-600: #4f46e5;
 }
 html[data-accent-color="purple"] {
   --primary: #9333ea;
@@ -114,6 +116,8 @@ html[data-accent-color="purple"] {
   --color-blue-500: #a855f7;
   --color-blue-600: #9333ea;
   --color-blue-700: #7e22ce;
+  --color-teal-600: #9333ea;
+  --color-emerald-600: #9333ea;
 }
 html[data-accent-color="emerald"] {
   --primary: #059669;
@@ -122,6 +126,18 @@ html[data-accent-color="emerald"] {
   --color-blue-500: #10b981;
   --color-blue-600: #059669;
   --color-blue-700: #047857;
+  --color-teal-600: #059669;
+  --color-emerald-600: #059669;
+}
+html[data-accent-color="teal"] {
+  --primary: #18A7B8;
+  --color-blue-50: #e0f7fa;
+  --color-blue-100: #b2ebf2;
+  --color-blue-500: #18A7B8;
+  --color-blue-600: #18A7B8;
+  --color-blue-700: #14929f;
+  --color-teal-600: #18A7B8;
+  --color-emerald-600: #18A7B8;
 }
 html[data-accent-color="rose"] {
   --primary: #e11d48;
@@ -130,6 +146,8 @@ html[data-accent-color="rose"] {
   --color-blue-500: #f43f5e;
   --color-blue-600: #e11d48;
   --color-blue-700: #be123c;
+  --color-teal-600: #e11d48;
+  --color-emerald-600: #e11d48;
 }
 html[data-accent-color="amber"] {
   --primary: #d97706;
@@ -138,6 +156,8 @@ html[data-accent-color="amber"] {
   --color-blue-500: #f59e0b;
   --color-blue-600: #d97706;
   --color-blue-700: #b45309;
+  --color-teal-600: #d97706;
+  --color-emerald-600: #d97706;
 }
 
 /* Sidebar Density & Badges */

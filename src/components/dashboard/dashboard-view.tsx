@@ -482,7 +482,7 @@ export function DashboardView({
                 <div className="mt-auto pt-1">
                   <button
                     onClick={toggleAssistant}
-                    className="w-full rounded-xl h-11 text-sm font-medium text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
+                    className="w-full rounded-xl h-11 text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90 shadow-sm"
                     style={{ background: "linear-gradient(to right, #1d4ed8, #2563eb, #4f46e5)" }}
                   >
                     <Sparkles className="h-4 w-4" />

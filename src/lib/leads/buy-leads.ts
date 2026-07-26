@@ -3,7 +3,7 @@ import { aiJson } from "@/lib/ai/client";
 import { brightDataConfigured, brightDataSearchPeople, brightDataFindCompanyWebsite } from "@/lib/leads/bright-data";
 import { anysiteConfigured, findEmailsByLinkedIn } from "@/lib/leads/anysite";
 import { guessAndVerifyEmail } from "@/lib/leads/email-guess";
-import { hasFeature } from "@/lib/queries/subscriptions";
+import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
 import { mapWithConcurrency } from "@/lib/utils";
 
 export interface BuyCriteria {
@@ -39,10 +39,15 @@ export interface BuyLeadsResult {
  * profile sourcing via SERP); falls back to AI-generated samples when Bright
  * Data isn't configured or returns nothing.
  */
-export async function searchBuyLeads(criteria: BuyCriteria): Promise<BuyLeadsResult> {
+export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeadsResult> {
   if (!(await hasFeature("discovery"))) {
     return { ok: false, prospects: [], error: "Lead discovery isn't included on your plan. Upgrade to Starter or Pro to unlock it." };
   }
+  // Server-side enforcement of the per-request cap (100) and the plan's
+  // remaining lead balance — the client's max attribute is a convenience,
+  // not the real gate.
+  const maxAllowed = await getMaxBuyLeadsCount();
+  const criteria: BuyCriteria = { ...rawCriteria, count: Math.max(1, Math.min(rawCriteria.count, maxAllowed)) };
   if (brightDataConfigured) {
     const r = await brightDataSearchPeople(criteria);
     if (r.ok && r.prospects.length) {
@@ -127,7 +132,7 @@ export async function searchBuyLeads(criteria: BuyCriteria): Promise<BuyLeadsRes
  * clearly-fake example.com-style domain so they can't be mistaken for verified data.
  */
 export async function generateSampleProspects(criteria: BuyCriteria): Promise<BuyLeadsResult> {
-  const count = Math.max(1, Math.min(25, Math.round(criteria.count || 10)));
+  const count = Math.max(1, Math.min(100, Math.round(criteria.count || 10)));
   const system =
     "You generate SAMPLE B2B prospect data for a sales-tool demo. The data is synthetic, not real people. Return ONLY valid JSON. Do not include email addresses. Use plausible but clearly-sample company websites.";
   const prompt = `Generate ${count} sample B2B prospects matching:

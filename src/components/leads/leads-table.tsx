@@ -397,61 +397,61 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
   function renderCell(key: ColKey, l: LeadRow, rowNumber: number) {
     switch (key) {
       case "index":
-        return <span className="text-slate-400 tabular-nums">{rowNumber}</span>;
+        return <span className="text-slate-400 dark:text-slate-500 tabular-nums font-mono text-xs">{rowNumber}</span>;
       case "first_name":
         return (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); openLead(l.id); }}
-            className="font-medium text-slate-900 hover:text-blue-600"
+            className="font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate max-w-[150px] text-left block whitespace-nowrap"
           >
             {splitName(l).first || "—"}
           </button>
         );
       case "last_name":
-        return <span className="text-slate-700">{splitName(l).last || "—"}</span>;
+        return <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[160px] block whitespace-nowrap" title={splitName(l).last || ""}>{splitName(l).last || "—"}</span>;
       case "email":
-        return <span className="block max-w-[220px] truncate text-slate-600" title={l.email || ""}>{l.email || "—"}</span>;
+        return <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap" title={l.email || ""}>{l.email || "—"}</span>;
       case "company":
-        return <span className="text-slate-700">{l.company_name || "—"}</span>;
+        return <span className="block max-w-[180px] truncate text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap" title={l.company_name || ""}>{l.company_name || "—"}</span>;
       case "industry":
-        return <span className="text-slate-600">{l.industry || "—"}</span>;
+        return <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap" title={l.industry || ""}>{l.industry || "—"}</span>;
       case "email_provider":
         return <EmailProviderCell provider={emailProvider(l.email)} />;
       case "score":
         return (
-          <div className="flex items-center gap-2">
-            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex-shrink-0">
               <div
-                className={`h-full rounded-full ${l.lead_score >= 80 ? "bg-red-500" : l.lead_score >= 60 ? "bg-amber-500" : "bg-blue-500"}`}
+                className={`h-full rounded-full ${l.lead_score >= 80 ? "bg-rose-500" : l.lead_score >= 60 ? "bg-amber-500" : "bg-blue-500"}`}
                 style={{ width: `${l.lead_score}%` }}
               />
             </div>
-            <span className="text-sm font-semibold text-slate-700">{l.lead_score}</span>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 tabular-nums">{l.lead_score}</span>
           </div>
         );
       case "status":
         return <Badge variant={statusVariant[l.status] || "default"}>{l.status}</Badge>;
       case "phone":
-        return <span className="text-slate-600">{l.phone || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{l.phone || "—"}</span>;
       case "interest_area":
-        return <span className="text-slate-600">{l.interest_area || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.interest_area || "—"}</span>;
       case "source":
-        return <span className="text-slate-600">{l.source || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.source || "—"}</span>;
       case "linkedin":
         return l.linkedin
-          ? <a href={l.linkedin} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:underline"><Share2 className="h-3.5 w-3.5" /> Profile</a>
+          ? <a href={l.linkedin} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
           : <span className="text-slate-400">—</span>;
       case "website":
         return l.website_url
-          ? <a href={l.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 hover:underline"><Link2 className="h-3.5 w-3.5 flex-shrink-0" />{l.website_url.replace(/^https?:\/\//, "")}</a>
+          ? <a href={l.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Link2 className="h-3.5 w-3.5 flex-shrink-0" />{l.website_url.replace(/^https?:\/\//, "")}</a>
           : <span className="text-slate-400">—</span>;
       case "verified":
         return l.verified
-          ? <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
-          : <span className="text-xs text-slate-400">No</span>;
+          ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
+          : <span className="text-xs text-slate-400 whitespace-nowrap">No</span>;
       case "created_at":
-        return <span className="text-slate-500">{new Date(l.created_at).toLocaleDateString()}</span>;
+        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</span>;
       default:
         return null;
     }
@@ -470,87 +470,137 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
         </div>
       )}
       <Card className="overflow-hidden">
-        {/* Toolbar — instantly-style */}
-        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
-          {/* Search */}
-          <div className="min-w-[200px] max-w-xs flex-1 sm:flex-none sm:w-72">
-            <Input
-              leftIcon={<Search className="h-4 w-4" />}
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        {/* Compact Single-Line Toolbar */}
+        <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
+          {/* Left Controls: Search + Count + Compact Tool Buttons */}
+          <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
+            {/* Search Input */}
+            <div className="w-36 sm:w-48 md:w-56 flex-shrink-0">
+              <Input
+                leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
+                placeholder="Search…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 text-xs rounded-xl"
+              />
+            </div>
+
+            {/* Count Chip */}
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0">
+              <Users2 className="h-3.5 w-3.5 text-slate-400" />
+              <span>{filtered.length}</span>
+            </div>
+
+            {/* Filter Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openFiltersPopover}
+              className={cn(
+                "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
+                hasActiveFilters && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
+              )}
+              title="Filter leads"
+            >
+              <Filter className="h-3.5 w-3.5" />
+              <span>Filter</span>
+              {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
+            </Button>
+
+            {/* Columns Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openColsMenu}
+              className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 text-slate-700 dark:text-slate-300 flex-shrink-0"
+              title="Customize visible columns"
+            >
+              <Settings2 className="h-3.5 w-3.5 text-slate-400" />
+              <span>Columns</span>
+            </Button>
+
+            {/* Use AI Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { closeLead(); setShowAiColumnModal(true); }}
+              className="rounded-xl gap-1 font-semibold h-8 text-xs px-2.5 border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex-shrink-0"
+              title="Use AI column enrichment"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+              <span>AI</span>
+            </Button>
           </div>
 
-          {/* Divider + count chip */}
-          <div className="hidden sm:block h-6 w-px bg-slate-200" />
-          <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
-            <Users2 className="h-4 w-4 text-slate-400" />
-            {filtered.length}
-          </div>
+          {/* Right Controls: Bulk Delete + Sort Dropdown + Add Leads Primary Button */}
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+            {selected.length > 0 && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleBulkDelete}
+                className="rounded-xl gap-1 font-semibold h-8 px-2.5 text-xs flex-shrink-0"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Delete</span> ({selected.length})
+              </Button>
+            )}
 
-          {/* Filters — click opens a popover anchored right next to the count chip */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={openFiltersPopover}
-            className={hasActiveFilters ? "ring-1 ring-blue-200 border-blue-300 text-blue-700" : ""}
-          >
-            <Filter className="h-4 w-4" /> Filters
-            {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
-          </Button>
-
-          <div className="ml-auto flex items-center gap-2">
-            {/* Sort */}
-            <div className="relative inline-flex items-center">
-              <ArrowUpDown className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+            {/* Sort Dropdown */}
+            <div className="relative inline-flex items-center flex-shrink-0">
+              <ArrowUpDown className="h-3 w-3 text-slate-400 absolute left-2 pointer-events-none" />
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="appearance-none rounded-lg border border-slate-200 bg-white pl-7 pr-7 py-2 text-sm text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                className="appearance-none rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-6 py-1 h-8 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-[#18A7B8]/20 transition-all shadow-sm cursor-pointer"
               >
-                <option value="none">No sort</option>
+                <option value="none">Sort</option>
                 <option value="name">Name A–Z</option>
-                <option value="score">Score high→low</option>
-                <option value="newest">Newest first</option>
+                <option value="score">Score High→Low</option>
+                <option value="newest">Newest</option>
               </select>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
+              <ChevronDown className="h-3 w-3 text-slate-400 absolute right-2 pointer-events-none" />
             </div>
 
-            <Button size="sm" onClick={() => setShowWizard(true)}>
-              <Plus className="h-4 w-4" /> Add Leads
+            {/* Add Leads Primary Button */}
+            <Button
+              size="sm"
+              onClick={() => setShowWizard(true)}
+              className="rounded-xl gap-1.5 font-bold h-8 px-3 bg-[#18A7B8] hover:bg-[#14929f] text-white shadow-sm transition-all text-xs flex-shrink-0 whitespace-nowrap"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Leads</span>
             </Button>
           </div>
         </div>
 
-
-        {/* Table — bounded to the viewport height so only rows scroll, toolbar/pagination stay in view */}
+        {/* Table Container */}
         <div className="relative">
           <div ref={scrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
-            <table className="w-full text-sm min-w-[760px]">
-              <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
-                <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
-                  <th className="px-4 py-3 w-10">
+            <table className="w-full text-sm border-collapse min-w-[900px]">
+              <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-10 backdrop-blur-md">
+                <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="px-4 py-3.5 w-10">
                     <input
                       type="checkbox"
                       checked={selected.length === filtered.length && filtered.length > 0}
                       onChange={toggleAll}
-                      className="rounded border-slate-300"
+                      className="rounded border-slate-300 dark:border-slate-700"
                     />
                   </th>
                   {visibleCols.map((c) => {
                     const filterable = c.key !== "index";
                     const active = Boolean(columnFilters[c.key]);
                     return (
-                      <th key={c.key} className={cn("px-4 py-3 font-semibold", c.key === "index" && "w-12")}>
+                      <th key={c.key} className={cn("px-4 py-3.5 font-bold whitespace-nowrap", c.key === "index" && "w-12")}>
                         <span
                           role={filterable ? "button" : undefined}
                           title={filterable ? `Click to search ${c.label}` : undefined}
                           onClick={filterable ? (e) => openColumnFilter(e, c.key) : undefined}
                           className={cn(
-                            "inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 -mx-1",
-                            filterable && "cursor-pointer hover:bg-slate-200/60",
-                            active && "text-blue-700 bg-blue-50"
+                            "inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 -mx-1 transition-colors",
+                            filterable && "cursor-pointer hover:bg-slate-200/60 dark:hover:bg-slate-800",
+                            active && "text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60"
                           )}
                         >
                           {c.icon && <c.icon className={cn("h-3.5 w-3.5", active ? "text-blue-500" : "text-slate-400")} />}
@@ -560,7 +610,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
                               role="button"
                               title="Clear filter"
                               onClick={(e) => clearColumnFilter(c.key, e)}
-                              className="text-blue-400 hover:text-blue-700"
+                              className="text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                             >
                               <X className="h-3 w-3" />
                             </span>
@@ -573,21 +623,21 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
                     const running = runProgress?.columnId === col.id;
                     const pct = running && runProgress.total > 0 ? Math.round((runProgress.done / runProgress.total) * 100) : 0;
                     return (
-                      <th key={col.id} className="px-3 py-3 font-semibold w-[200px] max-w-[200px]">
+                      <th key={col.id} className="px-4 py-3.5 font-bold w-[200px] max-w-[200px] whitespace-nowrap">
                         <span className="flex items-center gap-1.5 min-w-0">
                           <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                          <span className="truncate whitespace-nowrap" title={col.name}>{col.name}</span>
+                          <span className="truncate" title={col.name}>{col.name}</span>
                           <button
                             onClick={(e) => openAiColMenu(e, col.id)}
                             title="Column actions"
-                            className="p-0.5 rounded hover:bg-slate-200/70 flex-shrink-0 ml-auto"
+                            className="p-0.5 rounded hover:bg-slate-200/70 dark:hover:bg-slate-800 flex-shrink-0 ml-auto"
                           >
                             <MoreVertical className="h-3 w-3 text-slate-400" />
                           </button>
                         </span>
                         {running && (
                           <div className="flex items-center gap-1.5 mt-1.5">
-                            <div className="flex-1 h-[3px] rounded-full bg-slate-100 overflow-hidden">
+                            <div className="flex-1 h-[3px] rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                               <div className="h-full bg-blue-500 transition-[width] duration-500 rounded-full" style={{ width: `${Math.max(pct, 4)}%` }} />
                             </div>
                             <span className="text-[10px] font-normal normal-case text-slate-400 tabular-nums flex-shrink-0">{pct}%</span>
@@ -596,24 +646,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
                       </th>
                     );
                   })}
-                  <th className="px-4 py-3 w-16 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <button
-                        onClick={() => { closeLead(); setShowAiColumnModal(true); }}
-                        title="Add AI column"
-                        className="p-1 rounded-md hover:bg-blue-50"
-                      >
-                        <Plus className="h-4 w-4 text-slate-400 hover:text-blue-600" />
-                      </button>
-                      <button
-                        onClick={openColsMenu}
-                        title="Customize columns"
-                        className="p-1 rounded-md hover:bg-slate-200/70"
-                      >
-                        <Settings2 className="h-4 w-4 text-slate-400 hover:text-slate-700" />
-                      </button>
-                    </div>
-                  </th>
+                  <th className="px-4 py-3.5 w-12 text-right font-bold text-slate-400"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

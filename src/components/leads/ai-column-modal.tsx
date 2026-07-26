@@ -181,7 +181,7 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
         <div className="flex items-center gap-2">
           <div className="rounded-lg bg-blue-50 p-1.5"><Sparkles className="h-4 w-4 text-blue-600" /></div>
           <h2 className="font-semibold text-slate-900">
-            {step === "templates" ? "Add an AI column" : configureTab === "generate" ? "Use AI" : "Configure column"}
+            {step === "templates" ? "Use AI" : configureTab === "generate" ? "Use AI" : "Configure column"}
           </h2>
         </div>
         <button onClick={handleClose} className="p-1 rounded-md hover:bg-slate-100"><X className="h-4 w-4 text-slate-500" /></button>

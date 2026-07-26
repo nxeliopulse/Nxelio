@@ -15,7 +15,7 @@ import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outr
 import { searchBuyLeads, type GeneratedProspect } from "@/lib/leads/buy-leads";
 import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
 import { MultiLocationInput } from "@/components/leads/location-search-input";
-import { hasFeature } from "@/lib/queries/subscriptions";
+import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
 
 type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
 
@@ -149,6 +149,8 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
   const [buySource, setBuySource] = useState<"brightdata" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
+  // Per-request cap: at most 100, further capped by what's left on the plan this cycle.
+  const [maxBuyCount, setMaxBuyCount] = useState(100);
 
   // Import
   const [pending, start] = useTransition();
@@ -165,6 +167,12 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     if (!open) return;
     hasFeature("discovery")
       .then((discovery) => setLocked({ discovery: !discovery }))
+      .catch(() => {});
+    getMaxBuyLeadsCount()
+      .then((max) => {
+        setMaxBuyCount(max);
+        setBuy((b) => ({ ...b, count: Math.min(b.count, max) }));
+      })
       .catch(() => {});
   }, [open]);
 
@@ -456,8 +464,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
                   </button>
                 );
 
-                // Selected card gets the same bright gradient-border technique used on
-                // the AI Assistant panel (blue → indigo), just a thicker frame (3px vs 1.5px).
+                // Selected card gets the original blue → indigo gradient border frame
                 if (active && !sourceLocked) {
                   return (
                     <div key={s.id} className="rounded-xl p-[3px]" style={{ background: "linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)" }}>
@@ -482,6 +489,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
                 loading={buyLoading}
                 onGenerate={runGenerate}
                 error={step2Error}
+                maxCount={maxBuyCount}
               />
             ) : (
               <Step2Input
@@ -846,7 +854,7 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
 // ============================================================================
 // Buy Leads — real LinkedIn prospects via Bright Data (AI samples as fallback)
 type BuyState = { industry: string; role: string; locations: string[]; count: number };
-function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
+function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, maxCount }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;
@@ -854,8 +862,20 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
   loading: boolean;
   onGenerate: () => void;
   error: string | null;
+  maxCount: number;
 }) {
   const isReal = source === "brightdata";
+  // Initialized once from buy.count — BuyForm unmounts whenever the user leaves
+  // the Buy Leads source/step, so a fresh mount always picks up the latest value
+  // (e.g. after the plan-cap clamp on wizard open) without needing a sync effect.
+  const [countDraft, setCountDraft] = useState(String(buy.count));
+
+  function commitCount() {
+    const n = Math.max(1, Math.min(maxCount, parseInt(countDraft, 10) || 1));
+    setCountDraft(String(n));
+    if (n !== buy.count) setBuy({ ...buy, count: n });
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -873,15 +893,24 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
             {COMMON_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
           </Select>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
-          <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">How many (max 25)</label>
-          <Input type="number" min={1} max={25} value={buy.count}
-            onChange={(e) => setBuy({ ...buy, count: Math.max(1, Math.min(25, parseInt(e.target.value) || 1)) })} />
-        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
+        <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
+      </div>
+
+      <div className="max-w-[220px]">
+        <label className="block text-sm font-medium text-slate-700 mb-1.5">How many (max {maxCount})</label>
+        <Input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={countDraft}
+          onChange={(e) => setCountDraft(e.target.value.replace(/[^0-9]/g, ""))}
+          onBlur={commitCount}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitCount(); } }}
+        />
       </div>
 
       <Button onClick={onGenerate} disabled={loading}>

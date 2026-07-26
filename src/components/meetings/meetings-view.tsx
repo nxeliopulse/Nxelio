@@ -3,15 +3,15 @@ import { useState, useMemo, useTransition, useEffect } from "react";
 import Link from "next/link";
 import {
   CalendarDays, Clock, Users, ExternalLink, Pencil, X, Plus, Link2, FileText,
-  PlayCircle, Video, MapPin, CalendarClock, AlertCircle, Loader2, Wand2,
+  PlayCircle, Video, MapPin, AlertCircle, Loader2, Wand2,
   Send, Check, ChevronLeft, ChevronRight, UserPlus, CalendarCheck, RefreshCw,
+  CheckSquare, Square, Globe,
 } from "lucide-react";
 import { generateConferenceLink, type ConferenceProvider } from "@/lib/meetings/conference-link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Select, Textarea } from "@/components/ui/input";
-import { PageHeader } from "@/components/ui/page-header";
 import { useFeedback } from "@/components/ui/feedback";
 import {
   updateMeeting, cancelMeeting, deleteMeeting, scheduleMeeting,
@@ -21,11 +21,12 @@ import {
   getCalendarBusy, getCalendarAccounts, getExternalCalendarEvents,
   type CalendarAccountRow, type SyncedCalendarEvent,
 } from "@/lib/queries/calendar-accounts";
+import { cn } from "@/lib/utils";
 
 /** Per-provider accent used consistently across the legend, day chips, and agenda. */
 const PROVIDER_STYLE: Record<string, { dot: string; chip: string; label: string }> = {
-  google: { dot: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Google Calendar" },
-  microsoft: { dot: "bg-indigo-500", chip: "bg-indigo-50 text-indigo-700 border-indigo-200", label: "Outlook Calendar" },
+  google: { dot: "bg-emerald-500", chip: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800", label: "Google Calendar" },
+  microsoft: { dot: "bg-indigo-500", chip: "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800", label: "Outlook Calendar" },
 };
 
 interface LeadOption { id: string; full_name: string | null; company_name: string | null; email: string | null }
@@ -57,11 +58,9 @@ function dayLabel(iso: string) {
   if (same(d, tomorrow)) return "Tomorrow";
   return d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
 }
-/** Local YYYY-MM-DD key — used to group meetings by calendar day. */
 function dateKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-/** datetime-local value (local time) for an <input>. */
 function toLocalInput(iso: string) {
   const d = new Date(iso);
   const off = d.getTimezoneOffset();
@@ -75,12 +74,16 @@ const STATUS_VARIANT: Record<string, "blue" | "success" | "danger" | "default"> 
 export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; leads: LeadOption[] }) {
   const { confirm } = useFeedback();
   const [pending, start] = useTransition();
-  const [tab, setTab] = useState<"upcoming" | "past" | "calendar">("calendar");
+  const [viewMode, setViewMode] = useState<"month" | "upcoming" | "past">("month");
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [selectedDay, setSelectedDay] = useState<Date>(() => new Date());
   const [detail, setDetail] = useState<MeetingRow | null>(null);
   const [editing, setEditing] = useState<MeetingRow | "new" | null>(null);
-  // LP-16 — arriving from Leads with ?leads=id1,id2 pre-opens the scheduler with those attendees.
+  
+  // Zoho Calendar sidebar visibility filters
+  const [showMyMeetings, setShowMyMeetings] = useState(true);
+  const [showExternalCalendars, setShowExternalCalendars] = useState(true);
+
   const [presetLeadIds, setPresetLeadIds] = useState<string[]>([]);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("leads");
@@ -91,14 +94,11 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
     }
   }, []);
 
-  // Connected calendar accounts — drives the legend + "connect a calendar" prompt.
   const [accounts, setAccounts] = useState<CalendarAccountRow[]>([]);
   useEffect(() => {
     getCalendarAccounts().then(setAccounts).catch(() => {});
   }, []);
 
-  // Real Google/Microsoft events for the visible month — refetched on month change so the
-  // calendar shows what's actually on your connected calendar, not just LeadPro meetings.
   const [external, setExternal] = useState<{ events: SyncedCalendarEvent[]; errors: string[]; loading: boolean }>({ events: [], errors: [], loading: false });
   const monthRange = useMemo(() => {
     const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
@@ -106,9 +106,10 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
     const gridEnd = new Date(gridStart); gridEnd.setDate(gridStart.getDate() + 42);
     return { start: gridStart.toISOString(), end: gridEnd.toISOString() };
   }, [calendarMonth]);
+
   useEffect(() => {
     if (accounts.length === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets stale events once accounts are known to be disconnected
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets external-calendar state when the last connected account is removed, not a mount-only init
       setExternal({ events: [], errors: [], loading: false });
       return;
     }
@@ -122,12 +123,13 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
 
   const externalByDay = useMemo(() => {
     const map = new Map<string, SyncedCalendarEvent[]>();
+    if (!showExternalCalendars) return map;
     for (const e of external.events) {
       const k = dateKey(new Date(e.start));
       (map.get(k) ?? map.set(k, []).get(k)!).push(e);
     }
     return map;
-  }, [external.events]);
+  }, [external.events, showExternalCalendars]);
 
   const [now] = useState(() => Date.now());
   const { upcoming, past } = useMemo(() => {
@@ -143,7 +145,6 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
     return { upcoming: up, past: pa };
   }, [meetings, now]);
 
-  // Group upcoming by day (LP-21)
   const grouped = useMemo(() => {
     const map = new Map<string, MeetingRow[]>();
     for (const m of upcoming) {
@@ -153,19 +154,18 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
     return [...map.entries()];
   }, [upcoming]);
 
-  // Group ALL meetings by calendar day (local) for the Calendar tab.
   const meetingsByDay = useMemo(() => {
     const map = new Map<string, MeetingRow[]>();
+    if (!showMyMeetings) return map;
     for (const m of meetings) {
       const k = dateKey(new Date(m.start_at));
       (map.get(k) ?? map.set(k, []).get(k)!).push(m);
     }
     for (const list of map.values()) list.sort((a, b) => a.start_at.localeCompare(b.start_at));
     return map;
-  }, [meetings]);
+  }, [meetings, showMyMeetings]);
+
   const selectedDayKey = dateKey(selectedDay);
-  // A single, time-ordered agenda for the selected day — this is what actually reads like
-  // Google/Microsoft/Zoho's day view, instead of two disconnected lists.
   const selectedDayAgenda = useMemo(() => {
     type AgendaItem = { key: string; start: string; end: string; kind: "meeting"; meeting: MeetingRow } | { key: string; start: string; end: string; kind: "external"; event: SyncedCalendarEvent };
     const dayMeetings = meetingsByDay.get(selectedDayKey) ?? [];
@@ -195,103 +195,256 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
     });
   }
 
-  const list = tab === "upcoming" ? upcoming : past;
-
   return (
-    <div className="max-w-[1100px] mx-auto">
-      <PageHeader
-        title="Meetings"
-        description="Your upcoming and past meetings, with attendees, join links, and history."
-        actions={<Button onClick={() => setEditing("new")}><Plus className="h-4 w-4" /> New meeting</Button>}
-      />
-
-      {/* Tabs */}
-      <div className="flex items-center gap-1 mb-4 border-b border-slate-200">
-        {(["upcoming", "past", "calendar"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+    <div className="max-w-[1600px] mx-auto space-y-4">
+      {/* Top Header & Primary Schedule Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Meetings & Calendar</h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Schedule, track, and sync meetings with Google & Outlook Calendar
+          </p>
+        </div>
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          {accounts.length === 0 ? (
+            <Link href="/settings?section=calendar" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#18A7B8] hover:underline">
+              <RefreshCw className="h-3.5 w-3.5" /> Connect Calendar
+            </Link>
+          ) : (
+            <div className="hidden md:flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Connected ({accounts.length})
+            </div>
+          )}
+          <Button
+            onClick={() => setEditing("new")}
+            className="rounded-xl font-bold px-4 py-2 text-xs sm:text-sm gap-2"
           >
-            {t === "upcoming" ? `Upcoming (${upcoming.length})` : t === "past" ? `Past (${past.length})` : "Calendar"}
-          </button>
-        ))}
+            <Plus className="h-4 w-4" /> Schedule Meeting
+          </Button>
+        </div>
       </div>
 
-      {tab === "calendar" ? (
-        <div>
-          {/* Legend + connection status — makes it explicit what's LeadPro vs synced */}
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-3 text-xs">
-            <div className="flex items-center gap-4 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 text-slate-600"><span className="h-2 w-2 rounded-full bg-blue-600" /> My meetings</span>
-              {accounts.map((a) => {
-                const style = PROVIDER_STYLE[a.provider] || PROVIDER_STYLE.google;
-                return <span key={a.id} className="inline-flex items-center gap-1.5 text-slate-600"><span className={`h-2 w-2 rounded-full ${style.dot}`} /> {style.label}</span>;
-              })}
-              {external.loading && <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> Syncing…</span>}
+      {/* Zero-Scroll Zoho Grid Layout: Left Control Panel + Right Calendar Container */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        
+        {/* Left Control Sidebar (Unified Single Card - Stretches 100% to match Big Calendar height) */}
+        <div className="lg:col-span-4 flex flex-col">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex-1 flex flex-col justify-between space-y-4">
+            {/* Section 1: Mini Month Picker */}
+            <div className="flex-shrink-0">
+              <MiniCalendar
+                month={calendarMonth}
+                onMonthChange={setCalendarMonth}
+                selectedDay={selectedDay}
+                onSelectDay={setSelectedDay}
+              />
             </div>
-            {accounts.length === 0 ? (
-              <Link href="/settings?section=calendar" className="inline-flex items-center gap-1 font-medium text-blue-600 hover:underline">
-                <RefreshCw className="h-3 w-3" /> Connect Google or Outlook calendar
-              </Link>
-            ) : external.errors.length > 0 ? (
-              <span className="inline-flex items-center gap-1 text-amber-600"><AlertCircle className="h-3 w-3" /> {external.errors[0]}</span>
-            ) : null}
+
+            <div className="border-t border-slate-100 dark:border-slate-800" />
+
+            {/* Section 2: My Calendars Checkboxes */}
+            <div className="flex-shrink-0 space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">My Calendars</h3>
+              <div className="space-y-1 text-xs font-medium">
+                <button
+                  onClick={() => setShowMyMeetings(!showMyMeetings)}
+                  className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-md bg-[#18A7B8] flex-shrink-0" />
+                    <span className="text-slate-900 dark:text-white font-semibold">LeadPro Meetings</span>
+                  </div>
+                  {showMyMeetings ? <CheckSquare className="h-3.5 w-3.5 text-[#18A7B8]" /> : <Square className="h-3.5 w-3.5 text-slate-300 dark:text-slate-700" />}
+                </button>
+
+                {accounts.map((a) => {
+                  const style = PROVIDER_STYLE[a.provider] || PROVIDER_STYLE.google;
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() => setShowExternalCalendars(!showExternalCalendars)}
+                      className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-md ${style.dot} flex-shrink-0`} />
+                        <span className="text-slate-900 dark:text-white truncate max-w-[140px]">{style.label}</span>
+                      </div>
+                      {showExternalCalendars ? <CheckSquare className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> : <Square className="h-3.5 w-3.5 text-slate-300 dark:text-slate-700" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 dark:border-slate-800" />
+
+            {/* Region / Time Zone Live Clock Widget */}
+            <div className="flex-shrink-0">
+              <RegionClockWidget />
+            </div>
+
+            <div className="border-t border-slate-100 dark:border-slate-800" />
+
+            {/* Section 3: Selected Day Schedule / Events List (Expands to fill remaining vertical space!) */}
+            <div className="flex-1 flex flex-col justify-between space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                    {selectedDay.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {selectedDayAgenda.length} event{selectedDayAgenda.length === 1 ? "" : "s"} scheduled
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditing("new")}
+                  className="rounded-xl gap-1 font-bold text-xs h-7 px-2.5"
+                >
+                  <Plus className="h-3 w-3" /> Add Event
+                </Button>
+              </div>
+
+              {selectedDayAgenda.length === 0 ? (
+                <div className="p-3 text-center text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl space-y-1 flex-1 flex flex-col items-center justify-center">
+                  <p>No events on this day.</p>
+                  {upcoming[0] && (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      Next: <span className="font-bold text-slate-700 dark:text-slate-300">{upcoming[0].title}</span> ({dayLabel(upcoming[0].start_at)})
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2 flex-1 min-h-[140px]">
+                  {selectedDayAgenda.map((item) =>
+                    item.kind === "meeting" ? (
+                      <MeetingRowItem key={item.key} m={item.meeting} onOpen={() => setDetail(item.meeting)} past={new Date(item.meeting.end_at).getTime() < now} compact />
+                    ) : (
+                      <ExternalEventRow key={item.key} e={item.event} compact />
+                    )
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+        </div>
 
-          <CalendarGrid
-            month={calendarMonth}
-            onMonthChange={setCalendarMonth}
-            meetingsByDay={meetingsByDay}
-            externalByDay={externalByDay}
-            selectedDay={selectedDay}
-            onSelectDay={setSelectedDay}
-          />
+        {/* Right Main Calendar View Container (Zero Scroll Full Screen Grid) */}
+        <div className="lg:col-span-8 flex flex-col">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm flex-1 flex flex-col">
+            {/* View Mode Bar */}
+            <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 p-1 bg-slate-50 dark:bg-slate-950/60">
+                <button
+                  onClick={() => setViewMode("month")}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-bold transition-all",
+                    viewMode === "month"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                  )}
+                >
+                  Month View
+                </button>
+                <button
+                  onClick={() => setViewMode("upcoming")}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-bold transition-all",
+                    viewMode === "upcoming"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                  )}
+                >
+                  Upcoming ({upcoming.length})
+                </button>
+                <button
+                  onClick={() => setViewMode("past")}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-bold transition-all",
+                    viewMode === "past"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                  )}
+                >
+                  Past ({past.length})
+                </button>
+              </div>
 
-          <div className="mt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-              {selectedDay.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
-            </h3>
-            {selectedDayAgenda.length === 0 ? (
-              <Card className="p-6 text-center text-sm text-slate-400">Nothing scheduled this day.</Card>
-            ) : (
-              <div className="space-y-2">
-                {selectedDayAgenda.map((item) =>
-                  item.kind === "meeting" ? (
-                    <MeetingRowItem key={item.key} m={item.meeting} onOpen={() => setDetail(item.meeting)} past={new Date(item.meeting.end_at).getTime() < now} />
-                  ) : (
-                    <ExternalEventRow key={item.key} e={item.event} />
-                  )
+              {/* Navigation Arrows for Month */}
+              {viewMode === "month" && (
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">
+                    {calendarMonth.toLocaleDateString([], { month: "long", year: "numeric" })}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() - 1); setCalendarMonth(d); }}
+                      className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => { const d = new Date(); d.setDate(1); setCalendarMonth(d); setSelectedDay(new Date()); }}
+                      className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      Today
+                    </button>
+                    <button
+                      onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() + 1); setCalendarMonth(d); }}
+                      className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Calendar Grid Mode */}
+            {viewMode === "month" && (
+              <CalendarGrid
+                month={calendarMonth}
+                onMonthChange={setCalendarMonth}
+                meetingsByDay={meetingsByDay}
+                externalByDay={externalByDay}
+                selectedDay={selectedDay}
+                onSelectDay={setSelectedDay}
+              />
+            )}
+
+            {/* List Modes */}
+            {viewMode === "upcoming" && (
+              <div className="p-4 space-y-4">
+                {upcoming.length === 0 ? (
+                  <div className="py-16 text-center text-slate-400 dark:text-slate-500 font-medium text-xs">No upcoming meetings scheduled.</div>
+                ) : (
+                  grouped.map(([day, items]) => (
+                    <div key={day} className="space-y-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{day}</h3>
+                      <div className="space-y-2">
+                        {items.map((m) => <MeetingRowItem key={m.id} m={m} onOpen={() => setDetail(m)} />)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {viewMode === "past" && (
+              <div className="p-4 space-y-2">
+                {past.length === 0 ? (
+                  <div className="py-16 text-center text-slate-400 dark:text-slate-500 font-medium text-xs">No past meetings recorded.</div>
+                ) : (
+                  past.map((m) => <MeetingRowItem key={m.id} m={m} onOpen={() => setDetail(m)} past />)
                 )}
               </div>
             )}
           </div>
         </div>
-      ) : list.length === 0 ? (
-        <Card className="p-12 text-center text-slate-500">
-          <CalendarClock className="h-10 w-10 mx-auto mb-3 text-slate-300" />
-          {tab === "upcoming" ? "No upcoming meetings. Click " : "No past meetings yet."}
-          {tab === "upcoming" && <button onClick={() => setEditing("new")} className="font-medium text-blue-600 hover:underline">New meeting</button>}
-          {tab === "upcoming" && " to schedule one."}
-        </Card>
-      ) : tab === "upcoming" ? (
-        <div className="space-y-6">
-          {grouped.map(([day, items]) => (
-            <div key={day}>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">{day}</h3>
-              <div className="space-y-2">
-                {items.map((m) => <MeetingRowItem key={m.id} m={m} onOpen={() => setDetail(m)} />)}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {past.map((m) => <MeetingRowItem key={m.id} m={m} onOpen={() => setDetail(m)} past />)}
-        </div>
-      )}
+      </div>
 
-      {/* Detail panel (LP-22/23/25) */}
+      {/* Detail panel */}
       {detail && (
         <DetailPanel
           m={detail}
@@ -317,76 +470,160 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
   );
 }
 
-function MeetingRowItem({ m, onOpen, past }: { m: MeetingRow; onOpen: () => void; past?: boolean }) {
+/** Mini Month Calendar Picker Widget for the Zoho Left Sidebar */
+function MiniCalendar({
+  month,
+  onMonthChange,
+  selectedDay,
+  onSelectDay,
+}: {
+  month: Date;
+  onMonthChange: (d: Date) => void;
+  selectedDay: Date;
+  onSelectDay: (d: Date) => void;
+}) {
+  const today = new Date();
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+  const days = useMemo(() => {
+    const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+    const start = new Date(firstOfMonth);
+    start.setDate(start.getDate() - start.getDay());
+    const result: Date[] = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      result.push(d);
+    }
+    return result;
+  }, [month]);
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between px-1">
+        <span className="font-bold text-xs text-slate-900 dark:text-white">
+          {month.toLocaleDateString([], { month: "short", year: "numeric" })}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() - 1); onMonthChange(d); }}
+            className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() + 1); onMonthChange(d); }}
+            className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400">
+        <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-xs">
+        {days.map((d) => {
+          const inMonth = d.getMonth() === month.getMonth();
+          const isToday = sameDay(d, today);
+          const isSelected = sameDay(d, selectedDay);
+          return (
+            <button
+              key={d.toISOString()}
+              onClick={() => onSelectDay(d)}
+              className={cn(
+                "h-6 w-6 rounded-lg flex items-center justify-center font-medium mx-auto transition-all text-[11px]",
+                isSelected
+                  ? "bg-[#18A7B8] text-white font-bold shadow-sm"
+                  : isToday
+                  ? "bg-blue-50 dark:bg-blue-950/80 text-blue-600 font-bold border border-blue-200 dark:border-blue-800"
+                  : inMonth
+                  ? "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  : "text-slate-300 dark:text-slate-700"
+              )}
+            >
+              {d.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MeetingRowItem({ m, onOpen, past, compact }: { m: MeetingRow; onOpen: () => void; past?: boolean; compact?: boolean }) {
   return (
     <button
       onClick={onOpen}
-      className="w-full text-left flex items-center gap-3 rounded-xl border border-slate-200 border-l-4 border-l-blue-500 bg-white px-4 py-3 hover:border-blue-300 hover:border-l-blue-500 hover:bg-blue-50/40 transition-colors"
+      className={cn(
+        "w-full text-left flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-[#18A7B8] bg-white dark:bg-slate-900 transition-all shadow-sm group",
+        compact ? "p-2.5" : "p-3.5"
+      )}
     >
-      <div className="h-10 w-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0">
-        <Video className="h-4.5 w-4.5" />
+      <div className={cn("rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-[#18A7B8] flex items-center justify-center flex-shrink-0 font-bold", compact ? "h-8 w-8 text-xs" : "h-10 w-10")}>
+        <Video className={compact ? "h-4 w-4" : "h-5 w-5"} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="font-medium text-slate-900 truncate">{m.title}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm group-hover:text-[#18A7B8] transition-colors">{m.title}</p>
           {m.status !== "scheduled" && <Badge variant={STATUS_VARIANT[m.status] || "default"}>{m.status}</Badge>}
         </div>
-        <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-          <Clock className="h-3 w-3" /> {fmtRange(m.start_at, m.end_at)}
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
+          <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {fmtRange(m.start_at, m.end_at)}</span>
           {leadLabel(m.lead) && <> · <span className="truncate">{leadLabel(m.lead)}</span></>}
         </p>
       </div>
       {!past && m.join_url && (
-        <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-blue-600">
-          <Video className="h-3.5 w-3.5" /> Join
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-[#18A7B8] hover:bg-[#14929f] px-2.5 py-1 rounded-lg shadow-sm transition-all flex-shrink-0">
+          <Video className="h-3 w-3" /> Join
         </span>
       )}
-      {past && m.recording_url && <PlayCircle className="h-4 w-4 text-slate-400" />}
+      {past && m.recording_url && <PlayCircle className="h-4 w-4 text-slate-400 flex-shrink-0" />}
     </button>
   );
 }
 
-/** Read-only row for an event synced from Google/Outlook — opens the real event when clicked. */
-function ExternalEventRow({ e }: { e: SyncedCalendarEvent }) {
+function ExternalEventRow({ e, compact }: { e: SyncedCalendarEvent; compact?: boolean }) {
   const style = PROVIDER_STYLE[e.provider] || PROVIDER_STYLE.google;
   const body = (
-    <div className={`w-full text-left flex items-center gap-3 rounded-xl border border-slate-200 border-l-4 bg-white px-4 py-3 ${e.htmlLink ? "hover:bg-slate-50 cursor-pointer" : ""}`}
-      style={{ borderLeftColor: undefined }}
-    >
-      <div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${style.chip}`}>
-        <CalendarDays className="h-4.5 w-4.5" />
+    <div className={cn(
+      "w-full text-left flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 border-l-4 bg-white dark:bg-slate-900 transition-all shadow-sm",
+      compact ? "p-2.5" : "p-3.5",
+      e.htmlLink ? "hover:bg-slate-50/50 dark:hover:bg-slate-800/40 cursor-pointer" : ""
+    )}>
+      <div className={cn("rounded-lg flex items-center justify-center flex-shrink-0", style.chip, compact ? "h-8 w-8" : "h-10 w-10")}>
+        <CalendarDays className={compact ? "h-4 w-4" : "h-5 w-5"} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="font-medium text-slate-900 truncate">{e.title}</p>
-          <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border ${style.chip}`}>{style.label}</span>
+        <div className="flex items-center gap-1.5">
+          <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm">{e.title}</p>
+          <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${style.chip}`}>{style.label}</span>
         </div>
-        <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 font-medium">
           <Clock className="h-3 w-3" /> {e.allDay ? "All day" : fmtRange(e.start, e.end)}
         </p>
       </div>
-      {e.htmlLink && <ExternalLink className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />}
+      {e.htmlLink && <ExternalLink className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />}
     </div>
   );
   const dotClass = style.dot;
-  return e.htmlLink ? (
-    <a href={e.htmlLink} target="_blank" rel="noopener noreferrer" className="block">
-      <div className="relative">
-        <span className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${dotClass}`} />
-        {body}
-      </div>
-    </a>
-  ) : (
+  return (
     <div className="relative">
       <span className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${dotClass}`} />
-      {body}
+      {e.htmlLink ? (
+        <a href={e.htmlLink} target="_blank" rel="noopener noreferrer" className="block">
+          {body}
+        </a>
+      ) : body}
     </div>
   );
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** Zoho-style month grid — highlights days with meetings, click a day to see them below. */
+/** Zero-Scroll Zoho Calendar Month Grid */
 function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, selectedDay, onSelectDay }: {
   month: Date;
   onMonthChange: (d: Date) => void;
@@ -399,9 +636,9 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
   const cells = useMemo(() => {
     const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
     const start = new Date(firstOfMonth);
-    start.setDate(start.getDate() - start.getDay()); // back up to the Sunday on/before the 1st
+    start.setDate(start.getDate() - start.getDay());
     const days: Date[] = [];
-    for (let i = 0; i < 42; i++) { // 6 rows x 7 cols always covers a month
+    for (let i = 0; i < 42; i++) {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
       days.push(d);
@@ -412,36 +649,12 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
   const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-slate-900">{month.toLocaleDateString([], { month: "long", year: "numeric" })}</h3>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() - 1); onMonthChange(d); }}
-            className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100"
-            aria-label="Previous month"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => { const d = new Date(); d.setDate(1); onMonthChange(d); onSelectDay(new Date()); }}
-            className="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-slate-100"
-          >
-            Today
-          </button>
-          <button
-            onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() + 1); onMonthChange(d); }}
-            className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100"
-            aria-label="Next month"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-7 gap-1">
+    <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
+      <div className="grid grid-cols-7 gap-1 flex-1">
         {WEEKDAY_LABELS.map((w) => (
-          <div key={w} className="text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400 pb-1">{w}</div>
+          <div key={w} className="text-center text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 py-1.5 border-b border-slate-100 dark:border-slate-800">
+            {w}
+          </div>
         ))}
         {cells.map((d) => {
           const inMonth = d.getMonth() === month.getMonth();
@@ -450,53 +663,66 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
           const totalCount = dayMeetings.length + dayExternal.length;
           const isToday = sameDay(d, today);
           const isSelected = sameDay(d, selectedDay);
-          // Chips shown in chronological order, LeadPro meetings first on ties.
+
           const chips = [
             ...dayMeetings.map((m) => ({ kind: "meeting" as const, start: m.start_at, title: m.title })),
             ...dayExternal.map((e) => ({ kind: "external" as const, start: e.start, title: e.title, provider: e.provider })),
           ].sort((a, b) => a.start.localeCompare(b.start));
-          const visibleChips = chips.slice(0, 2);
+
+          const visibleChips = chips.slice(0, 3);
           const overflow = chips.length - visibleChips.length;
+
           return (
             <button
               key={d.toISOString()}
               onClick={() => onSelectDay(d)}
-              className={`min-h-[72px] sm:min-h-[88px] rounded-lg flex flex-col items-stretch gap-1 text-sm transition-colors px-1 pt-1 pb-1.5 text-left ${
-                isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : inMonth ? "hover:bg-slate-100" : "text-slate-300 hover:bg-slate-50"
-              }`}
+              className={cn(
+                "min-h-[96px] sm:min-h-[110px] rounded-xl flex flex-col items-stretch gap-1 text-xs transition-all p-2 text-left border border-slate-100/60 dark:border-slate-800/60",
+                isSelected
+                  ? "bg-[#18A7B8]/10 border-[#18A7B8] dark:border-[#18A7B8] shadow-xs"
+                  : isToday
+                  ? "bg-blue-50/60 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800"
+                  : inMonth
+                  ? "hover:bg-slate-50 dark:hover:bg-slate-800/40 bg-white dark:bg-slate-900"
+                  : "bg-slate-50/30 dark:bg-slate-950/40 text-slate-400 dark:text-slate-700"
+              )}
             >
-              <span className={`self-start h-5 w-5 flex items-center justify-center rounded-full text-xs ${
-                isSelected ? "bg-white text-blue-700 font-semibold" : isToday ? "bg-blue-600 text-white font-semibold" : inMonth ? "text-slate-700" : "text-slate-300"
-              }`}>
+              <span className={cn(
+                "self-start h-5 w-5 flex items-center justify-center rounded-full text-[11px] font-bold transition-all",
+                isToday
+                  ? "bg-[#18A7B8] text-white shadow-xs"
+                  : isSelected
+                  ? "bg-[#18A7B8]/20 text-[#18A7B8] font-bold"
+                  : inMonth
+                  ? "text-slate-700 dark:text-slate-300"
+                  : "text-slate-400 dark:text-slate-600"
+              )}>
                 {d.getDate()}
               </span>
-              <div className="flex flex-col gap-0.5 min-w-0">
+
+              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                 {visibleChips.map((c, i) => (
                   <span
                     key={i}
-                    className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight border-l-2 ${
-                      isSelected
-                        ? "bg-white/15 border-white text-white"
-                        : c.kind === "meeting"
-                          ? "bg-blue-50 border-blue-500 text-blue-700"
-                          : `${(PROVIDER_STYLE[c.provider] || PROVIDER_STYLE.google).chip} border-l-2`
-                    }`}
+                    className={cn(
+                      "truncate rounded-md px-1.5 py-0.5 text-[9px] font-semibold leading-tight border-l-2 transition-colors",
+                      c.kind === "meeting"
+                        ? "bg-cyan-50 dark:bg-cyan-950/80 border-l-[#18A7B8] text-cyan-900 dark:text-cyan-200"
+                        : `${(PROVIDER_STYLE[c.provider] || PROVIDER_STYLE.google).chip} border-l-2`
+                    )}
                   >
                     {fmtTime(c.start)} {c.title}
                   </span>
                 ))}
                 {overflow > 0 && (
-                  <span className={`text-[10px] font-medium px-1 ${isSelected ? "text-blue-100" : "text-slate-400"}`}>+{overflow} more</span>
-                )}
-                {inMonth && totalCount === 0 && isToday && (
-                  <span className="text-[10px] text-blue-400 px-1">Today</span>
+                  <span className="text-[9px] font-bold px-1 text-slate-400 dark:text-slate-500">+{overflow} more</span>
                 )}
               </div>
             </button>
           );
         })}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -506,19 +732,19 @@ function DetailPanel({ m, pending, onClose, onEdit, onCancel, onDelete }: {
   const attendees = Array.isArray(m.attendees) ? m.attendees : [];
   return (
     <>
-      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-      <aside className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white shadow-xl border-l border-slate-200 flex flex-col">
-        <div className="flex items-start justify-between p-5 border-b border-slate-100">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40" onClick={onClose} />
+      <aside className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col">
+        <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-slate-900 truncate">{m.title}</h2>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white truncate">{m.title}</h2>
               {m.status !== "scheduled" && <Badge variant={STATUS_VARIANT[m.status] || "default"}>{m.status}</Badge>}
             </div>
-            <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5" /> {new Date(m.start_at).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
@@ -526,32 +752,32 @@ function DetailPanel({ m, pending, onClose, onEdit, onCancel, onDelete }: {
           {m.location && <Row icon={<MapPin className="h-4 w-4" />} label="Location">{m.location}</Row>}
           {m.lead && (
             <Row icon={<Link2 className="h-4 w-4" />} label="Contact">
-              <Link href={`/leads/${m.lead.id}`} className="text-blue-600 hover:underline">{leadLabel(m.lead)}</Link>
+              <Link href={`/leads/${m.lead.id}`} className="text-[#18A7B8] font-bold hover:underline">{leadLabel(m.lead)}</Link>
             </Row>
           )}
           <Row icon={<Users className="h-4 w-4" />} label={`Attendees (${attendees.length})`}>
             {attendees.length === 0 ? <span className="text-slate-400">None added</span> : (
-              <ul className="space-y-0.5">
-                {attendees.map((a, i) => <li key={i}>{a.name || a.email}{a.name && a.email ? ` · ${a.email}` : ""}</li>)}
+              <ul className="space-y-1">
+                {attendees.map((a, i) => <li key={i} className="text-slate-700 dark:text-slate-300 font-medium">{a.name || a.email}{a.name && a.email ? ` · ${a.email}` : ""}</li>)}
               </ul>
             )}
           </Row>
           {m.description && <Row icon={<FileText className="h-4 w-4" />} label="Notes">{m.description}</Row>}
-          {m.recording_url && <Row icon={<PlayCircle className="h-4 w-4" />} label="Recording"><a href={m.recording_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View recording</a></Row>}
+          {m.recording_url && <Row icon={<PlayCircle className="h-4 w-4" />} label="Recording"><a href={m.recording_url} target="_blank" rel="noopener noreferrer" className="text-[#18A7B8] font-bold hover:underline">View recording</a></Row>}
           {m.summary && <Row icon={<FileText className="h-4 w-4" />} label="Summary">{m.summary}</Row>}
         </div>
 
-        <div className="p-5 border-t border-slate-100 space-y-2">
+        <div className="p-5 border-t border-slate-100 dark:border-slate-800 space-y-2 bg-slate-50/50 dark:bg-slate-950/40">
           {m.join_url && (
             <a href={m.join_url} target="_blank" rel="noopener noreferrer">
-              <Button className="w-full"><Video className="h-4 w-4" /> Join meeting <ExternalLink className="h-3.5 w-3.5 opacity-70" /></Button>
+              <Button className="w-full font-bold bg-[#18A7B8] hover:bg-[#14929f] text-white rounded-xl"><Video className="h-4 w-4" /> Join meeting <ExternalLink className="h-3.5 w-3.5 opacity-70" /></Button>
             </a>
           )}
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={onEdit} disabled={pending}><Pencil className="h-4 w-4" /> Edit / reschedule</Button>
-            {m.status === "scheduled" && <Button variant="outline" className="flex-1" onClick={onCancel} disabled={pending}>Cancel</Button>}
+            <Button variant="outline" className="flex-1 rounded-xl font-bold" onClick={onEdit} disabled={pending}><Pencil className="h-4 w-4" /> Edit / reschedule</Button>
+            {m.status === "scheduled" && <Button variant="outline" className="flex-1 rounded-xl font-bold" onClick={onCancel} disabled={pending}>Cancel</Button>}
           </div>
-          <button onClick={onDelete} disabled={pending} className="w-full text-xs text-slate-400 hover:text-red-600 py-1">Delete meeting</button>
+          <button onClick={onDelete} disabled={pending} className="w-full text-xs font-semibold text-slate-400 hover:text-rose-600 py-1 transition-colors">Delete meeting</button>
         </div>
       </aside>
     </>
@@ -561,10 +787,10 @@ function DetailPanel({ m, pending, onClose, onEdit, onCancel, onDelete }: {
 function Row({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
-      <span className="text-slate-400 mt-0.5 flex-shrink-0">{icon}</span>
+      <span className="text-slate-400 dark:text-slate-500 mt-0.5 flex-shrink-0">{icon}</span>
       <div className="min-w-0">
-        <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</p>
-        <div className="text-slate-700 mt-0.5">{children}</div>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
+        <div className="text-slate-700 dark:text-slate-300 mt-0.5 font-medium">{children}</div>
       </div>
     </div>
   );
@@ -591,7 +817,6 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
   });
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) { setForm((f) => ({ ...f, [k]: v })); }
 
-  // ── Attendees (LP-16/LP-17) ──
   const [attendees, setAttendees] = useState<Attendee[]>(() => {
     if (meeting && Array.isArray(meeting.attendees) && meeting.attendees.length) {
       return meeting.attendees.map((a) => ({ name: a.name || "", email: a.email || "" }));
@@ -617,7 +842,6 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
   const removeAttendee = (i: number) => setAttendees((a) => a.filter((_, idx) => idx !== i));
   const invitableCount = attendees.filter((a) => a.email).length;
 
-  // ── Availability (uses connected calendar, LP-3) ──
   const [avail, setAvail] = useState<{ busy: { start: string; end: string }[]; checked: boolean; loading: boolean; error?: string }>({ busy: [], checked: false, loading: false });
 
   async function checkAvailability() {
@@ -635,8 +859,6 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
     }
   }
 
-  // Your own existing LeadPro meetings are busy too — not just what an external
-  // synced calendar reports. Always counted, whether or not "Check my calendar" was clicked.
   const ownBusy = useMemo(() => otherMeetings.map((m) => ({ start: m.start_at, end: m.end_at })), [otherMeetings]);
   const allBusy = useMemo(() => [...ownBusy, ...avail.busy], [ownBusy, avail.busy]);
 
@@ -700,18 +922,18 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto pointer-events-none">
-        <Card className="w-full max-w-lg p-6 mt-12 pointer-events-auto">
+        <Card className="w-full max-w-lg p-6 mt-12 pointer-events-auto rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               {isEdit ? "Edit / reschedule meeting" : step === "review" ? "Review & schedule" : "Schedule a meeting"}
             </h2>
-            <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+            <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-4">
+            <div className="flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/50 p-3 text-sm text-red-700 dark:text-red-300 mb-4">
               <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{error}</span>
             </div>
           )}
@@ -719,23 +941,22 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
           {step === "details" ? (
             <div className="space-y-4">
               <Field label="Title" required>
-                <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Discovery call" />
+                <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Discovery call" className="rounded-xl" />
               </Field>
 
-              {/* Attendees */}
               <Field label={`Attendees${invitableCount ? ` (${invitableCount} will be invited)` : ""}`}>
                 {attendees.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {attendees.map((a, i) => (
-                      <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
+                      <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
                         {a.name || a.email}{!a.email && <span className="text-amber-600" title="No email — won't get an invite">⚠</span>}
-                        <button onClick={() => removeAttendee(i)} className="text-slate-400 hover:text-red-600"><X className="h-3 w-3" /></button>
+                        <button onClick={() => removeAttendee(i)} className="text-slate-400 hover:text-rose-600"><X className="h-3 w-3" /></button>
                       </span>
                     ))}
                   </div>
                 )}
                 <div className="flex gap-2">
-                  <Select value="" onChange={(e) => { if (e.target.value) addLeadAttendee(e.target.value); }} className="flex-1">
+                  <Select value="" onChange={(e) => { if (e.target.value) addLeadAttendee(e.target.value); }} className="flex-1 rounded-xl">
                     <option value="">+ Add a lead…</option>
                     {leads.filter((l) => !attendees.some((a) => a.leadId === l.id)).map((l) => (
                       <option key={l.id} value={l.id}>{leadLabel(l)}{l.email ? "" : " (no email)"}</option>
@@ -743,43 +964,41 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
                   </Select>
                 </div>
                 <div className="flex gap-2 mt-2">
-                  <Input className="flex-1" placeholder="or add an email…" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addManualEmail(); } }} />
-                  <Button type="button" variant="outline" onClick={addManualEmail} className="flex-shrink-0"><UserPlus className="h-4 w-4" /> Add</Button>
+                  <Input className="flex-1 rounded-xl" placeholder="or add an email…" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addManualEmail(); } }} />
+                  <Button type="button" variant="outline" onClick={addManualEmail} className="flex-shrink-0 rounded-xl"><UserPlus className="h-4 w-4" /> Add</Button>
                 </div>
               </Field>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Start" required><Input type="datetime-local" value={form.startLocal} onChange={(e) => set("startLocal", e.target.value)} /></Field>
-                <Field label="End" required><Input type="datetime-local" value={form.endLocal} onChange={(e) => set("endLocal", e.target.value)} /></Field>
+                <Field label="Start" required><Input type="datetime-local" value={form.startLocal} onChange={(e) => set("startLocal", e.target.value)} className="rounded-xl" /></Field>
+                <Field label="End" required><Input type="datetime-local" value={form.endLocal} onChange={(e) => set("endLocal", e.target.value)} className="rounded-xl" /></Field>
               </div>
 
-              {/* Availability (LP-3 powered) */}
-              <div className="rounded-lg border border-slate-200 p-3">
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-950/40">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-700 inline-flex items-center gap-1.5"><CalendarCheck className="h-4 w-4 text-slate-400" /> Availability</span>
-                  <Button type="button" variant="outline" size="sm" onClick={checkAvailability} disabled={avail.loading}>
-                    {avail.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />} Check my calendar
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 inline-flex items-center gap-1.5 uppercase tracking-wider"><CalendarCheck className="h-4 w-4 text-[#18A7B8]" /> Availability</span>
+                  <Button type="button" variant="outline" size="sm" onClick={checkAvailability} disabled={avail.loading} className="rounded-xl text-xs font-bold">
+                    {avail.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />} Check calendar
                   </Button>
                 </div>
-                {/* Own LeadPro meetings are checked immediately, regardless of the external-calendar check below. */}
                 {!avail.checked && conflict && (
-                  <p className="mt-2 text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> This time overlaps another meeting you already have scheduled.</p>
+                  <p className="mt-2 text-xs text-rose-600 dark:text-rose-400 inline-flex items-center gap-1 font-medium"><AlertCircle className="h-3.5 w-3.5" /> Overlaps another meeting you have scheduled.</p>
                 )}
                 {avail.checked && (
-                  <div className="mt-2 text-xs">
+                  <div className="mt-2 text-xs font-medium">
                     {avail.error ? (
-                      <p className="text-slate-400">Calendar not connected — connect it in Settings → Calendar to see free times.</p>
+                      <p className="text-slate-400">Calendar not connected — connect it in Settings → Calendar.</p>
                     ) : (
                       <>
-                        {conflict && <p className="text-red-600 mb-1.5 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> This time overlaps a busy event on your calendar or another meeting.</p>}
-                        {!conflict && form.startLocal && <p className="text-emerald-600 mb-1.5 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> You&apos;re free at the selected time.</p>}
+                        {conflict && <p className="text-rose-600 dark:text-rose-400 mb-1.5 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Overlaps a busy event on your calendar.</p>}
+                        {!conflict && form.startLocal && <p className="text-emerald-600 dark:text-emerald-400 mb-1.5 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> You&apos;re free at the selected time.</p>}
                         {freeSlots.length > 0 && (
                           <>
-                            <p className="text-slate-500 mb-1">Free 30-min slots that day — click to use:</p>
+                            <p className="text-slate-500 mb-1">Free slots that day:</p>
                             <div className="flex flex-wrap gap-1.5">
-                              {freeSlots.slice(0, 12).map((s) => (
+                              {freeSlots.slice(0, 10).map((s) => (
                                 <button key={s.startLocal} onClick={() => { set("startLocal", s.startLocal); set("endLocal", s.endLocal); }}
-                                  className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:border-blue-300 hover:bg-blue-50">
+                                  className="rounded-lg border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-[#18A7B8]/10 hover:border-[#18A7B8]">
                                   {s.label}
                                 </button>
                               ))}
@@ -794,24 +1013,23 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Conferencing">
-                  <Select value={form.provider} onChange={(e) => set("provider", e.target.value)}>
+                  <Select value={form.provider} onChange={(e) => set("provider", e.target.value)} className="rounded-xl">
                     {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                   </Select>
                 </Field>
-                <Field label="Location"><Input value={form.location} onChange={(e) => set("location", e.target.value)} placeholder="Room or address (optional)" /></Field>
+                <Field label="Location"><Input value={form.location} onChange={(e) => set("location", e.target.value)} placeholder="Room or address" className="rounded-xl" /></Field>
               </div>
               <Field label="Join link">
                 <div className="flex gap-2">
-                  <Input className="flex-1" value={form.join_url} onChange={(e) => set("join_url", e.target.value)} placeholder="https://… (optional)" />
-                  <Button type="button" variant="outline" onClick={() => set("join_url", generateConferenceLink(form.provider as ConferenceProvider, form.title))} disabled={form.provider === "manual"} className="flex-shrink-0">
+                  <Input className="flex-1 rounded-xl" value={form.join_url} onChange={(e) => set("join_url", e.target.value)} placeholder="https://…" />
+                  <Button type="button" variant="outline" onClick={() => set("join_url", generateConferenceLink(form.provider as ConferenceProvider, form.title))} disabled={form.provider === "manual"} className="flex-shrink-0 rounded-xl font-bold">
                     <Wand2 className="h-4 w-4" /> Generate
                   </Button>
                 </div>
               </Field>
-              <Field label="Notes"><Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Agenda or context (optional)" /></Field>
+              <Field label="Notes"><Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Agenda or context" className="rounded-xl" /></Field>
             </div>
           ) : (
-            /* ── Review step (LP-18) ── */
             <div className="space-y-3 text-sm">
               <ReviewRow label="Title">{form.title}</ReviewRow>
               <ReviewRow label="When">{whenText}</ReviewRow>
@@ -825,27 +1043,26 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
               {form.description && <ReviewRow label="Notes">{form.description}</ReviewRow>}
 
               {!isEdit && (
-                <label className="flex items-center gap-2 pt-2 text-slate-700">
-                  <input type="checkbox" checked={sendInvites} onChange={(e) => setSendInvites(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                  Email an invite (with the join link) to the {invitableCount} attendee{invitableCount === 1 ? "" : "s"} with an email
+                <label className="flex items-center gap-2 pt-2 text-slate-700 dark:text-slate-300 font-medium">
+                  <input type="checkbox" checked={sendInvites} onChange={(e) => setSendInvites(e.target.checked)} className="rounded border-slate-300 text-[#18A7B8] focus:ring-[#18A7B8]" />
+                  Email an invite to {invitableCount} attendee{invitableCount === 1 ? "" : "s"}
                 </label>
               )}
             </div>
           )}
 
-          {/* Footer */}
           <div className="flex justify-between gap-2 mt-6">
             {step === "review"
-              ? <Button variant="ghost" onClick={() => setStep("details")} disabled={pending}><ChevronLeft className="h-4 w-4" /> Back</Button>
-              : <Button variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button>}
+              ? <Button variant="ghost" onClick={() => setStep("details")} disabled={pending} className="rounded-xl font-bold"><ChevronLeft className="h-4 w-4" /> Back</Button>
+              : <Button variant="ghost" onClick={onClose} disabled={pending} className="rounded-xl font-bold">Cancel</Button>}
             {isEdit ? (
-              <Button onClick={confirmSave} disabled={pending}>
+              <Button onClick={confirmSave} disabled={pending} className="rounded-xl font-bold bg-[#18A7B8] hover:bg-[#14929f] text-white">
                 {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</> : "Save changes"}
               </Button>
             ) : step === "details" ? (
-              <Button onClick={goReview} disabled={pending}>Review →</Button>
+              <Button onClick={goReview} disabled={pending} className="rounded-xl font-bold bg-[#18A7B8] hover:bg-[#14929f] text-white">Review →</Button>
             ) : (
-              <Button onClick={confirmSave} disabled={pending}>
+              <Button onClick={confirmSave} disabled={pending} className="rounded-xl font-bold bg-[#18A7B8] hover:bg-[#14929f] text-white">
                 {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</> : <><Send className="h-4 w-4" /> {sendInvites && invitableCount ? "Schedule & send invites" : "Schedule meeting"}</>}
               </Button>
             )}
@@ -859,8 +1076,8 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
 function ReviewRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
-      <span className="w-24 flex-shrink-0 text-xs font-medium uppercase tracking-wider text-slate-400 pt-0.5">{label}</span>
-      <div className="flex-1 text-slate-700">{children}</div>
+      <span className="w-24 flex-shrink-0 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 pt-0.5">{label}</span>
+      <div className="flex-1 text-slate-700 dark:text-slate-300 font-medium">{children}</div>
     </div>
   );
 }
@@ -868,8 +1085,102 @@ function ReviewRow({ label, children }: { label: string; children: React.ReactNo
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1.5">{label} {required && <span className="text-red-500">*</span>}</label>
+      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">{label} {required && <span className="text-rose-500">*</span>}</label>
       {children}
     </div>
   );
 }
+
+const REGIONS = [
+  { label: "Local Time (Auto)", zone: undefined },
+  { label: "US Eastern (EST/EDT)", zone: "America/New_York" },
+  { label: "US Pacific (PST/PDT)", zone: "America/Los_Angeles" },
+  { label: "US Central (CST/CDT)", zone: "America/Chicago" },
+  { label: "UK / London (GMT/BST)", zone: "Europe/London" },
+  { label: "Central Europe (CET)", zone: "Europe/Paris" },
+  { label: "Dubai (GST)", zone: "Asia/Dubai" },
+  { label: "India (IST)", zone: "Asia/Kolkata" },
+  { label: "Singapore (SGT)", zone: "Asia/Singapore" },
+  { label: "Tokyo (JST)", zone: "Asia/Tokyo" },
+  { label: "Sydney (AEST)", zone: "Australia/Sydney" },
+];
+
+function RegionClockWidget() {
+  const [time, setTime] = useState<Date | null>(null);
+  const [selectedZone, setSelectedZone] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only clock init on mount, avoids an SSR/client time mismatch
+    setTime(new Date());
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeString = useMemo(() => {
+    if (!time) return "--:--:--";
+    return time.toLocaleTimeString([], {
+      timeZone: selectedZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+  }, [time, selectedZone]);
+
+  const dateString = useMemo(() => {
+    if (!time) return "";
+    return time.toLocaleDateString([], {
+      timeZone: selectedZone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  }, [time, selectedZone]);
+
+  const tzAbbrev = useMemo(() => {
+    if (!time) return "";
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", { timeZoneName: "short", timeZone: selectedZone }).formatToParts(time);
+      return parts.find((p) => p.type === "timeZoneName")?.value || "";
+    } catch {
+      return "";
+    }
+  }, [time, selectedZone]);
+
+  return (
+    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 p-2.5 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 inline-flex items-center gap-1.5">
+          <Globe className="h-3.5 w-3.5 text-[#18A7B8]" /> Region Time
+        </span>
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#18A7B8]/10 text-[#18A7B8]">
+          {tzAbbrev || "LOCAL"}
+        </span>
+      </div>
+
+      <div className="flex items-baseline justify-between">
+        <span className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight font-mono">
+          {timeString}
+        </span>
+        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+          {dateString}
+        </span>
+      </div>
+
+      <div>
+        <select
+          value={selectedZone || ""}
+          onChange={(e) => setSelectedZone(e.target.value || undefined)}
+          className="w-full text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#18A7B8]"
+        >
+          {REGIONS.map((r) => (
+            <option key={r.label} value={r.zone || ""}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+

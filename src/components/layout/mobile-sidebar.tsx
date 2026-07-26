@@ -114,7 +114,7 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
           )}
         </nav>
 
-        <div className="p-3 border-t border-slate-100 space-y-2">
+        <div className="p-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
           <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-4 text-white">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="h-4 w-4" />

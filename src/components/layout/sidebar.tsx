@@ -7,7 +7,7 @@ import { onCreditsChanged } from "@/lib/credits-refresh";
 import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
-import { navMainItems, navAdminItems, filterNavByRoleAndOverrides } from "@/lib/nav-config";
+import { navMainItems, navAdminItems, filterNavByRoleAndOverrides, isNavItemAllowed } from "@/lib/nav-config";
 import { useSidebar } from "./sidebar-context";
 
 const EXPANDED = "w-64";
@@ -34,6 +34,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
 
   const main = filterNavByRoleAndOverrides(navMainItems, role, navAccess);
   const admin = filterNavByRoleAndOverrides(navAdminItems, role, navAccess);
+  const canViewBilling = isNavItemAllowed(navAdminItems, "/billing", role, navAccess);
 
   function renderItem(item: (typeof navMainItems)[number], exactActive: boolean) {
     const Icon = item.icon;
@@ -50,8 +51,8 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             className={cn(
               "relative flex items-center justify-center h-11 w-11 rounded-2xl transition-all duration-200",
               active
-                ? "bg-white text-blue-600 shadow-lg shadow-black/20"
-                : "text-white/60 hover:bg-white/15 hover:text-white"
+                ? "bg-white text-blue-600 shadow-lg shadow-black/20 font-bold"
+                : "text-white/80 hover:bg-white/20 hover:text-white"
             )}
           >
             <Icon className="h-[21px] w-[21px]" strokeWidth={2} />
@@ -65,13 +66,13 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
         <Link
           href={item.href}
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-colors group",
+            "flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-semibold transition-colors group",
             active
-              ? "bg-white/15 text-white ring-1 ring-white/20"
-              : "text-white/60 hover:bg-white/10 hover:text-white"
+              ? "bg-white/25 text-white ring-1 ring-white/35 shadow-xs"
+              : "text-white/85 hover:bg-white/15 hover:text-white"
           )}
         >
-          <Icon className={cn("h-5 w-5 flex-shrink-0", active ? "text-white" : "text-white/50 group-hover:text-white")} strokeWidth={2} />
+          <Icon className={cn("h-5 w-5 flex-shrink-0", active ? "text-white" : "text-white/75 group-hover:text-white")} strokeWidth={2} />
           <span className="flex-1 whitespace-nowrap">{item.label}</span>
         </Link>
       </li>
@@ -106,7 +107,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
                 <span className="font-bold text-white text-lg tracking-tight">
                   Nxelio
                 </span>
-                <span className="text-[10px] text-white/50 font-medium uppercase tracking-[0.12em]">AI Engagement</span>
+                <span className="text-[10px] text-white/75 font-bold uppercase tracking-[0.12em]">AI Engagement</span>
               </span>
             )}
           </button>
@@ -114,13 +115,13 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
 
         <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-6", collapsed ? "px-2" : "px-3")}>
           <div>
-            {!collapsed && <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">Workspace</p>}
+            {!collapsed && <p className="px-3 mb-2 text-[11px] font-extrabold uppercase tracking-wider text-white/75">Workspace</p>}
             <ul className="space-y-1.5">{main.map((item) => renderItem(item, false))}</ul>
           </div>
 
           {admin.length > 0 && (
             <div>
-              {!collapsed && <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">Admin</p>}
+              {!collapsed && <p className="px-3 mb-2 text-[11px] font-extrabold uppercase tracking-wider text-white/75">Admin</p>}
               <ul className="space-y-1.5">{admin.map((item) => renderItem(item, true))}</ul>
             </div>
           )}
@@ -128,7 +129,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
 
         <div className={cn("py-3 space-y-2 flex-shrink-0", collapsed ? "px-2" : "px-3")}>
           {/* AI credits */}
-          {collapsed ? (
+          {!canViewBilling ? null : collapsed ? (
             <div className="flex justify-center">
               <Link
                 href="/billing"
@@ -139,18 +140,18 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
               </Link>
             </div>
           ) : (
-            <div className="bg-white/10 rounded-2xl p-4 text-white overflow-hidden ring-1 ring-white/15">
+            <div className="bg-white/15 rounded-2xl p-4 text-white overflow-hidden ring-1 ring-white/20">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="h-4 w-4 flex-shrink-0" />
-                <p className="font-semibold text-sm">Subscription and Payments</p>
+                <p className="font-bold text-sm">Subscription and Payments</p>
               </div>
-              <p className="text-xs text-white/60 mb-2 whitespace-nowrap">
+              <p className="text-xs text-white/90 font-medium mb-2 whitespace-nowrap">
                 {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} used` : "Loading..."}
               </p>
-              <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-white/25 rounded-full overflow-hidden">
                 <div className="h-full bg-white rounded-full transition-all" style={{ width: credits ? `${Math.min(100, Math.round((credits.used / credits.total) * 100))}%` : "0%" }} />
               </div>
-              <Link href="/billing" className="mt-3 inline-block text-xs font-medium text-white/70 hover:text-white whitespace-nowrap">Upgrade plan →</Link>
+              <Link href="/billing" className="mt-3 inline-block text-xs font-semibold text-white/90 hover:text-white underline-offset-2 hover:underline whitespace-nowrap">Upgrade plan →</Link>
             </div>
           )}
 
@@ -160,7 +161,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
               <Link
                 href="/help"
                 title="Help & Support"
-                className="flex items-center justify-center h-11 w-11 rounded-2xl text-white/50 hover:bg-white/10 hover:text-white transition-colors"
+                className="flex items-center justify-center h-11 w-11 rounded-2xl text-white/70 hover:bg-white/15 hover:text-white transition-colors"
               >
                 <HelpCircle className="h-5 w-5" />
               </Link>
@@ -168,9 +169,9 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
           ) : (
             <Link
               href="/help"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-semibold text-white/85 hover:bg-white/15 hover:text-white transition-colors"
             >
-              <HelpCircle className="h-5 w-5 flex-shrink-0" />
+              <HelpCircle className="h-5 w-5 flex-shrink-0 text-white/75" />
               <span className="whitespace-nowrap">Help &amp; Support</span>
             </Link>
           )}

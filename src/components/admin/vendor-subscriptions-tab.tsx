@@ -9,14 +9,14 @@ function centsToDollarsStr(cents: number | null): string {
 
 export function VendorSubscriptionsTab({ rows }: { rows: VendorSubscriptionRow[] }) {
   return (
-    <div className="rounded-xl border border-slate-800 overflow-hidden">
-      <div className="p-4 border-b border-slate-800">
-        <h3 className="font-semibold text-white">Our Vendor Subscriptions</h3>
-        <p className="text-xs text-slate-400 mt-0.5">
-          Nxelio&apos;s own paid accounts (Unipile, AnySite, Brevo, Bright Data). Tracked manually — these vendors don&apos;t expose a billing API we integrate with.
+    <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+      <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+        <h3 className="font-bold text-slate-900 dark:text-white text-base">Our Vendor Subscriptions</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          Nxelio&apos;s own paid accounts (Unipile, AnySite, Brevo, Bright Data). Tracked manually &mdash; these vendors don&apos;t expose a billing API we integrate with.
         </p>
       </div>
-      <div className="divide-y divide-slate-800">
+      <div className="divide-y divide-slate-100 dark:divide-slate-800/70">
         {rows.map((r) => <VendorRow key={r.id} row={r} />)}
       </div>
     </div>
@@ -45,53 +45,82 @@ function VendorRow({ row }: { row: VendorSubscriptionRow }) {
 
   if (!editing) {
     return (
-      <div className="p-4 flex items-start justify-between gap-4">
+      <div className="p-5 flex items-start justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
         <div>
-          <p className="font-medium text-white">{row.vendor_name}</p>
-          <p className="text-sm text-slate-400 mt-0.5">
+          <p className="font-bold text-slate-900 dark:text-white text-base">{row.vendor_name}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 font-medium mt-0.5">
             {row.plan_name || "No plan set"}
             {row.monthly_cost_cents != null && ` · $${(row.monthly_cost_cents / 100).toFixed(2)}/mo`}
             {row.renewal_date && ` · renews ${new Date(row.renewal_date).toLocaleDateString(undefined, { dateStyle: "medium" })}`}
           </p>
-          {row.usage_notes && <p className="text-xs text-slate-500 mt-1">{row.usage_notes}</p>}
+          {row.usage_notes && <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{row.usage_notes}</p>}
         </div>
-        <button onClick={() => setEditing(true)} className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800">
-          <Pencil className="h-3.5 w-3.5" /> Edit
+        <button
+          onClick={() => setEditing(true)}
+          className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-all"
+        >
+          <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" /> Edit
         </button>
       </div>
     );
   }
 
   return (
-    <div className="p-4 space-y-3">
-      <p className="font-medium text-white">{row.vendor_name}</p>
-      <div className="grid grid-cols-2 gap-3">
+    <div className="p-5 space-y-4 bg-slate-50/50 dark:bg-slate-950/40 border-b border-slate-200/80 dark:border-slate-800 last:border-0">
+      <p className="font-bold text-slate-900 dark:text-white text-base">{row.vendor_name}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Plan name</label>
-          <input value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="e.g. Pro"
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-white outline-none focus:border-blue-500" />
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Plan name</label>
+          <input
+            value={planName}
+            onChange={(e) => setPlanName(e.target.value)}
+            placeholder="e.g. Pro"
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-[#18A7B8] focus:ring-2 focus:ring-[#18A7B8]/20 transition-all shadow-sm"
+          />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Monthly cost (USD)</label>
-          <input value={cost} onChange={(e) => setCost(e.target.value)} placeholder="e.g. 55" type="number" step="0.01"
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-white outline-none focus:border-blue-500" />
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Monthly cost (USD)</label>
+          <input
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="e.g. 55"
+            type="number"
+            step="0.01"
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-[#18A7B8] focus:ring-2 focus:ring-[#18A7B8]/20 transition-all shadow-sm"
+          />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Renewal date</label>
-          <input value={renewal} onChange={(e) => setRenewal(e.target.value)} type="date"
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-white outline-none focus:border-blue-500" />
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Renewal date</label>
+          <input
+            value={renewal}
+            onChange={(e) => setRenewal(e.target.value)}
+            type="date"
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-[#18A7B8] focus:ring-2 focus:ring-[#18A7B8]/20 transition-all shadow-sm"
+          />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Usage notes</label>
-          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. 4,200 / 10,000 emails sent"
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-white outline-none focus:border-blue-500" />
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Usage notes</label>
+          <input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. 4,200 / 10,000 emails sent"
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-[#18A7B8] focus:ring-2 focus:ring-[#18A7B8]/20 transition-all shadow-sm"
+          />
         </div>
       </div>
-      <div className="flex gap-2">
-        <button onClick={save} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50">
+      <div className="flex gap-2.5 pt-1">
+        <button
+          onClick={save}
+          disabled={pending}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[#18A7B8] hover:bg-[#14929f] text-white px-4 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-50"
+        >
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Save
         </button>
-        <button onClick={() => setEditing(false)} disabled={pending} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800">
+        <button
+          onClick={() => setEditing(false)}
+          disabled={pending}
+          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-sm"
+        >
           Cancel
         </button>
       </div>

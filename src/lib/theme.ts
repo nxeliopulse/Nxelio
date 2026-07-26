@@ -3,7 +3,7 @@ export type FontSize = "default" | "compact" | "large" | "xl";
 export type FontStyle = "sans" | "inter" | "roboto" | "outfit" | "serif" | "mono" | "rounded";
 export type LightPreset = "light" | "warm" | "slate";
 export type DarkPreset = "dark" | "midnight" | "obsidian" | "emerald";
-export type AccentColor = "blue" | "indigo" | "purple" | "emerald" | "rose" | "amber";
+export type AccentColor = "blue" | "indigo" | "purple" | "emerald" | "rose" | "amber" | "teal";
 export type SidebarBadgeStyle = "default" | "numeric" | "dot" | "hidden";
 export type SidebarDensity = "default" | "compact";
 

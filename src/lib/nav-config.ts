@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users2, Send, Layers3, Briefcase, BarChart3, Newspaper, UserCog, Settings, Link2, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Users2, Send, Layers3, Briefcase, BarChart3, Newspaper, UserCog, Settings, Link2, CalendarDays, CreditCard } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type Role = "Super Admin" | "Sales Admin" | "Marketing Admin" | string;
@@ -39,6 +39,7 @@ export const navMainItems: NavItem[] = [
 export const navAdminItems: NavItem[] = [
   { label: "User Management", href: "/users", icon: UserCog, roles: SUPER },
   { label: "Capture Form", href: "/capture-form", icon: Link2, roles: SUPER },
+  { label: "Subscription", href: "/billing", icon: CreditCard, roles: ALL },
   { label: "Settings", href: "/settings", icon: Settings, roles: ALL },
 ];
 
@@ -53,6 +54,21 @@ export function filterNavByRole(items: NavItem[], role: Role | null | undefined)
  * - If navAccess[item.href] === false, item is denied (even if role allows it)
  * - If navAccess has no key, falls back to role default
  */
+/** Whether a single nav item (by href) is allowed for this role, honoring per-user overrides. */
+export function isNavItemAllowed(
+  items: NavItem[],
+  href: string,
+  role: Role | null | undefined,
+  navAccess?: Record<string, boolean> | null
+): boolean {
+  const item = items.find((i) => i.href === href);
+  if (!item) return false;
+  const override = navAccess && Object.prototype.hasOwnProperty.call(navAccess, href) ? navAccess[href] : undefined;
+  if (override === true) return true;
+  if (override === false) return false;
+  return !role || item.roles.includes(role);
+}
+
 export function filterNavByRoleAndOverrides(
   items: NavItem[],
   role: Role | null | undefined,

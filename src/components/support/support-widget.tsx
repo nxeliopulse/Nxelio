@@ -99,55 +99,44 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                     className="w-full bg-white rounded-xl border border-slate-200 p-4 text-left shadow-sm hover:border-blue-300 hover:shadow transition-all flex items-center justify-between gap-3"
                   >
                     <div>
-                      <p className="font-semibold text-slate-900 text-sm">Ask a question</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Product help, how-tos & navigation</p>
+                      <p className="font-semibold text-slate-900 text-sm">Ask a question...</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Search how-tos, workflows & features</p>
                     </div>
-                    <div className="h-9 w-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-                      <MessageSquare className="h-4.5 w-4.5" />
-                    </div>
+                    <Search className="h-5 w-5 text-slate-400" />
                   </button>
 
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2 text-slate-400">
-                      <Search className="h-4 w-4" />
-                      <span className="text-sm">Browse common topics</span>
-                    </div>
-                    <ul className="divide-y divide-slate-100">
-                      {SUPPORT_TOPICS.map((t) => (
-                        <li key={t.label}>
-                          <button
-                            onClick={() => ask(t.question)}
-                            className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
-                          >
-                            <span className="text-sm text-slate-700">{t.label}</span>
-                            <ChevronRight className="h-4 w-4 text-blue-400 flex-shrink-0" />
-                          </button>
-                        </li>
+                  <div className="pt-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 px-1 mb-2">Popular help topics</p>
+                    <div className="space-y-1.5">
+                      {SUPPORT_TOPICS.map((topic) => (
+                        <button
+                          key={topic.label}
+                          onClick={() => ask(topic.question)}
+                          className="w-full bg-white rounded-xl border border-slate-200 p-3 text-left hover:border-blue-300 hover:bg-blue-50/50 transition-all flex items-center justify-between group"
+                        >
+                          <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{topic.label}</span>
+                          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-blue-600" />
+                        </button>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 </>
               ) : (
-                <>
-                  {chat.map((m, i) => (
-                    <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                      <div className="max-w-[88%]">
-                        <div className={`rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap ${
-                          m.role === "user"
-                            ? "bg-blue-600 text-white rounded-br-sm"
-                            : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
-                        }`}>
-                          {m.content}
-                        </div>
-                        {m.links && m.links.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {m.links.map((l, j) => (
+                <div className="space-y-3">
+                  {chat.map((msg, idx) => (
+                    <div key={idx} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                      <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${msg.role === "user" ? "bg-blue-600 text-white" : "bg-white text-slate-800 border border-slate-200 shadow-xs"}`}>
+                        <p className="whitespace-pre-wrap font-medium">{msg.content}</p>
+                        {msg.links && msg.links.length > 0 && (
+                          <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-1">
+                            {msg.links.map((link) => (
                               <button
-                                key={j}
-                                onClick={() => goTo(l.href)}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-blue-200 text-blue-700 text-xs font-semibold px-3 py-1.5 hover:bg-blue-50 transition-colors"
+                                key={link.href}
+                                onClick={() => goTo(link.href)}
+                                className="w-full flex items-center justify-between text-xs font-bold text-blue-600 hover:underline"
                               >
-                                {l.label} <ChevronRight className="h-3.5 w-3.5" />
+                                <span>{link.label}</span>
+                                <ChevronRight className="h-3 w-3" />
                               </button>
                             ))}
                           </div>
@@ -156,26 +145,27 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                     </div>
                   ))}
                   {pending && (
-                    <div className="flex justify-start">
-                      <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm text-slate-500 inline-flex items-center gap-2">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Finding the answer…
-                      </div>
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 p-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" /> Finding answer...
                     </div>
                   )}
-                </>
+                </div>
               )}
             </div>
 
-            {/* Input */}
-            <div className="p-3 border-t border-slate-100 bg-white">
-              <form onSubmit={(e) => { e.preventDefault(); ask(); }} className="flex items-center gap-2">
+            {/* Footer */}
+            <div className="p-3 bg-white border-t border-slate-200">
+              <form
+                onSubmit={(e) => { e.preventDefault(); ask(); }}
+                className="flex items-center gap-2"
+              >
                 <input
                   ref={inputRef}
+                  type="text"
+                  placeholder="Ask any question..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about a feature or where to find it…"
-                  className="flex-1 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
-                  disabled={pending}
+                  className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <button
                   type="submit"

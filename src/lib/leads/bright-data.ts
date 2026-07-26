@@ -91,7 +91,7 @@ export async function brightDataSearchPeople(criteria: {
 }): Promise<{ ok: boolean; prospects: BrightDataProspect[]; error?: string }> {
   if (!API_KEY) return { ok: false, prospects: [], error: "Bright Data not configured" };
 
-  const target = Math.max(1, Math.min(50, Math.round(criteria.count || 10)));
+  const target = Math.max(1, Math.min(100, Math.round(criteria.count || 10)));
   const terms = [criteria.role, criteria.industry].filter(Boolean).join(" ").trim() || "professional";
   const generic = new Set(["", "worldwide", "global", "anywhere", "remote"]);
   const locs = (criteria.locations || []).filter((l) => !generic.has(l.toLowerCase()));
