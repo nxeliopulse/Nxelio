@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { getAiCreditsUsage } from "@/lib/queries/credits";
+import { getAiCreditsUsage, type AiCreditsUsage } from "@/lib/queries/credits";
 import { onCreditsChanged } from "@/lib/credits-refresh";
 import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
@@ -13,10 +13,18 @@ import { useSidebar } from "./sidebar-context";
 const EXPANDED = "w-64";
 const COLLAPSED = "w-[84px]";
 
+// The plan one tier above the current one — null once already on the top plan.
+const NEXT_PLAN: Record<string, string | null> = {
+  basic: "Starter",
+  starter: "Pro",
+  pro: null,
+};
+
 export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record<string, boolean> | null }) {
   const pathname = usePathname();
   const { collapsed, toggleCollapsed } = useSidebar();
-  const [credits, setCredits] = useState<{ used: number; total: number } | null>(null);
+  const [credits, setCredits] = useState<AiCreditsUsage | null>(null);
+  const nextPlan = credits ? NEXT_PLAN[credits.planId] : "Starter";
 
   useEffect(() => {
     let cancelled = false;
@@ -126,13 +134,13 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
           )}
         </nav>
 
-        {/* Bottom Upgrade CTA card */}
         <div className={cn("py-3 space-y-2 flex-shrink-0", collapsed ? "px-2" : "px-3")}>
-          {collapsed ? (
+          {/* Bottom Upgrade CTA card — hidden once already on the top plan */}
+          {nextPlan && (collapsed ? (
             <div className="flex justify-center">
               <Link
                 href="/billing"
-                title="Upgrade to Starter"
+                title={`Upgrade to ${nextPlan}`}
                 className="flex items-center justify-center h-10 w-10 rounded-xl bg-teal-600 hover:bg-teal-500 text-white transition-colors"
               >
                 <Sparkles className="h-4.5 w-4.5" />
@@ -142,7 +150,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             <div className="bg-[#0f4d4a] rounded-xl p-3 text-white overflow-hidden border border-[#186a66]">
               <div className="flex items-center gap-1.5 mb-1 text-teal-200">
                 <Sparkles className="h-4 w-4 flex-shrink-0" />
-                <p className="font-bold text-xs">Upgrade to Starter</p>
+                <p className="font-bold text-xs">Upgrade to {nextPlan}</p>
               </div>
               <p className="text-[11px] text-teal-100/70 mb-2 leading-tight">
                 {credits ? `${credits.used.toLocaleString()} / ${credits.total.toLocaleString()} credits used` : "Unlock full CRM features"}
@@ -154,7 +162,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
                 Learn more
               </Link>
             </div>
-          )}
+          ))}
 
           {/* Help & support */}
           {collapsed ? (

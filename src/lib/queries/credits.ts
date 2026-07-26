@@ -5,6 +5,7 @@ import { getSubscription } from "@/lib/queries/subscriptions";
 export interface AiCreditsUsage {
   used: number;
   total: number;
+  planId: string;
 }
 
 /**
@@ -14,6 +15,6 @@ export interface AiCreditsUsage {
  */
 export async function getAiCreditsUsage(): Promise<AiCreditsUsage> {
   const sub = await getSubscription();
-  if (!sub) return { used: 0, total: 0 };
-  return { used: sub.credits_total - sub.credits_remaining, total: sub.credits_total };
+  if (!sub) return { used: 0, total: 0, planId: "basic" };
+  return { used: sub.credits_total - sub.credits_remaining, total: sub.credits_total, planId: sub.plan_id };
 }

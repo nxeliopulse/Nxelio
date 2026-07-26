@@ -63,6 +63,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
               placeholder="Find or Ask..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              suppressHydrationWarning
               onKeyDown={(e) => {
                 if (e.key === "Enter" && searchQuery.trim()) {
                   router.push(`/leads?q=${encodeURIComponent(searchQuery.trim())}`);
