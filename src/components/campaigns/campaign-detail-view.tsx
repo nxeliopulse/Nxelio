@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Users2, Send, MailOpen, Reply, AlertTriangle, Clock, Trash2,
-  BarChart3, MousePointerClick, CalendarClock,
+  BarChart3, MousePointerClick, CalendarClock, Loader2,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -86,6 +86,7 @@ export function CampaignDetailView({
   const router = useRouter();
   const { confirm, toast } = useFeedback();
   const [pending, start] = useTransition();
+  const [sending, setSending] = useState(false);
   const [tab, setTab] = useState<Tab>("Audience");
   const [name, setName] = useState(campaign.campaign_name);
   const [status, setStatusLocal] = useState(campaign.status);
@@ -150,15 +151,16 @@ export function CampaignDetailView({
   }
   async function handleSendNow() {
     if (!(await confirm({ title: "Send this campaign?", message: `Send the opener email to everyone in “${audienceLabel}” (${audience.toLocaleString()} leads).`, confirmLabel: "Send now" }))) return;
-    start(async () => {
-      try {
-        const res = await sendCampaign(campaign.id);
-        if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
-        else toast(res.error || "No emails were sent.", "error");
-      } catch (err) {
-        toast(err instanceof Error ? err.message : "Send failed. Try again.", "error");
-      }
-    });
+    setSending(true);
+    try {
+      const res = await sendCampaign(campaign.id);
+      if (res.ok) { toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}.`, "success"); router.refresh(); }
+      else toast(res.error || "No emails were sent.", "error");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Send failed. Try again.", "error");
+    } finally {
+      setSending(false);
+    }
   }
   function saveName() {
     start(async () => { await updateCampaign(campaign.id, { campaign_name: name.trim() || "Untitled Campaign" }); toast("Campaign updated", "success"); });
@@ -199,8 +201,10 @@ export function CampaignDetailView({
 
           <div className="flex items-center gap-3 lg:flex-col lg:items-end lg:gap-2">
             <div className="flex items-center gap-2">
-              <Button onClick={handleSendNow} disabled={pending}>
-                <Send className="h-4 w-4" /> Send now
+              <Button onClick={handleSendNow} disabled={pending || sending}>
+                {sending
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>
+                  : <><Send className="h-4 w-4" /> Send now</>}
               </Button>
             </div>
             <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, MoreHorizontal, Pause, Play, Copy, Trash2, Pencil, Search, LayoutTemplate, ChevronDown, ChevronRight, Megaphone, Link2, Send, CheckCircle2, Undo2, Archive } from "lucide-react";
@@ -22,6 +23,7 @@ interface UnifiedRow {
   name: string;
   kind: "email" | "sequence";
   channel?: string;
+  channelLabel: "Email" | "LinkedIn" | "Multichannel";
   status: string;
   approvalStatus: string | null; // email campaigns only — sequences aren't in scope for this lifecycle
   leads: number | null;
@@ -31,6 +33,28 @@ interface UnifiedRow {
   ownerId: string | null;
   updatedAt: string;
   href: string;
+}
+
+/** A campaign's own step content decides its channel — multichannel sequences
+ *  embed LinkedIn steps as "[li:...]" header markers alongside plain email
+ *  steps (see parseCampaignSteps in campaign-scheduler.ts), so a campaign with
+ *  both kinds of step is genuinely multichannel, not just "email". */
+function campaignChannelLabel(content: string | null): "Email" | "LinkedIn" | "Multichannel" {
+  if (!content || !content.trim()) return "Email";
+  const blocks = content.split(/\n+\s*---\s*\n+/);
+  let hasLinkedIn = false, hasEmail = false;
+  for (const block of blocks) {
+    const header = (block.trim().split("\n")[0] || "");
+    if (/\[li:(connection_request|linkedin_message|message)\]/i.test(header)) hasLinkedIn = true;
+    else hasEmail = true;
+  }
+  if (hasLinkedIn && hasEmail) return "Multichannel";
+  return hasLinkedIn ? "LinkedIn" : "Email";
+}
+
+function ChannelBadge({ label }: { label: "Email" | "LinkedIn" | "Multichannel" }) {
+  const variant = label === "LinkedIn" ? "blue" : label === "Multichannel" ? "purple" : "info";
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 export function CampaignsView({
@@ -59,6 +83,7 @@ export function CampaignsView({
   const [activeOnly, setActiveOnly] = useState(false);
   const [approvalFilter, setApprovalFilter] = useState("All");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -74,6 +99,19 @@ export function CampaignsView({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [openId, templatesOpen]);
 
+  // Table rows paint over each other's overflowing content, so the row-action menu is
+  // rendered in a portal instead — close it on scroll since its position is fixed at open time.
+  useEffect(() => {
+    if (!openId) return;
+    function onScroll() { setOpenId(null); }
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [openId]);
+
   const segmentContacts = new Map(segments.map((s) => [s.id, s.contacts]));
 
   const rows: UnifiedRow[] = [
@@ -81,6 +119,7 @@ export function CampaignsView({
       id: c.id,
       name: c.campaign_name,
       kind: "email",
+      channelLabel: campaignChannelLabel(c.content),
       status: c.status,
       approvalStatus: c.approval_status,
       leads: c.segment_id ? (segmentContacts.get(c.segment_id) ?? 0) : totalLeads,
@@ -96,6 +135,7 @@ export function CampaignsView({
       name: s.name,
       kind: "sequence",
       channel: s.channel,
+      channelLabel: s.channel === "linkedin" ? "LinkedIn" : s.channel === "multichannel" ? "Multichannel" : "Email",
       status: s.status,
       approvalStatus: null,
       leads: s.enrolled_count || 0,
@@ -329,6 +369,7 @@ export function CampaignsView({
                         <div className="flex items-center gap-1.5 min-w-0">
                           <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
                           <span className="font-medium text-slate-900 truncate">{r.name}</span>
+                          <ChannelBadge label={r.channelLabel} />
                         </div>
                       </td>
                       <td className="px-3 py-3">
@@ -356,12 +397,25 @@ export function CampaignsView({
                       </td>
                       <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{formatDate(r.updatedAt)}</td>
                       <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="relative" ref={openId === r.id ? menuRef : undefined}>
-                          <button onClick={() => setOpenId(openId === r.id ? null : r.id)} aria-label="Campaign actions" className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600">
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              if (openId === r.id) { setOpenId(null); return; }
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                              setOpenId(r.id);
+                            }}
+                            aria-label="Campaign actions"
+                            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                          >
                             <MoreHorizontal className="h-4 w-4" />
                           </button>
-                          {openId === r.id && (
-                            <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-44 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden p-1">
+                          {openId === r.id && menuPos && createPortal(
+                            <div
+                              ref={menuRef}
+                              style={{ position: "fixed", top: menuPos.top, right: menuPos.right }}
+                              className="lp-anim-pop origin-top-right z-50 w-44 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden p-1"
+                            >
                               <Link href={r.href} onClick={() => setOpenId(null)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
                                 <Pencil className="h-4 w-4 text-slate-400" /> Edit
                               </Link>
@@ -394,7 +448,8 @@ export function CampaignsView({
                               <button onClick={() => handleDelete(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50">
                                 <Trash2 className="h-4 w-4" /> Delete
                               </button>
-                            </div>
+                            </div>,
+                            document.body
                           )}
                         </div>
                       </td>

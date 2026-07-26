@@ -14,7 +14,7 @@ import { importLinkedInLeads, hasLinkedInAccount } from "@/lib/leads/linkedin-im
 import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outreach-accounts";
 import { searchBuyLeads, type GeneratedProspect } from "@/lib/leads/buy-leads";
 import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
-import { LocationSearchInput } from "@/components/leads/location-search-input";
+import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { hasFeature } from "@/lib/queries/subscriptions";
 
 type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
@@ -145,7 +145,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Buy leads (real prospects via Bright Data, or AI samples as fallback)
-  const [buy, setBuy] = useState({ industry: "", role: "", location: "", count: 10 });
+  const [buy, setBuy] = useState({ industry: "", role: "", locations: [] as string[], count: 10 });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
   const [buySource, setBuySource] = useState<"brightdata" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
@@ -201,7 +201,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     setStep(1); setSource(null); setInputValue("");
     setStep2Error(null); setStep2Warning(null);
     setManual([newManual()]); setEntries([newEntry()]); setCsvRows(null); setCsvName(""); setDragOver(false);
-    setBuy({ industry: "", role: "", location: "", count: 10 }); setBuyResults(null); setBuySource(null); setBuyLoading(false);
+    setBuy({ industry: "", role: "", locations: [], count: 10 }); setBuyResults(null); setBuySource(null); setBuyLoading(false);
     setSummary(null); setImportError(null);
   }
 
@@ -209,12 +209,13 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     return source !== null || inputValue.trim() !== "" || csvRows !== null ||
       manual.some((m) => m.name || m.title || m.url) ||
       entries.some(entryStarted) || buyResults !== null ||
-      buy.industry !== "" || buy.role !== "" || buy.location !== "";
+      buy.industry !== "" || buy.role !== "" || buy.locations.length > 0;
   }
 
   async function attemptClose() {
+    if (buyLoading) return; // a search is in flight — don't let it vanish mid-search
     if (summary) { reset(); onClose(); return; }       // already imported — just close
-    if (hasProgress() && !(await confirm({ title: "Discard import?", message: "Your progress will be lost.", confirmLabel: "Discard", danger: true }))) return;
+    if (hasProgress() && !(await confirm({ title: "Close this window?", message: "The details you've entered here haven't been saved yet, and will be lost.", confirmLabel: "Close anyway", danger: true }))) return;
     reset();
     onClose();
   }
@@ -402,7 +403,13 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
               <h2 className="font-semibold text-lg text-slate-900">Create a list of leads below</h2>
               <p className="text-sm text-slate-500 mt-0.5">Step {step} of 4 · {step === 1 ? "Choose a source" : step === 2 ? SOURCE_LABEL[source!] : step === 3 ? "Review" : "Summary"}</p>
             </div>
-            <button onClick={attemptClose} aria-label="Close" className="text-slate-400 hover:text-slate-700 rounded-md p-1">
+            <button
+              onClick={attemptClose}
+              aria-label="Close"
+              disabled={buyLoading}
+              title={buyLoading ? "Please wait for the search to finish" : undefined}
+              className="text-slate-400 hover:text-slate-700 rounded-md p-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-400"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -540,7 +547,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
         {/* Footer nav */}
         <div className="p-4 border-t border-slate-100 flex items-center justify-between">
           {step > 1 && step < 4 ? (
-            <Button variant="outline" onClick={back} disabled={pending}><ArrowLeft className="h-4 w-4" /> Back</Button>
+            <Button variant="outline" onClick={back} disabled={pending || buyLoading}><ArrowLeft className="h-4 w-4" /> Back</Button>
           ) : <span />}
 
           {step < 3 && (
@@ -635,6 +642,15 @@ function Step2Input(props: {
               <p className="text-xs text-slate-500">{csvRows.length} row{csvRows.length === 1 ? "" : "s"} parsed · {csvRows.filter((r) => r._valid).length} valid</p>
             </div>
             <button onClick={clearCsv} className="text-xs text-slate-500 hover:text-slate-700 underline">Choose different file</button>
+          </div>
+        )}
+        {csvRows && csvRows.some((r) => !r._valid) && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>
+              {csvRows.filter((r) => !r._valid).length} of {csvRows.length} row{csvRows.length === 1 ? "" : "s"} {csvRows.filter((r) => !r._valid).length === 1 ? "is" : "are"} missing a required field (a name or company, and an email or website) and won&apos;t be imported.
+              Fix those rows in your CSV and choose the file again, or continue to import only the valid rows.
+            </span>
           </div>
         )}
         {error && <ErrorNote text={error} />}
@@ -829,7 +845,7 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
 
 // ============================================================================
 // Buy Leads — real LinkedIn prospects via Bright Data (AI samples as fallback)
-type BuyState = { industry: string; role: string; location: string; count: number };
+type BuyState = { industry: string; role: string; locations: string[]; count: number };
 function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
@@ -859,7 +875,7 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
-          <LocationSearchInput value={buy.location} onChange={(v) => setBuy({ ...buy, location: v })} />
+          <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">How many (max 25)</label>
@@ -894,13 +910,13 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error }: {
   );
 }
 
-function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; location: string } }) {
+function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; locations: string[] } }) {
   const withLinkedIn = prospects.filter((p) => p.linkedin).length;
   const withEmail = prospects.filter((p) => p.email).length;
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
-        Prospects for <span className="font-medium text-slate-900">{criteria.role || "decision makers"}</span> in <span className="font-medium text-slate-900">{criteria.industry || "any industry"}</span>{criteria.location ? <> · {criteria.location}</> : null}
+        Prospects for <span className="font-medium text-slate-900">{criteria.role || "decision makers"}</span> in <span className="font-medium text-slate-900">{criteria.industry || "any industry"}</span>{criteria.locations.length ? <> · {criteria.locations.join(", ")}</> : null}
         {prospects.length > 0 && <span className="text-slate-400"> · {withLinkedIn} with LinkedIn · {withEmail} with an email</span>}
       </div>
       <div className="border border-slate-200 rounded-lg overflow-hidden">

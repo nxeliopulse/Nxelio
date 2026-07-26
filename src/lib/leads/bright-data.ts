@@ -86,7 +86,7 @@ function parseLinkedInTitle(rawTitle: string, fallbackRole: string): { name: str
 export async function brightDataSearchPeople(criteria: {
   industry?: string;
   role?: string;
-  location?: string;
+  locations?: string[];
   count: number;
 }): Promise<{ ok: boolean; prospects: BrightDataProspect[]; error?: string }> {
   if (!API_KEY) return { ok: false, prospects: [], error: "Bright Data not configured" };
@@ -94,8 +94,10 @@ export async function brightDataSearchPeople(criteria: {
   const target = Math.max(1, Math.min(50, Math.round(criteria.count || 10)));
   const terms = [criteria.role, criteria.industry].filter(Boolean).join(" ").trim() || "professional";
   const generic = new Set(["", "worldwide", "global", "anywhere", "remote"]);
-  const loc = generic.has((criteria.location || "").toLowerCase()) ? "" : criteria.location || "";
-  const query = `site:linkedin.com/in ${terms} ${loc}`.trim();
+  const locs = (criteria.locations || []).filter((l) => !generic.has(l.toLowerCase()));
+  const locPart = locs.length > 1 ? `(${locs.map((l) => `"${l}"`).join(" OR ")})` : locs[0] || "";
+  const query = `site:linkedin.com/in ${terms} ${locPart}`.trim();
+  const displayLocation = locs.join(", ");
 
   const prospects: BrightDataProspect[] = [];
   const seen = new Set<string>();
@@ -114,7 +116,7 @@ export async function brightDataSearchPeople(criteria: {
           full_name: cut(name, 150),
           title: cut(title, 150),
           company_name: cut(company, 200),
-          location: cut(criteria.location, 150),
+          location: cut(displayLocation, 150),
           linkedin: cut(link, 500),
           email: "",
         });

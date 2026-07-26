@@ -4,25 +4,12 @@ import { brightDataConfigured, brightDataSearchPeople, brightDataFindCompanyWebs
 import { anysiteConfigured, findEmailsByLinkedIn } from "@/lib/leads/anysite";
 import { guessAndVerifyEmail } from "@/lib/leads/email-guess";
 import { hasFeature } from "@/lib/queries/subscriptions";
-
-/** Runs `fn` over `items` with at most `concurrency` in flight at once. */
-async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let i = 0;
-  async function worker() {
-    while (i < items.length) {
-      const idx = i++;
-      results[idx] = await fn(items[idx]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
-  return results;
-}
+import { mapWithConcurrency } from "@/lib/utils";
 
 export interface BuyCriteria {
   industry: string;
   role: string;
-  location: string;
+  locations: string[];
   count: number;
 }
 
@@ -146,7 +133,7 @@ export async function generateSampleProspects(criteria: BuyCriteria): Promise<Bu
   const prompt = `Generate ${count} sample B2B prospects matching:
 - Industry: ${criteria.industry || "any"}
 - Job title / role: ${criteria.role || "decision maker"}
-- Location: ${criteria.location || "global"}
+- Location: ${criteria.locations.length ? criteria.locations.join(", ") : "global"}
 
 Return JSON in exactly this shape:
 {
