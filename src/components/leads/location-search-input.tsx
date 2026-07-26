@@ -1,15 +1,22 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-/** Debounced location search-as-you-type, backed by OpenStreetMap Nominatim (see /api/geo/search). */
-export function LocationSearchInput({
+/**
+ * Multi-location picker for Buy Leads — chips for each picked location, backed
+ * by the same debounced Nominatim search-as-you-type used elsewhere (see
+ * /api/geo/search). Locations can only be added by picking a suggestion, never
+ * typed as a free-text address, so every stored value is a real place name.
+ */
+export function MultiLocationInput({
   value,
   onChange,
 }: {
-  value: string;
-  onChange: (v: string) => void;
+  value: string[];
+  onChange: (v: string[]) => void;
 }) {
+  const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -24,37 +31,60 @@ export function LocationSearchInput({
   }, []);
 
   function handleChange(v: string) {
-    onChange(v);
+    setQuery(v);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (v.trim().length < 2) { setSuggestions([]); setOpen(false); return; }
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await fetch(`/api/geo/search?q=${encodeURIComponent(v)}`);
         const data = await res.json();
-        setSuggestions(data.results || []);
-        setOpen((data.results || []).length > 0);
+        const results: string[] = (data.results || []).filter((s: string) => !value.includes(s));
+        setSuggestions(results);
+        setOpen(results.length > 0);
       } catch {
         setSuggestions([]);
       }
     }, 350);
   }
 
+  function addLocation(loc: string) {
+    if (!value.includes(loc)) onChange([...value, loc]);
+    setQuery("");
+    setSuggestions([]);
+    setOpen(false);
+  }
+
+  function removeLocation(loc: string) {
+    onChange(value.filter((v) => v !== loc));
+  }
+
   return (
     <div ref={wrapRef} className="relative">
-      <Input
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        onFocus={() => { if (suggestions.length) setOpen(true); }}
-        placeholder="e.g. United States, Austin TX"
-        autoComplete="off"
-      />
+      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400">
+        {value.map((loc) => (
+          <span key={loc} className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium pl-3 pr-1.5 py-1">
+            {loc}
+            <button type="button" onClick={() => removeLocation(loc)} aria-label={`Remove ${loc}`} className="p-0.5 rounded-full hover:bg-blue-100 text-blue-500">
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <Input
+          value={query}
+          onChange={(e) => handleChange(e.target.value)}
+          onFocus={() => { if (suggestions.length) setOpen(true); }}
+          placeholder={value.length ? "Add another location" : "e.g. United States, Austin TX"}
+          autoComplete="off"
+          className="flex-1 min-w-[140px] border-0 shadow-none focus:ring-0 px-1 py-1 h-auto"
+        />
+      </div>
       {open && (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg max-h-56 overflow-y-auto">
           {suggestions.map((s) => (
             <button
               key={s}
               type="button"
-              onClick={() => { onChange(s); setOpen(false); }}
+              onClick={() => addLocation(s)}
               className="block w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 truncate"
               title={s}
             >

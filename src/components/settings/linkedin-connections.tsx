@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, CheckCircle2, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { Linkedin } from "@/components/outreach/linkedin-icon";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ export function LinkedInConnections({
   connectorReady: boolean;
 }) {
   const { confirm } = useFeedback();
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,7 @@ export function LinkedInConnections({
       if (!ok) return;
       try {
         await deleteOutreachAccount(id);
+        router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't disconnect");
       }

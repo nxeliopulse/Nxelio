@@ -29,8 +29,29 @@ export async function isUnipileConfigured() {
   return unipileConfigured;
 }
 
+/**
+ * Deletes any locally-stored Unipile account rows that no longer exist on
+ * Unipile's side (trial reset, manually removed there, etc.) — without this,
+ * a stale row keeps showing "Connected" forever since nothing ever re-checks
+ * it against the real Unipile account list. Fails silently on network errors
+ * so a Unipile hiccup never wipes out otherwise-valid local rows.
+ */
+async function pruneDeadUnipileAccounts(supabase: Awaited<ReturnType<typeof createClient>>, liveAccounts?: { id: string }[]): Promise<void> {
+  if (!unipileConfigured) return;
+  try {
+    const live = liveAccounts ?? (await listUnipileAccounts());
+    const liveIds = live.map((a) => a.id).filter(Boolean);
+    let q = supabase.from("outreach_accounts").delete().eq("provider", "unipile");
+    if (liveIds.length) q = q.not("account_id", "in", `(${liveIds.join(",")})`);
+    await q;
+  } catch {
+    // Unipile unreachable — leave local rows as-is rather than guessing.
+  }
+}
+
 export async function getOutreachAccounts(): Promise<OutreachAccountRow[]> {
   const supabase = await createClient();
+  await pruneDeadUnipileAccounts(supabase);
   const { data } = await supabase
     .from("outreach_accounts")
     .select("*")
@@ -57,6 +78,11 @@ export async function connectOutreachAccount(channel: "email" | "linkedin", retu
     return { ok: false, error: "Unipile is not configured. Add UNIPILE_DSN and UNIPILE_API_KEY to your environment." };
   }
   const supabase = await createClient();
+
+  // Clear out any rows for accounts Unipile no longer has (trial reset, etc.)
+  // before enforcing the cap below — otherwise a dead account blocks reconnecting
+  // forever, since nothing else ever re-checks it.
+  await pruneDeadUnipileAccounts(supabase);
 
   // Cap: at most one connected account per channel (email, linkedin).
   const { count } = await supabase
@@ -127,17 +153,11 @@ export async function syncOutreachAccounts(): Promise<{ ok: boolean; count: numb
 
     // Prune local accounts that no longer exist in Unipile (deleted/expired) so dead
     // accounts can't be picked for sending. RLS scopes the delete to this workspace.
-    const liveIds = accounts.map((a) => a.id).filter(Boolean);
-    if (liveIds.length) {
-      await supabase
-        .from("outreach_accounts")
-        .delete()
-        .eq("provider", "unipile")
-        .not("account_id", "in", `(${liveIds.join(",")})`);
-    }
+    await pruneDeadUnipileAccounts(supabase, accounts);
 
     revalidatePath("/outreach");
     revalidatePath("/campaigns");
+    revalidatePath("/settings");
     return { ok: true, count };
   } catch (err) {
     return { ok: false, count: 0, error: err instanceof Error ? err.message : "Sync failed" };

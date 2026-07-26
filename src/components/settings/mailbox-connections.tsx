@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Mail, Plus, Trash2, CheckCircle2, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ export function MailboxConnections({
   unipileConfigured: boolean;
 }) {
   const { confirm } = useFeedback();
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export function MailboxConnections({
       if (!ok) return;
       try {
         await deleteOutreachAccount(id);
+        router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't disconnect");
       }

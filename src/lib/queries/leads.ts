@@ -4,7 +4,8 @@ import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { archiveImportedLeads, markArchivedLeadsDeleted } from "@/lib/queries/lead-import-archive";
 import { revalidatePath } from "next/cache";
-import type { AiScoreResult } from "@/lib/ai/actions";
+import { scoreLeadWithAi, isAiConfigured, type AiScoreResult } from "@/lib/ai/actions";
+import { mapWithConcurrency } from "@/lib/utils";
 
 export interface LeadRow {
   id: string;
@@ -171,6 +172,17 @@ export async function bulkInsertLeads(
       metadata: { count: inserted, duplicates, source: sourceLabel },
     });
     await archiveImportedLeads((data as LeadRow[]) ?? [], sourceLabel);
+
+    // Score every newly imported lead automatically, so Lead Score is populated
+    // right away instead of requiring the user to open each lead's Score tab.
+    // Best-effort per lead — one failure (e.g. AI credits run out mid-batch)
+    // just leaves that lead unscored rather than blocking the rest of the import.
+    if (await isAiConfigured()) {
+      const ids = ((data as LeadRow[]) ?? []).map((l) => l.id).filter(Boolean);
+      await mapWithConcurrency(ids, 4, async (id) => {
+        try { await scoreLeadWithAi(id); } catch { /* left unscored */ }
+      });
+    }
   }
   return { inserted, duplicates };
 }

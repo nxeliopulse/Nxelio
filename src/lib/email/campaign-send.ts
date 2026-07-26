@@ -37,7 +37,7 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
   const steps = parseCampaignSteps(campaign.content, campaign.subject);
   const step1 = steps[0];
   if (!step1 || (!step1.subject && !step1.body)) {
-    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "This campaign has no email content yet." };
+    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: `This campaign has no ${step1?.channel === "linkedin" ? "LinkedIn message" : "email"} content yet.` };
   }
 
   // Resolve audience (segment members, or all workspace leads). Email sequences
@@ -66,14 +66,15 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
   const fromName = await fromNameForWorkspace(supabase, workspaceId);
 
   let sent = 0, failed = 0, skipped = 0, scheduled = 0, simulated = false;
+  let lastError: string | undefined;
   const launchMs = Date.now();
   const hasFollowups = steps.length > 1;
 
   for (const lead of leads.slice(0, MAX_PER_SEND)) {
     const r = await sendCampaignStepToLead(supabase, { campaignId, workspaceId, lead, subject: step1.subject, body: step1.body, senderName, fromName, channel: step1.channel, action: step1.action });
     if (r.ok) { sent++; if (r.simulated) simulated = true; }
-    else if (r.skipped) skipped++;
-    else failed++;
+    else if (r.skipped) { skipped++; lastError = r.error || lastError; }
+    else { failed++; lastError = r.error || lastError; }
     // Schedule follow-ups regardless of step 1's outcome so one skipped step
     // (e.g. a LinkedIn step with no connected account) never strands the sequence.
     if (hasFollowups) {
@@ -113,7 +114,9 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
 
   revalidatePath("/campaigns");
   revalidatePath(`/campaigns/${campaignId}`);
-  return { ok: sent > 0, sent, failed, skipped, scheduled, simulated, error: sent === 0 ? "No emails were sent." : undefined };
+  const channelLabel = step1.channel === "linkedin" ? "LinkedIn messages" : "emails";
+  const noneSentError = lastError ? `No ${channelLabel} were sent — ${lastError}` : `No ${channelLabel} were sent.`;
+  return { ok: sent > 0, sent, failed, skipped, scheduled, simulated, error: sent === 0 ? noneSentError : undefined };
 }
 
 /**
