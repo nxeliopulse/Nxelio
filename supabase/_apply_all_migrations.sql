@@ -3485,10 +3485,12 @@ ALTER TABLE email_verification_codes ENABLE ROW LEVEL SECURITY;
 
 
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
--- >>> FILE: 0070_reprice_and_remove_topup.sql
+-- >>> FILE: 0071_reprice_and_remove_topup.sql
 -- >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 -- ============================================================================
--- 0070_reprice_and_remove_topup.sql
+-- 0071_reprice_and_remove_topup.sql
+-- (renumbered from 0070 — collided with a concurrently-created
+-- 0070_outreach_send_limits.sql from another session)
 --
 -- 1. Reprice Starter and Pro (Basic unchanged) and raise their monthly
 --    AI-discovered-leads allowance. Applied immediately to existing
