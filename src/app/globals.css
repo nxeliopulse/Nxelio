@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 /* Enable class-based dark mode (toggled via .dark on <html>) */
@@ -23,6 +24,142 @@
      whole canvas drops a notch in brightness (dark mode re-inverts these). */
   --color-slate-50:  #e9edf3;
   --color-slate-100: #dfe5ee;
+}
+
+/* Dynamic font sizing */
+html[data-font-size="compact"] { font-size: 14px; }
+html[data-font-size="default"] { font-size: 16px; }
+html[data-font-size="large"] { font-size: 17.5px; }
+html[data-font-size="xl"] { font-size: 19px; }
+
+/* Dynamic font style / family */
+html[data-font-style="sans"], html[data-font-style="sans"] body { font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important; }
+html[data-font-style="inter"], html[data-font-style="inter"] body { font-family: 'Inter', var(--font-geist-sans), -apple-system, sans-serif !important; }
+html[data-font-style="roboto"], html[data-font-style="roboto"] body { font-family: 'Roboto', var(--font-geist-sans), sans-serif !important; }
+html[data-font-style="outfit"], html[data-font-style="outfit"] body { font-family: 'Outfit', var(--font-geist-sans), sans-serif !important; }
+html[data-font-style="rounded"], html[data-font-style="rounded"] body { font-family: 'Plus Jakarta Sans', var(--font-geist-sans), sans-serif !important; }
+html[data-font-style="serif"], html[data-font-style="serif"] body { font-family: Georgia, Cambria, "Times New Roman", serif !important; }
+html[data-font-style="mono"], html[data-font-style="mono"] body { font-family: var(--font-geist-mono), 'Fira Code', monospace !important; }
+
+/* Pointer cursors override */
+html[data-pointer-cursors="true"] button,
+html[data-pointer-cursors="true"] a,
+html[data-pointer-cursors="true"] [role="button"],
+html[data-pointer-cursors="true"] select,
+html[data-pointer-cursors="true"] input[type="checkbox"],
+html[data-pointer-cursors="true"] input[type="radio"] {
+  cursor: pointer !important;
+}
+
+html[data-pointer-cursors="false"] button,
+html[data-pointer-cursors="false"] a,
+html[data-pointer-cursors="false"] [role="button"],
+html[data-pointer-cursors="false"] select,
+html[data-pointer-cursors="false"] input[type="checkbox"],
+html[data-pointer-cursors="false"] input[type="radio"],
+html[data-pointer-cursors="false"] .cursor-pointer {
+  cursor: default !important;
+}
+
+/* Underline links override */
+html[data-underline-links="true"] a {
+  text-decoration: underline !important;
+}
+
+/* Light Theme Presets */
+html:not(.dark)[data-light-preset="warm"] {
+  --background: #fdfbf7;
+  --card: #f6f2ea;
+  --border: #e8e1d5;
+}
+html:not(.dark)[data-light-preset="slate"] {
+  --background: #f1f5f9;
+  --card: #ffffff;
+  --border: #cbd5e1;
+}
+
+/* Dark Theme Presets */
+html.dark[data-dark-preset="midnight"] {
+  --background: #090d16;
+  --card: #111726;
+  --muted: #192236;
+  --border: #232e48;
+}
+html.dark[data-dark-preset="obsidian"] {
+  --background: #09090b;
+  --card: #121215;
+  --muted: #1c1c21;
+  --border: #272730;
+}
+html.dark[data-dark-preset="emerald"] {
+  --background: #061412;
+  --card: #0d211e;
+  --muted: #14302c;
+  --border: #1e453f;
+}
+
+/* Accent Color Customizations */
+html[data-accent-color="indigo"] {
+  --primary: #4f46e5;
+  --color-blue-50: #eef2ff;
+  --color-blue-100: #e0e7ff;
+  --color-blue-500: #6366f1;
+  --color-blue-600: #4f46e5;
+  --color-blue-700: #4338ca;
+}
+html[data-accent-color="purple"] {
+  --primary: #9333ea;
+  --color-blue-50: #faf5ff;
+  --color-blue-100: #f3e8ff;
+  --color-blue-500: #a855f7;
+  --color-blue-600: #9333ea;
+  --color-blue-700: #7e22ce;
+}
+html[data-accent-color="emerald"] {
+  --primary: #059669;
+  --color-blue-50: #ecfdf5;
+  --color-blue-100: #d1fae5;
+  --color-blue-500: #10b981;
+  --color-blue-600: #059669;
+  --color-blue-700: #047857;
+}
+html[data-accent-color="rose"] {
+  --primary: #e11d48;
+  --color-blue-50: #fff1f2;
+  --color-blue-100: #ffe4e6;
+  --color-blue-500: #f43f5e;
+  --color-blue-600: #e11d48;
+  --color-blue-700: #be123c;
+}
+html[data-accent-color="amber"] {
+  --primary: #d97706;
+  --color-blue-50: #fffbeb;
+  --color-blue-100: #fef3c7;
+  --color-blue-500: #f59e0b;
+  --color-blue-600: #d97706;
+  --color-blue-700: #b45309;
+}
+
+/* Sidebar Density & Badges */
+html[data-sidebar-density="compact"] aside nav {
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
+}
+html[data-sidebar-density="compact"] aside nav a {
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
+}
+html[data-sidebar-badge="hidden"] .sidebar-badge {
+  display: none !important;
+}
+html[data-sidebar-badge="dot"] .sidebar-badge {
+  width: 8px !important;
+  height: 8px !important;
+  padding: 0 !important;
+  border-radius: 9999px !important;
+  color: transparent !important;
+  overflow: hidden !important;
+  min-width: 0 !important;
 }
 
 /* ============================================================================
@@ -56,9 +193,8 @@
   --color-slate-900: #f8fafc;
 }
 
-/* white surfaces → dark. Kept as an explicit rule (not via --color-white) so
-   `text-white` on colored buttons/badges stays white. */
-.dark .bg-white { background-color: #1b212e; }
+/* white surfaces → dynamic card variable so light & dark presets update surfaces */
+.dark .bg-white { background-color: var(--card); }
 
 /* slate shades used AS backgrounds must stay dark (the ramp inversion above
    would otherwise turn them light, e.g. the dark secondary button / overlays). */
@@ -82,11 +218,8 @@
 .dark ::-webkit-scrollbar-thumb { background: #334155; }
 .dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-/* Light mode: soften pure-white surfaces (cards, sidebar, topbar, modals) to a
-   calm off-white so the UI isn't glaring. `text-white` is untouched (only the
-   bg utility is remapped). In dark mode `.dark .bg-white` (higher specificity)
-   still wins, so this has no effect there. */
-.bg-white { background-color: #f5f8fc; }
+/* Light mode: soften pure-white surfaces (cards, sidebar, topbar, modals) to the preset card color. */
+.bg-white { background-color: var(--card); }
 
 @theme inline {
   --color-background: var(--background);

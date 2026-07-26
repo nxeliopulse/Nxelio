@@ -1,7 +1,7 @@
 "use client";
-import { useState, useTransition, useEffect, type ReactNode } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Sun, Moon, Monitor, Mail, Calendar, ScrollText } from "lucide-react";
+import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Mail, Calendar, ScrollText, Sliders, X } from "lucide-react";
 import { Linkedin } from "@/components/outreach/linkedin-icon";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 import { syncOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
@@ -14,7 +14,20 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { updateProfile, updatePassword } from "@/lib/queries/profile";
 import { addBlocklistEntry, removeBlocklistEntry, type BlocklistEntry } from "@/lib/queries/blocklist";
-import { getStoredTheme, applyTheme, type Theme } from "@/lib/theme";
+import {
+  getStoredAppearance,
+  applyAppearance,
+  DEFAULT_APPEARANCE,
+  type AppearanceSettings,
+  type Theme,
+  type FontSize,
+  type FontStyle,
+  type LightPreset,
+  type DarkPreset,
+  type AccentColor,
+  type SidebarBadgeStyle,
+  type SidebarDensity,
+} from "@/lib/theme";
 
 const sections = [
   { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
@@ -46,26 +59,78 @@ interface Props {
   auditLog: AuditLogRow[];
 }
 
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+        checked ? "bg-blue-600" : "bg-slate-300"
+      }`}
+    >
+      <span
+        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+          checked ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
+  );
+}
+
+function CustomSelect<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (val: T) => void;
+}) {
+  return (
+    <div className="relative inline-block">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className="appearance-none bg-slate-100 hover:bg-slate-200 text-slate-900 text-sm font-medium py-1.5 pl-3 pr-8 rounded-lg border border-slate-200 cursor-pointer focus:outline-none transition-colors"
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value} className="bg-white text-slate-900 py-1">
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+        <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
+          <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
+  { id: "blue", name: "Blue", bg: "bg-blue-600" },
+  { id: "indigo", name: "Indigo", bg: "bg-indigo-600" },
+  { id: "purple", name: "Purple", bg: "bg-purple-600" },
+  { id: "emerald", name: "Emerald", bg: "bg-emerald-600" },
+  { id: "rose", name: "Rose", bg: "bg-rose-600" },
+  { id: "amber", name: "Amber", bg: "bg-amber-600" },
+];
+
 export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog }: Props) {
   const router = useRouter();
   const [active, setActive] = useState("profile");
   const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
-  // Deep-link support: the calendar OAuth callback redirects back with ?section=calendar,
-  // and the mailbox/LinkedIn connect flow uses ?section=email / ?section=linkedin — each
-  // is now its own tab id, so no resolution/remapping is needed.
+
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get("section");
     if (s && visibleSections.some((sec) => sec.id === s)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
       setActive(s);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [visibleSections]);
 
-  // After the Unipile mailbox/LinkedIn connect redirect lands back here
-  // (?connected=email|linkedin), pull the newly-authorized account into our DB
-  // and refresh — otherwise this page keeps showing "not connected" until a
-  // manual reload, even though the connection actually succeeded.
   useEffect(() => {
     const connected = new URLSearchParams(window.location.search).get("connected");
     if (connected !== "email" && connected !== "linkedin") return;
@@ -73,8 +138,8 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
       window.history.replaceState(null, "", `/settings?section=${connected}`);
       router.refresh();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router]);
+
   const [pending, start] = useTransition();
   const [name, setName] = useState(profile?.full_name || "");
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
@@ -89,11 +154,21 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
   const [blockInput, setBlockInput] = useState("");
   const [blockErr, setBlockErr] = useState<string | null>(null);
 
-  const [theme, setThemeState] = useState<Theme>("system");
-  // Read the saved theme after mount (localStorage is client-only).
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setThemeState(getStoredTheme()); }, []);
-  function selectTheme(t: Theme) { applyTheme(t); setThemeState(t); }
+  // Appearance State
+  const [appearance, setAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE);
+  const [showSidebarModal, setShowSidebarModal] = useState(false);
+
+  useEffect(() => {
+    setAppearance(getStoredAppearance());
+  }, []);
+
+  function updateAppearance(partial: Partial<AppearanceSettings>) {
+    setAppearance((prev) => {
+      const next = { ...prev, ...partial };
+      applyAppearance(next);
+      return next;
+    });
+  }
 
   function saveProfile() {
     setProfileMsg(null); setProfileErr(null);
@@ -230,32 +305,225 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
           )}
 
           {active === "appearance" && (
-            <Card className="p-6">
-              <h3 className="font-semibold text-slate-900 mb-1">Appearance</h3>
-              <p className="text-sm text-slate-500 mb-5">Choose how Nxelio looks. &ldquo;System&rdquo; follows your device setting.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
-                {([
-                  { value: "light", label: "Light", icon: <Sun className="h-5 w-5" />, preview: "bg-white border-slate-200" },
-                  { value: "dark", label: "Dark", icon: <Moon className="h-5 w-5" />, preview: "bg-slate-900 border-slate-700" },
-                  { value: "system", label: "System", icon: <Monitor className="h-5 w-5" />, preview: "bg-gradient-to-br from-white to-slate-900 border-slate-300" },
-                ] as { value: Theme; label: string; icon: ReactNode; preview: string }[]).map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => selectTheme(opt.value)}
-                    className={`text-left p-4 rounded-xl border-2 transition-colors ${
-                      theme === opt.value ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15" : "border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className={`h-16 w-full rounded-lg border mb-3 ${opt.preview}`} />
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 font-medium text-slate-900">{opt.icon} {opt.label}</span>
-                      {theme === opt.value && <Check className="h-4 w-4 text-blue-600" />}
-                    </div>
-                  </button>
-                ))}
+            <div className="space-y-6 max-w-4xl">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Interface and theme</h2>
               </div>
-              <p className="text-xs text-slate-400 mt-4">Your choice is saved to this browser and applied instantly.</p>
-            </Card>
+
+              {/* Card 1: General Display Settings */}
+              <Card className="p-0 overflow-hidden divide-y divide-slate-200">
+                {/* Row 1: App sidebar */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">App sidebar</h4>
+                    <p className="text-xs text-slate-500">Customize sidebar item visibility, ordering, and badge style</p>
+                  </div>
+                  <button
+                    onClick={() => setShowSidebarModal(true)}
+                    className="text-sm font-medium text-slate-700 hover:text-blue-600 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    Customize
+                  </button>
+                </div>
+
+                {/* Row 2: Font size */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Font size</h4>
+                    <p className="text-xs text-slate-500">Adjust the size of text across the app</p>
+                  </div>
+                  <CustomSelect<FontSize>
+                    value={appearance.fontSize}
+                    onChange={(val) => updateAppearance({ fontSize: val })}
+                    options={[
+                      { value: "default", label: "Default" },
+                      { value: "compact", label: "Compact" },
+                      { value: "large", label: "Large" },
+                      { value: "xl", label: "Extra Large" },
+                    ]}
+                  />
+                </div>
+
+                {/* Row 3: Font style */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Font style</h4>
+                    <p className="text-xs text-slate-500">Customize typography and font family for the application interface</p>
+                  </div>
+                  <CustomSelect<FontStyle>
+                    value={appearance.fontStyle || "sans"}
+                    onChange={(val) => updateAppearance({ fontStyle: val })}
+                    options={[
+                      { value: "sans", label: "Default (Geist Sans)" },
+                      { value: "inter", label: "Inter (Modern Sans)" },
+                      { value: "roboto", label: "Roboto (Classic)" },
+                      { value: "outfit", label: "Outfit (Geometric)" },
+                      { value: "rounded", label: "Plus Jakarta (Rounded)" },
+                      { value: "serif", label: "Georgia (Editorial Serif)" },
+                      { value: "mono", label: "Fira Code (Monospace)" },
+                    ]}
+                  />
+                </div>
+
+                {/* Row 3: Use pointer cursors */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Use pointer cursors</h4>
+                    <p className="text-xs text-slate-500">Change the cursor to a pointer when hovering over any interactive elements</p>
+                  </div>
+                  <ToggleSwitch
+                    checked={appearance.pointerCursors}
+                    onChange={(v) => updateAppearance({ pointerCursors: v })}
+                  />
+                </div>
+
+                {/* Row 4: Underline links */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Underline links</h4>
+                    <p className="text-xs text-slate-500">Always underline links in text content</p>
+                  </div>
+                  <ToggleSwitch
+                    checked={appearance.underlineLinks}
+                    onChange={(v) => updateAppearance({ underlineLinks: v })}
+                  />
+                </div>
+              </Card>
+
+              {/* Card 2: Interface theme Settings */}
+              <Card className="p-0 overflow-hidden divide-y divide-slate-200">
+                {/* Row 1: Interface theme */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Interface theme</h4>
+                    <p className="text-xs text-slate-500">Select or customize your interface color scheme</p>
+                  </div>
+                  <CustomSelect<Theme>
+                    value={appearance.theme}
+                    onChange={(val) => updateAppearance({ theme: val })}
+                    options={[
+                      { value: "system", label: "• Aa System preference" },
+                      { value: "dark", label: "• Aa Dark" },
+                      { value: "light", label: "• Aa Light" },
+                    ]}
+                  />
+                </div>
+
+                {/* Row 2: Light */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Light</h4>
+                    <p className="text-xs text-slate-500">Theme to use for light system appearance</p>
+                  </div>
+                  <CustomSelect<LightPreset>
+                    value={appearance.lightPreset}
+                    onChange={(val) => updateAppearance({ lightPreset: val })}
+                    options={[
+                      { value: "light", label: "• Aa Light" },
+                      { value: "warm", label: "• Aa Warm Cream" },
+                      { value: "slate", label: "• Aa Soft Slate" },
+                    ]}
+                  />
+                </div>
+
+                {/* Row 3: Dark */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Dark</h4>
+                    <p className="text-xs text-slate-500">Theme to use for dark system appearance</p>
+                  </div>
+                  <CustomSelect<DarkPreset>
+                    value={appearance.darkPreset}
+                    onChange={(val) => updateAppearance({ darkPreset: val })}
+                    options={[
+                      { value: "dark", label: "• Aa Dark" },
+                      { value: "midnight", label: "• Aa Midnight Blue" },
+                      { value: "obsidian", label: "• Aa Obsidian" },
+                      { value: "emerald", label: "• Aa Emerald Dark" },
+                    ]}
+                  />
+                </div>
+
+                {/* Row 4: Accent color swatches */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Accent color</h4>
+                    <p className="text-xs text-slate-500">Primary brand color for buttons and highlights</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {ACCENT_COLORS.map((col) => (
+                      <button
+                        key={col.id}
+                        type="button"
+                        onClick={() => updateAppearance({ accentColor: col.id })}
+                        title={col.name}
+                        className={`h-7 w-7 rounded-full ${col.bg} flex items-center justify-center transition-transform ${
+                          appearance.accentColor === col.id ? "ring-2 ring-offset-2 ring-blue-500 scale-110" : "hover:scale-105 opacity-90"
+                        }`}
+                      >
+                        {appearance.accentColor === col.id && <Check className="h-3.5 w-3.5 text-white" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Sidebar Customization Modal */}
+              {showSidebarModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+                  <div className="w-full max-w-md bg-white rounded-xl border border-slate-200 shadow-2xl p-6 space-y-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-slate-900 font-semibold">
+                        <Sliders className="h-5 w-5 text-blue-600" />
+                        <span>Customize App Sidebar</span>
+                      </div>
+                      <button
+                        onClick={() => setShowSidebarModal(false)}
+                        className="text-slate-500 hover:text-slate-700 rounded-lg p-1"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                          Badge Style
+                        </label>
+                        <CustomSelect<SidebarBadgeStyle>
+                          value={appearance.sidebarBadgeStyle}
+                          onChange={(val) => updateAppearance({ sidebarBadgeStyle: val })}
+                          options={[
+                            { value: "default", label: "Default Pill" },
+                            { value: "numeric", label: "Numeric Count" },
+                            { value: "dot", label: "Indicator Dot" },
+                            { value: "hidden", label: "Hidden" },
+                          ]}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                          Sidebar Density
+                        </label>
+                        <CustomSelect<SidebarDensity>
+                          value={appearance.sidebarDensity}
+                          onChange={(val) => updateAppearance({ sidebarDensity: val })}
+                          options={[
+                            { value: "default", label: "Comfortable" },
+                            { value: "compact", label: "Compact" },
+                          ]}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <Button onClick={() => setShowSidebarModal(false)}>Done</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {active === "email" && (
