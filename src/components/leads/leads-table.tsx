@@ -552,7 +552,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="appearance-none rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-6 py-1 h-8 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-[#18A7B8]/20 transition-all shadow-sm cursor-pointer"
+                className="appearance-none rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-6 py-1 h-8 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer"
               >
                 <option value="none">Sort</option>
                 <option value="name">Name A–Z</option>
@@ -566,7 +566,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, initialSelect
             <Button
               size="sm"
               onClick={() => setShowWizard(true)}
-              className="rounded-xl gap-1.5 font-bold h-8 px-3 bg-[#18A7B8] hover:bg-[#14929f] text-white shadow-sm transition-all text-xs flex-shrink-0 whitespace-nowrap"
+              className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Add Leads</span>

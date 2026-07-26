@@ -103,12 +103,12 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             suppressHydrationWarning
-            className="flex items-center gap-2.5 group w-full"
+            className={cn("flex items-center gap-2.5 group w-full", collapsed && "justify-center")}
           >
-            <span className="relative h-9 w-9 rounded-xl bg-orange-500 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-              <LogoMark className="h-5 w-5 text-white" />
-              <PanelLeftClose className={cn("absolute h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity", collapsed && "hidden")} />
-              <PanelLeftOpen className={cn("absolute h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity", !collapsed && "hidden")} />
+            <span className="relative h-9 w-9 rounded-xl bg-white flex items-center justify-center font-bold flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+              <LogoMark className="h-5 w-5 text-orange-500 transition-opacity duration-200 group-hover:opacity-0" />
+              <PanelLeftClose className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", collapsed && "hidden")} />
+              <PanelLeftOpen className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", !collapsed && "hidden")} />
             </span>
             {!collapsed && (
               <span className="flex flex-col leading-none whitespace-nowrap text-left">

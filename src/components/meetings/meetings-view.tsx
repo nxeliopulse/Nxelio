@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 /** Per-provider accent used consistently across the legend, day chips, and agenda. */
 const PROVIDER_STYLE: Record<string, { dot: string; chip: string; label: string }> = {
-  google: { dot: "bg-emerald-500", chip: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800", label: "Google Calendar" },
+  google: { dot: "bg-blue-500", chip: "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800", label: "Google Calendar" },
   microsoft: { dot: "bg-indigo-500", chip: "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800", label: "Outlook Calendar" },
 };
 
@@ -207,7 +207,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
         </div>
         <div className="flex items-center gap-3 self-start sm:self-auto">
           {accounts.length === 0 ? (
-            <Link href="/settings?section=calendar" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#18A7B8] hover:underline">
+            <Link href="/settings?section=calendar" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
               <RefreshCw className="h-3.5 w-3.5" /> Connect Calendar
             </Link>
           ) : (
@@ -251,10 +251,10 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                   className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-md bg-[#18A7B8] flex-shrink-0" />
+                    <span className="h-2.5 w-2.5 rounded-md bg-blue-600 dark:bg-blue-500 flex-shrink-0" />
                     <span className="text-slate-900 dark:text-white font-semibold">LeadPro Meetings</span>
                   </div>
-                  {showMyMeetings ? <CheckSquare className="h-3.5 w-3.5 text-[#18A7B8]" /> : <Square className="h-3.5 w-3.5 text-slate-300 dark:text-slate-700" />}
+                  {showMyMeetings ? <CheckSquare className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> : <Square className="h-3.5 w-3.5 text-slate-300 dark:text-slate-700" />}
                 </button>
 
                 {accounts.map((a) => {
@@ -269,7 +269,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                         <span className={`h-2.5 w-2.5 rounded-md ${style.dot} flex-shrink-0`} />
                         <span className="text-slate-900 dark:text-white truncate max-w-[140px]">{style.label}</span>
                       </div>
-                      {showExternalCalendars ? <CheckSquare className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> : <Square className="h-3.5 w-3.5 text-slate-300 dark:text-slate-700" />}
+                      {showExternalCalendars ? <CheckSquare className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> : <Square className="h-3.5 w-3.5 text-slate-300 dark:text-slate-700" />}
                     </button>
                   );
                 })}
@@ -536,7 +536,7 @@ function MiniCalendar({
               className={cn(
                 "h-6 w-6 rounded-lg flex items-center justify-center font-medium mx-auto transition-all text-[11px]",
                 isSelected
-                  ? "bg-[#18A7B8] text-white font-bold shadow-sm"
+                  ? "bg-blue-600 text-white font-bold shadow-sm"
                   : isToday
                   ? "bg-blue-50 dark:bg-blue-950/80 text-blue-600 font-bold border border-blue-200 dark:border-blue-800"
                   : inMonth
@@ -558,16 +558,16 @@ function MeetingRowItem({ m, onOpen, past, compact }: { m: MeetingRow; onOpen: (
     <button
       onClick={onOpen}
       className={cn(
-        "w-full text-left flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-[#18A7B8] bg-white dark:bg-slate-900 transition-all shadow-sm group",
+        "w-full text-left flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 border-l-4 border-l-blue-600 dark:border-l-blue-500 bg-white dark:bg-slate-900 transition-all shadow-sm group",
         compact ? "p-2.5" : "p-3.5"
       )}
     >
-      <div className={cn("rounded-lg bg-cyan-50 dark:bg-cyan-950/60 text-[#18A7B8] flex items-center justify-center flex-shrink-0 font-bold", compact ? "h-8 w-8 text-xs" : "h-10 w-10")}>
+      <div className={cn("rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0 font-bold", compact ? "h-8 w-8 text-xs" : "h-10 w-10")}>
         <Video className={compact ? "h-4 w-4" : "h-5 w-5"} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm group-hover:text-[#18A7B8] transition-colors">{m.title}</p>
+          <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{m.title}</p>
           {m.status !== "scheduled" && <Badge variant={STATUS_VARIANT[m.status] || "default"}>{m.status}</Badge>}
         </div>
         <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
@@ -576,7 +576,7 @@ function MeetingRowItem({ m, onOpen, past, compact }: { m: MeetingRow; onOpen: (
         </p>
       </div>
       {!past && m.join_url && (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-[#18A7B8] hover:bg-[#14929f] px-2.5 py-1 rounded-lg shadow-sm transition-all flex-shrink-0">
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1 rounded-lg shadow-sm transition-all flex-shrink-0">
           <Video className="h-3 w-3" /> Join
         </span>
       )}
@@ -679,7 +679,7 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
               className={cn(
                 "min-h-[96px] sm:min-h-[110px] rounded-xl flex flex-col items-stretch gap-1 text-xs transition-all p-2 text-left border border-slate-100/60 dark:border-slate-800/60",
                 isSelected
-                  ? "bg-[#18A7B8]/10 border-[#18A7B8] dark:border-[#18A7B8] shadow-xs"
+                  ? "bg-blue-50/80 dark:bg-blue-950/60 border-blue-600 dark:border-blue-500 shadow-xs"
                   : isToday
                   ? "bg-blue-50/60 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800"
                   : inMonth
@@ -690,9 +690,9 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
               <span className={cn(
                 "self-start h-5 w-5 flex items-center justify-center rounded-full text-[11px] font-bold transition-all",
                 isToday
-                  ? "bg-[#18A7B8] text-white shadow-xs"
+                  ? "bg-blue-600 text-white shadow-xs"
                   : isSelected
-                  ? "bg-[#18A7B8]/20 text-[#18A7B8] font-bold"
+                  ? "bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold"
                   : inMonth
                   ? "text-slate-700 dark:text-slate-300"
                   : "text-slate-400 dark:text-slate-600"
@@ -707,7 +707,7 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
                     className={cn(
                       "truncate rounded-md px-1.5 py-0.5 text-[9px] font-semibold leading-tight border-l-2 transition-colors",
                       c.kind === "meeting"
-                        ? "bg-cyan-50 dark:bg-cyan-950/80 border-l-[#18A7B8] text-cyan-900 dark:text-cyan-200"
+                        ? "bg-blue-50 dark:bg-blue-950/80 border-l-blue-600 text-blue-900 dark:text-blue-200"
                         : `${(PROVIDER_STYLE[c.provider] || PROVIDER_STYLE.google).chip} border-l-2`
                     )}
                   >
@@ -752,7 +752,7 @@ function DetailPanel({ m, pending, onClose, onEdit, onCancel, onDelete }: {
           {m.location && <Row icon={<MapPin className="h-4 w-4" />} label="Location">{m.location}</Row>}
           {m.lead && (
             <Row icon={<Link2 className="h-4 w-4" />} label="Contact">
-              <Link href={`/leads/${m.lead.id}`} className="text-[#18A7B8] font-bold hover:underline">{leadLabel(m.lead)}</Link>
+              <Link href={`/leads/${m.lead.id}`} className="text-blue-600 dark:text-blue-400 font-bold hover:underline">{leadLabel(m.lead)}</Link>
             </Row>
           )}
           <Row icon={<Users className="h-4 w-4" />} label={`Attendees (${attendees.length})`}>
@@ -763,14 +763,14 @@ function DetailPanel({ m, pending, onClose, onEdit, onCancel, onDelete }: {
             )}
           </Row>
           {m.description && <Row icon={<FileText className="h-4 w-4" />} label="Notes">{m.description}</Row>}
-          {m.recording_url && <Row icon={<PlayCircle className="h-4 w-4" />} label="Recording"><a href={m.recording_url} target="_blank" rel="noopener noreferrer" className="text-[#18A7B8] font-bold hover:underline">View recording</a></Row>}
+          {m.recording_url && <Row icon={<PlayCircle className="h-4 w-4" />} label="Recording"><a href={m.recording_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">View recording</a></Row>}
           {m.summary && <Row icon={<FileText className="h-4 w-4" />} label="Summary">{m.summary}</Row>}
         </div>
 
         <div className="p-5 border-t border-slate-100 dark:border-slate-800 space-y-2 bg-slate-50/50 dark:bg-slate-950/40">
           {m.join_url && (
             <a href={m.join_url} target="_blank" rel="noopener noreferrer">
-              <Button className="w-full font-bold bg-[#18A7B8] hover:bg-[#14929f] text-white rounded-xl"><Video className="h-4 w-4" /> Join meeting <ExternalLink className="h-3.5 w-3.5 opacity-70" /></Button>
+              <Button className="w-full font-bold rounded-xl"><Video className="h-4 w-4" /> Join meeting <ExternalLink className="h-3.5 w-3.5 opacity-70" /></Button>
             </a>
           )}
           <div className="flex gap-2">
@@ -976,7 +976,7 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
 
               <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-950/40">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 inline-flex items-center gap-1.5 uppercase tracking-wider"><CalendarCheck className="h-4 w-4 text-[#18A7B8]" /> Availability</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 inline-flex items-center gap-1.5 uppercase tracking-wider"><CalendarCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Availability</span>
                   <Button type="button" variant="outline" size="sm" onClick={checkAvailability} disabled={avail.loading} className="rounded-xl text-xs font-bold">
                     {avail.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />} Check calendar
                   </Button>
@@ -991,14 +991,14 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
                     ) : (
                       <>
                         {conflict && <p className="text-rose-600 dark:text-rose-400 mb-1.5 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Overlaps a busy event on your calendar.</p>}
-                        {!conflict && form.startLocal && <p className="text-emerald-600 dark:text-emerald-400 mb-1.5 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> You&apos;re free at the selected time.</p>}
+                        {!conflict && form.startLocal && <p className="text-blue-600 dark:text-blue-400 mb-1.5 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> You&apos;re free at the selected time.</p>}
                         {freeSlots.length > 0 && (
                           <>
                             <p className="text-slate-500 mb-1">Free slots that day:</p>
                             <div className="flex flex-wrap gap-1.5">
                               {freeSlots.slice(0, 10).map((s) => (
                                 <button key={s.startLocal} onClick={() => { set("startLocal", s.startLocal); set("endLocal", s.endLocal); }}
-                                  className="rounded-lg border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-[#18A7B8]/10 hover:border-[#18A7B8]">
+                                  className="rounded-lg border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:border-blue-500">
                                   {s.label}
                                 </button>
                               ))}
@@ -1044,7 +1044,7 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
 
               {!isEdit && (
                 <label className="flex items-center gap-2 pt-2 text-slate-700 dark:text-slate-300 font-medium">
-                  <input type="checkbox" checked={sendInvites} onChange={(e) => setSendInvites(e.target.checked)} className="rounded border-slate-300 text-[#18A7B8] focus:ring-[#18A7B8]" />
+                  <input type="checkbox" checked={sendInvites} onChange={(e) => setSendInvites(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                   Email an invite to {invitableCount} attendee{invitableCount === 1 ? "" : "s"}
                 </label>
               )}
@@ -1056,13 +1056,13 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
               ? <Button variant="ghost" onClick={() => setStep("details")} disabled={pending} className="rounded-xl font-bold"><ChevronLeft className="h-4 w-4" /> Back</Button>
               : <Button variant="ghost" onClick={onClose} disabled={pending} className="rounded-xl font-bold">Cancel</Button>}
             {isEdit ? (
-              <Button onClick={confirmSave} disabled={pending} className="rounded-xl font-bold bg-[#18A7B8] hover:bg-[#14929f] text-white">
+              <Button onClick={confirmSave} disabled={pending} className="rounded-xl font-bold">
                 {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</> : "Save changes"}
               </Button>
             ) : step === "details" ? (
-              <Button onClick={goReview} disabled={pending} className="rounded-xl font-bold bg-[#18A7B8] hover:bg-[#14929f] text-white">Review →</Button>
+              <Button onClick={goReview} disabled={pending} className="rounded-xl font-bold">Review →</Button>
             ) : (
-              <Button onClick={confirmSave} disabled={pending} className="rounded-xl font-bold bg-[#18A7B8] hover:bg-[#14929f] text-white">
+              <Button onClick={confirmSave} disabled={pending} className="rounded-xl font-bold">
                 {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</> : <><Send className="h-4 w-4" /> {sendInvites && invitableCount ? "Schedule & send invites" : "Schedule meeting"}</>}
               </Button>
             )}
@@ -1151,9 +1151,9 @@ function RegionClockWidget() {
     <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 p-2.5 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 inline-flex items-center gap-1.5">
-          <Globe className="h-3.5 w-3.5 text-[#18A7B8]" /> Region Time
+          <Globe className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> Region Time
         </span>
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#18A7B8]/10 text-[#18A7B8]">
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
           {tzAbbrev || "LOCAL"}
         </span>
       </div>
@@ -1171,7 +1171,7 @@ function RegionClockWidget() {
         <select
           value={selectedZone || ""}
           onChange={(e) => setSelectedZone(e.target.value || undefined)}
-          className="w-full text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#18A7B8]"
+          className="w-full text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           {REGIONS.map((r) => (
             <option key={r.label} value={r.zone || ""}>

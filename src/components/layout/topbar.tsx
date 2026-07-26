@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown, LogOut, User as UserIcon, Settings, Menu, Sparkles,
-  Phone, ShoppingBag, HelpCircle, ArrowUpRight
+  Phone, ShoppingBag, HelpCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { globalSearch, type GlobalSearchResult } from "@/lib/queries/global-search";
 import { NotificationsBell } from "./notifications-bell";
 import { useSidebar } from "./sidebar-context";
 
@@ -22,16 +23,54 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<GlobalSearchResult>({ leads: [], campaigns: [] });
   const ref = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initials = userName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  function handleSearchChange(v: string) {
+    setSearchQuery(v);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    const q = v.trim();
+    if (q.length < 2) {
+      setSearchResults({ leads: [], campaigns: [] });
+      setSearchOpen(false);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    setSearchOpen(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await globalSearch(q);
+        setSearchResults(res);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+  }
+
+  function goToSearch(path: string) {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults({ leads: [], campaigns: [] });
+    router.push(path);
+  }
+
+  const hasSearchResults = searchResults.leads.length > 0 || searchResults.campaigns.length > 0;
 
   async function handleLogout() {
     const supabase = createClient();
@@ -42,7 +81,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
 
   return (
     <header className="h-14 bg-[var(--primary)] border-b border-white/10 px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-3 sticky top-0 z-30 text-white shadow-sm">
-      {/* Left side: hamburger (mobile) */}
+      {/* Left side: hamburger (mobile) + global search */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {/* Hamburger — mobile/tablet only */}
         <button
@@ -52,6 +91,77 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
         >
           <Menu className="h-5 w-5" />
         </button>
+
+        {/* Global search — leads & campaigns, live as you type */}
+        <div className="hidden sm:block relative flex-1 max-w-sm" ref={searchRef}>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search leads, campaigns..."
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onFocus={() => { if (searchQuery.trim().length >= 2) setSearchOpen(true); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && searchQuery.trim()) {
+                goToSearch(`/leads?q=${encodeURIComponent(searchQuery.trim())}`);
+              }
+              if (e.key === "Escape") setSearchOpen(false);
+            }}
+            className="w-full h-8 pl-8 pr-8 bg-white/15 hover:bg-white/20 focus:bg-white/20 border border-white/20 rounded-full text-xs text-white placeholder-white/60 outline-none transition-colors"
+          />
+          {searchLoading && (
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/70 animate-spin" />
+          )}
+
+          {searchOpen && (
+            <div className="lp-anim-pop absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden z-40 max-h-96 overflow-y-auto text-slate-900">
+              {!searchLoading && !hasSearchResults && (
+                <p className="px-4 py-6 text-sm text-slate-500 text-center">No leads or campaigns match &quot;{searchQuery.trim()}&quot;.</p>
+              )}
+              {searchResults.leads.length > 0 && (
+                <div className="p-1">
+                  <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Leads</p>
+                  {searchResults.leads.map((l) => (
+                    <button
+                      key={l.id}
+                      onClick={() => goToSearch(`/leads/${l.id}`)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-slate-50"
+                    >
+                      <Users2 className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-slate-900 truncate">{l.full_name || l.email || "Unnamed lead"}</span>
+                        {l.company_name && <span className="block text-xs text-slate-500 truncate">{l.company_name}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchResults.campaigns.length > 0 && (
+                <div className="p-1 border-t border-slate-100">
+                  <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Campaigns</p>
+                  {searchResults.campaigns.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => goToSearch(`/campaigns/${c.id}`)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-slate-50"
+                    >
+                      <Megaphone className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                      <span className="text-sm font-medium text-slate-900 truncate">{c.campaign_name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchQuery.trim() && (
+                <button
+                  onClick={() => goToSearch(`/leads?q=${encodeURIComponent(searchQuery.trim())}`)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--primary)] hover:bg-slate-50 border-t border-slate-100"
+                >
+                  <Search className="h-3.5 w-3.5" /> See all leads matching &quot;{searchQuery.trim()}&quot;
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Right side: HubSpot style top action tools */}
