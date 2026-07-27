@@ -53,15 +53,15 @@ function renderNewsletterHtml(content: NewsletterContent, opts: { subject?: stri
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden">
           <tr><td style="padding:32px 32px 24px;border-bottom:1px solid #f1f5f9">
             <table role="presentation" width="100%"><tr>
-              <td style="font-weight:700;font-size:18px;color:#0f172a">Nxelio</td>
-              <td align="right" style="font-size:12px;color:#94a3b8">AI Engagement</td>
+              <td style="font-weight:700;font-size:18px;color:#0f172a">Nxelio Nurture</td>
+              <td align="right" style="font-size:12px;color:#94a3b8">AI-Powered Lead Nurturing</td>
             </tr></table>
           </td></tr>
           <tr><td style="padding:32px">
             ${blockHtml}
           </td></tr>
           <tr><td style="padding:24px 32px;border-top:1px solid #f1f5f9;font-size:12px;color:#94a3b8;text-align:center">
-            <p style="margin:0">You're receiving this because you subscribed to Nxelio updates.</p>
+            <p style="margin:0">You're receiving this because you subscribed to Nxelio Nurture updates.</p>
             <p style="margin:6px 0 0"><a href="#" style="color:#94a3b8;text-decoration:underline">Unsubscribe</a> · <a href="#" style="color:#94a3b8;text-decoration:underline">Preferences</a></p>
           </td></tr>
         </table>
@@ -178,7 +178,7 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
 
   // 4. Render and send
   const { data: onboarding } = await getOnboarding();
-  const fromName = onboarding?.company_name?.trim() || "Nxelio";
+  const fromName = onboarding?.company_name?.trim() || "Nxelio Nurture";
   // Route replies to whichever mailbox is actually connected, not a stale env var.
   const { data: mailbox } = await supabase
     .from("outreach_accounts")
@@ -304,7 +304,7 @@ export async function sendTestNewsletter(newsletterId: string, testEmail: string
     to: testEmail,
     subject: `[TEST] ${substituteMergeTags(n.subject || n.title, fakeLead)}`,
     html,
-    fromName: onboarding?.company_name?.trim() || "Nxelio",
+    fromName: onboarding?.company_name?.trim() || "Nxelio Nurture",
     replyTo: (mailbox?.identifier as string) || undefined,
   });
 

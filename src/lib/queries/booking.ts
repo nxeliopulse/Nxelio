@@ -23,7 +23,7 @@ async function workspaceBySlug(slug: string): Promise<WsInfo | null> {
     .eq("capture_slug", slug)
     .single();
   if (!data) return null;
-  const companyName = (data.onboarding as { company_name?: string } | null)?.company_name?.trim() || data.name || "Nxelio";
+  const companyName = (data.onboarding as { company_name?: string } | null)?.company_name?.trim() || data.name || "Nxelio Nurture";
   return { id: data.id, companyName };
 }
 

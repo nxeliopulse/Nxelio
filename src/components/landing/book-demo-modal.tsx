@@ -85,7 +85,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
             <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-slate-900">You&apos;re booked!</h2>
             <p className="mt-3 text-slate-600">
-              Your Nxelio demo is confirmed for
+              Your Nxelio Nurture demo is confirmed for
             </p>
             <p className="mt-1 text-lg font-semibold text-slate-900">
               {done.formattedDate} at {done.formattedTime}

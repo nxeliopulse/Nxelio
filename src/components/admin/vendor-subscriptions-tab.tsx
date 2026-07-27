@@ -13,7 +13,7 @@ export function VendorSubscriptionsTab({ rows }: { rows: VendorSubscriptionRow[]
       <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
         <h3 className="font-bold text-slate-900 dark:text-white text-base">Our Vendor Subscriptions</h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          Nxelio&apos;s own paid accounts (Unipile, AnySite, Brevo, Bright Data). Tracked manually &mdash; these vendors don&apos;t expose a billing API we integrate with.
+          Nxelio Nurture&apos;s own paid accounts (Unipile, AnySite, Brevo, Bright Data). Tracked manually &mdash; these vendors don&apos;t expose a billing API we integrate with.
         </p>
       </div>
       <div className="divide-y divide-slate-100 dark:divide-slate-800/70">

@@ -14,7 +14,7 @@ export function NoMailboxBanner() {
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-amber-900">No mailbox connected</p>
-        <p className="text-xs text-amber-700/80">Connect your Gmail or Outlook inbox to send campaigns and capture replies inside Nxelio.</p>
+        <p className="text-xs text-amber-700/80">Connect your Gmail or Outlook inbox to send campaigns and capture replies inside Nxelio Nurture.</p>
       </div>
       <Link
         href="/settings?section=email"

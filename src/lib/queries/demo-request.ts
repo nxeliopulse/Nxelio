@@ -85,14 +85,14 @@ export async function submitDemoRequest(input: DemoRequestInput): Promise<DemoRe
   const firstName = fullName.split(" ")[0];
   const visitorText =
     `Hi ${firstName},\n\n` +
-    `Thanks for booking a demo with Nxelio! Your demo is confirmed for ${formattedDate} at ${requestedTime}.\n\n` +
+    `Thanks for booking a demo with Nxelio Nurture! Your demo is confirmed for ${formattedDate} at ${requestedTime}.\n\n` +
     `Join here: ${joinUrl}\n\n` +
-    `Looking forward to speaking with you,\nThe Nxelio Team`;
+    `Looking forward to speaking with you,\nThe Nxelio Nurture Team`;
   await sendEmail({
     to: businessEmail,
-    subject: `Your Nxelio demo is confirmed — ${formattedDate} at ${requestedTime}`,
+    subject: `Your Nxelio Nurture demo is confirmed — ${formattedDate} at ${requestedTime}`,
     text: visitorText,
-    fromName: "Nxelio",
+    fromName: "Nxelio Nurture",
   }).catch(() => {});
 
   const salesText =
@@ -111,7 +111,7 @@ export async function submitDemoRequest(input: DemoRequestInput): Promise<DemoRe
     to: SALES_NOTIFY_EMAIL,
     subject: `New demo booked — ${fullName} (${input.industry})`,
     text: salesText,
-    fromName: "Nxelio",
+    fromName: "Nxelio Nurture",
   }).catch(() => {});
 
   return { ok: true, joinUrl, formattedDate, formattedTime: requestedTime };

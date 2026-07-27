@@ -42,7 +42,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                   <circle cx="26" cy="8" r="2.2" fill="white"/>
                 </svg>
               </div>
-              <span className="font-bold text-white text-lg tracking-tight">Nxelio</span>
+              <span className="font-bold text-white text-lg tracking-tight">Nxelio Nurture</span>
             </Link>
 
             {/* Tagline */}
@@ -110,7 +110,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                 <circle cx="26" cy="8" r="2.2" fill="white"/>
               </svg>
             </div>
-            <span className="font-bold text-white text-base">Nxelio</span>
+            <span className="font-bold text-white text-base">Nxelio Nurture</span>
           </div>
 
           <div className="flex-1 flex items-center justify-center p-8 lg:p-12">

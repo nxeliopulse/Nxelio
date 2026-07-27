@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { navMainItems, navAdminItems, filterNavByRoleAndOverrides, isNavItemAllowed } from "@/lib/nav-config";
 import { useSidebar } from "./sidebar-context";
 
-const EXPANDED = "w-64";
+const EXPANDED = "w-[200px]";
 const COLLAPSED = "w-[84px]";
 
 // The plan one tier above the current one — null once already on the top plan.
@@ -24,7 +24,8 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
   const pathname = usePathname();
   const { collapsed, toggleCollapsed } = useSidebar();
   const [credits, setCredits] = useState<AiCreditsUsage | null>(null);
-  const nextPlan = credits ? NEXT_PLAN[credits.planId] : "Starter";
+  // Once already on the top plan there's nothing to upgrade to.
+  const canUpgrade = !credits || NEXT_PLAN[credits.planId] !== null;
 
   useEffect(() => {
     let cancelled = false;
@@ -96,7 +97,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
     >
       <div className="w-full flex flex-col h-full">
         {/* Header Logo */}
-        <div className={cn("h-14 flex items-center flex-shrink-0", collapsed ? "justify-center px-2" : "px-4")}>
+        <div className={cn("h-11 flex items-center flex-shrink-0", collapsed ? "justify-center px-2" : "px-4")}>
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -106,16 +107,16 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             className={cn("flex items-center gap-2.5 group w-full", collapsed && "justify-center")}
           >
             <span className="relative h-9 w-9 rounded-xl bg-white flex items-center justify-center font-bold flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-              <LogoMark className="h-5 w-5 text-orange-500 transition-opacity duration-200 group-hover:opacity-0" />
+              <LogoMark className="h-6 w-6 transition-opacity duration-200 group-hover:opacity-0" />
               <PanelLeftClose className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", collapsed && "hidden")} />
               <PanelLeftOpen className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", !collapsed && "hidden")} />
             </span>
             {!collapsed && (
               <span className="flex flex-col leading-none whitespace-nowrap text-left">
                 <span className="font-bold text-white text-base tracking-tight">
-                  Nxelio
+                  Nxelio Nurture
                 </span>
-                <span className="text-[10px] text-white/80 font-bold uppercase tracking-widest mt-0.5">AI Engagement</span>
+                <span className="text-[10px] text-white/80 font-bold uppercase tracking-widest mt-0.5">AI-Powered Lead Nurturing</span>
               </span>
             )}
           </button>
@@ -166,7 +167,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
                 href="/billing"
                 className="inline-block text-xs font-semibold text-white/90 hover:text-white underline-offset-2 hover:underline whitespace-nowrap"
               >
-                Upgrade plan →
+                {canUpgrade ? "Upgrade plan →" : "Manage plan →"}
               </Link>
             </div>
           )}

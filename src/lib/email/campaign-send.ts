@@ -65,7 +65,7 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
 
   const profile = await getCurrentUserProfile().catch(() => null);
   const senderName = (profile as { full_name?: string | null } | null)?.full_name || undefined;
-  // From Name recipients see = the workspace's company name (or "Nxelio").
+  // From Name recipients see = the workspace's company name (or "Nxelio Nurture").
   const fromName = await fromNameForWorkspace(supabase, workspaceId);
 
   let sent = 0, failed = 0, skipped = 0, scheduled = 0, deferred = 0, simulated = false;

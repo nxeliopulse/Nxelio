@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { LegalShell } from "../legal-shell";
 
-export const metadata: Metadata = { title: "Privacy Policy — Nxelio" };
+export const metadata: Metadata = { title: "Privacy Policy — Nxelio Nurture" };
 
 export default function PrivacyPage() {
   return (
     <LegalShell title="Privacy Policy" updated="July 14, 2026" active="privacy">
       <p>
-        Nxelio (&quot;Nxelio&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides an AI-powered sales
+        Nxelio Nurture (&quot;Nxelio Nurture&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides an AI-powered sales
         engagement and lead-nurturing platform (the &quot;Service&quot;). This Privacy Policy explains what
         information we collect, how we use it, and the choices available to you. This Policy is governed by
         United States law and is written for users located in the United States; it is not drafted under, and
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
         the safety of others.
       </p>
       <p>
-        <strong>Business transfers.</strong> If Nxelio is involved in a merger, acquisition, or asset sale,
+        <strong>Business transfers.</strong> If Nxelio Nurture is involved in a merger, acquisition, or asset sale,
         information may be transferred as part of that transaction, subject to this Policy.
       </p>
 
@@ -137,7 +137,7 @@ export default function PrivacyPage() {
       <p>
         You retain all ownership rights to the Customer Data you upload to the Service. Your workspace&apos;s
         Customer Data is logically isolated from other <em>customers&apos;</em> workspaces within the
-        customer-facing product — one customer can never see another customer&apos;s data. Nxelio personnel
+        customer-facing product — one customer can never see another customer&apos;s data. Nxelio Nurture personnel
         access Customer Data only as needed to provide the Service, respond to your support requests, maintain
         the lead import record described in Section 7, or as required by law.
       </p>

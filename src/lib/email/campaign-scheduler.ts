@@ -232,15 +232,15 @@ export async function scheduleCampaignFollowups(
 }
 
 /** The "From Name" recipients see for a workspace: its company name (from
- *  onboarding) or "Nxelio" if not set. Used so campaign emails send under the
+ *  onboarding) or "Nxelio Nurture" if not set. Used so campaign emails send under the
  *  customer's brand. */
 export async function fromNameForWorkspace(db: Db, workspaceId: string): Promise<string> {
   try {
     const { data } = await db.from("workspaces").select("onboarding").eq("id", workspaceId).single();
     const name = (data?.onboarding as { company_name?: string } | null)?.company_name;
-    return (name && name.trim()) || "Nxelio";
+    return (name && name.trim()) || "Nxelio Nurture";
   } catch {
-    return "Nxelio";
+    return "Nxelio Nurture";
   }
 }
 

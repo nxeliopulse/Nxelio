@@ -38,9 +38,9 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
   const finalSubject = substituteMergeTags(subject, lead, senderName);
   const finalBody = substituteMergeTags(body, lead, senderName);
 
-  // From Name recipients see = the workspace's company name (or "Nxelio").
+  // From Name recipients see = the workspace's company name (or "Nxelio Nurture").
   const { data: onboarding } = await getOnboarding();
-  const fromName = onboarding?.company_name?.trim() || "Nxelio";
+  const fromName = onboarding?.company_name?.trim() || "Nxelio Nurture";
 
   // Route replies to whichever mailbox is actually connected, not a stale env var.
   const supabase = await createClient();

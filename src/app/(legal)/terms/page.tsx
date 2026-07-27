@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { LegalShell } from "../legal-shell";
 
-export const metadata: Metadata = { title: "Terms of Service — Nxelio" };
+export const metadata: Metadata = { title: "Terms of Service — Nxelio Nurture" };
 
 export default function TermsPage() {
   return (
     <LegalShell title="Terms of Service" updated="July 13, 2026" active="terms">
       <p>
-        These Terms of Service (&quot;Terms&quot;) are a binding agreement between you and Nxelio
-        (&quot;Nxelio&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) governing your access to and use
+        These Terms of Service (&quot;Terms&quot;) are a binding agreement between you and Nxelio Nurture
+        (&quot;Nxelio Nurture&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) governing your access to and use
         of our AI-powered sales engagement and lead-nurturing platform (the &quot;Service&quot;). These Terms
         are governed by the laws of the United States, as set out in Section 13; they do not incorporate or
         reference the laws of India or any jurisdiction outside the U.S.
@@ -117,7 +117,7 @@ export default function TermsPage() {
 
       <h2>11. Indemnification</h2>
       <p>
-        You agree to indemnify and hold Nxelio harmless from any claims, damages, liabilities, and expenses
+        You agree to indemnify and hold Nxelio Nurture harmless from any claims, damages, liabilities, and expenses
         (including reasonable attorneys&apos; fees) arising from your Customer Data, your use of the Service in
         violation of these Terms, or your violation of applicable law.
       </p>

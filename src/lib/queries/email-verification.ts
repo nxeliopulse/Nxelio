@@ -19,7 +19,7 @@ function codeEmailHtml(code: string, fullName: string): string {
     <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;border:1px solid #e2e8f0">
       <div style="height:40px;width:40px;border-radius:12px;background:linear-gradient(135deg,#18A7B8,#7E57C2);margin-bottom:20px"></div>
       <h2 style="margin:0 0 8px;color:#0f172a;font-size:20px">Confirm your email address</h2>
-      <p style="margin:0 0 24px;color:#64748b;font-size:14px">Hi ${fullName ? escapeHtml(fullName) : "there"}, enter this code to finish setting up your Nxelio account:</p>
+      <p style="margin:0 0 24px;color:#64748b;font-size:14px">Hi ${fullName ? escapeHtml(fullName) : "there"}, enter this code to finish setting up your Nxelio Nurture account:</p>
       <div style="text-align:center;margin:0 0 24px">
         <span style="display:inline-block;font-size:32px;font-weight:800;letter-spacing:8px;color:#0d8fa0;background:#f0fdfb;padding:16px 24px;border-radius:12px;border:1.5px solid #b2ebf2">${code}</span>
       </div>
@@ -55,7 +55,7 @@ export async function sendVerificationCode(email: string, fullName?: string): Pr
   if (upsertError) return { ok: false, error: "Couldn't generate a verification code" };
 
   const name = fullName ?? (user.user_metadata as { full_name?: string } | null)?.full_name ?? "";
-  const res = await sendEmail({ to: normalized, subject: "Confirm your email — Nxelio", html: codeEmailHtml(code, name) });
+  const res = await sendEmail({ to: normalized, subject: "Confirm your email — Nxelio Nurture", html: codeEmailHtml(code, name) });
   if (!res.ok) return { ok: false, error: "Couldn't send the verification email" };
   // No real email provider configured (local dev) — the shared dev-log truncates
   // the HTML before the code appears, so log it directly here for local testing.

@@ -53,6 +53,25 @@ export async function markAllRead() {
   revalidatePath("/", "layout");
 }
 
+export async function markNotificationsRead(ids: string[]) {
+  if (ids.length === 0) return;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("notifications")
+    .update({ is_read: true })
+    .in("id", ids);
+  if (error) throw error;
+  revalidatePath("/", "layout");
+}
+
+export async function deleteNotifications(ids: string[]) {
+  if (ids.length === 0) return;
+  const supabase = await createClient();
+  const { error } = await supabase.from("notifications").delete().in("id", ids);
+  if (error) throw error;
+  revalidatePath("/", "layout");
+}
+
 /** Deletes every notification for the current user (RLS scopes this to their own rows). */
 export async function clearAllNotifications() {
   const supabase = await createClient();

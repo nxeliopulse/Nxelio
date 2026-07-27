@@ -116,7 +116,7 @@ export function BookingView({ slug, hostName, days }: { slug: string; hostName: 
           )}
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-4">Powered by Nxelio</p>
+        <p className="text-center text-xs text-slate-400 mt-4">Powered by Nxelio Nurture</p>
       </div>
     </div>
   );

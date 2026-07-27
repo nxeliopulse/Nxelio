@@ -13,7 +13,7 @@ export function OnboardingBanner() {
         <Sparkles className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-blue-900">Finish setting up Nxelio</p>
+        <p className="text-sm font-semibold text-blue-900">Finish setting up Nxelio Nurture</p>
         <p className="text-xs text-blue-700/80">Tell us about your business so we can tailor leads, scoring, and outreach to you.</p>
       </div>
       <Link

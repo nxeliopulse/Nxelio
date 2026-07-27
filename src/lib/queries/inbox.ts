@@ -112,7 +112,7 @@ export async function sendReply(
     const { sendEmail } = await import("@/lib/email/resend");
     const { getOnboarding } = await import("@/lib/queries/onboarding");
     const { data: onboarding } = await getOnboarding();
-    const fromName = onboarding?.company_name?.trim() || "Nxelio";
+    const fromName = onboarding?.company_name?.trim() || "Nxelio Nurture";
     const result = await sendEmail({ to: lead.email, subject, text: body, fromName });
     if (!result.ok) return { ok: false, error: result.error };
     simulated = result.simulated ?? false;

@@ -22,7 +22,7 @@ const CYCLES = ["< 1 week", "1–4 weeks", "1–3 months", "3–6 months", "6+ m
 const CUSTOMER_TYPES = ["B2B", "B2C", "Both"];
 
 const STEP_TITLES = [
-  { title: "Essentials setup", desc: "Tell us about your business so Nxelio can tailor your workflow" },
+  { title: "Essentials setup", desc: "Tell us about your business so Nxelio Nurture can tailor your workflow" },
   { title: "Connect your inbox", desc: "Send and track campaigns from your own mailbox (optional)" },
 ];
 
@@ -258,7 +258,7 @@ export function OnboardingWizard({ initial, isEdit }: { initial?: OnboardingData
 
               <Field label="Key competitors">
                 <Input leftIcon={<Swords className="h-4 w-4" />} placeholder="e.g. HubSpot, Salesforce, Pipedrive" value={form.key_competitors} onChange={(e) => set("key_competitors", e.target.value)} />
-                <p className="text-xs text-slate-400 mt-1.5">Separate multiple competitors with a comma. Nxelio uses this to surface high-intent leads.</p>
+                <p className="text-xs text-slate-400 mt-1.5">Separate multiple competitors with a comma. Nxelio Nurture uses this to surface high-intent leads.</p>
               </Field>
             </div>
           </Card>

@@ -55,7 +55,7 @@ export function LegalShell({
       </main>
       <footer className="border-t border-slate-200 mt-12">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 text-xs text-slate-500 flex items-center justify-between">
-          <span>© 2026 Nxelio. All rights reserved.</span>
+          <span>© 2026 Nxelio Nurture. All rights reserved.</span>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-slate-900">Privacy</Link>
             <Link href="/terms" className="hover:text-slate-900">Terms</Link>

@@ -78,8 +78,8 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                       <ArrowLeft className="h-5 w-5" />
                     </button>
                   )}
-                  <div className="h-8 w-8 rounded-lg bg-white/15 flex items-center justify-center">
-                    <LogoMark className="h-5 w-5 text-white" />
+                  <div className="h-8 w-8 rounded-lg overflow-hidden bg-white flex items-center justify-center">
+                    <LogoMark className="h-full w-full" />
                   </div>
                 </div>
                 <button onClick={() => setOpen(false)} aria-label="Close support" className="p-1 rounded-md hover:bg-white/15">
@@ -87,7 +87,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
                 </button>
               </div>
               <h2 className="mt-3 text-xl font-bold">Hi there 👋</h2>
-              <p className="text-white/80 text-sm">How can we help you use Nxelio?</p>
+              <p className="text-white/80 text-sm">How can we help you use Nxelio Nurture?</p>
             </div>
 
             {/* Body */}
@@ -188,7 +188,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
         aria-label={open ? "Close support" : "Open support"}
         title="Help & Support"
         suppressHydrationWarning
-        className={`fixed bottom-6 z-40 h-14 w-14 rounded-full bg-[var(--primary)] text-white shadow-xl shadow-black/20 flex items-center justify-center hover:scale-105 active:scale-95 transition-[right,transform] duration-300 ease-in-out ${assistantOpen ? (assistantExpanded ? "right-6 sm:right-[564px]" : "right-6 sm:right-[424px]") : "right-6"}`}
+        className={`fixed bottom-6 z-40 h-14 w-14 rounded-full bg-[var(--primary)] text-white shadow-xl shadow-black/20 flex items-center justify-center hover:scale-105 active:scale-95 transition-[right,transform] duration-300 ease-in-out ${assistantExpanded ? "hidden" : assistantOpen ? "right-6 sm:right-[424px]" : "right-6"}`}
       >
         {open ? <X className="h-6 w-6" /> : <span className="text-[26px] font-bold leading-none" aria-hidden="true">?</span>}
       </button>
