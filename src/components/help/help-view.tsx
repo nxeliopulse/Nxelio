@@ -28,7 +28,7 @@ const categories = [
     icon: Rocket,
     color: "from-blue-500 to-indigo-600",
     articles: [
-      "Welcome to Nxelio",
+      "Welcome to Nxelio Nurture",
       "Setting up your workspace",
       "Inviting team members",
       "Importing your first leads",
@@ -82,7 +82,7 @@ const categories = [
 const faqs = [
   {
     q: "How do I import leads from a CSV?",
-    a: "Open the Leads page, click 'Import' in the top-right, and upload a CSV with at least an email column. Nxelio will auto-map common fields like name, company, and title. You can review the mapping before committing the import.",
+    a: "Open the Leads page, click 'Import' in the top-right, and upload a CSV with at least an email column. Nxelio Nurture will auto-map common fields like name, company, and title. You can review the mapping before committing the import.",
   },
   {
     q: "Where do I configure AI?",
@@ -102,7 +102,7 @@ const faqs = [
   },
   {
     q: "What integrations are supported?",
-    a: "Nxelio ships with Groq (AI), Brevo (email), and Supabase (database, auth, storage) wired in. HubSpot CRM sync is optional and configurable in Settings > API Keys. A general REST API and webhooks are on the roadmap.",
+    a: "Nxelio Nurture ships with Groq (AI), Brevo (email), and Supabase (database, auth, storage) wired in. HubSpot CRM sync is optional and configurable in Settings > API Keys. A general REST API and webhooks are on the roadmap.",
   },
 ];
 

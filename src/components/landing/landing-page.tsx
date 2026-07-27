@@ -112,7 +112,7 @@ const PLANS = [
 
 // ─── Testimonials ─────────────────────────────────────────────────────────────
 const TESTIMONIALS = [
-  { quote:"Nxelio turned our outbound from a grind into a machine. Pipeline is up 3× in 90 days — the inbox alone saves my team hours every week.",        name:"Sarah Chen",       role:"Head of Sales",    co:"TechVenture", init:"SC", color:"#18A7B8" },
+  { quote:"Nxelio Nurture turned our outbound from a grind into a machine. Pipeline is up 3× in 90 days — the inbox alone saves my team hours every week.",        name:"Sarah Chen",       role:"Head of Sales",    co:"TechVenture", init:"SC", color:"#18A7B8" },
   { quote:"The capture form + campaigns combo is unbeatable. We published a form, ran a sequence, and had 40 replies in the first week. Zero tech setup.",  name:"Marcus Rodriguez", role:"Founder & CEO",   co:"GrowthLabs",  init:"MR", color:"#7E57C2" },
   { quote:"The Opportunities pipeline gives my team full visibility. We know exactly where every deal is and what to do next. Closed 18 deals last month.", name:"Priya Sharma",     role:"Revenue Director", co:"Enterprise.io", init:"PS", color:"#43A047" },
   { quote:"Segments + Newsletters changed our nurture game. We send the right message to the right people every time — open rates doubled.",               name:"Alex Kim",         role:"Marketing Lead",   co:"ScaleStack",  init:"AK", color:"#FF9800" },
@@ -120,12 +120,12 @@ const TESTIMONIALS = [
 
 // ─── FAQs ─────────────────────────────────────────────────────────────────────
 const FAQS = [
-  { q:"What is Nxelio?",                       a:"Nxelio is a B2B revenue platform. It lets you import leads, run email campaigns, manage replies in a unified inbox, track deals through an opportunities pipeline, segment your contacts, send newsletters, and view analytics — all from one workspace.", pal: P.teal   },
+  { q:"What is Nxelio Nurture?",                       a:"Nxelio Nurture is a B2B revenue platform. It lets you import leads, run email campaigns, manage replies in a unified inbox, track deals through an opportunities pipeline, segment your contacts, send newsletters, and view analytics — all from one workspace.", pal: P.teal   },
   { q:"What's the difference between Basic, Starter, and Pro?",
-    a:"Basic ($14.99/mo) gives you the full outreach toolkit — AI enrichment, scoring, email + LinkedIn outreach, reply tracking, and meetings — for leads you bring in yourself (CSV import). Starter ($149.99/mo) adds automated lead discovery, so Nxelio finds new leads for you (1,000/month), plus a bigger AI-credit allowance (300/month). Pro ($299.99/mo) raises discovery to 2,000/month and AI credits to 1,000/month, and adds priority support. Every plan includes the same core feature set — higher tiers mainly unlock automated discovery and more monthly volume.", pal: P.violet },
+    a:"Basic ($14.99/mo) gives you the full outreach toolkit — AI enrichment, scoring, email + LinkedIn outreach, reply tracking, and meetings — for leads you bring in yourself (CSV import). Starter ($149.99/mo) adds automated lead discovery, so Nxelio Nurture finds new leads for you (1,000/month), plus a bigger AI-credit allowance (300/month). Pro ($299.99/mo) raises discovery to 2,000/month and AI credits to 1,000/month, and adds priority support. Every plan includes the same core feature set — higher tiers mainly unlock automated discovery and more monthly volume.", pal: P.violet },
   { q:"How do AI credits work?",               a:"Each AI action (generating email copy, scoring a lead, enriching a contact) uses credits. Basic gives 200/month, Starter 300/month, Pro 1,000/month. Unused monthly credits reset at renewal — they don't roll over.", pal: P.blue   },
   { q:"What's the difference between lead discovery and enrichment/scoring?",
-    a:"Discovery is Nxelio finding brand-new leads for you automatically (Starter and Pro only — Basic brings your own via CSV). Enrichment and scoring work on leads you already have, regardless of how they got there — enrichment fills in company/contact details, scoring ranks how promising a lead is. Enrichment and scoring are included on every plan, including Basic.", pal: P.coral  },
+    a:"Discovery is Nxelio Nurture finding brand-new leads for you automatically (Starter and Pro only — Basic brings your own via CSV). Enrichment and scoring work on leads you already have, regardless of how they got there — enrichment fills in company/contact details, scoring ranks how promising a lead is. Enrichment and scoring are included on every plan, including Basic.", pal: P.coral  },
   { q:"What is reply tracking?",               a:"Reply tracking shows you opens, clicks, and replies on every email you send, right in your Smart Inbox — so you always know who's engaging before you follow up. It's included on every plan.", pal: P.green  },
   { q:"How do promo codes and coupons work?",  a:"Enter a code at checkout or when upgrading your plan. Depending on the code, it can apply a percentage or fixed-amount discount to your subscription price, grant bonus AI credits, grant bonus leads, or some combination — we'll show you exactly what a code does before you confirm. Each code can only be redeemed once per account, and every redemption is recorded in your billing history.", pal: P.pink },
   { q:"Does Basic include a free trial?",      a:"Yes — Basic on monthly billing includes a 7-day free trial with 200 AI credits. A card is required to start the trial, but you won't be charged until day 7, and you can cancel anytime before then at no cost. Annual billing doesn't include a trial. You get full access to leads, campaigns, inbox, and capture forms during the trial.", pal: P.orange },
@@ -133,8 +133,8 @@ const FAQS = [
   { q:"What happens when I upgrade my plan?", a:"Upgrades take effect immediately and are prorated — you're only charged the difference for the rest of your current billing period, and your new credits/leads allowance is available right away. Moving to a lower plan isn't available self-serve — contact support if you need to change to a lower plan.", pal: P.violet },
   { q:"What support level do I get?",          a:"Basic and Starter include standard support. Pro includes priority support with faster response times.", pal: P.blue },
   { q:"How does the capture form work?",       a:"Go to Capture Form in settings, customise your form fields and branding, then publish. You get a public link (nxelio.ai/capture/your-slug) to share. Every submission lands directly in your Leads list.", pal: P.amber  },
-  { q:"Can I import my existing contacts?",    a:"Yes. Upload any CSV from Settings or Leads. Nxelio maps your columns automatically and imports every contact into your workspace instantly.", pal: P.coral  },
-  { q:"Is my data secure?",                    a:"Yes. Nxelio is built on Supabase with row-level security and workspace isolation. Your contacts, campaigns, and analytics are never shared across workspaces.", pal: P.green  },
+  { q:"Can I import my existing contacts?",    a:"Yes. Upload any CSV from Settings or Leads. Nxelio Nurture maps your columns automatically and imports every contact into your workspace instantly.", pal: P.coral  },
+  { q:"Is my data secure?",                    a:"Yes. Nxelio Nurture is built on Supabase with row-level security and workspace isolation. Your contacts, campaigns, and analytics are never shared across workspaces.", pal: P.green  },
   { q:"Can I cancel anytime?",                 a:"Yes. Cancel from your billing dashboard at any time — no cancellation fees. Your subscription stays fully active until the end of your current billing period, then won't renew.", pal: P.pink   },
 ];
 
@@ -327,7 +327,7 @@ function Hero({ onBookDemo }: { onBookDemo: () => void }) {
         </h1>
 
         <p className="text-lg sm:text-xl max-w-2xl mx-auto font-medium leading-relaxed mb-10 nxl-section-in" style={{ animationDelay:"0.25s", color:"rgba(255,255,255,0.85)" }}>
-          Nxelio puts your entire outreach workflow in one place — leads, campaigns,
+          Nxelio Nurture puts your entire outreach workflow in one place — leads, campaigns,
           inbox, pipeline, segments, newsletters, and analytics.
         </p>
 
@@ -582,7 +582,7 @@ const CRM_DEMOS = [
   },
   {
     title:   "Smart Inbox",
-    desc:    "See every reply in one place, flag hot leads, and reply without leaving Nxelio.",
+    desc:    "See every reply in one place, flag hot leads, and reply without leaving Nxelio Nurture.",
     dur:     "1:18",
     pal:     P.violet,
     icon:    Inbox,
@@ -1097,7 +1097,7 @@ function Testimonials() {
             <span className="text-xs font-bold" style={{ color:"#880E4F" }}>Customer stories</span>
           </div>
           <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 leading-tight max-w-2xl mx-auto">
-            Teams that{" "}<span className="nxl-text-shimmer">love Nxelio</span>
+            Teams that{" "}<span className="nxl-text-shimmer">love Nxelio Nurture</span>
           </h2>
         </div>
 
@@ -1231,7 +1231,7 @@ function CTABanner({ onBookDemo }: { onBookDemo: () => void }) {
               <span className="block mt-1 nxl-text-shimmer">Start closing deals.</span>
             </h2>
             <p className="mt-6 text-lg text-slate-600 max-w-xl mx-auto font-medium leading-relaxed">
-              Join 2,400+ revenue teams using Nxelio to run their entire outreach workflow
+              Join 2,400+ revenue teams using Nxelio Nurture to run their entire outreach workflow
               from a single, beautifully simple workspace.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -1314,7 +1314,7 @@ function Footer() {
                 </svg>
               </div>
               <div>
-                <p className="font-bold text-white text-lg leading-none">Nxelio</p>
+                <p className="font-bold text-white text-lg leading-none">Nxelio Nurture</p>
                 <p className="text-[10px] text-white/60 uppercase tracking-[0.14em] mt-0.5">Turn Leads into Revenue</p>
               </div>
             </div>
@@ -1358,7 +1358,7 @@ function Footer() {
         {/* Bottom bar */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3"
           style={{ borderTop:"1px solid rgba(255,255,255,.18)" }}>
-          <p className="text-xs text-white/55">© 2026 Nxelio, Inc. All rights reserved.</p>
+          <p className="text-xs text-white/55">© 2026 Nxelio Nurture, Inc. All rights reserved.</p>
           <div className="flex items-center gap-2 text-xs text-white/55">
             <Lock className="h-3.5 w-3.5 text-white/70"/>
             <span>Secured by Supabase · Row-level security</span>
@@ -1389,7 +1389,7 @@ function DemoVideo() {
               <span className="text-xs font-bold" style={{ color:"#4527A0" }}>2-minute product tour</span>
             </div>
             <h2 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 leading-tight">
-              See Nxelio in{" "}
+              See Nxelio Nurture in{" "}
               <span className="nxl-text-shimmer">action</span>
             </h2>
             <p className="mt-4 text-base text-slate-500 font-medium max-w-lg mx-auto">
@@ -1564,7 +1564,7 @@ function DemoVideo() {
                     <circle cx="26" cy="8" r="2.2" fill="white"/>
                   </svg>
                 </div>
-                <span className="text-sm font-bold text-white">Nxelio — Product Demo</span>
+                <span className="text-sm font-bold text-white">Nxelio Nurture — Product Demo</span>
               </div>
               <button type="button" onClick={() => setOpen(false)}
                 className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors">

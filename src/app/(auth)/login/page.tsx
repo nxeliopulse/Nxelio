@@ -72,7 +72,7 @@ function LoginForm() {
     <div>
       <h1 className="text-3xl font-black text-white mb-1">Sign in</h1>
       <p className="text-sm mb-8" style={{ color:"rgba(255,255,255,.45)" }}>
-        Welcome back to your Nxelio workspace
+        Welcome back to your Nxelio Nurture workspace
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">

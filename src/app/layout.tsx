@@ -7,7 +7,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Nxelio — AI Lead Nurturing Platform",
+  title: "Nxelio Nurture — AI-Powered Lead Nurturing",
   description: "AI-powered customer engagement and lead nurturing platform",
 };
 

@@ -557,7 +557,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
   const [chatOpen,     setChatOpen]     = useState(false);
   const [chatInput,    setChatInput]    = useState("");
   const [chatMessages, setChatMessages] = useState<Array<{ sender: "user" | "copilot"; text: string; data?: unknown }>>([
-    { sender: "copilot", text: "Hello! I am your Nxelio Copilot. You can ask me to filter data, calculate metrics, or summarize insights. Try selecting one of the queries below!" }
+    { sender: "copilot", text: "Hello! I am your Nxelio Nurture Copilot. You can ask me to filter data, calculate metrics, or summarize insights. Try selecting one of the queries below!" }
   ]);
 
   const prevRange=useRef(filters.range);
@@ -1392,7 +1392,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-black text-sm tracking-tight text-slate-900 dark:text-slate-900 uppercase">Nxelio Intelligence Hub</h1>
+                <h1 className="font-black text-sm tracking-tight text-slate-900 dark:text-slate-900 uppercase">Nxelio Nurture Intelligence Hub</h1>
                 <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-sm bg-indigo-600 text-white shadow-2xs">AI POWERED</span>
               </div>
               <p style={{fontSize:11}} className="font-bold flex items-center gap-1.5 text-slate-500 dark:text-slate-500">
@@ -1613,7 +1613,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             </div>
             <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 text-xs space-y-2.5 leading-relaxed">
               <h4 className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">IQL Projection Reference</h4>
-              <p className="text-slate-400 font-medium">This console compiles standard Nxelio IQL query directives. Try modifying lines like:</p>
+              <p className="text-slate-400 font-medium">This console compiles standard Nxelio Nurture IQL query directives. Try modifying lines like:</p>
               <code className="block bg-slate-900 border border-slate-800 p-2 rounded text-indigo-300 font-mono text-[10px]">
                 q = filter q by &apos;Region&apos; == &quot;West&quot;;<br/>
                 q = filter q by &apos;Stage&apos; == &quot;Proposal Sent&quot;;
@@ -1741,7 +1741,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
                   <Bot size={16} />
                 </div>
                 <div>
-                  <h4 className="text-xs font-black tracking-wide uppercase">Nxelio Assistant</h4>
+                  <h4 className="text-xs font-black tracking-wide uppercase">Nxelio Nurture Assistant</h4>
                   <div className="flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping" />
                     <span className="text-[10px] text-slate-400 font-bold">AI Assistant Active</span>

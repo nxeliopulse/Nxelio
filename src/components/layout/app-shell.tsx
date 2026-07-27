@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
@@ -27,10 +28,10 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
   const [assistantExpanded, setAssistantExpanded] = useState(false);
   return (
     <AssistantProvider toggle={() => setAssistantOpen((v) => !v)}>
-      <div className="flex min-h-screen bg-slate-50">
+      <div className="flex h-screen bg-slate-50 overflow-hidden">
         <Sidebar role={userRole} navAccess={navAccess} />
         <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} role={userRole} navAccess={navAccess} />
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className={cn("flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[var(--primary)]", assistantExpanded && "hidden")}>
           <Topbar
             userName={userName}
             userEmail={userEmail}
@@ -39,7 +40,9 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
             assistantOpen={assistantOpen}
           />
           {!onboardingCompleted ? <OnboardingBanner /> : !mailboxConnected && <NoMailboxBanner />}
-          <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-hidden">{children}</main>
+          {/* Its own scroll region (not the page) — keeps the rounded top-left
+              corner anchored to the viewport instead of scrolling away with content. */}
+          <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-6 bg-slate-50 rounded-tl-2xl">{children}</main>
         </div>
         {/* Renders as a flex column on desktop — the content area shrinks to share the window */}
         <AssistantWidget open={assistantOpen} onClose={() => setAssistantOpen(false)} onExpandChange={setAssistantExpanded} />

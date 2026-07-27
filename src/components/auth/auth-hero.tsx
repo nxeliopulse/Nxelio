@@ -6,14 +6,14 @@ import { Logo } from "@/components/brand/logo";
 const TESTIMONIALS = [
   {
     quote:
-      "Nxelio writes better follow-ups than half my SDR team — and it never forgets to send them. Our reply rate doubled in six weeks.",
+      "Nxelio Nurture writes better follow-ups than half my SDR team — and it never forgets to send them. Our reply rate doubled in six weeks.",
     name: "Sarah Chen",
     role: "VP of Sales, Northwind",
     avatar: "SC",
   },
   {
     quote:
-      "We replaced three tools with Nxelio. Lead scoring, sequences, and reporting all live in one place now. The AI just gets it.",
+      "We replaced three tools with Nxelio Nurture. Lead scoring, sequences, and reporting all live in one place now. The AI just gets it.",
     name: "Marcus Reyes",
     role: "Founder, Loophole Labs",
     avatar: "MR",

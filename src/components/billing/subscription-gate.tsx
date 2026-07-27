@@ -148,7 +148,7 @@ export function SubscriptionGate() {
           style={{ background: "linear-gradient(135deg,#06B6D4,#8B5CF6)" }}>
           <BarChart2 size={18} className="text-white" />
         </div>
-        <span className="text-xl font-black text-white tracking-tight">Nxelio</span>
+        <span className="text-xl font-black text-white tracking-tight">Nxelio Nurture</span>
       </div>
 
       {/* Heading */}

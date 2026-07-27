@@ -110,7 +110,7 @@ function formatWhen(startIso: string, endIso: string): string {
 
 /**
  * Epic 4 (LP-19): creates a meeting AND emails an invite (with the join link) to
- * every attendee that has an email. Falls back to "Nxelio" as the From Name when
+ * every attendee that has an email. Falls back to "Nxelio Nurture" as the From Name when
  * the workspace hasn't set a company name. Returns how many invites went out.
  */
 export async function scheduleMeeting(
@@ -134,7 +134,7 @@ export async function scheduleMeeting(
   let invitesSent = 0;
   if (opts?.sendInvites !== false) {
     const { data: onboarding } = await getOnboarding();
-    const fromName = onboarding?.company_name?.trim() || "Nxelio";
+    const fromName = onboarding?.company_name?.trim() || "Nxelio Nurture";
     const when = formatWhen(input.start_at, input.end_at);
     const whereLine = input.join_url
       ? `\n\nJoin: ${input.join_url}`

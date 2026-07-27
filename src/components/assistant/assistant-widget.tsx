@@ -193,6 +193,18 @@ export function AssistantWidget({
     if (open && view === "chat") inputRef.current?.focus();
   }, [open, view]);
 
+  // Closing the panel (X button, Escape key, etc.) must also drop expanded
+  // mode — otherwise the app shell's content stays hidden (blank screen)
+  // since it only re-shows when assistantExpanded flips back to false.
+  useEffect(() => {
+    if (!open && expanded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets expanded mode when the panel closes by any path
+      setExpanded(false);
+      onExpandChange?.(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [chat, pending]);
@@ -334,8 +346,8 @@ export function AssistantWidget({
   }
 
   const filteredMentions = MENTION_ITEMS.filter((m) => !mentionFilter || m.label.toLowerCase().startsWith(mentionFilter));
-  const panelWidth = expanded ? "sm:w-[560px]" : "sm:w-[420px]";
-  const innerWidth = expanded ? "w-[536px]" : "w-[396px]";
+  const panelWidth = expanded ? "sm:w-[calc(100vw-300px)]" : "sm:w-[420px]";
+  const innerWidth = expanded ? "w-[calc(100vw-320px)]" : "w-[396px]";
 
   return (
     <aside
@@ -348,7 +360,7 @@ export function AssistantWidget({
         open ? panelWidth : "sm:w-0"
       )}
       role="complementary"
-      aria-label="Nxelio AI assistant"
+      aria-label="Nxelio Nurture AI assistant"
     >
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.txt,.csv,.docx,.xlsx" className="hidden" onChange={handleFiles} />
 
@@ -441,14 +453,14 @@ export function AssistantWidget({
             <>
               <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ background: T.panel }}>
                 {chat.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full px-6 py-8 text-center">
-                    <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-5 shadow-md" style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, ${PURPLE} 100%)` }}>
-                      <Bot className="h-8 w-8 text-white" />
+                  <div className={cn("flex flex-col items-center justify-center h-full px-6 py-8 text-center", expanded && "mx-auto w-full max-w-xl")}>
+                    <div className={cn("rounded-2xl flex items-center justify-center mb-5 shadow-md", expanded ? "h-20 w-20" : "h-16 w-16")} style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, ${PURPLE} 100%)` }}>
+                      <Bot className={cn(expanded ? "h-10 w-10" : "h-8 w-8", "text-white")} />
                     </div>
-                    <h2 className="text-2xl font-bold mb-1.5" style={{ color: T.textPrimary }}>Hi {userName}!</h2>
-                    <p className="text-base font-medium mb-1" style={{ color: PRIMARY }}>How can I help you?</p>
-                    <p className="text-xs mb-8 max-w-[240px]" style={{ color: T.textSecondary }}>
-                      Ask me anything about your Nxelio workspace — leads, campaigns, analytics, and more.
+                    <h2 className={cn("font-bold mb-1.5", expanded ? "text-4xl" : "text-2xl")} style={{ color: T.textPrimary }}>Hi {userName}!</h2>
+                    <p className={cn("font-medium mb-1", expanded ? "text-xl" : "text-base")} style={{ color: PRIMARY }}>How can I help you?</p>
+                    <p className={cn("mb-8", expanded ? "text-sm max-w-sm" : "text-xs max-w-[240px]")} style={{ color: T.textSecondary }}>
+                      Ask me anything about your Nxelio Nurture workspace — leads, campaigns, analytics, and more.
                     </p>
                     <div className="w-full space-y-2">
                       {activeSuggestions.map((s) => (
@@ -567,8 +579,8 @@ export function AssistantWidget({
               </div>
 
               {/* ── Input area ── */}
-              <div className="p-3 pt-2 border-t" style={{ background: T.panel, borderColor: T.headerBorder }}>
-                <div className="relative">
+              <div className={cn("p-3 pt-2 border-t", expanded && "pb-6")} style={{ background: T.panel, borderColor: T.headerBorder }}>
+                <div className={cn("relative", expanded && "mx-auto w-full max-w-2xl")}>
 
                   {/* @ Mention dropdown */}
                   {showMention && filteredMentions.length > 0 && (

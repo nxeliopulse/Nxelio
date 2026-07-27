@@ -4,7 +4,7 @@ import { X, Send, Loader2, Mic, MicOff, Volume2, VolumeX, Sparkles, Volume1 } fr
 import { askLandingAssistant, type LandingChatMessage } from "@/lib/ai/landing-chat";
 
 const SUGGESTED_QUESTIONS = [
-  "What does Nxelio do?",
+  "What does Nxelio Nurture do?",
   "What's included in the pricing plans?",
   "How does AI lead scoring work?",
   "Is my data secure?",
@@ -165,7 +165,7 @@ export function AiAssistantWidget() {
                   </button>
                 </div>
               </div>
-              <h2 className="mt-3 text-lg font-bold">Ask Nxelio AI</h2>
+              <h2 className="mt-3 text-lg font-bold">Ask Nxelio Nurture AI</h2>
               <p className="text-white/80 text-sm">Product questions, answered instantly — with voice.</p>
             </div>
 
@@ -239,7 +239,7 @@ export function AiAssistantWidget() {
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={listening ? "Listening…" : "Ask about Nxelio…"}
+                  placeholder={listening ? "Listening…" : "Ask about Nxelio Nurture…"}
                   className="flex-1 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-400"
                   disabled={pending}
                 />
@@ -262,7 +262,7 @@ export function AiAssistantWidget() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close AI assistant" : "Open AI assistant"}
-        title="Ask Nxelio AI"
+        title="Ask Nxelio Nurture AI"
         className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full text-white shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
         style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow: "0 8px 24px rgba(24,167,184,.45)" }}
       >
