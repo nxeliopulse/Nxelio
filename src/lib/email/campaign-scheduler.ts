@@ -182,6 +182,10 @@ async function sendLinkedInStepToLead(
     const { providerId, error: resolveError } = await unipileResolveProfile({ accountId, identifier: lead.linkedin });
     if (!providerId) return { ok: false, error: resolveError || "Could not resolve LinkedIn profile" };
 
+    // Reply webhooks identify the sender by this opaque provider_id, not the
+    // public URL — persist it so an inbound reply can be matched back to the lead.
+    await db.from("leads").update({ linkedin_provider_id: providerId }).eq("id", lead.id);
+
     if (action === "connection_request") {
       await unipileSendInvite({ accountId, providerId, message });
     } else {

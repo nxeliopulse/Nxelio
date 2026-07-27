@@ -89,7 +89,18 @@ export async function POST(request: NextRequest) {
   lead = (await matchEmail(scopeWorkspaceId)) || (await matchEmail(null));
 
   if (!lead) {
-    // try LinkedIn handle match (also workspace-scoped first)
+    // Prefer the exact opaque provider_id we saved when we last messaged this
+    // lead (LinkedIn webhooks identify people by this id, not a public URL —
+    // see linkedin_provider_id migration). Fall back to a URL substring match
+    // for leads never yet resolved through that path.
+    for (const c of candidates) {
+      let q = db.from("leads").select("id, workspace_id, full_name, company_name, email").ilike("linkedin_provider_id", c);
+      if (scopeWorkspaceId) q = q.eq("workspace_id", scopeWorkspaceId);
+      const { data } = await q.limit(1);
+      if (data?.[0]) { lead = data[0]; break; }
+    }
+  }
+  if (!lead) {
     for (const c of candidates) {
       let q = db.from("leads").select("id, workspace_id, full_name, company_name, email").ilike("linkedin", `%${c}%`);
       if (scopeWorkspaceId) q = q.eq("workspace_id", scopeWorkspaceId);

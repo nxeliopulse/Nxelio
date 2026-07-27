@@ -143,6 +143,12 @@ async function executeJob(db: Db, job: JobRow, lead: Record<string, unknown>): P
   const { providerId, error: resolveError } = await unipileResolveProfile({ accountId: account.account_id, identifier: linkedinUrl });
   if (!providerId) return { status: "failed", detail: resolveError || "Could not resolve LinkedIn profile" };
 
+  // Reply webhooks identify the sender by this opaque provider_id, not the
+  // public URL — persist it so an inbound reply can be matched back to the lead.
+  if (providerId !== lead.linkedin_provider_id) {
+    await db.from("leads").update({ linkedin_provider_id: providerId }).eq("id", lead.id as string);
+  }
+
   try {
     if (job.action === "connection_request") {
       await unipileSendInvite({ accountId: account.account_id, providerId, message: body });
