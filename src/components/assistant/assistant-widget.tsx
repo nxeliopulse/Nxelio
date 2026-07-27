@@ -202,7 +202,7 @@ export function AssistantWidget({
       if (e.key === "Escape") {
         if (showMention) { setShowMention(false); return; }
         if (showApps) { setShowApps(false); return; }
-        onClose();
+        onClose?.();
       }
     }
     if (open) window.addEventListener("keydown", onKey);
