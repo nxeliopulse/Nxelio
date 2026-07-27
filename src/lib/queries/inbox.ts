@@ -114,18 +114,17 @@ export async function sendReply(
 
   // Reply on whatever channel this conversation has actually been using — a
   // hybrid lead can have both an email and a LinkedIn profile, so "has an
-  // email" alone isn't a safe signal. The prior outbound message's subject
-  // already encodes the channel ("LinkedIn message"/"LinkedIn connection
-  // request" vs. an email subject line).
-  const { data: lastOutbound } = await supabase
+  // email" alone isn't a safe signal. Check whether ANY outbound message in
+  // this thread was ever tagged as LinkedIn (the original campaign step
+  // carries that subject) — checking only the MOST RECENT one breaks after
+  // the first manual reply, since a manual reply's own subject is the
+  // generic "Re: Reply", not "LinkedIn message"/"LinkedIn connection request".
+  const { data: outboundHistory } = await supabase
     .from("inbox_messages")
     .select("subject")
     .eq("lead_id", leadId)
-    .eq("direction", "outbound")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const isLinkedInThread = /linkedin/i.test(lastOutbound?.subject || "");
+    .eq("direction", "outbound");
+  const isLinkedInThread = (outboundHistory || []).some((m) => /linkedin/i.test(m.subject || ""));
 
   let simulated = false;
   if (lead?.email && !isLinkedInThread) {
