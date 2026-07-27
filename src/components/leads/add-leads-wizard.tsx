@@ -401,37 +401,36 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={attemptClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header + progress */}
-        <div className="p-5 border-b border-slate-100">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="font-semibold text-lg text-slate-900">Create a list of leads below</h2>
-              <p className="text-sm text-slate-500 mt-0.5">Step {step} of 4 · {step === 1 ? "Choose a source" : step === 2 ? SOURCE_LABEL[source!] : step === 3 ? "Review" : "Summary"}</p>
-            </div>
-            <button
-              onClick={attemptClose}
-              aria-label="Close"
-              disabled={buyLoading}
-              title={buyLoading ? "Please wait for the search to finish" : undefined}
-              className="text-slate-400 hover:text-slate-700 rounded-md p-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-400"
-            >
-              <X className="h-5 w-5" />
-            </button>
+    <div className="absolute inset-0 z-50 bg-white flex flex-col">
+      {/* Header + progress */}
+      <div className="px-6 sm:px-10 py-5 border-b border-slate-100 flex-shrink-0">
+        <div className="max-w-6xl mx-auto flex items-start justify-between">
+          <div>
+            <h2 className="font-semibold text-xl text-slate-900">Create a list of leads below</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Step {step} of 4 · {step === 1 ? "Choose a source" : step === 2 ? SOURCE_LABEL[source!] : step === 3 ? "Review" : "Summary"}</p>
           </div>
-          <div className="mt-4 flex gap-1.5">
-            {[1, 2, 3, 4].map((n) => (
-              <div key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? "bg-blue-600" : "bg-slate-200"}`} />
-            ))}
-          </div>
+          <button
+            onClick={attemptClose}
+            aria-label="Close"
+            disabled={buyLoading}
+            title={buyLoading ? "Please wait for the search to finish" : undefined}
+            className="text-slate-400 hover:text-slate-700 rounded-md p-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-400"
+          >
+            <X className="h-6 w-6" />
+          </button>
         </div>
+        <div className="max-w-6xl mx-auto mt-4 flex gap-1.5">
+          {[1, 2, 3, 4].map((n) => (
+            <div key={n} className={`h-1.5 flex-1 rounded-full ${n <= step ? "bg-blue-600" : "bg-slate-200"}`} />
+          ))}
+        </div>
+      </div>
 
-        {/* Body */}
-        <div className="overflow-auto flex-1 p-5">
+      {/* Body */}
+      <div className="overflow-auto flex-1 px-6 sm:px-10 py-8">
+        <div className="max-w-6xl mx-auto">
           {step === 1 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {SOURCES.map((s) => {
                 const Icon = s.icon;
                 const active = source === s.id;
@@ -440,7 +439,7 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
                 const card = (
                   <button
                     onClick={() => chooseSource(s.id)}
-                    className={`relative w-full text-left rounded-[11px] p-4 transition-all ${
+                    className={`relative w-full h-full text-left rounded-[11px] p-6 transition-all ${
                       sourceLocked
                         ? "border-2 border-slate-200 bg-slate-50 opacity-70 cursor-not-allowed"
                         : active ? "bg-blue-50 dark:bg-blue-500/15 shadow-md" : "border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
@@ -456,11 +455,11 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
                     ) : !active && s.badge && (
                       <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white rounded-full px-2 py-0.5">{s.badge}</span>
                     )}
-                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center mb-3 ${s.color}`}>
-                      <Icon className="h-5 w-5" />
+                    <div className={`h-12 w-12 rounded-lg flex items-center justify-center mb-4 ${s.color}`}>
+                      <Icon className="h-6 w-6" />
                     </div>
-                    <p className="font-semibold text-slate-900 text-sm">{s.label}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}</p>
+                    <p className="font-semibold text-slate-900 text-base">{s.label}</p>
+                    <p className="text-sm text-slate-500 mt-1.5">{sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}</p>
                   </button>
                 );
 
@@ -551,9 +550,10 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
             </div>
           )}
         </div>
+      </div>
 
-        {/* Footer nav */}
-        <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+      {/* Footer nav */}
+      <div className="px-6 sm:px-10 py-4 border-t border-slate-100 flex-shrink-0 flex items-center justify-between max-w-6xl mx-auto w-full">
           {step > 1 && step < 4 ? (
             <Button variant="outline" onClick={back} disabled={pending || buyLoading}><ArrowLeft className="h-4 w-4" /> Back</Button>
           ) : <span />}
@@ -577,7 +577,6 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
           {step === 4 && (
             <Button onClick={() => { reset(); onClose(); }}>Done</Button>
           )}
-        </div>
       </div>
     </div>
   );
@@ -628,7 +627,7 @@ function Step2Input(props: {
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) onFile(f); }}
-              className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${dragOver ? "border-blue-400 bg-blue-50 dark:bg-blue-500/15" : "border-slate-300 bg-slate-50"}`}
+              className={`border-2 border-dashed rounded-xl p-16 text-center transition-colors ${dragOver ? "border-blue-400 bg-blue-50 dark:bg-blue-500/15" : "border-slate-300 bg-slate-50"}`}
             >
               <div className="h-12 w-12 mx-auto rounded-full bg-blue-50 flex items-center justify-center mb-3">
                 <Upload className="h-6 w-6 text-blue-600" />
@@ -666,27 +665,60 @@ function Step2Input(props: {
     );
   }
 
+  const steps: Record<SourceId, string[]> = {
+    "linkedin-search": [
+      "Open LinkedIn and run a people search with the filters you want (role, industry, location).",
+      "Copy the search results URL from your browser's address bar and paste it here.",
+      "On the next step you'll add the profiles you found — name, title and profile link each.",
+    ],
+    "linkedin-post": [
+      "Find a LinkedIn post with comments/reactions from people you'd like to reach.",
+      "Copy the post's URL and paste it here.",
+      "Next, add the engagers you want to capture as leads.",
+    ],
+    youtube: [
+      "Find a YouTube video or Community post with an engaged audience.",
+      "Copy its URL and paste it here.",
+      "Next, add the commenters/channels you want to capture as leads.",
+    ],
+    manual: [], buy: [], csv: [],
+  };
+
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">{fieldLabel[source]}</label>
-        <Input value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={placeholder[source]} />
-      </div>
-
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 flex items-start gap-2">
-        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-slate-400" />
-        <span>
-          Automated retrieval for {SOURCE_LABEL[source]} runs after you connect the channel. For now, enter the source above and add the
-          profiles you found in the next step — name, title and profile link are captured to your list.
-        </span>
-      </div>
-
-      {error && <ErrorNote text={error} />}
-      {warning && (
-        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{warning}</span>
+    <div className="grid md:grid-cols-2 gap-8">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{fieldLabel[source]}</label>
+          <Input value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={placeholder[source]} />
         </div>
-      )}
+
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-slate-400" />
+          <span>
+            Automated retrieval for {SOURCE_LABEL[source]} runs after you connect the channel. For now, enter the source above and add the
+            profiles you found in the next step — name, title and profile link are captured to your list.
+          </span>
+        </div>
+
+        {error && <ErrorNote text={error} />}
+        {warning && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{warning}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-5">
+        <p className="font-semibold text-slate-900 text-sm mb-3">How this works</p>
+        <ol className="space-y-3">
+          {steps[source].map((s, i) => (
+            <li key={i} className="flex gap-3 text-sm text-slate-600">
+              <span className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">{i + 1}</span>
+              <span>{s}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
     </div>
   );
 }
@@ -712,7 +744,7 @@ function CsvReview({ rows, valid, invalid }: { rows: CsvRow[]; valid: number; in
             <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Email</th><th className="px-3 py-2 text-left font-semibold">Company</th><th className="px-3 py-2 text-left font-semibold">Status</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.slice(0, 8).map((r, i) => (
+            {rows.slice(0, 15).map((r, i) => (
               <tr key={i} className={r._valid ? "" : "bg-red-50/50"}>
                 <td className="px-3 py-2">{r.full_name || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{r.email || <span className="text-slate-400">—</span>}</td>
@@ -722,7 +754,7 @@ function CsvReview({ rows, valid, invalid }: { rows: CsvRow[]; valid: number; in
             ))}
           </tbody>
         </table>
-        {rows.length > 8 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 border-t border-slate-100">Showing first 8 of {rows.length} rows</p>}
+        {rows.length > 15 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 border-t border-slate-100">Showing first 15 of {rows.length} rows</p>}
       </div>
     </div>
   );
@@ -835,7 +867,7 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
             <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Email</th><th className="px-3 py-2 text-left font-semibold">Company</th><th className="px-3 py-2 text-left font-semibold">Status</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.slice(0, 8).map((e) => (
+            {rows.slice(0, 15).map((e) => (
               <tr key={e.id} className={entryValid(e) ? "" : "bg-red-50/50"}>
                 <td className="px-3 py-2">{e.name || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{e.email || <span className="text-slate-400">—</span>}</td>
@@ -845,7 +877,7 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
             ))}
           </tbody>
         </table>
-        {rows.length > 8 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 border-t border-slate-100">Showing first 8 of {rows.length}</p>}
+        {rows.length > 15 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 border-t border-slate-100">Showing first 15 of {rows.length}</p>}
       </div>
     </div>
   );
@@ -877,64 +909,74 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, max
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className="grid lg:grid-cols-[1.3fr_1fr] gap-8">
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Industry</label>
+            <Select value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })}>
+              <option value="">Any industry</option>
+              {LINKEDIN_INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
+            </Select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Job title / role</label>
+            <Select value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })}>
+              <option value="">Any role</option>
+              {COMMON_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            </Select>
+          </div>
+        </div>
+
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Industry</label>
-          <Select value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })}>
-            <option value="">Any industry</option>
-            {LINKEDIN_INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
-          </Select>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
+          <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Job title / role</label>
-          <Select value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })}>
-            <option value="">Any role</option>
-            {COMMON_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-          </Select>
+
+        <div className="max-w-[220px]">
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">How many (max {maxCount})</label>
+          <Input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={countDraft}
+            onChange={(e) => setCountDraft(e.target.value.replace(/[^0-9]/g, ""))}
+            onBlur={commitCount}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitCount(); } }}
+          />
         </div>
+
+        <Button onClick={onGenerate} disabled={loading}>
+          {loading
+            ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
+            : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
+        </Button>
+
+        {results && isReal && (
+          <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+            <CheckCircle2 className="h-4 w-4" /> {results.length} real prospects found — review them on the next step.
+          </div>
+        )}
+
+        {results && source === "ai" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>Couldn&apos;t reach the data provider, so these are <span className="font-semibold">AI-generated samples</span> — not verified contacts.</span>
+          </div>
+        )}
+
+        {error && <ErrorNote text={error} />}
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
-        <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
+      <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-5 h-fit">
+        <p className="font-semibold text-slate-900 text-sm mb-3">What you&apos;ll get</p>
+        <ul className="space-y-3 text-sm text-slate-600">
+          <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Real prospects sourced from public LinkedIn profiles via BILEADS Kit.</li>
+          <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Each lead includes a LinkedIn URL, with an email attached where one is found.</li>
+          <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Narrow by industry, role and location to target the right audience.</li>
+          <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
+        </ul>
       </div>
-
-      <div className="max-w-[220px]">
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">How many (max {maxCount})</label>
-        <Input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={countDraft}
-          onChange={(e) => setCountDraft(e.target.value.replace(/[^0-9]/g, ""))}
-          onBlur={commitCount}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitCount(); } }}
-        />
-      </div>
-
-      <Button onClick={onGenerate} disabled={loading}>
-        {loading
-          ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
-          : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
-      </Button>
-
-      <p className="text-xs text-slate-500">Sourced from public LinkedIn profiles via BILEADS Kit — each lead includes a LinkedIn URL, with an email attached where one is found.</p>
-
-      {results && isReal && (
-        <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-          <CheckCircle2 className="h-4 w-4" /> {results.length} real prospects found — review them on the next step.
-        </div>
-      )}
-
-      {results && source === "ai" && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <span>Couldn&apos;t reach the data provider, so these are <span className="font-semibold">AI-generated samples</span> — not verified contacts.</span>
-        </div>
-      )}
-
-      {error && <ErrorNote text={error} />}
     </div>
   );
 }
@@ -959,7 +1001,7 @@ function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; cr
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {prospects.slice(0, 8).map((p, i) => (
+            {prospects.slice(0, 15).map((p, i) => (
               <tr key={i}>
                 <td className="px-3 py-2 align-top">{p.full_name || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2 text-slate-600 align-top"><span className="line-clamp-2">{p.title || "—"}</span></td>
@@ -969,7 +1011,7 @@ function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; cr
             ))}
           </tbody>
         </table>
-        {prospects.length > 8 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 border-t border-slate-100">Showing first 8 of {prospects.length}</p>}
+        {prospects.length > 15 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 border-t border-slate-100">Showing first 15 of {prospects.length}</p>}
       </div>
     </div>
   );
