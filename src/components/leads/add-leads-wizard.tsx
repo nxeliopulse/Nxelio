@@ -786,6 +786,16 @@ function Step2Input(props: {
   );
 }
 
+/** Labeled block field — label above the input, matching standard CRM form conventions. */
+function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 function ErrorNote({ text }: { text: string }) {
   return (
     <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
@@ -893,40 +903,59 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
         <p className="text-sm text-slate-600">Type your leads below. Each needs a <span className="font-medium text-slate-900">name</span> and an <span className="font-medium text-slate-900">email</span>.</p>
         <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap"><Users2 className="h-3.5 w-3.5" /> {ready} ready</span>
       </div>
-      <div className="space-y-3">
-        {entries.map((e) => {
+      <div className="space-y-4">
+        {entries.map((e, idx) => {
           const bad = entryStarted(e) && !entryValid(e);
           return (
-            <div key={e.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
-              <div className="grid grid-cols-1 sm:grid-cols-[1.1fr_1.3fr_1.1fr_1fr_auto] gap-2">
-                <Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Name *" />
-                <Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="Email *"
-                  className={bad ? "border-amber-300 focus:ring-amber-200" : ""} />
-                <Input value={e.company} onChange={(ev) => update(e.id, "company", ev.target.value)} placeholder="Company" />
-                <Input value={e.title} onChange={(ev) => update(e.id, "title", ev.target.value)} placeholder="Job title" />
-                <button onClick={() => remove(e.id)} aria-label="Remove row" className="justify-self-start sm:justify-self-center p-2 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600">
+            <div key={e.id} className="rounded-xl border border-slate-200 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-200">
+                <span className="text-xs font-semibold text-slate-500">Lead {idx + 1}</span>
+                <button onClick={() => remove(e.id)} aria-label="Remove lead" className="p-1 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <Input value={e.phone} onChange={(ev) => update(e.id, "phone", ev.target.value)} placeholder="Phone" />
-                <Select value={e.companySize} onChange={(ev) => update(e.id, "companySize", ev.target.value)}>
-                  <option value="">Company size</option>
-                  {COMPANY_SIZE_BUCKETS.filter((b) => b !== "Any").map((b) => <option key={b} value={b}>{b}</option>)}
-                </Select>
-                <Select value={e.seniority} onChange={(ev) => update(e.id, "seniority", ev.target.value)}>
-                  <option value="">Seniority</option>
-                  {SENIORITY_LEVELS.filter((s) => s !== "Any").map((s) => <option key={s} value={s}>{s}</option>)}
-                </Select>
-                <Input value={e.twitter} onChange={(ev) => update(e.id, "twitter", ev.target.value)} placeholder="Twitter / X handle" />
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                <Input value={e.streetAddress} onChange={(ev) => update(e.id, "streetAddress", ev.target.value)} placeholder="Street address" className="sm:col-span-2" />
-                <Input value={e.city} onChange={(ev) => update(e.id, "city", ev.target.value)} placeholder="City" />
-                <Input value={e.state} onChange={(ev) => update(e.id, "state", ev.target.value)} placeholder="State" />
-                <div className="flex gap-2">
-                  <Input value={e.country} onChange={(ev) => update(e.id, "country", ev.target.value)} placeholder="Country" />
-                  <Input value={e.postalCode} onChange={(ev) => update(e.id, "postalCode", ev.target.value)} placeholder="Postal" />
+              <div className="p-4 space-y-4">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Contact</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Field label="Name *"><Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Jane Doe" /></Field>
+                    <Field label="Email *"><Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="jane@company.com" className={bad ? "border-amber-300 focus:ring-amber-200" : ""} /></Field>
+                    <Field label="Phone"><Input value={e.phone} onChange={(ev) => update(e.id, "phone", ev.target.value)} placeholder="+1 555 000 0000" /></Field>
+                    <Field label="Twitter / X handle"><Input value={e.twitter} onChange={(ev) => update(e.id, "twitter", ev.target.value)} placeholder="@janedoe" /></Field>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Company</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Field label="Company"><Input value={e.company} onChange={(ev) => update(e.id, "company", ev.target.value)} placeholder="Acme Inc." /></Field>
+                    <Field label="Job title"><Input value={e.title} onChange={(ev) => update(e.id, "title", ev.target.value)} placeholder="Head of Sales" /></Field>
+                    <Field label="Company size">
+                      <Select value={e.companySize} onChange={(ev) => update(e.id, "companySize", ev.target.value)}>
+                        <option value="">Select…</option>
+                        {COMPANY_SIZE_BUCKETS.filter((b) => b !== "Any").map((b) => <option key={b} value={b}>{b}</option>)}
+                      </Select>
+                    </Field>
+                    <Field label="Seniority">
+                      <Select value={e.seniority} onChange={(ev) => update(e.id, "seniority", ev.target.value)}>
+                        <option value="">Select…</option>
+                        {SENIORITY_LEVELS.filter((s) => s !== "Any").map((s) => <option key={s} value={s}>{s}</option>)}
+                      </Select>
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Address</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <Field label="Street address" className="lg:col-span-2"><Input value={e.streetAddress} onChange={(ev) => update(e.id, "streetAddress", ev.target.value)} placeholder="123 Main St" /></Field>
+                    <Field label="City"><Input value={e.city} onChange={(ev) => update(e.id, "city", ev.target.value)} placeholder="City" /></Field>
+                    <Field label="State"><Input value={e.state} onChange={(ev) => update(e.id, "state", ev.target.value)} placeholder="State" /></Field>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Country"><Input value={e.country} onChange={(ev) => update(e.id, "country", ev.target.value)} placeholder="Country" /></Field>
+                      <Field label="Postal code"><Input value={e.postalCode} onChange={(ev) => update(e.id, "postalCode", ev.target.value)} placeholder="Postal" /></Field>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
