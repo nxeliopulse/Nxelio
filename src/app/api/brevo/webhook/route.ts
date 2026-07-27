@@ -76,12 +76,26 @@ export async function POST(request: NextRequest) {
     const campaignId = extractCampaignId(ev);
     if (!activityType || !email) continue;
 
-    const { data: lead } = await db
-      .from("leads")
-      .select("id, workspace_id")
-      .ilike("email", email)
-      .limit(1)
-      .maybeSingle();
+    // A single email can exist on more than one lead row (duplicate imports
+    // across repeated campaigns) - an arbitrary first match risks landing on
+    // a duplicate that was never actually sent THIS campaign, so the open/
+    // click/bounce event gets logged under the wrong lead_id and never joins
+    // up with that campaign's own per-lead activity row. When we know the
+    // campaign_id (we always do here), prefer whichever duplicate actually
+    // has an EMAIL_SENT record for it.
+    const { data: candidates } = await db.from("leads").select("id, workspace_id").ilike("email", email);
+    let lead = candidates?.[0] ?? null;
+    if (candidates && candidates.length > 1 && campaignId) {
+      const { data: sentMatch } = await db
+        .from("lead_activities")
+        .select("lead_id")
+        .in("lead_id", candidates.map((c) => c.id))
+        .eq("activity_type", "EMAIL_SENT")
+        .eq("metadata->>campaign_id", campaignId)
+        .limit(1)
+        .maybeSingle();
+      if (sentMatch?.lead_id) lead = candidates.find((c) => c.id === sentMatch.lead_id) ?? lead;
+    }
     if (!lead) continue;
 
     await db.from("lead_activities").insert({
