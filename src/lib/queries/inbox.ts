@@ -111,8 +111,24 @@ export async function sendReply(
     .select("email, linkedin, linkedin_provider_id, workspace_id")
     .eq("id", leadId)
     .single();
+
+  // Reply on whatever channel this conversation has actually been using — a
+  // hybrid lead can have both an email and a LinkedIn profile, so "has an
+  // email" alone isn't a safe signal. The prior outbound message's subject
+  // already encodes the channel ("LinkedIn message"/"LinkedIn connection
+  // request" vs. an email subject line).
+  const { data: lastOutbound } = await supabase
+    .from("inbox_messages")
+    .select("subject")
+    .eq("lead_id", leadId)
+    .eq("direction", "outbound")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const isLinkedInThread = /linkedin/i.test(lastOutbound?.subject || "");
+
   let simulated = false;
-  if (lead?.email) {
+  if (lead?.email && !isLinkedInThread) {
     const { sendEmail } = await import("@/lib/email/resend");
     const { getOnboarding } = await import("@/lib/queries/onboarding");
     const { data: onboarding } = await getOnboarding();
@@ -121,9 +137,9 @@ export async function sendReply(
     if (!result.ok) return { ok: false, error: result.error };
     simulated = result.simulated ?? false;
   } else if (lead?.linkedin || lead?.linkedin_provider_id) {
-    // No email on file — this is a LinkedIn conversation. Previously this
-    // branch didn't exist at all, so a reply typed here was only ever saved
-    // locally and never actually reached LinkedIn.
+    // A LinkedIn conversation. Previously this branch didn't exist at all,
+    // so a reply typed here was only ever saved locally and never actually
+    // reached LinkedIn.
     const { unipileConfigured, unipileResolveProfile, unipileSendLinkedInMessage } = await import("@/lib/outreach/unipile");
     if (!unipileConfigured) return { ok: false, error: "LinkedIn (Unipile) not configured" };
 
