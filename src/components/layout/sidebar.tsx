@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { navMainItems, navAdminItems, filterNavByRoleAndOverrides, isNavItemAllowed } from "@/lib/nav-config";
 import { useSidebar } from "./sidebar-context";
 
-const EXPANDED = "w-[200px]";
+const EXPANDED = "w-[210px]";
 const COLLAPSED = "w-[84px]";
 
 // The plan one tier above the current one — null once already on the top plan.
@@ -96,8 +96,8 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
       )}
     >
       <div className="w-full flex flex-col h-full">
-        {/* Header Logo */}
-        <div className={cn("h-11 flex items-center flex-shrink-0", collapsed ? "justify-center px-2" : "px-4")}>
+        {/* Header Logo — aligned with Topbar height (h-16) */}
+        <div className={cn("h-16 py-2.5 flex items-center flex-shrink-0", collapsed ? "justify-center px-2" : "px-4")}>
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -112,11 +112,11 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
               <PanelLeftOpen className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", !collapsed && "hidden")} />
             </span>
             {!collapsed && (
-              <span className="flex flex-col leading-none whitespace-nowrap text-left">
-                <span className="font-bold text-white text-base tracking-tight">
+              <span className="flex flex-col leading-tight whitespace-nowrap text-left">
+                <span className="font-bold text-white text-sm tracking-tight">
                   Nxelio Nurture
                 </span>
-                <span className="text-[10px] text-white/80 font-bold uppercase tracking-widest mt-0.5">AI-Powered Lead Nurturing</span>
+                <span className="text-[10px] text-white/80 font-bold uppercase tracking-wider mt-0.5">AI NURTURE</span>
               </span>
             )}
           </button>

@@ -263,7 +263,7 @@ export function InboxView({ conversations, embedded = false }: InboxViewProps) {
       {!embedded && <PageHeader title="Smart Inbox" description="Unified inbox for all campaign replies" />}
 
       <Card className="overflow-hidden border border-slate-200/90 shadow-sm">
-        <div className={cn("grid grid-cols-1 lg:grid-cols-[300px_1fr]", embedded ? "h-[calc(100vh-275px)] min-h-[560px]" : "h-[calc(100vh-220px)] min-h-[600px]")}>
+        <div className={cn("grid grid-cols-1 lg:grid-cols-[300px_1fr]", embedded ? "h-[calc(100vh-380px)] min-h-[440px] max-h-[500px]" : "h-[calc(100vh-220px)] min-h-[520px]")}>
           {/* Conversation list */}
           <div className="border-r border-slate-100 flex flex-col bg-white">
             <div className="p-3 border-b border-slate-100 space-y-2">

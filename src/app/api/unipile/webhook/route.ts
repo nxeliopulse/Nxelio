@@ -94,12 +94,29 @@ export async function POST(request: NextRequest) {
   let lead: { id: string; workspace_id: string; full_name: string | null; company_name: string | null; email: string | null } | null = null;
 
   // Match the reply sender to a lead — prefer the connected account's workspace.
+  // A single email address can exist on more than one lead row (duplicate
+  // imports across test campaigns) — an arbitrary first match risks landing
+  // on a duplicate with no real send history, so the reply gets logged but
+  // never attributed to the campaign that actually messaged this person.
+  // Prefer whichever matching lead has real outbound activity, most recent first.
   const matchEmail = async (ws: string | null) => {
     if (!emails.length) return null;
     let q = db.from("leads").select("id, workspace_id, full_name, company_name, email").in("email", emails);
     if (ws) q = q.eq("workspace_id", ws);
-    const { data } = await q.limit(1);
-    return data?.[0] ?? null;
+    const { data } = await q;
+    const candidates = data ?? [];
+    if (candidates.length <= 1) return candidates[0] ?? null;
+
+    const { data: activity } = await db
+      .from("inbox_messages")
+      .select("lead_id, created_at")
+      .in("lead_id", candidates.map((c) => c.id))
+      .eq("direction", "outbound")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const mostActiveId = activity?.lead_id as string | undefined;
+    return candidates.find((c) => c.id === mostActiveId) ?? candidates[0];
   };
   lead = (await matchEmail(scopeWorkspaceId)) || (await matchEmail(null));
 
