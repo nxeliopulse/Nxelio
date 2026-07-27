@@ -65,13 +65,14 @@ export async function getInboxConversations(campaignId?: string): Promise<InboxC
   return [...byLead.values()].map((c) => ({ ...c, is_read: !anyUnread.has((c.lead_id as string) || c.id) }));
 }
 
-export async function getInboxThread(leadId: string): Promise<InboxMessage[]> {
+/** Pass campaignId when viewing this thread from a specific campaign's own
+ *  Inbox tab, so it only shows that campaign's messages — otherwise a lead
+ *  enrolled in several campaigns shows every one of them mixed together. */
+export async function getInboxThread(leadId: string, campaignId?: string): Promise<InboxMessage[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("inbox_messages")
-    .select("*")
-    .eq("lead_id", leadId)
-    .order("created_at", { ascending: true });
+  let q = supabase.from("inbox_messages").select("*").eq("lead_id", leadId);
+  if (campaignId) q = q.eq("campaign_id", campaignId);
+  const { data } = await q.order("created_at", { ascending: true });
   return data || [];
 }
 

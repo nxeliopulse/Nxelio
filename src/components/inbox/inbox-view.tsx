@@ -55,9 +55,13 @@ interface InboxViewProps {
    *  height — used when this same inbox UI is embedded inside a campaign's "Inbox" tab
    *  instead of the standalone /inbox page. */
   embedded?: boolean;
+  /** When set (embedded in one campaign's own Inbox tab), scopes the shown
+   *  thread to that campaign only — a lead enrolled in several campaigns would
+   *  otherwise show every one of them mixed into a single thread. */
+  campaignId?: string;
 }
 
-export function InboxView({ conversations, embedded = false }: InboxViewProps) {
+export function InboxView({ conversations, embedded = false, campaignId }: InboxViewProps) {
   const router = useRouter();
   const { toast, confirm } = useFeedback();
   const [pending, start] = useTransition();
@@ -95,15 +99,15 @@ export function InboxView({ conversations, embedded = false }: InboxViewProps) {
   // Load the full conversation thread (inbound + your sent replies) for the open lead.
   function loadThread(leadId: string | null | undefined) {
     if (!leadId) return;
-    getInboxThread(leadId).then(setThread).catch(() => setThread([]));
+    getInboxThread(leadId, campaignId).then(setThread).catch(() => setThread([]));
   }
   useEffect(() => {
     const leadId = active?.lead_id;
     if (!leadId) return;
     let cancelled = false;
-    getInboxThread(leadId).then((t) => { if (!cancelled) setThread(t); }).catch(() => {});
+    getInboxThread(leadId, campaignId).then((t) => { if (!cancelled) setThread(t); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [active?.lead_id]);
+  }, [active?.lead_id, campaignId]);
 
   // Jump to the newest message whenever the thread or active conversation changes.
   useEffect(() => {
@@ -259,11 +263,11 @@ export function InboxView({ conversations, embedded = false }: InboxViewProps) {
   const isStarred = active ? starred.has(active.id) : false;
 
   return (
-    <div className={embedded ? "" : "max-w-[1600px] mx-auto"}>
+    <div className={embedded ? "flex-1 min-h-0 flex flex-col h-full w-full" : "max-w-[1600px] mx-auto"}>
       {!embedded && <PageHeader title="Smart Inbox" description="Unified inbox for all campaign replies" />}
 
-      <Card className="overflow-hidden border border-slate-200/90 shadow-sm">
-        <div className={cn("grid grid-cols-1 lg:grid-cols-[300px_1fr]", embedded ? "h-[calc(100vh-380px)] min-h-[440px] max-h-[500px]" : "h-[calc(100vh-220px)] min-h-[520px]")}>
+      <Card className={cn("overflow-hidden border border-slate-200/90 shadow-sm", embedded && "flex-1 min-h-0 flex flex-col h-full")}>
+        <div className={cn("grid grid-cols-1 lg:grid-cols-[300px_1fr] flex-1 min-h-0", embedded ? "h-full" : "h-[calc(100vh-220px)] min-h-[520px]")}>
           {/* Conversation list */}
           <div className="border-r border-slate-100 flex flex-col bg-white">
             <div className="p-3 border-b border-slate-100 space-y-2">
