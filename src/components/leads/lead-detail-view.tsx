@@ -108,9 +108,11 @@ export function LeadDetailView({
   const [showAiScoreDrawer, setShowAiScoreDrawer] = useState(false);
 
   const displayName = lead.full_name || lead.company_name || "—";
+  // Prefer the real first_name/last_name columns; fall back to splitting
+  // full_name for older rows imported before those columns existed.
   const splitNames = displayName.split(" ");
-  const firstName = splitNames[0] || "";
-  const lastName = splitNames.slice(1).join(" ") || "";
+  const firstName = lead.first_name || splitNames[0] || "";
+  const lastName = lead.last_name || splitNames.slice(1).join(" ") || "";
 
   async function handleDelete() {
     setMenuOpen(false);
@@ -246,7 +248,11 @@ export function LeadDetailView({
                 <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
                   <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Email</span>
                   {email ? (
-                    <a href={`mailto:${email}`} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline break-all">{email}</a>
+                    <div className="flex items-center gap-1.5">
+                      <a href={`mailto:${email}`} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline break-all">{email}</a>
+                      {lead.email_verification_status === "valid" && <Badge variant="success">Verified</Badge>}
+                      {lead.email_verification_status === "catch_all" && <Badge variant="warning">Catch-all</Badge>}
+                    </div>
                   ) : (
                     <button type="button" onClick={() => setFindEmailOpen((v) => !v)} className="text-blue-600 hover:underline font-semibold">
                       + Find email address
@@ -279,6 +285,15 @@ export function LeadDetailView({
                   )}
                 </div>
 
+                {lead.twitter_handle && (
+                  <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                    <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Twitter / X</span>
+                    <a href={`https://x.com/${lead.twitter_handle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                      @{lead.twitter_handle.replace(/^@/, "")}
+                    </a>
+                  </div>
+                )}
+
                 <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
                   <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Website</span>
                   {lead.website_url ? (
@@ -287,6 +302,15 @@ export function LeadDetailView({
                     <span className="text-slate-400">—</span>
                   )}
                 </div>
+
+                {(lead.street_address || lead.city || lead.state || lead.country || lead.postal_code) && (
+                  <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                    <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Address</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {[lead.street_address, lead.city, lead.state, lead.postal_code, lead.country].filter(Boolean).join(", ")}
+                    </span>
+                  </div>
+                )}
 
                 {lead.company_name && (
                   <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
@@ -298,6 +322,30 @@ export function LeadDetailView({
                   </div>
                 )}
 
+                {lead.job_title && (
+                  <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                    <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Job Title</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{lead.job_title}</span>
+                  </div>
+                )}
+
+                {(lead.seniority || lead.department) && (
+                  <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                    {lead.seniority && (
+                      <div>
+                        <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Seniority</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{lead.seniority}</span>
+                      </div>
+                    )}
+                    {lead.department && (
+                      <div>
+                        <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Department</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{lead.department}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {lead.industry && (
                   <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
                     <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Industry</span>
@@ -305,6 +353,23 @@ export function LeadDetailView({
                       <span className="font-semibold text-slate-800 dark:text-slate-200">{lead.industry}</span>
                       <Pencil className="h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100 cursor-pointer" onClick={() => setEditOpen(true)} />
                     </div>
+                  </div>
+                )}
+
+                {(lead.company_size || lead.annual_revenue) && (
+                  <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                    {lead.company_size && (
+                      <div>
+                        <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Company Size</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{lead.company_size} employees</span>
+                      </div>
+                    )}
+                    {lead.annual_revenue && (
+                      <div>
+                        <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Annual Revenue</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{lead.annual_revenue}</span>
+                      </div>
+                    )}
                   </div>
                 )}
 

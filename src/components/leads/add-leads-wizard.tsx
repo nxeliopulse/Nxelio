@@ -7,6 +7,7 @@ import {
   Upload, Plus, Trash2, Users2, Link2, RefreshCw, ExternalLink, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input, Select } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
 import { bulkInsertLeads, type LeadRow } from "@/lib/queries/leads";
@@ -49,8 +50,14 @@ const SOURCE_LABEL: Record<SourceId, string> = {
 };
 
 type ManualLead = { id: string; name: string; title: string; url: string };
-// Full manual entry row (the "Add Leads Manually" source)
-type ManualEntry = { id: string; name: string; email: string; company: string; title: string };
+// Full manual entry row (the "Add Leads Manually" source) — phone/companySize/
+// seniority/twitter/address are real user-supplied CRM fields (unlike Buy
+// Leads, this source genuinely has this data because the person typing it in knows it).
+type ManualEntry = {
+  id: string; name: string; email: string; company: string; title: string;
+  phone: string; companySize: string; seniority: string; twitter: string;
+  streetAddress: string; city: string; state: string; country: string; postalCode: string;
+};
 
 type CsvRow = {
   full_name: string | null;
@@ -59,6 +66,17 @@ type CsvRow = {
   company_name: string | null;
   industry: string | null;
   interest_area: string | null;
+  job_title: string | null;
+  seniority: string | null;
+  department: string | null;
+  company_size: string | null;
+  annual_revenue: string | null;
+  twitter_handle: string | null;
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postal_code: string | null;
   linkedin: string | null;
   website_url: string | null;
   _valid: boolean;
@@ -71,7 +89,18 @@ const CSV_HEADER_MAP: Record<string, keyof CsvRow> = {
   email: "email", "email address": "email",
   phone: "phone", "phone number": "phone",
   industry: "industry",
-  interest_area: "interest_area", interestarea: "interest_area", "interest area": "interest_area", interest: "interest_area", title: "interest_area",
+  interest_area: "interest_area", interestarea: "interest_area", "interest area": "interest_area", interest: "interest_area",
+  job_title: "job_title", jobtitle: "job_title", "job title": "job_title", title: "job_title",
+  seniority: "seniority", "seniority level": "seniority",
+  department: "department",
+  company_size: "company_size", companysize: "company_size", "company size": "company_size", headcount: "company_size",
+  annual_revenue: "annual_revenue", annualrevenue: "annual_revenue", "annual revenue": "annual_revenue", revenue: "annual_revenue",
+  twitter: "twitter_handle", twitter_handle: "twitter_handle", "twitter handle": "twitter_handle", "twitter/x": "twitter_handle", x: "twitter_handle",
+  street_address: "street_address", address: "street_address", "street address": "street_address",
+  city: "city",
+  state: "state", province: "state",
+  country: "country",
+  postal_code: "postal_code", zip: "postal_code", "zip code": "postal_code", "postal code": "postal_code",
   linkedin: "linkedin", "linkedin url": "linkedin",
   website_url: "website_url", weburl: "website_url", "web url": "website_url", website: "website_url", url: "website_url",
 };
@@ -101,7 +130,12 @@ function parseCsv(text: string): CsvRow[] {
   const rows: CsvRow[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cells = splitCsvLine(lines[i]);
-    const row: CsvRow = { full_name: null, email: null, phone: null, company_name: null, industry: null, interest_area: null, linkedin: null, website_url: null, _valid: false };
+    const row: CsvRow = {
+      full_name: null, email: null, phone: null, company_name: null, industry: null, interest_area: null,
+      job_title: null, seniority: null, department: null, company_size: null, annual_revenue: null,
+      twitter_handle: null, street_address: null, city: null, state: null, country: null, postal_code: null,
+      linkedin: null, website_url: null, _valid: false,
+    };
     cells.forEach((v, c) => {
       const key = headers[c];
       if (key && v) (row as Record<string, string | null | boolean>)[key] = v;
@@ -119,10 +153,17 @@ let _mid = 0;
 const newManual = (): ManualLead => ({ id: `m${++_mid}`, name: "", title: "", url: "" });
 const manualInvalidCount = (rows: ManualLead[]) => rows.filter((m) => !m.url.trim() && (m.name.trim() || m.title.trim())).length;
 
-const newEntry = (): ManualEntry => ({ id: `e${++_mid}`, name: "", email: "", company: "", title: "" });
+const newEntry = (): ManualEntry => ({
+  id: `e${++_mid}`, name: "", email: "", company: "", title: "",
+  phone: "", companySize: "", seniority: "", twitter: "",
+  streetAddress: "", city: "", state: "", country: "", postalCode: "",
+});
 // A manual entry imports if it has a name (or company) AND an email.
 const entryValid = (e: ManualEntry) => !!((e.name.trim() || e.company.trim()) && e.email.trim());
-const entryStarted = (e: ManualEntry) => !!(e.name.trim() || e.email.trim() || e.company.trim() || e.title.trim());
+const entryStarted = (e: ManualEntry) =>
+  !!(e.name.trim() || e.email.trim() || e.company.trim() || e.title.trim() || e.phone.trim() ||
+     e.companySize.trim() || e.seniority.trim() || e.twitter.trim() ||
+     e.streetAddress.trim() || e.city.trim() || e.state.trim() || e.country.trim() || e.postalCode.trim());
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
 export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -145,7 +186,10 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Buy leads (real prospects via Bright Data, or AI samples as fallback)
-  const [buy, setBuy] = useState({ industry: "", role: "", locations: [] as string[], count: 10 });
+  const [buy, setBuy] = useState({
+    industry: "", role: "", locations: [] as string[], count: 10,
+    companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true,
+  });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
   const [buySource, setBuySource] = useState<"brightdata" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
@@ -209,7 +253,8 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
     setStep(1); setSource(null); setInputValue("");
     setStep2Error(null); setStep2Warning(null);
     setManual([newManual()]); setEntries([newEntry()]); setCsvRows(null); setCsvName(""); setDragOver(false);
-    setBuy({ industry: "", role: "", locations: [], count: 10 }); setBuyResults(null); setBuySource(null); setBuyLoading(false);
+    setBuy({ industry: "", role: "", locations: [], count: 10, companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true });
+    setBuyResults(null); setBuySource(null); setBuyLoading(false);
     setSummary(null); setImportError(null);
   }
 
@@ -353,6 +398,9 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
       payload = csvValid.map((r) => ({
         full_name: r.full_name, email: r.email, phone: r.phone,
         company_name: r.company_name, industry: r.industry, interest_area: r.interest_area,
+        job_title: r.job_title, seniority: r.seniority, department: r.department,
+        company_size: r.company_size, annual_revenue: r.annual_revenue, twitter_handle: r.twitter_handle,
+        street_address: r.street_address, city: r.city, state: r.state, country: r.country, postal_code: r.postal_code,
         linkedin: r.linkedin, website_url: r.website_url, source: "CSV Upload", status: "New",
       }));
     } else if (isManualEntry) {
@@ -360,8 +408,18 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
       payload = entryValidRows.map((e) => ({
         full_name: e.name.trim() || null,
         email: e.email.trim() || null,
+        phone: e.phone.trim() || null,
         company_name: e.company.trim() || null,
         interest_area: e.title.trim() || null,
+        job_title: e.title.trim() || null,
+        seniority: e.seniority.trim() || null,
+        company_size: e.companySize.trim() || null,
+        twitter_handle: e.twitter.trim() || null,
+        street_address: e.streetAddress.trim() || null,
+        city: e.city.trim() || null,
+        state: e.state.trim() || null,
+        country: e.country.trim() || null,
+        postal_code: e.postalCode.trim() || null,
         source: "Manual Entry", status: "New",
       }));
     } else if (isBuy) {
@@ -371,10 +429,15 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
       const buyLabel = buySource === "brightdata" ? "Purchased Leads (BILEADS Kit)" : "Purchased Leads (sample)";
       payload = (buyResults ?? []).map((p) => ({
         full_name: (p.full_name || "").slice(0, 150) || null,
+        first_name: (p.first_name || "").slice(0, 100) || null,
+        last_name: (p.last_name || "").slice(0, 100) || null,
         company_name: (p.company_name || "").slice(0, 200) || null,
         industry: (p.industry || "").slice(0, 100) || null,
         interest_area: (p.title || "").slice(0, 150) || null,
+        job_title: (p.title || "").slice(0, 150) || null,
+        seniority: p.seniority || null,
         email: p.email || null,
+        email_verification_status: p.emailVerificationStatus || null,
         linkedin: p.linkedin || null,
         website_url: p.website_url || null,
         source: buyLabel, status: "New",
@@ -638,7 +701,7 @@ function Step2Input(props: {
             </div>
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-slate-700">
               <p className="font-semibold text-slate-900 mb-1">Columns we recognise</p>
-              <p><code className="text-xs">full_name</code>/<code className="text-xs">company_name</code> and <code className="text-xs">email</code>/<code className="text-xs">website_url</code> are required; <code className="text-xs">title</code>, <code className="text-xs">phone</code>, <code className="text-xs">industry</code>, <code className="text-xs">linkedin</code> optional.</p>
+              <p><code className="text-xs">full_name</code>/<code className="text-xs">company_name</code> and <code className="text-xs">email</code>/<code className="text-xs">website_url</code> are required. Optional: <code className="text-xs">job_title</code>, <code className="text-xs">seniority</code>, <code className="text-xs">department</code>, <code className="text-xs">phone</code>, <code className="text-xs">industry</code>, <code className="text-xs">company_size</code>, <code className="text-xs">annual_revenue</code>, <code className="text-xs">twitter</code>, <code className="text-xs">street_address</code>, <code className="text-xs">city</code>, <code className="text-xs">state</code>, <code className="text-xs">country</code>, <code className="text-xs">postal_code</code>, <code className="text-xs">linkedin</code>.</p>
             </div>
           </>
         ) : (
@@ -741,7 +804,7 @@ function CsvReview({ rows, valid, invalid }: { rows: CsvRow[]; valid: number; in
       <div className="border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Email</th><th className="px-3 py-2 text-left font-semibold">Company</th><th className="px-3 py-2 text-left font-semibold">Status</th></tr>
+            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Email</th><th className="px-3 py-2 text-left font-semibold">Company</th><th className="px-3 py-2 text-left font-semibold">Job Title</th><th className="px-3 py-2 text-left font-semibold">Phone</th><th className="px-3 py-2 text-left font-semibold">Status</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.slice(0, 15).map((r, i) => (
@@ -749,6 +812,8 @@ function CsvReview({ rows, valid, invalid }: { rows: CsvRow[]; valid: number; in
                 <td className="px-3 py-2">{r.full_name || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{r.email || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{r.company_name || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2">{r.job_title || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2">{r.phone || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{r._valid ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <span className="inline-flex items-center gap-1 text-red-600 text-xs"><AlertCircle className="h-3.5 w-3.5" /> {r._reason}</span>}</td>
               </tr>
             ))}
@@ -828,22 +893,42 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
         <p className="text-sm text-slate-600">Type your leads below. Each needs a <span className="font-medium text-slate-900">name</span> and an <span className="font-medium text-slate-900">email</span>.</p>
         <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap"><Users2 className="h-3.5 w-3.5" /> {ready} ready</span>
       </div>
-      <div className="space-y-2">
-        <div className="hidden sm:grid grid-cols-[1.1fr_1.3fr_1.1fr_1fr_auto] gap-2 px-1 text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
-          <span>Name *</span><span>Email *</span><span>Company</span><span>Title / role</span><span></span>
-        </div>
+      <div className="space-y-3">
         {entries.map((e) => {
           const bad = entryStarted(e) && !entryValid(e);
           return (
-            <div key={e.id} className="grid grid-cols-1 sm:grid-cols-[1.1fr_1.3fr_1.1fr_1fr_auto] gap-2">
-              <Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Jane Doe" />
-              <Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="jane@company.com"
-                className={bad ? "border-amber-300 focus:ring-amber-200" : ""} />
-              <Input value={e.company} onChange={(ev) => update(e.id, "company", ev.target.value)} placeholder="Company" />
-              <Input value={e.title} onChange={(ev) => update(e.id, "title", ev.target.value)} placeholder="Head of Sales" />
-              <button onClick={() => remove(e.id)} aria-label="Remove row" className="justify-self-start sm:justify-self-center p-2 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600">
-                <Trash2 className="h-4 w-4" />
-              </button>
+            <div key={e.id} className="rounded-xl border border-slate-200 p-3 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-[1.1fr_1.3fr_1.1fr_1fr_auto] gap-2">
+                <Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Name *" />
+                <Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="Email *"
+                  className={bad ? "border-amber-300 focus:ring-amber-200" : ""} />
+                <Input value={e.company} onChange={(ev) => update(e.id, "company", ev.target.value)} placeholder="Company" />
+                <Input value={e.title} onChange={(ev) => update(e.id, "title", ev.target.value)} placeholder="Job title" />
+                <button onClick={() => remove(e.id)} aria-label="Remove row" className="justify-self-start sm:justify-self-center p-2 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Input value={e.phone} onChange={(ev) => update(e.id, "phone", ev.target.value)} placeholder="Phone" />
+                <Select value={e.companySize} onChange={(ev) => update(e.id, "companySize", ev.target.value)}>
+                  <option value="">Company size</option>
+                  {COMPANY_SIZE_BUCKETS.filter((b) => b !== "Any").map((b) => <option key={b} value={b}>{b}</option>)}
+                </Select>
+                <Select value={e.seniority} onChange={(ev) => update(e.id, "seniority", ev.target.value)}>
+                  <option value="">Seniority</option>
+                  {SENIORITY_LEVELS.filter((s) => s !== "Any").map((s) => <option key={s} value={s}>{s}</option>)}
+                </Select>
+                <Input value={e.twitter} onChange={(ev) => update(e.id, "twitter", ev.target.value)} placeholder="Twitter / X handle" />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <Input value={e.streetAddress} onChange={(ev) => update(e.id, "streetAddress", ev.target.value)} placeholder="Street address" className="sm:col-span-2" />
+                <Input value={e.city} onChange={(ev) => update(e.id, "city", ev.target.value)} placeholder="City" />
+                <Input value={e.state} onChange={(ev) => update(e.id, "state", ev.target.value)} placeholder="State" />
+                <div className="flex gap-2">
+                  <Input value={e.country} onChange={(ev) => update(e.id, "country", ev.target.value)} placeholder="Country" />
+                  <Input value={e.postalCode} onChange={(ev) => update(e.id, "postalCode", ev.target.value)} placeholder="Postal" />
+                </div>
+              </div>
             </div>
           );
         })}
@@ -864,7 +949,7 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
       <div className="border border-slate-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Email</th><th className="px-3 py-2 text-left font-semibold">Company</th><th className="px-3 py-2 text-left font-semibold">Status</th></tr>
+            <tr><th className="px-3 py-2 text-left font-semibold">Name</th><th className="px-3 py-2 text-left font-semibold">Email</th><th className="px-3 py-2 text-left font-semibold">Company</th><th className="px-3 py-2 text-left font-semibold">Phone</th><th className="px-3 py-2 text-left font-semibold">Seniority</th><th className="px-3 py-2 text-left font-semibold">Status</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.slice(0, 15).map((e) => (
@@ -872,6 +957,8 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
                 <td className="px-3 py-2">{e.name || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{e.email || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{e.company || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2">{e.phone || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2">{e.seniority || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{entryValid(e) ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <span className="inline-flex items-center gap-1 text-red-600 text-xs"><AlertCircle className="h-3.5 w-3.5" /> Needs name + email</span>}</td>
               </tr>
             ))}
@@ -885,7 +972,13 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
 
 // ============================================================================
 // Buy Leads — real LinkedIn prospects via Bright Data (AI samples as fallback)
-type BuyState = { industry: string; role: string; locations: string[]; count: number };
+type BuyState = {
+  industry: string; role: string; locations: string[]; count: number;
+  companySize: string; seniority: string; requireVerifiedEmail: boolean; includePhoneAndSocial: boolean;
+};
+
+const COMPANY_SIZE_BUCKETS = ["Any", "1-10", "11-50", "51-200", "201-1000", "1000+"];
+const SENIORITY_LEVELS = ["Any", "C-Level", "VP", "Director", "Manager", "Individual Contributor"];
 function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, maxCount }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
@@ -933,6 +1026,32 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, max
           <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
         </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Company size / headcount</label>
+            <Select value={buy.companySize} onChange={(e) => setBuy({ ...buy, companySize: e.target.value })}>
+              {COMPANY_SIZE_BUCKETS.map((b) => <option key={b} value={b}>{b === "Any" ? "Any size" : b}</option>)}
+            </Select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Seniority level</label>
+            <Select value={buy.seniority} onChange={(e) => setBuy({ ...buy, seniority: e.target.value })}>
+              {SENIORITY_LEVELS.map((s) => <option key={s} value={s}>{s === "Any" ? "Any seniority" : s}</option>)}
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={buy.requireVerifiedEmail} onChange={(e) => setBuy({ ...buy, requireVerifiedEmail: e.target.checked })} className="rounded border-slate-300" />
+            Require a verified work email
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={buy.includePhoneAndSocial} onChange={(e) => setBuy({ ...buy, includePhoneAndSocial: e.target.checked })} className="rounded border-slate-300" />
+            Include phone number &amp; social handles (where available)
+          </label>
+        </div>
+
         <div className="max-w-[220px]">
           <label className="block text-sm font-medium text-slate-700 mb-1.5">How many (max {maxCount})</label>
           <Input
@@ -968,14 +1087,20 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, max
         {error && <ErrorNote text={error} />}
       </div>
 
-      <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-5 h-fit">
-        <p className="font-semibold text-slate-900 text-sm mb-3">What you&apos;ll get</p>
-        <ul className="space-y-3 text-sm text-slate-600">
-          <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Real prospects sourced from public LinkedIn profiles via BILEADS Kit.</li>
-          <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Each lead includes a LinkedIn URL, with an email attached where one is found.</li>
-          <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Narrow by industry, role and location to target the right audience.</li>
-          <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
-        </ul>
+      <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-5 h-fit space-y-4">
+        <div>
+          <p className="font-semibold text-slate-900 text-sm mb-3">What you&apos;ll get</p>
+          <ul className="space-y-3 text-sm text-slate-600">
+            <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Name, job title, company and LinkedIn URL from real public profiles via BILEADS Kit.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Seniority estimated from each person&apos;s real job title.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Work email included when found — flagged as verified or catch-all, never guessed silently.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
+          </ul>
+        </div>
+        <div className="pt-3 border-t border-amber-200/70">
+          <p className="text-xs font-semibold text-slate-700 mb-1.5">Not available from this source</p>
+          <p className="text-xs text-slate-500">Company size and seniority above are search filters/estimates, not verified fields — there&apos;s no public data source for a company&apos;s exact headcount, revenue, direct phone, or Twitter/X handle. Add those yourself afterward, or via Manual Entry / CSV Import where you already have them.</p>
+        </div>
       </div>
     </div>
   );
@@ -996,6 +1121,7 @@ function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; cr
             <tr>
               <th className="px-3 py-2 text-left font-semibold">Name</th>
               <th className="px-3 py-2 text-left font-semibold">Title</th>
+              <th className="px-3 py-2 text-left font-semibold">Seniority</th>
               <th className="px-3 py-2 text-left font-semibold">Email</th>
               <th className="px-3 py-2 text-left font-semibold">LinkedIn</th>
             </tr>
@@ -1005,7 +1131,16 @@ function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; cr
               <tr key={i}>
                 <td className="px-3 py-2 align-top">{p.full_name || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2 text-slate-600 align-top"><span className="line-clamp-2">{p.title || "—"}</span></td>
-                <td className="px-3 py-2 text-slate-600 align-top">{p.email || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2 text-slate-600 align-top">{p.seniority || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2 text-slate-600 align-top">
+                  {p.email ? (
+                    <span className="flex items-center gap-1.5">
+                      {p.email}
+                      {p.emailVerificationStatus === "valid" && <Badge variant="success">Verified</Badge>}
+                      {p.emailVerificationStatus === "catch_all" && <Badge variant="warning">Catch-all</Badge>}
+                    </span>
+                  ) : <span className="text-slate-400">—</span>}
+                </td>
                 <td className="px-3 py-2 align-top">{p.linkedin ? <a href={p.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Profile</a> : <span className="text-slate-400">—</span>}</td>
               </tr>
             ))}

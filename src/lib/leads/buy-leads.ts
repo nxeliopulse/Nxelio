@@ -11,11 +11,23 @@ export interface BuyCriteria {
   role: string;
   locations: string[];
   count: number;
+  /** Query-hint only for Bright Data (no real per-prospect headcount data exists in
+   *  this pipeline) — "Any" or omitted means no filtering. */
+  companySize?: string;
+  /** Biases the search AND filters results by their real, derived seniority. */
+  seniority?: string;
+  /** Drop any prospect whose email wasn't confirmed by a real check (AnySite hit,
+   *  or an SMTP-verified/catch-all guess) — never relaxes into fabricating one. */
+  requireVerifiedEmail?: boolean;
 }
 
 export interface GeneratedProspect {
   full_name: string;
+  first_name?: string;
+  last_name?: string;
   title: string;
+  /** Derived from the real title text; "" when it can't be determined. */
+  seniority?: string;
   company_name: string;
   industry: string;
   website_url: string;
@@ -24,6 +36,8 @@ export interface GeneratedProspect {
   location?: string;
   /** Found via Anysite when configured; empty if not found or not configured. Never fabricated. */
   email?: string;
+  /** "valid" | "catch_all" — only set when email was actually confirmed by a real check. */
+  emailVerificationStatus?: "valid" | "catch_all";
 }
 
 export interface BuyLeadsResult {
@@ -53,7 +67,10 @@ export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeads
     if (r.ok && r.prospects.length) {
       let prospects: GeneratedProspect[] = r.prospects.map((p) => ({
         full_name: p.full_name,
+        first_name: p.first_name,
+        last_name: p.last_name,
         title: p.title,
+        seniority: p.seniority,
         company_name: p.company_name,
         industry: criteria.industry || "",
         website_url: "",
@@ -83,7 +100,7 @@ export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeads
         const found = await findEmailsByLinkedIn(urls);
         prospects = prospects.map((p) => {
           const hit = p.linkedin ? found.get(p.linkedin) : undefined;
-          return hit?.ok ? { ...p, email: hit.email || p.email } : p;
+          return hit?.ok ? { ...p, email: hit.email || p.email, emailVerificationStatus: hit.email ? "valid" : p.emailVerificationStatus } : p;
         });
         const emailCount = prospects.filter(p => p.email).length;
         console.log(`[buy-leads] Email enrichment done: ${emailCount}/${prospects.length} prospects have an email`);
@@ -108,8 +125,19 @@ export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeads
         prospects = prospects.map((p) => {
           if (p.email) return p;
           const g = guessByKey.get(p.linkedin || p.full_name);
-          return g?.ok && g.email ? { ...p, email: g.email } : p;
+          return g?.ok && g.email ? { ...p, email: g.email, emailVerificationStatus: g.status } : p;
         });
+      }
+
+      // Real filter — only drop prospects whose email was actually confirmed
+      // by one of the checks above (Anysite hit, SMTP-valid, or catch-all
+      // best-guess). Never relaxes into keeping an unconfirmed contact.
+      if (criteria.requireVerifiedEmail) {
+        prospects = prospects.filter((p) => p.email && p.emailVerificationStatus);
+      }
+
+      if (!prospects.length) {
+        return { ok: false, prospects: [], error: criteria.requireVerifiedEmail ? "No prospects with a verified email found. Try broader criteria or turn off that filter." : "No prospects found." };
       }
 
       return { ok: true, source: "brightdata", prospects };

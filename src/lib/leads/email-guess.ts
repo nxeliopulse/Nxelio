@@ -76,7 +76,18 @@ async function resolveMx(domain: string): Promise<string | null> {
  * that allows outbound 25. Treat it as a bonus for non-serverless deployments,
  * not something to rely on the way you can rely on AnySite in production.
  */
-export async function guessAndVerifyEmail(fullName: string, websiteUrl: string): Promise<{ ok: boolean; email?: string; error?: string }> {
+export interface EmailGuessResult {
+  ok: boolean;
+  email?: string;
+  /** "valid" — this specific address was accepted by the mail server.
+   *  "catch_all" — the domain accepts every address, so this is our best
+   *  guess but not individually confirmed. Only ever set from a real SMTP
+   *  probe, never guessed at. */
+  status?: "valid" | "catch_all";
+  error?: string;
+}
+
+export async function guessAndVerifyEmail(fullName: string, websiteUrl: string): Promise<EmailGuessResult> {
   let domain: string;
   try { domain = new URL(websiteUrl).hostname.replace(/^www\./, ""); } catch { return { ok: false, error: "Invalid website URL" }; }
 
@@ -87,13 +98,15 @@ export async function guessAndVerifyEmail(fullName: string, websiteUrl: string):
   if (!mxHost) return { ok: false, error: "Domain has no mail server (MX record)" };
 
   // Catch-all check: if the server accepts a deliberately fake address too,
-  // it accepts everything — no guess can be trusted, so don't report one.
+  // it accepts everything, so no individual guess can be confirmed. Real
+  // verification tools still surface the best-guessed pattern in this case,
+  // labeled "catch_all" rather than hiding it entirely — do the same here.
   const fakeProbe = `nxelio-verify-${Date.now()}@${domain}`;
   const catchAll = await smtpProbe(mxHost, fakeProbe);
-  if (catchAll) return { ok: false, error: "Domain accepts all addresses (catch-all) — can't verify a specific guess" };
+  if (catchAll) return { ok: true, email: patterns[0].split("@")[0] + "@" + domain, status: "catch_all" };
 
   for (const candidate of patterns) {
-    if (await smtpProbe(mxHost, candidate)) return { ok: true, email: candidate };
+    if (await smtpProbe(mxHost, candidate)) return { ok: true, email: candidate, status: "valid" };
   }
   return { ok: false, error: "No guessed pattern was accepted" };
 }
