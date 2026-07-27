@@ -41,7 +41,7 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
           {!onboardingCompleted ? <OnboardingBanner /> : !mailboxConnected && <NoMailboxBanner />}
           {/* Its own scroll region (not the page) — keeps the rounded top-left
               corner anchored to the viewport instead of scrolling away with content. */}
-          <main className="flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-6 bg-slate-50 rounded-tl-2xl">{children}</main>
+          <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-6 bg-slate-50 rounded-tl-2xl">{children}</main>
         </div>
         {/* Renders as a flex column on desktop — the content area shrinks to share the window */}
         <AssistantWidget open={assistantOpen} onClose={() => setAssistantOpen(false)} onExpandChange={setAssistantExpanded} />

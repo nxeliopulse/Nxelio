@@ -174,8 +174,8 @@ export function CampaignDetailView({
   }
 
   return (
-    <div className={cn("mx-auto transition-all flex-1 min-h-0 flex flex-col w-full", tab === "Inbox" ? "max-w-none" : "max-w-[1400px]")}>
-      <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4 flex-shrink-0">
+    <div className="max-w-[1400px] mx-auto">
+      <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4">
         <ArrowLeft className="h-4 w-4" /> Back to campaigns
       </Link>
 
@@ -369,7 +369,7 @@ export function CampaignDetailView({
       {/* Inbox — this campaign's replies, scoped from the shared inbox_messages table */}
       {tab === "Inbox" && (
         replyTrackingEnabled
-          ? <div className="flex-1 min-h-0 flex flex-col pb-2.5"><InboxView conversations={inboxConversations} embedded campaignId={campaign.id} /></div>
+          ? <InboxView conversations={inboxConversations} embedded campaignId={campaign.id} />
           : <LockedFeature feature="Reply Tracking" />
       )}
 
