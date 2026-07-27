@@ -20,17 +20,36 @@ export async function POST(request: NextRequest) {
   let payload: Record<string, unknown> = {};
   try { payload = await request.json(); } catch { /* ignore */ }
 
+  const db = createAdminClient();
+  const eventType = pickString(payload, ["event", "type", "event_type", "webhook_name"]) || "unknown";
+
+  // Every call gets logged (even ignored ones) so a missed reply is diagnosable
+  // from webhook_logs alone — never let logging itself break the webhook.
+  async function log(status: "processed" | "failed" | "skipped", detail?: string) {
+    await db
+      .from("webhook_logs")
+      .insert({ source: "unipile", event_type: eventType, payload, status, error: detail || null, processed_at: new Date().toISOString() })
+      .then(
+        () => {},
+        () => {}
+      );
+  }
+
   // Ignore our own outbound messages.
   const eventStr = JSON.stringify(payload).toLowerCase();
   const looksOutbound = eventStr.includes('"direction":"out"') || eventStr.includes("message_sent") || eventStr.includes("mail_sent");
-  if (looksOutbound) return NextResponse.json({ ok: true, ignored: "outbound" });
+  if (looksOutbound) {
+    await log("skipped", "outbound");
+    return NextResponse.json({ ok: true, ignored: "outbound" });
+  }
 
   // Pull any candidate sender identifiers out of the (variably-shaped) payload.
   const candidates = collectIdentifiers(payload);
   const bodyText = pickString(payload, ["body", "message", "text", "snippet", "subject"]) || "Replied";
-  if (!candidates.length) return NextResponse.json({ ok: true, ignored: "no-sender" });
-
-  const db = createAdminClient();
+  if (!candidates.length) {
+    await log("skipped", "no-sender");
+    return NextResponse.json({ ok: true, ignored: "no-sender" });
+  }
 
   // Resolve the connected account → its workspace + owner mailbox address, so we
   // scope the lead match to the right tenant and ignore our OWN sent mail (the
@@ -45,8 +64,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Sender emails, excluding the mailbox owner's own address (that's our outbound).
+  // Only treat this as "our own mail" when the payload actually contained an
+  // email-shaped candidate in the first place — a pure-LinkedIn payload has no
+  // email candidates at all, and previously that (mis)matched this same check
+  // (ownerEmail set + emails.length === 0), silently dropping every LinkedIn
+  // reply before it ever reached the LinkedIn-handle matching below.
+  const hadEmailCandidate = candidates.some((c) => c.includes("@"));
   const emails = candidates.filter((c) => c.includes("@") && c.toLowerCase() !== ownerEmail);
-  if (ownerEmail && emails.length === 0) {
+  if (ownerEmail && hadEmailCandidate && emails.length === 0) {
+    await log("skipped", "own-outbound-mail");
     return NextResponse.json({ ok: true, ignored: "own-outbound-mail" });
   }
 
@@ -71,7 +97,10 @@ export async function POST(request: NextRequest) {
       if (data?.[0]) { lead = data[0]; break; }
     }
   }
-  if (!lead) return NextResponse.json({ ok: true, ignored: "no-matching-lead" });
+  if (!lead) {
+    await log("skipped", "no-matching-lead");
+    return NextResponse.json({ ok: true, ignored: "no-matching-lead" });
+  }
 
   // Stop every active enrollment for this lead and count the reply.
   const { data: enrollments } = await db
@@ -130,6 +159,7 @@ export async function POST(request: NextRequest) {
     is_read: false,
   });
 
+  await log("processed");
   return NextResponse.json({ ok: true, lead_id: lead.id, stopped: enrollments?.length ?? 0 });
 }
 
@@ -145,16 +175,25 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | null
   return null;
 }
 
-/** Recursively gathers email-like and linkedin-handle-like strings from the payload. */
-function collectIdentifiers(obj: unknown, acc: Set<string> = new Set(), depth = 0): string[] {
+// LinkedIn webhook payloads identify people by a bare handle/id field (e.g.
+// "public_identifier": "andrew-edgell") rather than a full profile URL — match
+// on the key name too, not just the "linkedin.com/in/" substring pattern.
+const IDENTIFIER_KEY = /^(public_identifier|provider_?id|member_urn|attendee_?id|sender_?id|username|handle)$/i;
+
+/** Recursively gathers email-like, linkedin-handle-like, and bare-identifier strings from the payload. */
+function collectIdentifiers(obj: unknown, acc: Set<string> = new Set(), depth = 0, keyHint = ""): string[] {
   if (depth > 6 || obj == null) return [...acc];
   if (typeof obj === "string") {
     const s = obj.trim();
+    if (!s) return [...acc];
     if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)) acc.add(s.toLowerCase());
     else if (s.includes("linkedin.com/in/")) acc.add(s.split("/in/").pop()!.split(/[/?]/)[0].toLowerCase());
+    else if (IDENTIFIER_KEY.test(keyHint)) acc.add(s.toLowerCase());
     return [...acc];
   }
-  if (Array.isArray(obj)) { obj.forEach((v) => collectIdentifiers(v, acc, depth + 1)); return [...acc]; }
-  if (typeof obj === "object") { Object.values(obj as Record<string, unknown>).forEach((v) => collectIdentifiers(v, acc, depth + 1)); }
+  if (Array.isArray(obj)) { obj.forEach((v) => collectIdentifiers(v, acc, depth + 1, keyHint)); return [...acc]; }
+  if (typeof obj === "object") {
+    Object.entries(obj as Record<string, unknown>).forEach(([k, v]) => collectIdentifiers(v, acc, depth + 1, k));
+  }
   return [...acc];
 }
