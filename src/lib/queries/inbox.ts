@@ -106,7 +106,11 @@ export async function sendReply(
 
   // Actually deliver the reply via the email service (Brevo/dev-sim) —
   // previously this only logged a row without sending anything.
-  const { data: lead } = await supabase.from("leads").select("email").eq("id", leadId).single();
+  const { data: lead } = await supabase
+    .from("leads")
+    .select("email, linkedin, linkedin_provider_id, workspace_id")
+    .eq("id", leadId)
+    .single();
   let simulated = false;
   if (lead?.email) {
     const { sendEmail } = await import("@/lib/email/resend");
@@ -116,6 +120,36 @@ export async function sendReply(
     const result = await sendEmail({ to: lead.email, subject, text: body, fromName });
     if (!result.ok) return { ok: false, error: result.error };
     simulated = result.simulated ?? false;
+  } else if (lead?.linkedin || lead?.linkedin_provider_id) {
+    // No email on file — this is a LinkedIn conversation. Previously this
+    // branch didn't exist at all, so a reply typed here was only ever saved
+    // locally and never actually reached LinkedIn.
+    const { unipileConfigured, unipileResolveProfile, unipileSendLinkedInMessage } = await import("@/lib/outreach/unipile");
+    if (!unipileConfigured) return { ok: false, error: "LinkedIn (Unipile) not configured" };
+
+    const { data: account } = await supabase
+      .from("outreach_accounts")
+      .select("account_id")
+      .eq("workspace_id", lead.workspace_id)
+      .eq("channel", "linkedin")
+      .eq("status", "connected")
+      .limit(1)
+      .maybeSingle();
+    if (!account) return { ok: false, error: "No connected LinkedIn account" };
+
+    let providerId = lead.linkedin_provider_id as string | null;
+    if (!providerId) {
+      const resolved = await unipileResolveProfile({ accountId: account.account_id, identifier: (lead.linkedin as string) || "" });
+      if (!resolved.providerId) return { ok: false, error: resolved.error || "Could not resolve LinkedIn profile" };
+      providerId = resolved.providerId;
+      await supabase.from("leads").update({ linkedin_provider_id: providerId }).eq("id", leadId);
+    }
+
+    try {
+      await unipileSendLinkedInMessage({ accountId: account.account_id, providerId, text: body });
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "LinkedIn send failed" };
+    }
   }
 
   await supabase.from("inbox_messages").insert({
