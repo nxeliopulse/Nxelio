@@ -7,7 +7,7 @@ import { onCreditsChanged } from "@/lib/credits-refresh";
 import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
-import { navMainItems, navAdminItems, filterNavByRoleAndOverrides, isNavItemAllowed } from "@/lib/nav-config";
+import { navMainItems, navAdminItems, sidebarAdminItems, filterNavByRoleAndOverrides, isNavItemAllowed } from "@/lib/nav-config";
 import { useSidebar } from "./sidebar-context";
 
 const EXPANDED = "w-[210px]";
@@ -42,7 +42,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
   }, []);
 
   const main = filterNavByRoleAndOverrides(navMainItems, role, navAccess);
-  const admin = filterNavByRoleAndOverrides(navAdminItems, role, navAccess);
+  const admin = filterNavByRoleAndOverrides(sidebarAdminItems, role, navAccess);
   const canViewBilling = isNavItemAllowed(navAdminItems, "/billing", role, navAccess);
 
   function renderItem(item: (typeof navMainItems)[number], exactActive: boolean) {
@@ -122,7 +122,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
           </button>
         </div>
 
-        <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-5", collapsed ? "px-2" : "px-3")}>
+        <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide py-3 space-y-5", collapsed ? "px-2" : "px-3")}>
           <div>
             {!collapsed && <p className="px-3 mb-2 text-[10px] font-extrabold uppercase tracking-wider text-white/85">Main Menu</p>}
             <ul className="space-y-1">{main.map((item) => renderItem(item, false))}</ul>

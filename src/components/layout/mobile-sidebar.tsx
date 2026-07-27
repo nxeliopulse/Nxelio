@@ -7,7 +7,7 @@ import { getAiCreditsUsage } from "@/lib/queries/credits";
 import { onCreditsChanged } from "@/lib/credits-refresh";
 import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
-import { navMainItems, navAdminItems, filterNavByRoleAndOverrides } from "@/lib/nav-config";
+import { navMainItems, sidebarAdminItems, filterNavByRoleAndOverrides } from "@/lib/nav-config";
 
 export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolean; onClose: () => void; role?: string; navAccess?: Record<string, boolean> | null }) {
   const pathname = usePathname();
@@ -36,7 +36,7 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
   }, [open]);
 
   const main = filterNavByRoleAndOverrides(navMainItems, role, navAccess);
-  const admin = filterNavByRoleAndOverrides(navAdminItems, role, navAccess);
+  const admin = filterNavByRoleAndOverrides(sidebarAdminItems, role, navAccess);
 
   return (
     <>
@@ -60,7 +60,7 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-3 space-y-6">
+        <nav className="flex-1 overflow-y-auto scrollbar-hide p-3 space-y-6">
           <div>
             <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Workspace</p>
             <ul className="space-y-0.5">

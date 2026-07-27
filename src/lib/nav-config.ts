@@ -45,6 +45,12 @@ export const navAdminItems: NavItem[] = [
   { label: "Subscription", href: "/billing", icon: CreditCard, roles: ALL },
 ];
 
+/** Admin nav entries actually rendered in the sidebar. "Settings" stays in
+ *  navAdminItems (permission checks — e.g. the per-user nav-access toggle
+ *  list — still key off it) but is reached from the topbar profile menu
+ *  instead of the sidebar, so it's excluded from the rendered list. */
+export const sidebarAdminItems: NavItem[] = navAdminItems.filter((i) => i.href !== "/settings");
+
 export function filterNavByRole(items: NavItem[], role: Role | null | undefined): NavItem[] {
   if (!role) return items;
   return items.filter((i) => i.roles.includes(role));
