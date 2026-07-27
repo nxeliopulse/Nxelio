@@ -449,7 +449,7 @@ function AccountsTab({ channel, accounts, unipileReady }: {
       {!unipileReady && (
         <div className="mb-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <span>Unipile isn&apos;t configured yet. Add <code>UNIPILE_DSN</code> and <code>UNIPILE_API_KEY</code> to your environment to connect real accounts. {channel === "email" ? "Until then, email steps fall back to Brevo." : "Until then, LinkedIn steps can't send."}</span>
+          <span>Outreach connector isn&apos;t configured yet. Add <code>UNIPILE_DSN</code> and <code>UNIPILE_API_KEY</code> to your environment to connect real accounts.</span>
         </div>
       )}
       {error && (
@@ -483,14 +483,13 @@ function AccountsTab({ channel, accounts, unipileReady }: {
           <Button variant="outline" className="flex-1" onClick={handleConnect} disabled={pending || !unipileReady}>
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />} Connect {isLinkedIn ? "a LinkedIn account" : "an email account"}
           </Button>
-          <Button variant="ghost" onClick={handleSync} disabled={pending || !unipileReady} title="Refresh from Unipile">
+          <Button variant="ghost" onClick={handleSync} disabled={pending || !unipileReady} title="Refresh accounts">
             <RefreshCw className="h-4 w-4" /> Sync
           </Button>
         </div>
         {isLinkedIn && (
           <p className="text-xs text-slate-400 leading-relaxed">
-            LinkedIn has no official outreach API. Unipile manages the session + a dedicated proxy per account, with
-            human-like daily limits to keep accounts safe.
+            LinkedIn outreach manages account sessions with dedicated proxies and human-like daily limits to keep accounts safe.
           </p>
         )}
       </div>

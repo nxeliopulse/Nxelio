@@ -322,13 +322,15 @@ export async function unipilePostEngagers(opts: {
 export async function unipileResolveProfile(opts: {
   accountId: string;
   identifier: string; // public LinkedIn url or handle
-}): Promise<{ providerId: string | null }> {
+}): Promise<{ providerId: string | null; error: string | null }> {
   const handle = opts.identifier.replace(/\/+$/, "").split("/in/").pop()?.split(/[/?]/)[0] || opts.identifier;
   try {
     const data = await unipileFetch(`/users/${encodeURIComponent(handle)}?account_id=${encodeURIComponent(opts.accountId)}`, { method: "GET" });
     const pid = (data as { provider_id?: string })?.provider_id;
-    return { providerId: pid ? String(pid) : null };
-  } catch {
-    return { providerId: null };
+    return { providerId: pid ? String(pid) : null, error: null };
+  } catch (err) {
+    // Surface the real Unipile response (rate limit / expired session / bad
+    // handle / outage) instead of hiding it behind a generic "not found".
+    return { providerId: null, error: err instanceof Error ? err.message : "Unipile profile lookup failed" };
   }
 }

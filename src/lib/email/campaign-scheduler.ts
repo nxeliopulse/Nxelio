@@ -179,8 +179,8 @@ async function sendLinkedInStepToLead(
   const message = substituteMergeTags(opts.body, lead, opts.senderName);
 
   try {
-    const { providerId } = await unipileResolveProfile({ accountId, identifier: lead.linkedin });
-    if (!providerId) return { ok: false, error: "Could not resolve LinkedIn profile" };
+    const { providerId, error: resolveError } = await unipileResolveProfile({ accountId, identifier: lead.linkedin });
+    if (!providerId) return { ok: false, error: resolveError || "Could not resolve LinkedIn profile" };
 
     if (action === "connection_request") {
       await unipileSendInvite({ accountId, providerId, message });

@@ -400,7 +400,7 @@ export function CampaignDetailView({
       )}
 
       {/* Inline step editor — opens when a node on the canvas is clicked */}
-      <Modal open={editIndex !== null} onClose={() => setEditIndex(null)} title={`Edit step ${editIndex !== null ? editIndex + 1 : ""}`} description="Modify this email in the sequence" size="lg">
+      <Modal open={editIndex !== null} onClose={() => setEditIndex(null)} title={`Edit step ${editIndex !== null ? editIndex + 1 : ""}`} description="Modify this step in the sequence" size="lg">
         <div className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Wait before this step</label>
@@ -422,13 +422,55 @@ export function CampaignDetailView({
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Subject</label>
-            <Input value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} placeholder="Subject line" />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Channel</label>
+            <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setDraft({ ...draft, channel: "email", action: "email" })}
+                className={`px-3 py-1 text-xs font-medium rounded-md ${draft.channel !== "linkedin" ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}
+              >
+                Email
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraft({ ...draft, channel: "linkedin", action: draft.action && draft.action !== "email" ? draft.action : "connection_request" })}
+                className={`px-3 py-1 text-xs font-medium rounded-md ${draft.channel === "linkedin" ? "bg-white shadow-sm text-sky-700" : "text-slate-500"}`}
+              >
+                LinkedIn
+              </button>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Body</label>
-            <Textarea value={draft.body || ""} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={8} placeholder="Email body…" />
-          </div>
+          {draft.channel === "linkedin" ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Action</label>
+                <Select
+                  value={draft.action === "linkedin_message" ? "linkedin_message" : "connection_request"}
+                  onChange={(e) => setDraft({ ...draft, action: e.target.value as "connection_request" | "linkedin_message" })}
+                >
+                  <option value="connection_request">Connection request</option>
+                  <option value="linkedin_message">LinkedIn message</option>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  {draft.action === "linkedin_message" ? "Message" : "Invite note (optional)"}
+                </label>
+                <Textarea value={draft.body || ""} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={6} placeholder={draft.action === "linkedin_message" ? "Message…" : "Note to include with invite…"} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Subject</label>
+                <Input value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} placeholder="Subject line" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Body</label>
+                <Textarea value={draft.body || ""} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={8} placeholder="Email body…" />
+              </div>
+            </>
+          )}
         </div>
         <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setEditIndex(null)}>Cancel</Button>

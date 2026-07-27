@@ -117,11 +117,8 @@ const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
   { id: "black", name: "Onyx Black", bg: "bg-[#22252a]" },
   { id: "blue", name: "Blue", bg: "bg-blue-600" },
   { id: "indigo", name: "Indigo", bg: "bg-indigo-600" },
-  { id: "purple", name: "Purple", bg: "bg-purple-600" },
   { id: "teal", name: "Cyan Teal", bg: "bg-[#18A7B8]" },
   { id: "emerald", name: "Emerald", bg: "bg-emerald-600" },
-  { id: "rose", name: "Rose", bg: "bg-rose-600" },
-  { id: "amber", name: "Amber", bg: "bg-amber-600" },
 ];
 
 export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit }: Props) {

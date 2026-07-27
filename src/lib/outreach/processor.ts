@@ -140,8 +140,8 @@ async function executeJob(db: Db, job: JobRow, lead: Record<string, unknown>): P
   const linkedinUrl = (lead.linkedin as string) || "";
   if (!linkedinUrl && job.action !== "profile_view") return { status: "failed", detail: "Lead has no LinkedIn URL" };
 
-  const { providerId } = await unipileResolveProfile({ accountId: account.account_id, identifier: linkedinUrl });
-  if (!providerId) return { status: "failed", detail: "Could not resolve LinkedIn profile" };
+  const { providerId, error: resolveError } = await unipileResolveProfile({ accountId: account.account_id, identifier: linkedinUrl });
+  if (!providerId) return { status: "failed", detail: resolveError || "Could not resolve LinkedIn profile" };
 
   try {
     if (job.action === "connection_request") {

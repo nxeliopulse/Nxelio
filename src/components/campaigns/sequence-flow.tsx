@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { Mail, Clock, Play, CircleStop, GitBranch } from "lucide-react";
+import { Mail, Clock, Play, CircleStop, GitBranch, Share2 } from "lucide-react";
 
 /** Tiny abstract workflow diagram for template gallery cards. */
 export function MiniSequencePreview({ steps }: { steps: number }) {
@@ -59,8 +59,12 @@ function DelayPill({ label }: { label: string }) {
   );
 }
 
-function EmailNode({ step, index, onClick }: { step: FlowStep; index: number; onClick?: (i: number) => void }) {
+function StepNode({ step, index, onClick }: { step: FlowStep; index: number; onClick?: (i: number) => void }) {
   const clickable = !!onClick;
+  const isLi = step.channel === "linkedin";
+  const actionLabel = step.action === "connection_request" ? "Invite" : step.action === "linkedin_message" ? "Message" : "Email";
+  const title = isLi ? (step.body ? (step.body.length > 45 ? step.body.slice(0, 45) + "…" : step.body) : "LinkedIn step") : (step.subject || "Untitled email");
+
   return (
     <div
       role={clickable ? "button" : undefined}
@@ -68,16 +72,18 @@ function EmailNode({ step, index, onClick }: { step: FlowStep; index: number; on
       onPointerDown={clickable ? (e) => e.stopPropagation() : undefined}
       onClick={clickable ? () => onClick!(index) : undefined}
       className={`w-full max-w-sm bg-white rounded-xl border shadow-sm px-4 py-3 transition-all ${
-        clickable ? "border-slate-200 hover:border-blue-400 hover:shadow-md cursor-pointer" : "border-slate-200"
+        clickable ? (isLi ? "border-slate-200 hover:border-sky-400 hover:shadow-md cursor-pointer" : "border-slate-200 hover:border-blue-400 hover:shadow-md cursor-pointer") : "border-slate-200"
       }`}
     >
       <div className="flex items-center gap-2.5">
-        <span className="h-8 w-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
-          <Mail className="h-4 w-4" />
+        <span className={`h-8 w-8 rounded-lg text-white flex items-center justify-center flex-shrink-0 ${isLi ? "bg-sky-600" : "bg-blue-600"}`}>
+          {isLi ? <Share2 className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
         </span>
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-600">Step {index + 1} · Email · {step.day}</p>
-          <p className="text-sm font-medium text-slate-900 truncate">{step.subject || "Untitled email"}</p>
+          <p className={`text-[11px] font-semibold uppercase tracking-wide ${isLi ? "text-sky-600" : "text-blue-600"}`}>
+            Step {index + 1} · {isLi ? `LinkedIn (${actionLabel})` : "Email"} · {step.day}
+          </p>
+          <p className="text-sm font-medium text-slate-900 truncate">{title}</p>
         </div>
       </div>
     </div>
@@ -112,7 +118,7 @@ export function SequenceFlow({ steps, onStepClick }: { steps: FlowStep[]; onStep
     >
       <Terminator label="Start" />
       <VLine />
-      <EmailNode step={first} index={0} onClick={onStepClick} />
+      <StepNode step={first} index={0} onClick={onStepClick} />
       <VLine />
 
       {/* Condition split */}
@@ -139,7 +145,7 @@ export function SequenceFlow({ steps, onStepClick }: { steps: FlowStep[]; onStep
                 <Fragment key={i}>
                   <DelayPill label={s.day} />
                   <VLine />
-                  <EmailNode step={s} index={i + 1} onClick={onStepClick} />
+                  <StepNode step={s} index={i + 1} onClick={onStepClick} />
                   <VLine />
                 </Fragment>
               ))}

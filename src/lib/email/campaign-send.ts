@@ -51,11 +51,11 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
     const { data: members } = await supabase.from("segment_members").select("lead_id").eq("segment_id", campaign.segment_id);
     const ids = (members || []).map((m) => m.lead_id).filter(Boolean);
     if (ids.length) {
-      const { data } = await supabase.from("leads").select(AUDIENCE_COLS).in("id", ids).not(reqCol, "is", null);
+      const { data } = await supabase.from("leads").select(AUDIENCE_COLS).in("id", ids).not(reqCol, "is", null).neq(reqCol, "");
       leads = (data as unknown as StepLead[]) || [];
     }
   } else {
-    const { data } = await supabase.from("leads").select(AUDIENCE_COLS).not(reqCol, "is", null);
+    const { data } = await supabase.from("leads").select(AUDIENCE_COLS).not(reqCol, "is", null).neq(reqCol, "");
     leads = (data as unknown as StepLead[]) || [];
   }
 
