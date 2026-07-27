@@ -263,7 +263,7 @@ export function InboxView({ conversations, embedded = false }: InboxViewProps) {
       {!embedded && <PageHeader title="Smart Inbox" description="Unified inbox for all campaign replies" />}
 
       <Card className="overflow-hidden border border-slate-200/90 shadow-sm">
-        <div className={cn("grid grid-cols-1 lg:grid-cols-[320px_1fr]", embedded ? "h-[540px]" : "h-[calc(100vh-220px)]")}>
+        <div className={cn("grid grid-cols-1 lg:grid-cols-[300px_1fr]", embedded ? "h-[calc(100vh-275px)] min-h-[560px]" : "h-[calc(100vh-220px)] min-h-[600px]")}>
           {/* Conversation list */}
           <div className="border-r border-slate-100 flex flex-col bg-white">
             <div className="p-3 border-b border-slate-100 space-y-2">
@@ -301,7 +301,7 @@ export function InboxView({ conversations, embedded = false }: InboxViewProps) {
                     className={`p-3 cursor-pointer transition-colors ${active?.id === c.id ? "bg-blue-50/80 border-l-2 border-blue-600" : "hover:bg-slate-50"}`}
                   >
                     <div className="flex items-start gap-2.5">
-                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-xs">
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-xs">
                         {(c.lead_name || "??").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -329,7 +329,7 @@ export function InboxView({ conversations, embedded = false }: InboxViewProps) {
           {/* Conversation view */}
           {active ? (
             <div className="flex flex-col h-full min-h-0 bg-white">
-              <div className="p-3 px-4 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
+              <div className="p-3 px-5 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold flex items-center justify-center shadow-xs">
                     {(active.lead_name || "??").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
@@ -345,8 +345,7 @@ export function InboxView({ conversations, embedded = false }: InboxViewProps) {
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon" onClick={toggleStar} aria-label="Star" className="h-8 w-8">
                     <Star
-                      className={`h-4 w-4 ${isStarred ? "text-amber-500" : "text-slate-400"}`}
-                      fill={isStarred ? "currentColor" : "none"}
+                      className={`h-4 w-4 ${isStarred ? "text-amber-500 fill-amber-500" : "text-slate-400"}`}
                     />
                   </Button>
 
@@ -408,54 +407,56 @@ export function InboxView({ conversations, embedded = false }: InboxViewProps) {
               </div>
 
               {/* Chat Thread */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-50/70">
-                {activeTags.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 pb-1">
-                    {activeTags.map((t) => (
-                      <span key={t} className="inline-flex items-center gap-1">
-                        <Badge variant="blue">{t}</Badge>
-                        <button
-                          onClick={() => removeTag(t)}
-                          className="p-0.5 rounded hover:bg-slate-200 text-slate-500"
-                          aria-label={`Remove ${t}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-slate-50/50">
+                <div className="max-w-3xl mx-auto space-y-4">
+                  {activeTags.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                      {activeTags.map((t) => (
+                        <span key={t} className="inline-flex items-center gap-1">
+                          <Badge variant="blue">{t}</Badge>
+                          <button
+                            onClick={() => removeTag(t)}
+                            className="p-0.5 rounded hover:bg-slate-200 text-slate-500"
+                            aria-label={`Remove ${t}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
-                <div className="space-y-3">
-                  {(thread.length ? thread : [active]).map((m) => {
-                    const outbound = m.direction === "outbound";
-                    return (
-                      <div key={m.id} className={`flex items-end gap-2 ${outbound ? "justify-end" : "justify-start"}`}>
-                        {!outbound && (
-                          <div className="h-6 w-6 rounded-full bg-slate-300 text-slate-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mb-1">
-                            {(active.lead_name || "?")[0]?.toUpperCase()}
+                  <div className="space-y-3">
+                    {(thread.length ? thread : [active]).map((m) => {
+                      const outbound = m.direction === "outbound";
+                      return (
+                        <div key={m.id} className={`flex items-end gap-2.5 ${outbound ? "justify-end" : "justify-start"}`}>
+                          {!outbound && (
+                            <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mb-1 shadow-2xs">
+                              {(active.lead_name || "?")[0]?.toUpperCase()}
+                            </div>
+                          )}
+                          <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 shadow-2xs ${
+                            outbound
+                              ? "bg-blue-600 text-white rounded-tr-xs"
+                              : "bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs"
+                          }`}>
+                            <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">{cleanEmailText(m.body)}</p>
+                            <p className={`text-[10px] mt-1 font-medium ${outbound ? "text-blue-100 text-right" : "text-slate-400"}`}>
+                              {outbound ? "You" : active.lead_name} · {relativeTime(m.created_at)}
+                            </p>
                           </div>
-                        )}
-                        <div className={`max-w-[75%] sm:max-w-[65%] rounded-2xl px-4 py-2.5 shadow-xs ${
-                          outbound
-                            ? "bg-blue-600 text-white rounded-tr-xs"
-                            : "bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs"
-                        }`}>
-                          <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">{cleanEmailText(m.body)}</p>
-                          <p className={`text-[10px] mt-1 font-medium ${outbound ? "text-blue-100 text-right" : "text-slate-400"}`}>
-                            {outbound ? "You" : active.lead_name} · {relativeTime(m.created_at)}
-                          </p>
                         </div>
-                      </div>
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
                 </div>
               </div>
 
               {/* Reply Section */}
-              <div className="border-t border-slate-100 p-3 bg-white flex-shrink-0">
-                <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-2.5 focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+              <div className="border-t border-slate-100 p-3 sm:p-4 bg-white flex-shrink-0">
+                <div className="max-w-3xl mx-auto bg-slate-50/90 border border-slate-200 rounded-xl p-2.5 focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                   <textarea
                     value={reply}
                     onChange={(e) => setReply(e.target.value)}

@@ -35,7 +35,16 @@ export async function POST(request: NextRequest) {
       );
   }
 
-  // Ignore our own outbound messages.
+  // Ignore our own outbound messages. Unipile marks a message with
+  // is_sender: true when it's the connected account's OWN view of a message
+  // IT sent - trust that directly rather than the old string-matching
+  // heuristic below, which never actually matched LinkedIn's payload shape
+  // (it has no "direction"/"message_sent" field at all) and let our own
+  // outbound LinkedIn messages slip through and get logged as if inbound.
+  if (payload.is_sender === true) {
+    await log("skipped", "outbound (is_sender)");
+    return NextResponse.json({ ok: true, ignored: "outbound" });
+  }
   const eventStr = JSON.stringify(payload).toLowerCase();
   const looksOutbound = eventStr.includes('"direction":"out"') || eventStr.includes("message_sent") || eventStr.includes("mail_sent");
   if (looksOutbound) {
@@ -43,8 +52,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, ignored: "outbound" });
   }
 
-  // Pull any candidate sender identifiers out of the (variably-shaped) payload.
-  const candidates = collectIdentifiers(payload);
+  // Pull candidate sender identifiers scoped to the actual sender/from-field
+  // when the payload gives us one - NOT the whole payload, which for a
+  // LinkedIn message also includes an "attendees" array naming the OTHER
+  // party (the recipient), and would otherwise get matched as if they sent it.
+  const senderSource = (payload.sender as Record<string, unknown> | undefined)
+    ?? (payload.from_attendee as Record<string, unknown> | undefined)
+    ?? payload;
+  const candidates = collectIdentifiers(senderSource);
   const bodyText = pickString(payload, ["body", "message", "text", "snippet", "subject"]) || "Replied";
   if (!candidates.length) {
     await log("skipped", "no-sender");

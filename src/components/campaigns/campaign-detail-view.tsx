@@ -174,7 +174,7 @@ export function CampaignDetailView({
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto">
+    <div className={cn("mx-auto transition-all", tab === "Inbox" ? "max-w-none" : "max-w-[1400px]")}>
       <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4">
         <ArrowLeft className="h-4 w-4" /> Back to campaigns
       </Link>
