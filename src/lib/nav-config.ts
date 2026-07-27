@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users2, Send, Layers3, Briefcase, BarChart3, Newspaper, UserCog, Settings, Link2, CalendarDays, CreditCard } from "lucide-react";
+import { LayoutDashboard, Users2, Send, Layers3, Briefcase, BarChart3, Newspaper, UserCog, Settings, Link2, CalendarDays, CreditCard, Building2, Contact } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type Role = "Super Admin" | "Sales Admin" | "Marketing Admin" | string;
@@ -28,6 +28,8 @@ const SUPER: Role[] = ["Super Admin"];
 export const navMainItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ALL },
   { label: "Leads", href: "/leads", icon: Users2, roles: SALES },
+  { label: "Accounts", href: "/accounts", icon: Building2, roles: SALES },
+  { label: "Contacts", href: "/contacts", icon: Contact, roles: SALES },
   { label: "Campaigns", href: "/campaigns", icon: Send, roles: SALES },
   { label: "Segments", href: "/segments", icon: Layers3, roles: MARKETING },
   { label: "Opportunities", href: "/opportunities", icon: Briefcase, roles: SALES },

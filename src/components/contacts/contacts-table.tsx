@@ -1,0 +1,308 @@
+"use client";
+import { useState, useTransition, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, Settings2, Hash, Phone, Briefcase, User } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { useFeedback } from "@/components/ui/feedback";
+import { cn } from "@/lib/utils";
+import { EditContactModal } from "@/components/contacts/edit-contact-modal";
+import { deleteContact, bulkDeleteContacts, type ContactRow } from "@/lib/queries/contacts";
+
+type ColKey = "index" | "first_name" | "last_name" | "email" | "phone" | "job_title" | "department" | "lead_source";
+
+interface ColumnDef { key: ColKey; label: string; icon?: typeof Users2; defaultOn: boolean }
+
+const COLUMNS: ColumnDef[] = [
+  { key: "index", label: "Row #", icon: Hash, defaultOn: true },
+  { key: "first_name", label: "First name", icon: User, defaultOn: true },
+  { key: "last_name", label: "Last name", icon: User, defaultOn: true },
+  { key: "email", label: "Email", icon: Mail, defaultOn: true },
+  { key: "phone", label: "Phone", icon: Phone, defaultOn: true },
+  { key: "job_title", label: "Job title", icon: Briefcase, defaultOn: true },
+  { key: "department", label: "Department", defaultOn: false },
+  { key: "lead_source", label: "Lead source", defaultOn: false },
+];
+
+const DEFAULT_COLS = COLUMNS.reduce((acc, c) => { acc[c.key] = c.defaultOn; return acc; }, {} as Record<ColKey, boolean>);
+const COLS_STORAGE_KEY = "lp_contacts_columns";
+const PAGE_SIZE = 15;
+
+export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
+  const { confirm, toast } = useFeedback();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const accountFilterId = searchParams.get("account");
+  const [pending, start] = useTransition();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"none" | "name" | "newest">("none");
+  const [page, setPage] = useState(0);
+  const [showModal, setShowModal] = useState(false);
+
+  const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
+  const [showCols, setShowCols] = useState(false);
+  const [colsPos, setColsPos] = useState<{ top: number; right: number } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COLS_STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (raw) setCols({ ...DEFAULT_COLS, ...JSON.parse(raw) });
+    } catch { /* ignore malformed storage */ }
+  }, []);
+
+  function toggleCol(k: ColKey) {
+    setCols((c) => {
+      const next = { ...c, [k]: !c[k] };
+      try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+  function openColsMenu(e: React.MouseEvent<HTMLButtonElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    setColsPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+    setShowCols(true);
+  }
+
+  const visibleCols = COLUMNS.filter((c) => cols[c.key]);
+
+  const scoped = accountFilterId ? contacts.filter((c) => c.account_id === accountFilterId) : contacts;
+
+  const filtered = scoped.filter((c) => {
+    const q = search.toLowerCase();
+    if (!q) return true;
+    const name = `${c.first_name} ${c.last_name}`.toLowerCase();
+    return (
+      name.includes(q) ||
+      (c.email?.toLowerCase().includes(q) ?? false) ||
+      (c.job_title?.toLowerCase().includes(q) ?? false) ||
+      (c.phone?.toLowerCase().includes(q) ?? false)
+    );
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sort === "name") return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+    if (sort === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    return 0;
+  });
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+
+  const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const toggleAll = () => setSelected(selected.length === filtered.length ? [] : filtered.map((c) => c.id));
+
+  function openContact(id: string) {
+    router.push(`/contacts/${id}`);
+  }
+
+  async function handleBulkDelete() {
+    if (!(await confirm({ title: "Delete contacts?", message: `Delete ${selected.length} contact(s)?`, confirmLabel: "Delete", danger: true }))) return;
+    const ids = [...selected];
+    setSelected([]);
+    start(async () => {
+      await bulkDeleteContacts(ids);
+      toast(`${ids.length} contact(s) deleted.`, "success");
+    });
+  }
+
+  async function handleDelete(id: string) {
+    if (!(await confirm({ title: "Delete contact?", message: "Delete this contact?", confirmLabel: "Delete", danger: true }))) return;
+    start(async () => {
+      await deleteContact(id);
+      setSelected((s) => s.filter((x) => x !== id));
+    });
+  }
+
+  function renderCell(key: ColKey, c: ContactRow, rowNumber: number) {
+    switch (key) {
+      case "index":
+        return <span className="text-slate-400 tabular-nums font-mono text-xs">{rowNumber}</span>;
+      case "first_name":
+        return (
+          <button type="button" onClick={(e) => { e.stopPropagation(); openContact(c.id); }} className="font-semibold text-slate-900 hover:text-blue-600 truncate max-w-[150px] text-left block whitespace-nowrap">
+            {c.first_name || "—"}
+          </button>
+        );
+      case "last_name":
+        return <span className="text-slate-700 font-medium truncate max-w-[160px] block whitespace-nowrap">{c.last_name || "—"}</span>;
+      case "email":
+        return <span className="block max-w-[240px] truncate text-slate-600 font-medium whitespace-nowrap">{c.email || "—"}</span>;
+      case "phone":
+        return <span className="text-slate-600 font-mono text-xs whitespace-nowrap">{c.phone || "—"}</span>;
+      case "job_title":
+        return <span className="block max-w-[180px] truncate text-slate-600 font-medium whitespace-nowrap">{c.job_title || "—"}</span>;
+      case "department":
+        return <span className="text-slate-600 whitespace-nowrap">{c.department || "—"}</span>;
+      case "lead_source":
+        return <span className="text-slate-600 whitespace-nowrap">{c.lead_source || "—"}</span>;
+      default:
+        return null;
+    }
+  }
+
+  return (
+    <div className="max-w-[1600px] mx-auto w-full">
+      {accountFilterId && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
+          <p className="text-sm text-blue-900">
+            Showing <span className="font-semibold">{scoped.length}</span> contact{scoped.length === 1 ? "" : "s"} for this account
+          </p>
+          <Link href="/contacts" className="text-sm font-medium text-blue-700 hover:text-blue-900">Clear filter ✕</Link>
+        </div>
+      )}
+      <Card className="overflow-hidden">
+        <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
+            <div className="w-36 sm:w-48 md:w-56 flex-shrink-0">
+              <Input
+                leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
+                placeholder="Search contacts…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 text-xs rounded-xl"
+              />
+            </div>
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 flex-shrink-0">
+              <Users2 className="h-3.5 w-3.5 text-slate-400" />
+              <span>{filtered.length}</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={openColsMenu} className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 text-slate-700 flex-shrink-0" title="Customize visible columns">
+              <Settings2 className="h-3.5 w-3.5 text-slate-400" />
+              <span>Columns</span>
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+            {selected.length > 0 && (
+              <Button variant="danger" size="sm" onClick={handleBulkDelete} className="rounded-xl gap-1 font-semibold h-8 px-2.5 text-xs flex-shrink-0">
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Delete</span> ({selected.length})
+              </Button>
+            )}
+            <div className="relative inline-flex items-center flex-shrink-0">
+              <ArrowUpDown className="h-3 w-3 text-slate-400 absolute left-2 pointer-events-none" />
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as typeof sort)}
+                className="appearance-none rounded-xl border border-slate-200 bg-white pl-6 pr-6 py-1 h-8 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer"
+              >
+                <option value="none">Sort</option>
+                <option value="name">Name A–Z</option>
+                <option value="newest">Newest</option>
+              </select>
+              <ChevronDown className="h-3 w-3 text-slate-400 absolute right-2 pointer-events-none" />
+            </div>
+            <Button size="sm" onClick={() => setShowModal(true)} className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap">
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Contact</span>
+            </Button>
+          </div>
+        </div>
+
+        <div className="relative">
+          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
+            <table className="w-full text-sm border-collapse min-w-[900px]">
+              <thead className="bg-slate-50/90 border-b border-slate-200/80 sticky top-0 z-10 backdrop-blur-md">
+                <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
+                  <th className="px-4 py-3.5 w-10">
+                    <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} className="rounded border-slate-300" />
+                  </th>
+                  {visibleCols.map((c) => (
+                    <th key={c.key} className={cn("px-4 py-3.5 font-bold whitespace-nowrap", c.key === "index" && "w-12")}>
+                      <span className="inline-flex items-center gap-1.5">
+                        {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}
+                        {c.label === "Row #" ? "#" : c.label}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="px-4 py-3.5 w-12 text-right font-bold text-slate-400"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paged.length === 0 && (
+                  <tr>
+                    <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
+                      No contacts yet. Click <strong>Add Contact</strong> to create one.
+                    </td>
+                  </tr>
+                )}
+                {paged.map((c, i) => (
+                  <tr key={c.id} onClick={() => openContact(c.id)} className="hover:bg-slate-50 transition-colors cursor-pointer">
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="rounded border-slate-300" />
+                    </td>
+                    {visibleCols.map((col) => (
+                      <td key={col.key} className="px-4 py-3">{renderCell(col.key, c, safePage * PAGE_SIZE + i + 1)}</td>
+                    ))}
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => handleDelete(c.id)} disabled={pending} title="Delete contact" className="p-1 rounded-md hover:bg-red-50 disabled:opacity-50">
+                        <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
+          <span>
+            {filtered.length === 0 ? "Showing 0 of 0" : `Showing ${safePage * PAGE_SIZE + 1}–${Math.min((safePage + 1) * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">Page {safePage + 1} of {pageCount}</span>
+            <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Previous</Button>
+            <Button variant="outline" size="sm" disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}>
+              Next <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <EditContactModal open={showModal} onClose={() => setShowModal(false)} defaultAccountId={accountFilterId || undefined} />
+
+      {showCols && colsPos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowCols(false)} />
+          <div className="fixed z-50 w-60 rounded-xl border border-slate-200 bg-white shadow-xl p-2" style={{ top: colsPos.top, right: colsPos.right }}>
+            <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
+            <div className="max-h-80 overflow-y-auto">
+              {COLUMNS.map((c) => (
+                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+                  <input type="checkbox" checked={cols[c.key]} onChange={() => toggleCol(c.key)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="inline-flex items-center gap-1.5">
+                    {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}
+                    {c.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {selected.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lp-anim-pop max-w-[calc(100vw-2rem)]">
+          <div className="flex items-center gap-3 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/30 pl-5 pr-3 py-2.5">
+            <span className="text-sm font-medium whitespace-nowrap">
+              <span className="font-semibold">{selected.length}</span> selected
+            </span>
+            <span className="h-5 w-px bg-white/20" />
+            <button onClick={handleBulkDelete} disabled={pending} className="inline-flex items-center gap-1.5 rounded-full bg-white text-red-600 hover:bg-red-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors">
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+            <button onClick={() => setSelected([])} className="rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-medium transition-colors">
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
