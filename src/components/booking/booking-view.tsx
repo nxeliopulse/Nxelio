@@ -83,7 +83,7 @@ export function BookingView({ slug, hostName, days }: { slug: string; hostName: 
               </button>
               <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 text-sm text-blue-900 flex items-center gap-2">
                 <Clock className="h-4 w-4" /> {dayLabel(slot.startIso)} · {timeLabel(slot.startIso)} – {timeLabel(slot.endIso)}
-                <span className="ml-auto inline-flex items-center gap-1 text-blue-700"><Video className="h-3.5 w-3.5" /> Google Meet</span>
+                <span className="ml-auto inline-flex items-center gap-1 text-blue-700"><Video className="h-3.5 w-3.5" /> Video Call</span>
               </div>
 
               {error && (

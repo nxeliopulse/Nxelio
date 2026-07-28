@@ -6,6 +6,7 @@ import { Topbar } from "@/components/layout/topbar";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import { SidebarProvider, useSidebar } from "@/components/layout/sidebar-context";
 import { AssistantWidget } from "@/components/assistant/assistant-widget";
+import { SupportWidget } from "@/components/support/support-widget";
 import { FeedbackProvider } from "@/components/ui/feedback";
 import { OnboardingBanner } from "@/components/layout/onboarding-banner";
 import { NoMailboxBanner } from "@/components/layout/no-mailbox-banner";
@@ -45,6 +46,8 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
         </div>
         {/* Renders as a flex column on desktop — the content area shrinks to share the window */}
         <AssistantWidget open={assistantOpen} onClose={() => setAssistantOpen(false)} onExpandChange={setAssistantExpanded} />
+        {/* Support help bot — floating FAB bottom-right; shifts left when the AI panel is open */}
+        <SupportWidget assistantOpen={assistantOpen} assistantExpanded={assistantExpanded} />
       </div>
     </AssistantProvider>
   );

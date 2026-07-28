@@ -1,19 +1,21 @@
 /**
  * Generates a meeting link for the selected conferencing app.
  *
- * NOTE: full API integration (real per-meeting rooms via Google Meet / Teams /
- * Webex) is pending the client's OAuth credentials. Until then we use each
- * provider's official "start a new meeting" entry point — these are real,
- * working links, just not pre-provisioned rooms:
- *   - Google Meet → meet.google.com/new spins up a fresh meeting on open
- *   - Teams       → the documented "new meeting" deep link
- *   - Webex       → a personal-room-style link (placeholder slug until API)
- * When the integration lands, swap generateConferenceLink for the API call.
+ * "Video Call" uses Jitsi Meet: a slug is generated once per meeting and
+ * stored on the meeting row, so every join (host or lead) opens the exact
+ * same URL and lands in the same room. This deliberately avoids
+ * meet.google.com/new and Teams' "new meeting" deep link — both mint a
+ * brand-new random room every time they're opened, so a host and a lead
+ * opening the "same" link at different times end up in two different rooms.
+ * Real per-meeting Google Meet/Teams rooms require Calendar API OAuth
+ * (Google Calendar read-only OAuth already exists in src/lib/calendar for
+ * availability sync; creating events with conferencing would need a write
+ * scope added) — a bigger integration, not this fix.
  */
 export type ConferenceProvider = "google_meet" | "teams" | "webex" | "manual";
 
 export const CONFERENCE_PROVIDERS: { value: ConferenceProvider; label: string }[] = [
-  { value: "google_meet", label: "Google Meet" },
+  { value: "google_meet", label: "Video Call" },
   { value: "teams", label: "Microsoft Teams" },
   { value: "webex", label: "Webex" },
 ];
@@ -27,7 +29,7 @@ function slug(): string {
 export function generateConferenceLink(provider: ConferenceProvider, subject?: string): string {
   switch (provider) {
     case "google_meet":
-      return "https://meet.google.com/new";
+      return `https://meet.jit.si/Nxelio-${slug()}`;
     case "teams":
       return `https://teams.microsoft.com/l/meeting/new?subject=${encodeURIComponent(subject || "Meeting")}`;
     case "webex":

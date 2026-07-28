@@ -32,7 +32,7 @@ const PROVIDER_STYLE: Record<string, { dot: string; chip: string; label: string 
 interface LeadOption { id: string; full_name: string | null; company_name: string | null; email: string | null }
 
 const PROVIDERS = [
-  { value: "google_meet", label: "Google Meet" },
+  { value: "google_meet", label: "Video Call" },
   { value: "teams", label: "Microsoft Teams" },
   { value: "webex", label: "Webex" },
   { value: "manual", label: "Other / manual link" },
