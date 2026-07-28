@@ -9,6 +9,7 @@ import { CalendarConnections } from "@/components/settings/calendar-connections"
 import { SendLimitPanel } from "@/components/settings/send-limit-panel";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
+import type { ZoomAccountRow } from "@/lib/queries/zoom-accounts";
 import type { SendLimitRow } from "@/lib/queries/outreach-send-limits";
 
 /**
@@ -111,11 +112,15 @@ export function CalendarConnectorView({
   isSuperAdmin,
   calendarAccounts,
   calendarProviderStatus,
+  zoomAccounts,
+  zoomConfigured,
   bookingSlug,
 }: {
   isSuperAdmin: boolean;
   calendarAccounts: CalendarAccountRow[];
   calendarProviderStatus: { google: boolean; microsoft: boolean };
+  zoomAccounts: ZoomAccountRow[];
+  zoomConfigured: boolean;
   bookingSlug?: string | null;
 }) {
   return (
@@ -123,7 +128,13 @@ export function CalendarConnectorView({
       <AdminOnlyNotice isSuperAdmin={isSuperAdmin} />
       <Card className="p-6">
         <fieldset disabled={!isSuperAdmin} className={!isSuperAdmin ? "opacity-60 pointer-events-none" : ""}>
-          <CalendarConnections accounts={calendarAccounts} providerStatus={calendarProviderStatus} bookingSlug={bookingSlug} />
+          <CalendarConnections
+            accounts={calendarAccounts}
+            providerStatus={calendarProviderStatus}
+            zoomAccounts={zoomAccounts}
+            zoomConfigured={zoomConfigured}
+            bookingSlug={bookingSlug}
+          />
         </fieldset>
       </Card>
     </div>

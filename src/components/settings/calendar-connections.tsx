@@ -8,16 +8,21 @@ import {
   getCalendarBusy,
   type CalendarAccountRow,
 } from "@/lib/queries/calendar-accounts";
+import { disconnectZoom, type ZoomAccountRow } from "@/lib/queries/zoom-accounts";
 
 const PROVIDER_LABEL: Record<string, string> = { google: "Google Calendar", microsoft: "Microsoft / Outlook" };
 
 export function CalendarConnections({
   accounts,
   providerStatus,
+  zoomAccounts,
+  zoomConfigured,
   bookingSlug,
 }: {
   accounts: CalendarAccountRow[];
   providerStatus: { google: boolean; microsoft: boolean };
+  zoomAccounts: ZoomAccountRow[];
+  zoomConfigured: boolean;
   bookingSlug?: string | null;
 }) {
   const [pending, start] = useTransition();
@@ -35,11 +40,13 @@ export function CalendarConnections({
     navigator.clipboard?.writeText(bookingUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
   }
 
-  // Surface the OAuth redirect result (?connected=calendar / ?calendar_error=...).
+  // Surface the OAuth redirect result (?connected=calendar|zoom / ?calendar_error=...).
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
+    const connected = p.get("connected");
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
-    if (p.get("connected") === "calendar") setBanner({ kind: "ok", msg: "Calendar connected — availability will now sync." });
+    if (connected === "calendar") setBanner({ kind: "ok", msg: "Calendar connected — availability will now sync." });
+    if (connected === "zoom") setBanner({ kind: "ok", msg: "Zoom connected — meetings will get a real, shared join link." });
     const err = p.get("calendar_error");
     if (err) setBanner({ kind: "err", msg: err });
   }, []);
@@ -47,6 +54,13 @@ export function CalendarConnections({
   function remove(id: string) {
     start(async () => {
       const r = await disconnectCalendar(id);
+      if (!r.ok) setBanner({ kind: "err", msg: r.error || "Couldn't disconnect" });
+    });
+  }
+
+  function removeZoom(id: string) {
+    start(async () => {
+      const r = await disconnectZoom(id);
       if (!r.ok) setBanner({ kind: "err", msg: r.error || "Couldn't disconnect" });
     });
   }
@@ -66,7 +80,7 @@ export function CalendarConnections({
     }
   }
 
-  const anyConfigured = providerStatus.google || providerStatus.microsoft;
+  const anyConfigured = providerStatus.google || providerStatus.microsoft || zoomConfigured;
 
   return (
     <div className="space-y-4">
@@ -74,7 +88,7 @@ export function CalendarConnections({
         <Calendar className="h-5 w-5 text-slate-700 mt-0.5" />
         <div>
           <h3 className="font-semibold text-slate-900">Calendar</h3>
-          <p className="text-sm text-slate-500">Connect your calendar so your availability syncs automatically for scheduling.</p>
+          <p className="text-sm text-slate-500">Connect your calendar so your availability syncs automatically, and Google Meet / Zoom links are created for real, shared meeting rooms instead of a generic fallback.</p>
         </div>
       </div>
 
@@ -93,11 +107,14 @@ export function CalendarConnections({
         <a href="/api/calendar/microsoft/connect" aria-disabled={!providerStatus.microsoft} className={!providerStatus.microsoft ? "pointer-events-none opacity-50" : ""}>
           <Button variant="outline"><Plus className="h-4 w-4" /> Connect Outlook Calendar</Button>
         </a>
+        <a href="/api/zoom/connect" aria-disabled={!zoomConfigured} className={!zoomConfigured ? "pointer-events-none opacity-50" : ""}>
+          <Button variant="outline"><Plus className="h-4 w-4" /> Connect Zoom</Button>
+        </a>
       </div>
 
       {!anyConfigured && (
         <p className="text-xs text-slate-400">
-          Calendar OAuth isn&apos;t configured yet. Add the Google / Microsoft client credentials to your environment to enable these buttons.
+          Calendar OAuth isn&apos;t configured yet. Add the Google / Microsoft / Zoom client credentials to your environment to enable these buttons.
         </p>
       )}
 
@@ -137,6 +154,32 @@ export function CalendarConnections({
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Connected Zoom accounts — no availability sync, just meeting creation */}
+      {zoomAccounts.length > 0 && (
+        <div className="space-y-2">
+          {zoomAccounts.map((a) => (
+            <div key={a.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <div>
+                  <p className="text-sm font-medium text-slate-800">Zoom</p>
+                  <p className="text-xs text-slate-500">{a.email || "Connected"}</p>
+                </div>
+                <Badge variant="success">{a.status}</Badge>
+              </div>
+              <button
+                onClick={() => removeZoom(a.id)}
+                disabled={pending}
+                title="Disconnect"
+                className="p-1.5 rounded-md hover:bg-red-50 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
 

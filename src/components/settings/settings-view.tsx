@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Mail, Calendar, ScrollText, Sliders, X } from "lucide-react";
 import { Linkedin } from "@/components/outreach/linkedin-icon";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
+import type { ZoomAccountRow } from "@/lib/queries/zoom-accounts";
 import { syncOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type { AuditLogRow } from "@/lib/queries/audit-log";
 import type { SendLimitRow } from "@/lib/queries/outreach-send-limits";
@@ -52,6 +53,8 @@ interface Props {
   blocklist: BlocklistEntry[];
   calendarAccounts: CalendarAccountRow[];
   calendarProviderStatus: { google: boolean; microsoft: boolean };
+  zoomAccounts: ZoomAccountRow[];
+  zoomConfigured: boolean;
   mailboxAccounts: OutreachAccountRow[];
   linkedinAccounts: OutreachAccountRow[];
   unipileConfigured: boolean;
@@ -121,7 +124,7 @@ const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
   { id: "emerald", name: "Emerald", bg: "bg-emerald-600" },
 ];
 
-export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit }: Props) {
+export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomConfigured, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit }: Props) {
   const router = useRouter();
   const [active, setActive] = useState("profile");
   const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
@@ -546,6 +549,8 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
               isSuperAdmin={isSuperAdmin}
               calendarAccounts={calendarAccounts}
               calendarProviderStatus={calendarProviderStatus}
+              zoomAccounts={zoomAccounts}
+              zoomConfigured={zoomConfigured}
               bookingSlug={bookingSlug}
             />
           )}

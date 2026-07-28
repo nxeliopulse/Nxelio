@@ -2,6 +2,7 @@ import { getCurrentUserProfile } from "@/lib/queries/users";
 import { getEmailDomainStatus } from "@/lib/queries/integrations";
 import { getBlocklist } from "@/lib/queries/blocklist";
 import { getCalendarAccounts, getCalendarProviderStatus } from "@/lib/queries/calendar-accounts";
+import { getZoomAccounts, getZoomProviderStatus } from "@/lib/queries/zoom-accounts";
 import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach-accounts";
 import { getCurrentWorkspace } from "@/lib/queries/workspaces";
 import { getAuditLog } from "@/lib/queries/audit-log";
@@ -9,12 +10,14 @@ import { getSendLimit } from "@/lib/queries/outreach-send-limits";
 import { SettingsView } from "@/components/settings/settings-view";
 
 export default async function SettingsPage() {
-  const [profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, outreachAccounts, unipileConfigured, workspace, emailSendLimit, linkedinSendLimit] = await Promise.all([
+  const [profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomProviderConfigured, outreachAccounts, unipileConfigured, workspace, emailSendLimit, linkedinSendLimit] = await Promise.all([
     getCurrentUserProfile(),
     getEmailDomainStatus(),
     getBlocklist(),
     getCalendarAccounts(),
     getCalendarProviderStatus(),
+    getZoomAccounts(),
+    getZoomProviderStatus(),
     getOutreachAccounts(),
     isUnipileConfigured(),
     getCurrentWorkspace(),
@@ -33,6 +36,8 @@ export default async function SettingsPage() {
       blocklist={blocklist}
       calendarAccounts={calendarAccounts}
       calendarProviderStatus={calendarProviderStatus}
+      zoomAccounts={zoomAccounts}
+      zoomConfigured={zoomProviderConfigured}
       mailboxAccounts={mailboxAccounts}
       linkedinAccounts={linkedinAccounts}
       unipileConfigured={unipileConfigured}
