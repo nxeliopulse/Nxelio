@@ -1,7 +1,7 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { refreshAccessToken, fetchBusy, fetchEvents, type CalProvider, type BusyInterval, type ExternalCalendarEvent } from "@/lib/calendar/providers";
+import { refreshAccessToken, fetchBusy, fetchEvents, createMeetEvent, type CalProvider, type BusyInterval, type ExternalCalendarEvent } from "@/lib/calendar/providers";
 import { calendarConfigured } from "@/lib/calendar/config";
 import { requireSuperAdmin } from "@/lib/queries/auth-guards";
 import { logAudit } from "@/lib/queries/audit-log";
@@ -152,4 +152,69 @@ export async function getWorkspaceBusy(workspaceId: string, startIso: string, en
     } catch { /* skip a failing calendar; a booking page should still show slots */ }
   }
   return busy;
+}
+
+export interface CreateMeetLinkInput {
+  title: string;
+  description?: string;
+  startIso: string;
+  endIso: string;
+  attendeeEmails?: string[];
+}
+
+export type CreateMeetLinkResult = { ok: true; joinUrl: string } | { ok: false; error: string };
+
+const NOT_CONNECTED_ERROR = "Connect Google Calendar in Settings → Calendar to generate a real Google Meet link.";
+
+/** Real Google Meet link for the current logged-in user's workspace (dashboard meeting creation). */
+export async function createGoogleMeetLink(input: CreateMeetLinkInput): Promise<CreateMeetLinkResult> {
+  const supabase = await createClient();
+  const { data: acc } = await supabase
+    .from("calendar_accounts")
+    .select("id, provider, email, access_token, refresh_token, token_expires_at")
+    .eq("provider", "google")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+  if (!acc) return { ok: false, error: NOT_CONNECTED_ERROR };
+  try {
+    const token = await ensureToken(acc as AccountWithTokens);
+    const evt = await createMeetEvent(token, {
+      summary: input.title,
+      description: input.description,
+      startIso: input.startIso,
+      endIso: input.endIso,
+      attendeeEmails: input.attendeeEmails,
+    });
+    return { ok: true, joinUrl: evt.joinUrl };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to create Google Meet event" };
+  }
+}
+
+/** Same as createGoogleMeetLink but for the public (unauthenticated) booking page — workspace-scoped via admin client. */
+export async function createGoogleMeetLinkForWorkspace(workspaceId: string, input: CreateMeetLinkInput): Promise<CreateMeetLinkResult> {
+  const admin = createAdminClient();
+  const { data: acc } = await admin
+    .from("calendar_accounts")
+    .select("id, provider, email, access_token, refresh_token, token_expires_at")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", "google")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+  if (!acc) return { ok: false, error: NOT_CONNECTED_ERROR };
+  try {
+    const token = await ensureToken(acc as AccountWithTokens);
+    const evt = await createMeetEvent(token, {
+      summary: input.title,
+      description: input.description,
+      startIso: input.startIso,
+      endIso: input.endIso,
+      attendeeEmails: input.attendeeEmails,
+    });
+    return { ok: true, joinUrl: evt.joinUrl };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to create Google Meet event" };
+  }
 }

@@ -18,9 +18,10 @@ import {
   type MeetingRow, type MeetingInput,
 } from "@/lib/queries/meetings";
 import {
-  getCalendarBusy, getCalendarAccounts, getExternalCalendarEvents,
+  getCalendarBusy, getCalendarAccounts, getExternalCalendarEvents, createGoogleMeetLink,
   type CalendarAccountRow, type SyncedCalendarEvent,
 } from "@/lib/queries/calendar-accounts";
+import { createZoomMeetingLink } from "@/lib/queries/zoom-accounts";
 import { cn } from "@/lib/utils";
 
 /** Per-provider accent used consistently across the legend, day chips, and agenda. */
@@ -33,8 +34,7 @@ interface LeadOption { id: string; full_name: string | null; company_name: strin
 
 const PROVIDERS = [
   { value: "google_meet", label: "Google Meet" },
-  { value: "teams", label: "Microsoft Teams" },
-  { value: "webex", label: "Webex" },
+  { value: "zoom", label: "Zoom" },
   { value: "manual", label: "Other / manual link" },
 ];
 
@@ -843,6 +843,27 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
   const invitableCount = attendees.filter((a) => a.email).length;
 
   const [avail, setAvail] = useState<{ busy: { start: string; end: string }[]; checked: boolean; loading: boolean; error?: string }>({ busy: [], checked: false, loading: false });
+  const [generating, setGenerating] = useState(false);
+
+  async function handleGenerate() {
+    if (form.provider !== "google_meet" && form.provider !== "zoom") {
+      set("join_url", generateConferenceLink(form.provider as ConferenceProvider));
+      return;
+    }
+    setGenerating(true);
+    setError(null);
+    const input = {
+      title: form.title || "Meeting",
+      startIso: form.startLocal ? new Date(form.startLocal).toISOString() : new Date(nowMs).toISOString(),
+      endIso: form.endLocal ? new Date(form.endLocal).toISOString() : new Date(nowMs + 30 * 60000).toISOString(),
+      attendeeEmails: attendees.filter((a) => a.email).map((a) => a.email),
+    };
+    const res = form.provider === "google_meet" ? await createGoogleMeetLink(input) : await createZoomMeetingLink(input);
+    setGenerating(false);
+    if (res.ok) { set("join_url", res.joinUrl); return; }
+    setError(res.error);
+    set("join_url", generateConferenceLink(form.provider as ConferenceProvider));
+  }
 
   async function checkAvailability() {
     if (!form.startLocal) { setError("Pick a start date first to check availability."); return; }
@@ -1022,8 +1043,8 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
               <Field label="Join link">
                 <div className="flex gap-2">
                   <Input className="flex-1 rounded-xl" value={form.join_url} onChange={(e) => set("join_url", e.target.value)} placeholder="https://…" />
-                  <Button type="button" variant="outline" onClick={() => set("join_url", generateConferenceLink(form.provider as ConferenceProvider, form.title))} disabled={form.provider === "manual"} className="flex-shrink-0 rounded-xl font-bold">
-                    <Wand2 className="h-4 w-4" /> Generate
+                  <Button type="button" variant="outline" onClick={handleGenerate} disabled={form.provider === "manual" || generating} className="flex-shrink-0 rounded-xl font-bold">
+                    {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />} Generate
                   </Button>
                 </div>
               </Field>

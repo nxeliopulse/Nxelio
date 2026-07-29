@@ -1,21 +1,25 @@
 /**
- * Generates a meeting link for the selected conferencing app.
+ * Fallback meeting link generator — used only when the real per-provider API
+ * integration isn't available (no connected account for that provider). The
+ * real paths are:
+ *   - src/lib/queries/calendar-accounts.ts#createGoogleMeetLink — creates an
+ *     actual Calendar event via the connected Google account, returns its
+ *     stable hangoutLink.
+ *   - src/lib/queries/zoom-accounts.ts#createZoomMeetingLink — creates an
+ *     actual Zoom meeting via the connected Zoom account, returns its stable
+ *     join_url.
  *
- * NOTE: full API integration (real per-meeting rooms via Google Meet / Teams /
- * Webex) is pending the client's OAuth credentials. Until then we use each
- * provider's official "start a new meeting" entry point — these are real,
- * working links, just not pre-provisioned rooms:
- *   - Google Meet → meet.google.com/new spins up a fresh meeting on open
- *   - Teams       → the documented "new meeting" deep link
- *   - Webex       → a personal-room-style link (placeholder slug until API)
- * When the integration lands, swap generateConferenceLink for the API call.
+ * The fallback below deliberately avoids meet.google.com/new — it mints a
+ * brand-new random room every time it's opened, so a host and a lead opening
+ * the "same" link at different times would land in two different rooms.
+ * Instead it generates a Jitsi Meet slug once per meeting, stored on the
+ * meeting row, so every join (host or lead) opens the exact same URL and room.
  */
-export type ConferenceProvider = "google_meet" | "teams" | "webex" | "manual";
+export type ConferenceProvider = "google_meet" | "zoom" | "manual";
 
 export const CONFERENCE_PROVIDERS: { value: ConferenceProvider; label: string }[] = [
   { value: "google_meet", label: "Google Meet" },
-  { value: "teams", label: "Microsoft Teams" },
-  { value: "webex", label: "Webex" },
+  { value: "zoom", label: "Zoom" },
 ];
 
 function slug(): string {
@@ -24,14 +28,11 @@ function slug(): string {
   return `${part(3)}-${part(4)}-${part(3)}`;
 }
 
-export function generateConferenceLink(provider: ConferenceProvider, subject?: string): string {
+export function generateConferenceLink(provider: ConferenceProvider): string {
   switch (provider) {
     case "google_meet":
-      return "https://meet.google.com/new";
-    case "teams":
-      return `https://teams.microsoft.com/l/meeting/new?subject=${encodeURIComponent(subject || "Meeting")}`;
-    case "webex":
-      return `https://web.webex.com/meet/${slug()}`;
+    case "zoom":
+      return `https://meet.jit.si/Nxelio-${slug()}`;
     default:
       return "";
   }

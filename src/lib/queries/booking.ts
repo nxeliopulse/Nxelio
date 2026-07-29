@@ -1,6 +1,6 @@
 "use server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getWorkspaceBusy } from "./calendar-accounts";
+import { getWorkspaceBusy, createGoogleMeetLinkForWorkspace } from "./calendar-accounts";
 import { sendEmail } from "@/lib/email/resend";
 import { generateConferenceLink } from "@/lib/meetings/conference-link";
 
@@ -102,10 +102,17 @@ export async function bookMeeting(input: {
     leadId = (created as { id: string } | null)?.id ?? null;
   }
 
-  const joinUrl = generateConferenceLink("google_meet");
+  const title = `Meeting with ${name}`;
+  const meetResult = await createGoogleMeetLinkForWorkspace(ws.id, {
+    title,
+    startIso: input.startIso,
+    endIso: input.endIso,
+    attendeeEmails: [email],
+  });
+  const joinUrl = meetResult.ok ? meetResult.joinUrl : generateConferenceLink("google_meet");
   const { error } = await admin.from("meetings").insert({
     workspace_id: ws.id,
-    title: `Meeting with ${name}`,
+    title,
     start_at: input.startIso,
     end_at: input.endIso,
     provider: "google_meet",

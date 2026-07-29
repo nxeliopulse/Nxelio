@@ -20,9 +20,12 @@ export interface ExternalCalendarEvent {
   htmlLink: string | null;
 }
 
-// Read-only calendar + identity. offline_access (MS) / access_type=offline (Google)
-// are what earn us a refresh token so availability keeps syncing without re-login.
-const GOOGLE_SCOPE = "openid email https://www.googleapis.com/auth/calendar.readonly";
+// Read-only calendar for availability sync, plus calendar.events (write) so we can
+// create a real per-meeting Google Meet room via the Calendar API. offline_access (MS) /
+// access_type=offline (Google) are what earn us a refresh token so this keeps working
+// without re-login. Accounts connected before calendar.events was added must reconnect —
+// Google/Microsoft only grant scopes present at consent time.
+const GOOGLE_SCOPE = "openid email https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events";
 const MS_SCOPE = "openid email offline_access https://graph.microsoft.com/Calendars.Read";
 
 const TOKEN_URL: Record<CalProvider, string> = {
@@ -211,4 +214,53 @@ export async function fetchEvents(
       allDay: Boolean(e.isAllDay),
       htmlLink: e.webLink || null,
     }));
+}
+
+export interface CreateMeetEventInput {
+  summary: string;
+  description?: string;
+  startIso: string;
+  endIso: string;
+  attendeeEmails?: string[];
+}
+
+export interface CreateMeetEventResult {
+  joinUrl: string;
+  htmlLink: string;
+  eventId: string;
+}
+
+/**
+ * Creates a real Google Calendar event with a Google Meet room attached
+ * (conferenceDataVersion=1 asks the API to provision one) and returns its
+ * stable join URL — the same URL for every attendee, unlike meet.google.com/new.
+ */
+export async function createMeetEvent(accessToken: string, input: CreateMeetEventInput): Promise<CreateMeetEventResult> {
+  const body = {
+    summary: input.summary,
+    description: input.description,
+    start: { dateTime: input.startIso },
+    end: { dateTime: input.endIso },
+    attendees: (input.attendeeEmails || []).map((email) => ({ email })),
+    conferenceData: {
+      createRequest: {
+        requestId: crypto.randomUUID(),
+        conferenceSolutionKey: { type: "hangoutsMeet" },
+      },
+    },
+  };
+  const res = await fetch(
+    "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error?.message || `Google Calendar event creation failed (${res.status})`);
+  const entryPoints = (d.conferenceData?.entryPoints || []) as { entryPointType?: string; uri?: string }[];
+  const joinUrl = entryPoints.find((e) => e.entryPointType === "video")?.uri;
+  if (!joinUrl) throw new Error("Google didn't return a Meet link for this event");
+  return { joinUrl, htmlLink: d.htmlLink || "", eventId: d.id };
 }

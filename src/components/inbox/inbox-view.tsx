@@ -129,7 +129,7 @@ export function InboxView({ conversations, embedded = false, campaignId }: Inbox
 
   // Insert a generated meeting link into the reply (LP — conferencing link from inbox).
   function insertMeetingLink(provider: ConferenceProvider) {
-    const link = generateConferenceLink(provider, active?.subject || "Meeting");
+    const link = generateConferenceLink(provider);
     setReply((r) => (r.trim() ? `${r.replace(/\s*$/, "")}\n\nJoin the meeting: ${link}` : `Join the meeting: ${link}`));
     setMeetOpen(false);
   }
