@@ -536,7 +536,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
           >
             <Plus className="h-3 w-3" /> Add company
           </button>
@@ -552,7 +552,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               const r = e.currentTarget.getBoundingClientRect();
               setFindEmailFor({ lead: l, top: r.bottom + 6, left: r.left });
             }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
           >
             <Mail className="h-3 w-3" /> Find email
           </button>
@@ -564,7 +564,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowAiColumnModal(true); }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
           >
             <Sparkles className="h-3 w-3" /> Enrich with AI
           </button>
@@ -589,7 +589,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
           >
             <Plus className="h-3 w-3" /> Add phone
           </button>
@@ -613,7 +613,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
           >
             <Plus className="h-3 w-3" /> Add LinkedIn
           </button>
@@ -625,7 +625,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
           >
             <Plus className="h-3 w-3" /> Add website
           </button>
