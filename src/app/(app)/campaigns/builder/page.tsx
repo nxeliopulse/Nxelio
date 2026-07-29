@@ -303,9 +303,10 @@ export default function CampaignBuilderPage() {
   // blocked for this campaign — sending would silently skip those leads.
   const missingEmailCount = audienceLeads.filter((l) => !l.email).length;
   const missingLinkedinCount = audienceLeads.filter((l) => !l.linkedin).length;
+  const readyToEmailCount = audienceLeads.length - missingEmailCount;
   const emailBlocked = audienceLeads.length > 0 && missingEmailCount > 0;
   const linkedinBlocked = audienceLeads.length > 0 && missingLinkedinCount > 0;
-  const EMAIL_BLOCKED_MSG = `${missingEmailCount} lead${missingEmailCount === 1 ? "" : "s"} in this audience ${missingEmailCount === 1 ? "doesn't" : "don't"} have an email — remove them or use LinkedIn instead.`;
+  const EMAIL_BLOCKED_MSG = `${readyToEmailCount} lead${readyToEmailCount === 1 ? "" : "s"} ready to email · ${missingEmailCount} lead${missingEmailCount === 1 ? "" : "s"} missing an email address — remove them or use LinkedIn instead.`;
   const LINKEDIN_BLOCKED_MSG = `${missingLinkedinCount} lead${missingLinkedinCount === 1 ? "" : "s"} in this audience ${missingLinkedinCount === 1 ? "doesn't" : "don't"} have a LinkedIn profile — remove them or use Email instead.`;
 
   function templateBlockReason(t: CampaignTemplate): string | null {

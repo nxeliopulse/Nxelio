@@ -2,17 +2,20 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Pencil, FileSpreadsheet, ShoppingCart, type LucideIcon } from "lucide-react";
-import { Input, Select } from "@/components/ui/input";
+import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, type LucideIcon } from "lucide-react";
+import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
-import { AddLeadsWizard, type SourceId } from "@/components/leads/add-leads-wizard";
+import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
-import { deleteLead, bulkDeleteLeads, type LeadRow } from "@/lib/queries/leads";
+import { EditLeadModal } from "@/components/leads/edit-lead-modal";
+import { FindEmailPicker } from "@/components/leads/find-email-picker";
+import { deleteLead, bulkDeleteLeads, updateLead, type LeadRow } from "@/lib/queries/leads";
 import { createStaticSegment } from "@/lib/queries/segments";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
@@ -41,10 +44,18 @@ type ColKey =
 interface ColumnDef { key: ColKey; label: string; icon?: LucideIcon; defaultOn: boolean }
 
 // Default order/visibility follows the recommended layout:
-// Lead | Company | Email | Status | AI Score | Source | Owner | Last Activity | Actions
-const COLUMNS: ColumnDef[] = [
+// Row # | Lead | Company | Email | Status | AI Score | Source | Owner | Last Activity | Actions
+//
+// "index" (Row #) and "name" (Lead) are both frozen (sticky-left) alongside the
+// checkbox column, and always render in that fixed order — Row # first, Lead
+// second — regardless of the user's custom column order below, since their
+// sticky-left pixel offsets assume that exact position. Every other column is
+// freely reorderable via the Columns picker.
+const FIRST_COLUMNS: ColumnDef[] = [
   { key: "index", label: "Row #", defaultOn: true },
   { key: "name", label: "Lead", icon: User, defaultOn: true },
+];
+const REORDERABLE_COLUMNS: ColumnDef[] = [
   { key: "company", label: "Company", icon: Building2, defaultOn: true },
   { key: "email", label: "Email", icon: Mail, defaultOn: true },
   { key: "status", label: "Status", defaultOn: true },
@@ -60,9 +71,12 @@ const COLUMNS: ColumnDef[] = [
   { key: "verified", label: "Verified", icon: CheckCircle2, defaultOn: false },
   { key: "created_at", label: "Added", icon: Calendar, defaultOn: false },
 ];
+const COLUMNS: ColumnDef[] = [...FIRST_COLUMNS, ...REORDERABLE_COLUMNS];
+const DEFAULT_ORDER: ColKey[] = REORDERABLE_COLUMNS.map((c) => c.key);
 
 const DEFAULT_COLS = COLUMNS.reduce((acc, c) => { acc[c.key] = c.defaultOn; return acc; }, {} as Record<ColKey, boolean>);
 const COLS_STORAGE_KEY = "lp_leads_columns";
+const COLS_ORDER_STORAGE_KEY = "lp_leads_column_order";
 
 interface Props {
   leads: LeadRow[];
@@ -81,7 +95,7 @@ interface Props {
 }
 
 export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
-  const { confirm, prompt, toast } = useFeedback();
+  const { confirm, toast } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
@@ -91,8 +105,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showWizard, setShowWizard] = useState(false);
-  const [wizardSource, setWizardSource] = useState<SourceId | null>(null);
-  const [showAddMenu, setShowAddMenu] = useState(false);
   const [page, setPage] = useState(0);
 
   // Quick status/score filters — a row of pill shortcuts above the table.
@@ -100,6 +112,18 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   // that's been Contacted or is in Nurturing, i.e. worked but not yet resolved.
   type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup";
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+
+  // Missing-data quick actions — inline instead of a bare "—".
+  const [editingLead, setEditingLead] = useState<LeadRow | null>(null);
+  const [findEmailFor, setFindEmailFor] = useState<{ lead: LeadRow; top: number; left: number } | null>(null);
+
+  // Selection contextual bar — replaces the toolbar controls while rows are selected.
+  const [showOwnerMenu, setShowOwnerMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
+  const [segmentName, setSegmentName] = useState("");
+  const [segmentDescription, setSegmentDescription] = useState("");
+  const [segmentType, setSegmentType] = useState<"static" | "dynamic">("static");
 
   // Clicking a lead navigates to its own full page (/leads/[id]) — matches how
   // campaign-detail-view.tsx gives each campaign a real standalone page instead
@@ -119,7 +143,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   // Industry/interest/date filters — opened as a popover next to the count chip.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersPos, setFiltersPos] = useState<{ top: number; left: number } | null>(null);
-  const hasActiveFilters = Boolean(industryFilter || interestFilter || dateFrom || dateTo);
+  const hasActiveFilters = Boolean(industryFilter || interestFilter || dateFrom || dateTo || quickFilter !== "all");
   function openFiltersPopover(e: React.MouseEvent<HTMLButtonElement>) {
     const r = e.currentTarget.getBoundingClientRect();
     setFiltersPos({ top: r.bottom + 6, left: r.left });
@@ -130,13 +154,25 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
   const [showCols, setShowCols] = useState(false);
   const [colsPos, setColsPos] = useState<{ top: number; right: number } | null>(null);
+  // Custom order for the reorderable columns (everything after the fixed Row #/Lead pair).
+  const [colOrder, setColOrder] = useState<ColKey[]>(DEFAULT_ORDER);
 
-  // Hydrate saved column choices after mount (localStorage is client-only).
+  // Hydrate saved column choices/order after mount (localStorage is client-only).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COLS_STORAGE_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setCols({ ...DEFAULT_COLS, ...JSON.parse(raw) });
+    } catch { /* ignore malformed storage */ }
+    try {
+      const rawOrder = localStorage.getItem(COLS_ORDER_STORAGE_KEY);
+      if (rawOrder) {
+        const saved = JSON.parse(rawOrder) as ColKey[];
+        // Merge with the current default order so a newly-added column key
+        // (e.g. shipped after a user already saved a custom order) still shows up.
+        const merged = [...saved.filter((k) => DEFAULT_ORDER.includes(k)), ...DEFAULT_ORDER.filter((k) => !saved.includes(k))];
+        setColOrder(merged);
+      }
     } catch { /* ignore malformed storage */ }
   }, []);
 
@@ -149,7 +185,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   }
   function resetCols() {
     setCols(DEFAULT_COLS);
-    try { localStorage.removeItem(COLS_STORAGE_KEY); } catch { /* ignore */ }
+    setColOrder(DEFAULT_ORDER);
+    try {
+      localStorage.removeItem(COLS_STORAGE_KEY);
+      localStorage.removeItem(COLS_ORDER_STORAGE_KEY);
+    } catch { /* ignore */ }
   }
   function openColsMenu(e: React.MouseEvent<HTMLButtonElement>) {
     const r = e.currentTarget.getBoundingClientRect();
@@ -157,7 +197,24 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
     setShowCols(true);
   }
 
-  const visibleCols = COLUMNS.filter((c) => cols[c.key]);
+  /** Moves a reorderable column up/down in the custom order — Row # and Lead are never part of this list. */
+  function moveCol(k: ColKey, direction: -1 | 1) {
+    setColOrder((order) => {
+      const i = order.indexOf(k);
+      const j = i + direction;
+      if (i < 0 || j < 0 || j >= order.length) return order;
+      const next = [...order];
+      [next[i], next[j]] = [next[j], next[i]];
+      try { localStorage.setItem(COLS_ORDER_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  const columnByKey = new Map(COLUMNS.map((c) => [c.key, c]));
+  const visibleCols = [
+    ...FIRST_COLUMNS.filter((c) => cols[c.key]),
+    ...colOrder.filter((k) => cols[k]).map((k) => columnByKey.get(k)!),
+  ];
 
   // Clay-style custom AI columns — creation/run/delete + per-row single-cell generation.
   const [showAiColumnModal, setShowAiColumnModal] = useState(false);
@@ -383,8 +440,14 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const toggleAll = () =>
     setSelected(selected.length === filtered.length ? [] : filtered.map((l) => l.id));
 
+  const selectedLeads = leads.filter((l) => selected.includes(l.id));
+  const selectedWithEmail = selectedLeads.filter((l) => l.email).length;
+  const selectedMissingEmail = selectedLeads.length - selectedWithEmail;
+
   async function handleBulkDelete() {
-    if (!(await confirm({ title: "Delete leads?", message: `Delete ${selected.length} leads?`, confirmLabel: "Delete", danger: true }))) return;
+    setShowMoreMenu(false);
+    const n = selected.length;
+    if (!(await confirm({ title: "Delete lead?", message: `Delete ${n} lead${n === 1 ? "" : "s"}? This action cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
     const ids = [...selected];
     setSelected([]);
     start(async () => {
@@ -392,26 +455,53 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
     });
   }
 
+  function openSegmentDialog() {
+    setSegmentName("");
+    setSegmentDescription("");
+    setSegmentType("static");
+    setSegmentDialogOpen(true);
+  }
+
   async function handleCreateSegment() {
-    const name = await prompt({
-      title: "Create segment",
-      message: `Create a segment with the ${selected.length} selected lead${selected.length === 1 ? "" : "s"}?`,
-      label: "Segment name",
-      placeholder: "e.g. Q3 conference leads",
-      confirmLabel: "Create",
-      required: true,
-    });
-    if (name === null) return;
+    const name = segmentName.trim();
+    if (!name) return;
     const ids = [...selected];
+    setSegmentDialogOpen(false);
     setSelected([]);
     start(async () => {
-      await createStaticSegment(name, "", ids);
-      toast(`Segment "${name}" created with ${ids.length} lead${ids.length === 1 ? "" : "s"}`, "success");
+      await createStaticSegment(name, segmentDescription.trim(), ids);
+      toast(`Segment "${name}" created with ${ids.length} lead${ids.length === 1 ? "" : "s"}.`, "success");
+    });
+  }
+
+  /** Bulk "Add to Campaign" has no notion of an ad-hoc lead-ID audience in the
+   *  campaign builder today — it only accepts "All leads" or a Segment. So this
+   *  quietly creates a Static segment from the selection first, then hands off
+   *  to the builder with that segment pre-selected. */
+  async function handleAddToCampaign() {
+    const ids = [...selected];
+    const count = ids.length;
+    setSelected([]);
+    start(async () => {
+      const seg = await createStaticSegment(`Campaign audience (${count} leads)`, "", ids);
+      router.push(`/campaigns/builder?segment=${seg.id}`);
+    });
+  }
+
+  function handleAssignOwner(ownerId: string) {
+    setShowOwnerMenu(false);
+    const ids = [...selected];
+    const ownerName = owners[ownerId] || "owner";
+    setSelected([]);
+    start(async () => {
+      await Promise.allSettled(ids.map((id) => updateLead(id, { owner_id: ownerId })));
+      toast(`${ids.length} lead${ids.length === 1 ? "" : "s"} assigned to ${ownerName}.`, "success");
+      router.refresh();
     });
   }
 
   async function handleDelete(id: string) {
-    if (!(await confirm({ title: "Delete lead?", message: "Delete this lead?", confirmLabel: "Delete", danger: true }))) return;
+    if (!(await confirm({ title: "Delete lead?", message: "Delete this lead? This action cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
     start(async () => {
       await deleteLead(id);
       setSelected((s) => s.filter((x) => x !== id));
@@ -440,11 +530,45 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         );
       }
       case "company":
-        return <span className="block max-w-[180px] truncate text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap" title={l.company_name || ""}>{l.company_name || "—"}</span>;
+        return l.company_name ? (
+          <span className="block max-w-[180px] truncate text-slate-700 dark:text-slate-300 whitespace-nowrap" title={l.company_name}>{l.company_name}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+          >
+            <Plus className="h-3 w-3" /> Add company
+          </button>
+        );
       case "email":
-        return <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap" title={l.email || ""}>{l.email || "—"}</span>;
+        return l.email ? (
+          <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-300 whitespace-nowrap" title={l.email}>{l.email}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const r = e.currentTarget.getBoundingClientRect();
+              setFindEmailFor({ lead: l, top: r.bottom + 6, left: r.left });
+            }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+          >
+            <Mail className="h-3 w-3" /> Find email
+          </button>
+        );
       case "industry":
-        return <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap" title={l.industry || ""}>{l.industry || "—"}</span>;
+        return l.industry ? (
+          <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-400 whitespace-nowrap" title={l.industry}>{l.industry}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowAiColumnModal(true); }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+          >
+            <Sparkles className="h-3 w-3" /> Enrich with AI
+          </button>
+        );
       case "score": {
         const level = scoreLevel(l.lead_score);
         return (
@@ -459,7 +583,17 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       case "status":
         return <Badge variant={statusVariant[l.status] || "default"}>{l.status}</Badge>;
       case "phone":
-        return <span className="text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{l.phone || "—"}</span>;
+        return l.phone ? (
+          <span className="text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{l.phone}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+          >
+            <Plus className="h-3 w-3" /> Add phone
+          </button>
+        );
       case "interest_area":
         return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.interest_area || "—"}</span>;
       case "source":
@@ -473,13 +607,29 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       case "last_activity":
         return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{new Date(l.updated_at).toLocaleDateString()}</span>;
       case "linkedin":
-        return l.linkedin
-          ? <a href={l.linkedin} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
-          : <span className="text-slate-400">—</span>;
+        return l.linkedin ? (
+          <a href={l.linkedin} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+          >
+            <Plus className="h-3 w-3" /> Add LinkedIn
+          </button>
+        );
       case "website":
-        return l.website_url
-          ? <a href={l.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Link2 className="h-3.5 w-3.5 flex-shrink-0" />{l.website_url.replace(/^https?:\/\//, "")}</a>
-          : <span className="text-slate-400">—</span>;
+        return l.website_url ? (
+          <a href={l.website_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Link2 className="h-3.5 w-3.5 flex-shrink-0" />{l.website_url.replace(/^https?:\/\//, "")}</a>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 whitespace-nowrap"
+          >
+            <Plus className="h-3 w-3" /> Add website
+          </button>
+        );
       case "verified":
         return l.verified
           ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
@@ -504,7 +654,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         </div>
       )}
       <Card className="overflow-hidden">
-        {/* Compact Single-Line Toolbar */}
+        {/* Toolbar */}
         <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
           {/* Left Controls: Search + Count + Compact Tool Buttons */}
           <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
@@ -566,20 +716,8 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             </Button>
           </div>
 
-          {/* Right Controls: Bulk Delete + Sort Dropdown + Add Leads Primary Button */}
+          {/* Right Controls: Sort Dropdown + Add Lead */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-            {selected.length > 0 && (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={handleBulkDelete}
-                className="rounded-xl gap-1 font-semibold h-8 px-2.5 text-xs flex-shrink-0"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Delete</span> ({selected.length})
-              </Button>
-            )}
-
             {/* Sort Dropdown */}
             <div className="relative inline-flex items-center flex-shrink-0 w-[88px]">
               <ArrowUpDown className="h-3 w-3 text-slate-400 absolute left-2 pointer-events-none" />
@@ -596,83 +734,25 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               <ChevronDown className="h-3 w-3 text-slate-400 absolute right-1.5 pointer-events-none" />
             </div>
 
-            {/* Add Lead — primary button with a dropdown for the quickest entry methods */}
-            <div className="relative flex-shrink-0">
-              <Button
-                size="sm"
-                onClick={() => setShowAddMenu((v) => !v)}
-                className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs whitespace-nowrap"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add Lead</span>
-                <ChevronDown className={cn("h-3 w-3 transition-transform", showAddMenu && "rotate-180")} />
-              </Button>
-              {showAddMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
-                  <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-50 w-56 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
-                    <button
-                      onClick={() => { setShowAddMenu(false); setWizardSource("manual"); setShowWizard(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
-                    >
-                      <Pencil className="h-4 w-4 text-slate-400 flex-shrink-0" /> Manual entry
-                    </button>
-                    <button
-                      onClick={() => { setShowAddMenu(false); setWizardSource("csv"); setShowWizard(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
-                    >
-                      <FileSpreadsheet className="h-4 w-4 text-slate-400 flex-shrink-0" /> Import CSV
-                    </button>
-                    <button
-                      onClick={() => { setShowAddMenu(false); setWizardSource("buy"); setShowWizard(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
-                    >
-                      <ShoppingCart className="h-4 w-4 text-slate-400 flex-shrink-0" /> Find new leads
-                    </button>
-                    <button
-                      onClick={() => { setShowAddMenu(false); setWizardSource(null); setShowWizard(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 mt-1 border-t border-slate-100 dark:border-slate-800 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
-                    >
-                      <Search className="h-4 w-4 flex-shrink-0" /> More sources…
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick status/score filters */}
-        <div className="px-3 sm:px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-          {([
-            ["all", "All"],
-            ["new", "New"],
-            ["qualified", "Qualified"],
-            ["hot", "Hot Leads"],
-            ["followup", "Needs Follow-up"],
-          ] as const).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setQuickFilter(key)}
-              className={cn(
-                "flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap",
-                quickFilter === key
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-              )}
+            {/* Add Lead — opens the source-picker screen directly (Manual, CSV, LinkedIn, Buy Leads, etc.) */}
+            <Button
+              size="sm"
+              onClick={() => setShowWizard(true)}
+              className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap"
             >
-              {label} <span className={cn("tabular-nums", quickFilter === key ? "text-white/80" : "text-slate-400")}>({quickFilterCounts[key]})</span>
-            </button>
-          ))}
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Lead</span>
+            </Button>
+          </div>
         </div>
 
         {/* Table Container */}
         <div className="relative">
           <div ref={scrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
             <table className="w-full text-sm border-collapse min-w-[900px]">
-              <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-10 backdrop-blur-md">
+              <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <th className="px-4 py-3.5 w-10">
+                  <th className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-2.5 w-10">
                     <input
                       type="checkbox"
                       checked={selected.length === filtered.length && filtered.length > 0}
@@ -684,7 +764,14 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                     const filterable = c.key !== "index";
                     const active = Boolean(columnFilters[c.key]);
                     return (
-                      <th key={c.key} className={cn("px-4 py-3.5 font-bold whitespace-nowrap", c.key === "index" && "w-12")}>
+                      <th
+                        key={c.key}
+                        className={cn(
+                          "px-3 py-2.5 font-bold whitespace-nowrap",
+                          c.key === "index" && "w-12 sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
+                          c.key === "name" && "sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
+                        )}
+                      >
                         <span
                           role={filterable ? "button" : undefined}
                           title={filterable ? `Click to search ${c.label}` : undefined}
@@ -715,7 +802,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                     const running = runProgress?.columnId === col.id;
                     const pct = running && runProgress.total > 0 ? Math.round((runProgress.done / runProgress.total) * 100) : 0;
                     return (
-                      <th key={col.id} className="px-4 py-3.5 font-bold w-[200px] max-w-[200px] whitespace-nowrap">
+                      <th key={col.id} className="px-3 py-2.5 font-bold w-[200px] max-w-[200px] whitespace-nowrap">
                         <span className="flex items-center gap-1.5 min-w-0">
                           <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                           <span className="truncate" title={col.name}>{col.name}</span>
@@ -738,7 +825,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                       </th>
                     );
                   })}
-                  <th className="px-4 py-3.5 w-12 text-right font-bold text-slate-400"></th>
+                  <th className="px-3 py-2.5 w-12 text-right font-bold text-slate-400"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -753,9 +840,9 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                   <tr
                     key={l.id}
                     onClick={() => openLead(l.id)}
-                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="group hover:bg-slate-50 transition-colors cursor-pointer"
                   >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.includes(l.id)}
@@ -766,7 +853,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                     {visibleCols.map((c) => (
                       <td
                         key={c.key}
-                        className="px-4 py-3"
+                        className={cn(
+                          "px-3 py-2",
+                          c.key === "index" && "sticky left-10 z-10 bg-white group-hover:bg-slate-50 transition-colors",
+                          c.key === "name" && "sticky left-[88px] z-10 bg-white group-hover:bg-slate-50 transition-colors"
+                        )}
                         onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
                       >
                         {renderCell(c.key, l, safePage * PAGE_SIZE + i + 1)}
@@ -777,7 +868,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                       const computed = l.custom_fields?.[col.id];
                       const running = runningCellKey === cellKey || runningColumnId === col.id;
                       return (
-                        <td key={col.id} className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td key={col.id} className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                           {running ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
                           ) : computed ? (
@@ -793,7 +884,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                         </td>
                       );
                     })}
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleDelete(l.id)}
                         disabled={pending}
@@ -829,7 +920,102 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         </div>
       </Card>
 
-      <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} initialSource={wizardSource} />
+      <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
+
+      {editingLead && (
+        <EditLeadModal open={Boolean(editingLead)} onClose={() => setEditingLead(null)} lead={editingLead} />
+      )}
+
+      {/* Find-email popover — anchored to the row's Email cell */}
+      {findEmailFor && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setFindEmailFor(null)} />
+          <div
+            className="fixed z-50 w-72 rounded-xl border border-slate-200 bg-white shadow-xl p-3"
+            style={{ top: findEmailFor.top, left: findEmailFor.left }}
+          >
+            <FindEmailPicker
+              leadId={findEmailFor.lead.id}
+              linkedinUrl={findEmailFor.lead.linkedin}
+              onFound={(email) => {
+                const leadId = findEmailFor.lead.id;
+                setFindEmailFor(null);
+                start(async () => {
+                  await updateLead(leadId, { email });
+                  toast("Email found and saved.", "success");
+                  router.refresh();
+                });
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Create Segment dialog */}
+      <Modal open={segmentDialogOpen} onClose={() => setSegmentDialogOpen(false)} title="Create Segment" description="Save the selected leads as a segment you can target with campaigns." size="md">
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="text-xs font-medium text-slate-600">Segment name</label>
+            <input
+              autoFocus
+              value={segmentName}
+              onChange={(e) => setSegmentName(e.target.value)}
+              placeholder="e.g. E-learning Prospects"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600">Description <span className="text-slate-400">(optional)</span></label>
+            <Textarea
+              value={segmentDescription}
+              onChange={(e) => setSegmentDescription(e.target.value)}
+              rows={2}
+              className="mt-1 text-sm"
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            <span>Selected leads</span>
+            <span className="font-semibold text-slate-900">{selected.length}</span>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1.5 block">Segment type</label>
+            <div className="space-y-2">
+              <label className={cn("flex items-start gap-2.5 rounded-lg border p-3 cursor-pointer", segmentType === "static" ? "border-blue-500 bg-blue-50/50" : "border-slate-200")}>
+                <input type="radio" name="segment-type" className="mt-0.5" checked={segmentType === "static"} onChange={() => setSegmentType("static")} />
+                <span>
+                  <span className="block text-sm font-medium text-slate-900">Static segment</span>
+                  <span className="block text-xs text-slate-500">Always contains exactly these {selected.length} selected leads.</span>
+                </span>
+              </label>
+              <label className={cn("flex items-start gap-2.5 rounded-lg border p-3 cursor-pointer", segmentType === "dynamic" ? "border-blue-500 bg-blue-50/50" : "border-slate-200")}>
+                <input type="radio" name="segment-type" className="mt-0.5" checked={segmentType === "dynamic"} onChange={() => setSegmentType("dynamic")} />
+                <span>
+                  <span className="block text-sm font-medium text-slate-900">Dynamic segment</span>
+                  <span className="block text-xs text-slate-500">Automatically adds leads matching defined conditions.</span>
+                </span>
+              </label>
+            </div>
+            {segmentType === "dynamic" && (
+              <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Dynamic segments are built from rule conditions in the full{" "}
+                <Link href="/segments/builder" className="underline font-medium">Segment Builder</Link>. This dialog can only create a Static segment from your selection.
+              </p>
+            )}
+          </div>
+          {selected.length > 0 && (
+            <p className="text-xs text-slate-500">
+              {selectedWithEmail} lead{selectedWithEmail === 1 ? "" : "s"} ready to email
+              {selectedMissingEmail > 0 && <> · {selectedMissingEmail} lead{selectedMissingEmail === 1 ? "" : "s"} missing an email address</>}
+            </p>
+          )}
+        </div>
+        <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setSegmentDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleCreateSegment} disabled={!segmentName.trim() || segmentType === "dynamic" || pending}>
+            Create Segment
+          </Button>
+        </div>
+      </Modal>
 
       {/* AI column header menu — run on all rows, or delete the column */}
       {aiColMenu && (
@@ -860,25 +1046,62 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowCols(false)} />
           <div
-            className="fixed z-50 w-60 rounded-xl border border-slate-200 bg-white shadow-xl p-2"
+            className="fixed z-50 w-64 rounded-xl border border-slate-200 bg-white shadow-xl p-2"
             style={{ top: colsPos.top, right: colsPos.right }}
           >
             <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
             <div className="max-h-80 overflow-y-auto">
-              {COLUMNS.map((c) => (
-                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+              {FIRST_COLUMNS.map((c) => (
+                <div key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm text-slate-700">
                   <input
                     type="checkbox"
                     checked={cols[c.key]}
                     onChange={() => toggleCol(c.key)}
                     className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="flex-1 inline-flex items-center gap-1.5">
                     {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}
                     {c.label}
                   </span>
-                </label>
+                  <span title="Always shown first — position is fixed" className="text-slate-300"><Lock className="h-3 w-3" /></span>
+                </div>
               ))}
+              <div className="my-1 border-t border-slate-100" />
+              {colOrder.map((key, i) => {
+                const c = columnByKey.get(key)!;
+                return (
+                  <div key={key} className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={cols[c.key]}
+                      onChange={() => toggleCol(c.key)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                    />
+                    <span className="flex-1 inline-flex items-center gap-1.5 min-w-0 truncate">
+                      {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />}
+                      <span className="truncate">{c.label}</span>
+                    </span>
+                    <div className="flex items-center flex-shrink-0">
+                      <button
+                        onClick={() => moveCol(key, -1)}
+                        disabled={i === 0}
+                        title="Move up"
+                        className="p-0.5 rounded hover:bg-slate-200/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                      </button>
+                      <button
+                        onClick={() => moveCol(key, 1)}
+                        disabled={i === colOrder.length - 1}
+                        title="Move down"
+                        className="p-0.5 rounded hover:bg-slate-200/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div className="border-t border-slate-100 mt-1 pt-1">
               <button onClick={resetCols} className="w-full text-left px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-50">
@@ -898,6 +1121,16 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             style={{ top: filtersPos.top, left: filtersPos.left }}
           >
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
+              <Select value={quickFilter} onChange={(e) => setQuickFilter(e.target.value as QuickFilter)}>
+                <option value="all">All ({quickFilterCounts.all})</option>
+                <option value="new">New ({quickFilterCounts.new})</option>
+                <option value="qualified">Qualified ({quickFilterCounts.qualified})</option>
+                <option value="hot">Hot Leads ({quickFilterCounts.hot})</option>
+                <option value="followup">Needs Follow-up ({quickFilterCounts.followup})</option>
+              </Select>
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Industry</label>
               <Select value={industryFilter} onChange={(e) => setIndustryFilter(e.target.value)}>
@@ -924,23 +1157,23 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                   value={dateFrom}
                   max={dateTo || undefined}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                  className="flex-1 min-w-0 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
                   aria-label="From date"
                 />
-                <span className="text-xs text-slate-400">to</span>
+                <span className="text-xs text-slate-400 flex-shrink-0">to</span>
                 <input
                   type="date"
                   value={dateTo}
                   min={dateFrom || undefined}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                  className="flex-1 min-w-0 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
                   aria-label="To date"
                 />
               </div>
             </div>
             {hasActiveFilters && (
               <button
-                onClick={() => { setIndustryFilter(""); setInterestFilter(""); setDateFrom(""); setDateTo(""); }}
+                onClick={() => { setQuickFilter("all"); setIndustryFilter(""); setInterestFilter(""); setDateFrom(""); setDateTo(""); }}
                 className="text-xs text-slate-500 hover:text-slate-700 underline"
               >
                 Clear filters
@@ -982,33 +1215,84 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         </>
       )}
 
-      {/* LP-15 — floating selection action bar */}
+      {/* Floating selection action bar — white with a subtle shadow + green accents,
+          positioned above rows without covering the toolbar. */}
       {selected.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lp-anim-pop max-w-[calc(100vw-2rem)]">
-          <div className="flex items-center gap-3 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/30 pl-5 pr-3 py-2.5">
-            <span className="text-sm font-medium whitespace-nowrap">
-              <span className="font-semibold">{selected.length}</span> selected
+          <div className="flex items-center gap-3 rounded-full bg-white dark:bg-slate-900 shadow-xl shadow-slate-900/10 ring-1 ring-slate-200 dark:ring-slate-800 pl-5 pr-3 py-2.5">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+              <Check className="h-4 w-4 text-emerald-600" />
+              {selected.length} lead{selected.length === 1 ? "" : "s"} selected
             </span>
-            <span className="h-5 w-px bg-white/20" />
+            <span className="h-5 w-px bg-slate-200 dark:bg-slate-800" />
             <button
-              onClick={handleCreateSegment}
-              disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white text-blue-600 hover:bg-blue-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+              onClick={openSegmentDialog}
+              className="inline-flex items-center gap-1.5 rounded-full text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
             >
-              <Layers3 className="h-3.5 w-3.5" /> Create segment
+              <Layers3 className="h-3.5 w-3.5" /> Create Segment
             </button>
             <button
-              onClick={handleBulkDelete}
+              onClick={handleAddToCampaign}
               disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white text-red-600 hover:bg-red-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
             >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
+              <Megaphone className="h-3.5 w-3.5" /> Add to Campaign
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowOwnerMenu((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-full text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+              >
+                <UserPlus className="h-3.5 w-3.5" /> Assign Owner
+              </button>
+              {showOwnerMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowOwnerMenu(false)} />
+                  <div className="lp-anim-pop origin-bottom-left absolute left-0 bottom-full mb-1 z-50 w-52 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
+                    {Object.keys(owners).length === 0 && (
+                      <p className="px-3 py-2 text-xs text-slate-400">No users found.</p>
+                    )}
+                    {Object.entries(owners).map(([id, name]) => (
+                      <button
+                        key={id}
+                        onClick={() => handleAssignOwner(id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left truncate"
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setShowMoreMenu((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+              >
+                More <ChevronDown className={cn("h-3 w-3 transition-transform", showMoreMenu && "rotate-180")} />
+              </button>
+              {showMoreMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
+                  <div className="lp-anim-pop origin-bottom-left absolute left-0 bottom-full mb-1 z-50 w-44 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={pending}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 text-left"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <span className="h-5 w-px bg-slate-200 dark:bg-slate-800" />
             <button
               onClick={() => setSelected([])}
-              className="rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 px-2 whitespace-nowrap"
             >
-              Clear
+              Deselect all
             </button>
           </div>
         </div>

@@ -27,6 +27,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<GlobalSearchResult>({ leads: [], campaigns: [] });
+  const [searchError, setSearchError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,10 +54,15 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
     }
     setSearchLoading(true);
     setSearchOpen(true);
+    setSearchError(null);
     searchDebounceRef.current = setTimeout(async () => {
       try {
         const res = await globalSearch(q);
         setSearchResults(res);
+      } catch (err) {
+        console.error("globalSearch failed:", err);
+        setSearchResults({ leads: [], campaigns: [] });
+        setSearchError("Search failed. Try again.");
       } finally {
         setSearchLoading(false);
       }
@@ -115,7 +121,10 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
 
           {searchOpen && (
             <div className="lp-anim-pop absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden z-40 max-h-96 overflow-y-auto text-slate-900">
-              {!searchLoading && !hasSearchResults && (
+              {!searchLoading && searchError && (
+                <p className="px-4 py-6 text-sm text-red-600 text-center">{searchError}</p>
+              )}
+              {!searchLoading && !searchError && !hasSearchResults && (
                 <p className="px-4 py-6 text-sm text-slate-500 text-center">No leads or campaigns match &quot;{searchQuery.trim()}&quot;.</p>
               )}
               {searchResults.leads.length > 0 && (
