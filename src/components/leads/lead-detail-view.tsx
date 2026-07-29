@@ -30,6 +30,19 @@ function money(n: number): string {
   return "₹" + Math.round(n).toLocaleString("en-IN");
 }
 
+// "Hot"/"Warm"/"Scored" are legacy values (never set by any live code path) —
+// kept mapped so old data, if any, still renders a real color.
+const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | "success" | "purple"> = {
+  New: "blue",
+  Contacted: "purple",
+  Qualified: "success",
+  Nurturing: "warning",
+  Converted: "success",
+  Warm: "warning",
+  Hot: "danger",
+  Scored: "purple",
+};
+
 export interface Activity {
   id: string;
   activity_type: string;
@@ -108,11 +121,7 @@ export function LeadDetailView({
   const [showAiScoreDrawer, setShowAiScoreDrawer] = useState(false);
 
   const displayName = lead.full_name || lead.company_name || "—";
-  // Prefer the real first_name/last_name columns; fall back to splitting
-  // full_name for older rows imported before those columns existed.
-  const splitNames = displayName.split(" ");
-  const firstName = lead.first_name || splitNames[0] || "";
-  const lastName = lead.last_name || splitNames.slice(1).join(" ") || "";
+  const firstName = lead.first_name || displayName.split(" ")[0] || "";
 
   async function handleDelete() {
     setMenuOpen(false);
@@ -234,15 +243,17 @@ export function LeadDetailView({
 
             {aboutOpen && (
               <div className="p-4 space-y-3.5 text-xs">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">First Name</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{firstName || "—"}</span>
+                <div>
+                  <span className="block text-slate-500 dark:text-slate-400 font-medium mb-1">Status</span>
+                  <div className="flex items-center justify-between group">
+                    <Badge variant={statusVariant[lead.status] || "default"} className="font-bold">{lead.status}</Badge>
+                    <Pencil className="h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100 cursor-pointer" onClick={() => setEditOpen(true)} />
                   </div>
-                  <div>
-                    <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Last Name</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{lastName || "—"}</span>
-                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                  <span className="block text-slate-500 dark:text-slate-400 font-medium mb-0.5">Name</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">{displayName || "—"}</span>
                 </div>
 
                 <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">

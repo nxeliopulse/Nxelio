@@ -27,7 +27,7 @@ import { LeadsTable } from "@/components/leads/leads-table";
 import { getOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import { getEmailStatus } from "@/lib/email/actions";
 import { generateEmailSequence, type GeneratedEmail } from "@/lib/ai/actions";
-import { campaignTemplates, getCampaignTemplate, TEMPLATE_CATEGORIES } from "@/lib/campaign-templates";
+import { campaignTemplates, getCampaignTemplate, TEMPLATE_CATEGORIES, type CampaignTemplate } from "@/lib/campaign-templates";
 import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { SequenceFlow, MiniSequencePreview } from "@/components/campaigns/sequence-flow";
@@ -103,6 +103,10 @@ export default function CampaignBuilderPage() {
   const [viewingLeads, setViewingLeads] = useState<LeadRow[] | null>(null);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const listLeadsCache = useRef<Record<string, LeadRow[]>>({});
+  // Full lead rows for every added list, deduped — used only to gate which
+  // channels (Email/LinkedIn) are safe to offer for the current audience.
+  const [audienceLeads, setAudienceLeads] = useState<LeadRow[]>([]);
+  const [audienceLoading, setAudienceLoading] = useState(false);
 
   // Sequence
   const [tplTab, setTplTab] = useState<"prebuilt" | "custom">("prebuilt");
@@ -187,6 +191,42 @@ export default function CampaignBuilderPage() {
     if (wasEmpty) setTab("sequence");
   }
 
+  // Keep audienceLeads in sync with the lists picked so far — reuses the same
+  // per-list cache viewList() fills, so re-fetches only happen for lists that
+  // haven't been loaded yet.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (lists.length === 0) {
+        setAudienceLeads([]);
+        setAudienceLoading(false);
+        return;
+      }
+      setAudienceLoading(true);
+      const perList = await Promise.all(
+        lists.map(async (l) => {
+          const cached = listLeadsCache.current[l.id];
+          if (cached) return cached;
+          try {
+            const rows = l.segmentId ? await getSegmentMemberLeads(l.segmentId) : await getLeads();
+            listLeadsCache.current[l.id] = rows;
+            return rows;
+          } catch {
+            return [];
+          }
+        })
+      );
+      if (cancelled) return;
+      const byId = new Map<string, LeadRow>();
+      for (const rows of perList) for (const r of rows) byId.set(r.id, r);
+      setAudienceLeads([...byId.values()]);
+      setAudienceLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lists]);
+
   /** Opens a full leads table for one list — cached per list so repeat clicks are instant. */
   async function viewList(l: LeadList) {
     setViewingList(l);
@@ -216,7 +256,11 @@ export default function CampaignBuilderPage() {
 
   function startCustom() {
     setChosenTpl("custom");
-    setSequence([{ day: "Day 1", subject: "", body: "" }]);
+    setSequence([
+      emailBlocked
+        ? { day: "Day 1", subject: "", body: "", channel: "linkedin", action: "connection_request" }
+        : { day: "Day 1", subject: "", body: "" },
+    ]);
   }
 
   function openAiRewrite() {
@@ -246,6 +290,42 @@ export default function CampaignBuilderPage() {
   const mailboxAccounts = senderAccounts.filter((a) => a.channel === "email");
   const linkedinAccounts = senderAccounts.filter((a) => a.channel === "linkedin");
   const totalLeadsCount = lists.reduce((sum, l) => sum + (l.segmentId ? l.count : 0), 0) || (lists.length ? undefined : 0);
+
+  // Empty audience — a list/segment was added but it has (or resolves to)
+  // zero actual leads. Checked before the email/linkedin gates below since
+  // there's nothing to send to either way; audienceLoading guards against
+  // flashing this while the fetch is still in flight.
+  const audienceEmpty = lists.length > 0 && !audienceLoading && audienceLeads.length === 0;
+  const AUDIENCE_EMPTY_MSG = "This audience doesn't have any leads yet — add leads to this list or segment before choosing a channel.";
+
+  // A channel is only as usable as its worst lead: if any lead in the chosen
+  // audience is missing an email/LinkedIn profile, that whole channel is
+  // blocked for this campaign — sending would silently skip those leads.
+  const missingEmailCount = audienceLeads.filter((l) => !l.email).length;
+  const missingLinkedinCount = audienceLeads.filter((l) => !l.linkedin).length;
+  const emailBlocked = audienceLeads.length > 0 && missingEmailCount > 0;
+  const linkedinBlocked = audienceLeads.length > 0 && missingLinkedinCount > 0;
+  const EMAIL_BLOCKED_MSG = `${missingEmailCount} lead${missingEmailCount === 1 ? "" : "s"} in this audience ${missingEmailCount === 1 ? "doesn't" : "don't"} have an email — remove them or use LinkedIn instead.`;
+  const LINKEDIN_BLOCKED_MSG = `${missingLinkedinCount} lead${missingLinkedinCount === 1 ? "" : "s"} in this audience ${missingLinkedinCount === 1 ? "doesn't" : "don't"} have a LinkedIn profile — remove them or use Email instead.`;
+
+  function templateBlockReason(t: CampaignTemplate): string | null {
+    if (audienceEmpty) return AUDIENCE_EMPTY_MSG;
+    if (emailBlocked && t.channels.includes("Email")) return EMAIL_BLOCKED_MSG;
+    if (linkedinBlocked && t.channels.includes("LinkedIn")) return LINKEDIN_BLOCKED_MSG;
+    return null;
+  }
+
+  const audienceWarningBanner = (audienceEmpty || emailBlocked || linkedinBlocked) && (
+    <div className="mb-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+      <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+      <span>
+        {audienceEmpty && AUDIENCE_EMPTY_MSG}
+        {!audienceEmpty && emailBlocked && !linkedinBlocked && EMAIL_BLOCKED_MSG}
+        {!audienceEmpty && linkedinBlocked && !emailBlocked && LINKEDIN_BLOCKED_MSG}
+        {!audienceEmpty && emailBlocked && linkedinBlocked && `${missingEmailCount} lead${missingEmailCount === 1 ? "" : "s"} in this audience ${missingEmailCount === 1 ? "is" : "are"} missing an email, and ${missingLinkedinCount} ${missingLinkedinCount === 1 ? "is" : "are"} missing a LinkedIn profile — Email and LinkedIn templates/steps are disabled until you narrow the audience.`}
+      </span>
+    </div>
+  );
 
   // Hard gate: every tab except Leads is locked until at least one lead list is added.
   const leadsGate = lists.length > 0;
@@ -395,7 +475,11 @@ export default function CampaignBuilderPage() {
               {submittingReview ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Submit for review
             </Button>
           )}
-          <Button onClick={launch} disabled={pending || !leadsGate || !approvalGate} title={!leadsGate ? LEADS_GATE_MESSAGE : !approvalGate ? APPROVAL_GATE_MESSAGE : undefined}>
+          <Button
+            onClick={launch}
+            disabled={pending || !leadsGate || audienceEmpty || !approvalGate}
+            title={!leadsGate ? LEADS_GATE_MESSAGE : audienceEmpty ? AUDIENCE_EMPTY_MSG : !approvalGate ? APPROVAL_GATE_MESSAGE : undefined}
+          >
             {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Launching…</> : <><Send className="h-4 w-4" /> Launch campaign</>}
           </Button>
         </div>
@@ -481,13 +565,24 @@ export default function CampaignBuilderPage() {
                 <h2 className="text-xl font-bold text-slate-900">Sequence templates</h2>
                 <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
                   {([["prebuilt", "Pre-built"], ["custom", "Custom"]] as const).map(([v, label]) => (
-                    <button key={v} onClick={() => { setTplTab(v); if (v === "custom") startCustom(); }}
-                      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${tplTab === v ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+                    <button
+                      key={v}
+                      onClick={() => { if (v === "custom" && audienceEmpty) return; setTplTab(v); if (v === "custom") startCustom(); }}
+                      disabled={v === "custom" && audienceEmpty}
+                      title={v === "custom" && audienceEmpty ? AUDIENCE_EMPTY_MSG : undefined}
+                      className={cn(
+                        "px-3 py-1.5 text-sm rounded-md transition-colors",
+                        tplTab === v ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-500 hover:text-slate-700",
+                        v === "custom" && audienceEmpty && "opacity-40 cursor-not-allowed"
+                      )}
+                    >
                       {label}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {audienceWarningBanner}
 
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -515,16 +610,24 @@ export default function CampaignBuilderPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {visible.map((t) => {
                       const Icon = t.icon;
+                      const blockReason = templateBlockReason(t);
                       return (
-                        <button key={t.id} onClick={() => setPreviewId(t.id)}
-                          className="group relative text-left bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all">
+                        <button key={t.id} onClick={() => { if (!blockReason) setPreviewId(t.id); }}
+                          disabled={Boolean(blockReason)}
+                          title={blockReason ?? undefined}
+                          className={cn(
+                            "group relative text-left bg-white rounded-xl border overflow-hidden transition-all",
+                            blockReason ? "border-slate-100 opacity-50 cursor-not-allowed" : "border-slate-200 hover:border-blue-300 hover:shadow-md"
+                          )}>
                           <div className="relative h-32 bg-slate-50 border-b border-slate-100 p-3 flex items-center justify-center overflow-hidden">
                             <MiniSequencePreview steps={t.steps.length} />
-                            <span className="absolute inset-0 flex items-center justify-center group-hover:bg-blue-600/5 transition-colors">
-                              <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
-                                <Eye className="h-3.5 w-3.5" /> Preview
+                            {!blockReason && (
+                              <span className="absolute inset-0 flex items-center justify-center group-hover:bg-blue-600/5 transition-colors">
+                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+                                  <Eye className="h-3.5 w-3.5" /> Preview
+                                </span>
                               </span>
-                            </span>
+                            )}
                           </div>
                           <div className="p-3">
                             <div className="flex items-center gap-1.5 mb-1.5">
@@ -611,6 +714,8 @@ export default function CampaignBuilderPage() {
                 </div>
               </Card>
 
+              {audienceWarningBanner}
+
               {/* Steps — full width, stacked vertically, every step editable at once */}
                 <div className="relative pl-4">
                   <div className="absolute left-[27px] top-2 bottom-10 w-px bg-slate-200" />
@@ -652,8 +757,26 @@ export default function CampaignBuilderPage() {
                                   <span className="text-xs font-semibold text-slate-500">Step {i + 1} · {s.day}</span>
                                   <div className="flex items-center gap-2">
                                     <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
-                                      <button onClick={() => patchStep(i, { channel: "email", action: "email" })} className={`px-2 py-0.5 text-xs rounded-md ${!isLi ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-500"}`}>Email</button>
-                                      <button onClick={() => patchStep(i, { channel: "linkedin", action: s.action && s.action !== "email" ? s.action : "connection_request" })} className={`px-2 py-0.5 text-xs rounded-md ${isLi ? "bg-white shadow-sm text-sky-700 font-medium" : "text-slate-500"}`}>LinkedIn</button>
+                                      <button
+                                        onClick={() => patchStep(i, { channel: "email", action: "email" })}
+                                        disabled={audienceEmpty || emailBlocked}
+                                        title={audienceEmpty ? AUDIENCE_EMPTY_MSG : emailBlocked ? EMAIL_BLOCKED_MSG : undefined}
+                                        className={cn(
+                                          "px-2 py-0.5 text-xs rounded-md",
+                                          !isLi ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-500",
+                                          (audienceEmpty || emailBlocked) && "opacity-40 cursor-not-allowed"
+                                        )}
+                                      >Email</button>
+                                      <button
+                                        onClick={() => patchStep(i, { channel: "linkedin", action: s.action && s.action !== "email" ? s.action : "connection_request" })}
+                                        disabled={audienceEmpty || linkedinBlocked}
+                                        title={audienceEmpty ? AUDIENCE_EMPTY_MSG : linkedinBlocked ? LINKEDIN_BLOCKED_MSG : undefined}
+                                        className={cn(
+                                          "px-2 py-0.5 text-xs rounded-md",
+                                          isLi ? "bg-white shadow-sm text-sky-700 font-medium" : "text-slate-500",
+                                          (audienceEmpty || linkedinBlocked) && "opacity-40 cursor-not-allowed"
+                                        )}
+                                      >LinkedIn</button>
                                     </div>
                                     {sequence.length > 1 && (
                                       <button onClick={() => setSequence(sequence.filter((_, j) => j !== i))} className="text-slate-300 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
@@ -685,7 +808,18 @@ export default function CampaignBuilderPage() {
                       );
                     })}
                   </div>
-                  <Button variant="outline" className="ml-0 mt-3" onClick={() => setSequence([...sequence, { day: formatDelay(3, "days"), subject: "", body: "" }])}>
+                  <Button
+                    variant="outline"
+                    className="ml-0 mt-3"
+                    onClick={() =>
+                      setSequence([
+                        ...sequence,
+                        emailBlocked
+                          ? { day: formatDelay(3, "days"), subject: "", body: "", channel: "linkedin", action: "connection_request" }
+                          : { day: formatDelay(3, "days"), subject: "", body: "" },
+                      ])
+                    }
+                  >
                     <Plus className="h-4 w-4" /> Add step
                   </Button>
                 </div>
@@ -857,9 +991,19 @@ export default function CampaignBuilderPage() {
         </div>
         <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setPreviewId(null)}>Cancel</Button>
-          <Button onClick={() => { if (previewId) pickTemplate(previewId); setPreviewId(null); }}>
-            <CheckCircle2 className="h-4 w-4" /> Select template
-          </Button>
+          {(() => {
+            const previewTpl = previewId ? getCampaignTemplate(previewId) : null;
+            const blockReason = previewTpl ? templateBlockReason(previewTpl) : null;
+            return (
+              <Button
+                onClick={() => { if (previewId && !blockReason) pickTemplate(previewId); setPreviewId(null); }}
+                disabled={Boolean(blockReason)}
+                title={blockReason ?? undefined}
+              >
+                <CheckCircle2 className="h-4 w-4" /> Select template
+              </Button>
+            );
+          })()}
         </div>
       </Modal>
 

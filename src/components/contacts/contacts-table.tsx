@@ -118,14 +118,33 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
     });
   }
 
+  const AVATAR_COLORS = ["bg-blue-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-violet-600", "bg-cyan-600", "bg-pink-600", "bg-indigo-600"];
+
+  function initials(c: ContactRow): string {
+    const first = c.first_name?.[0] || "";
+    const last = c.last_name?.[0] || "";
+    return (first + last).toUpperCase() || "?";
+  }
+
+  function avatarColor(name: string): string {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  }
+
   function renderCell(key: ColKey, c: ContactRow, rowNumber: number) {
     switch (key) {
       case "index":
         return <span className="text-slate-400 tabular-nums font-mono text-xs">{rowNumber}</span>;
       case "first_name":
         return (
-          <button type="button" onClick={(e) => { e.stopPropagation(); openContact(c.id); }} className="font-semibold text-slate-900 hover:text-blue-600 truncate max-w-[150px] text-left block whitespace-nowrap">
-            {c.first_name || "—"}
+          <button type="button" onClick={(e) => { e.stopPropagation(); openContact(c.id); }} className="flex items-center gap-2 max-w-[180px] text-left group">
+            <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(`${c.first_name} ${c.last_name}`))}>
+              {initials(c)}
+            </span>
+            <span className="font-semibold text-slate-900 group-hover:text-blue-600 truncate whitespace-nowrap">
+              {c.first_name || "—"}
+            </span>
           </button>
         );
       case "last_name":

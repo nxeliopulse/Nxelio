@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, ArrowUpDown, Info, Building2, Settings2, Hash, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Pencil, FileSpreadsheet, ShoppingCart, type LucideIcon } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,17 +10,24 @@ import { Card } from "@/components/ui/card";
 import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
-import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
+import { AddLeadsWizard, type SourceId } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
 import { deleteLead, bulkDeleteLeads, type LeadRow } from "@/lib/queries/leads";
 import { createStaticSegment } from "@/lib/queries/segments";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
+// "Hot"/"Warm"/"Scored" are legacy values (never set by any live code path,
+// kept only so old data — if any — still renders a real color instead of a
+// gray "default" badge) alongside the current New/Contacted/Qualified/
+// Nurturing/Converted vocabulary.
 const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | "success" | "purple"> = {
   New: "blue",
+  Contacted: "purple",
+  Qualified: "success",
+  Nurturing: "warning",
+  Converted: "success",
   Warm: "warning",
   Hot: "danger",
-  Converted: "success",
   Scored: "purple",
 };
 
@@ -28,25 +35,26 @@ const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | 
 // choice persists in localStorage so it survives reloads. `index`, the checkbox,
 // and the delete/actions column are always shown and not part of this list logic.
 type ColKey =
-  | "index" | "first_name" | "last_name" | "email" | "company" | "industry"
-  | "email_provider" | "score" | "status" | "phone" | "interest_area"
-  | "source" | "linkedin" | "website" | "verified" | "created_at";
+  | "index" | "name" | "company" | "email" | "status" | "score" | "source" | "owner" | "last_activity"
+  | "industry" | "phone" | "interest_area" | "linkedin" | "website" | "verified" | "created_at";
 
 interface ColumnDef { key: ColKey; label: string; icon?: LucideIcon; defaultOn: boolean }
 
+// Default order/visibility follows the recommended layout:
+// Lead | Company | Email | Status | AI Score | Source | Owner | Last Activity | Actions
 const COLUMNS: ColumnDef[] = [
-  { key: "index", label: "Row #", icon: Hash, defaultOn: true },
-  { key: "first_name", label: "First name", icon: User, defaultOn: true },
-  { key: "last_name", label: "Last name", icon: User, defaultOn: true },
-  { key: "email", label: "Email", icon: Mail, defaultOn: true },
+  { key: "index", label: "Row #", defaultOn: true },
+  { key: "name", label: "Lead", icon: User, defaultOn: true },
   { key: "company", label: "Company", icon: Building2, defaultOn: true },
-  { key: "industry", label: "Industry", icon: Briefcase, defaultOn: true },
-  { key: "email_provider", label: "Email provider", icon: Mail, defaultOn: true },
-  { key: "score", label: "Score", defaultOn: true },
+  { key: "email", label: "Email", icon: Mail, defaultOn: true },
   { key: "status", label: "Status", defaultOn: true },
+  { key: "score", label: "AI Score", icon: Sparkles, defaultOn: true },
+  { key: "source", label: "Source", icon: Globe, defaultOn: true },
+  { key: "owner", label: "Owner", icon: UserCog, defaultOn: true },
+  { key: "last_activity", label: "Last Activity", icon: Clock, defaultOn: true },
+  { key: "industry", label: "Industry", icon: Briefcase, defaultOn: false },
   { key: "phone", label: "Phone", icon: Phone, defaultOn: false },
   { key: "interest_area", label: "Interest area", icon: Tag, defaultOn: false },
-  { key: "source", label: "Source", icon: Globe, defaultOn: false },
   { key: "linkedin", label: "LinkedIn", icon: Share2, defaultOn: false },
   { key: "website", label: "Website", icon: Link2, defaultOn: false },
   { key: "verified", label: "Verified", icon: CheckCircle2, defaultOn: false },
@@ -68,9 +76,11 @@ interface Props {
   aiColumns?: AiColumnDefinitionRow[];
   /** Workspace's own saved AI column templates (user-created, distinct from the built-in library). */
   aiColumnSavedTemplates?: AiColumnSavedTemplateRow[];
+  /** Maps owner_id -> full name, for the Owner column. */
+  owners?: Record<string, string>;
 }
 
-export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [] }: Props) {
+export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
   const { confirm, prompt, toast } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -81,7 +91,15 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showWizard, setShowWizard] = useState(false);
+  const [wizardSource, setWizardSource] = useState<SourceId | null>(null);
+  const [showAddMenu, setShowAddMenu] = useState(false);
   const [page, setPage] = useState(0);
+
+  // Quick status/score filters — a row of pill shortcuts above the table.
+  // "Needs Follow-up" is a chosen proxy (no dedicated field exists): a lead
+  // that's been Contacted or is in Nurturing, i.e. worked but not yet resolved.
+  type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup";
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
 
   // Clicking a lead navigates to its own full page (/leads/[id]) — matches how
   // campaign-detail-view.tsx gives each campaign a real standalone page instead
@@ -195,7 +213,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
 
   const activeColumnFilterKeys = (Object.keys(columnFilters) as ColKey[]).filter((k) => columnFilters[k]);
 
-  const filtered = leads.filter((l) => {
+  const baseFiltered = leads.filter((l) => {
     const name = l.full_name || l.company_name || "";
     const q = search.toLowerCase();
     const matchSearch =
@@ -219,6 +237,26 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
     return matchSearch && matchIndustry && matchInterest && matchDateFrom && matchDateTo && matchColumns;
   });
 
+  function matchesQuickFilter(l: LeadRow, f: QuickFilter): boolean {
+    switch (f) {
+      case "new": return l.status === "New";
+      case "qualified": return l.status === "Qualified";
+      case "hot": return scoreLevel(l.lead_score).label === "Hot";
+      case "followup": return l.status === "Contacted" || l.status === "Nurturing";
+      default: return true;
+    }
+  }
+
+  const quickFilterCounts: Record<QuickFilter, number> = {
+    all: baseFiltered.length,
+    new: baseFiltered.filter((l) => matchesQuickFilter(l, "new")).length,
+    qualified: baseFiltered.filter((l) => matchesQuickFilter(l, "qualified")).length,
+    hot: baseFiltered.filter((l) => matchesQuickFilter(l, "hot")).length,
+    followup: baseFiltered.filter((l) => matchesQuickFilter(l, "followup")).length,
+  };
+
+  const filtered = baseFiltered.filter((l) => matchesQuickFilter(l, quickFilter));
+
   const sorted = [...filtered].sort((a, b) => {
     if (sort === "name") return (a.full_name || a.company_name || "").localeCompare(b.full_name || b.company_name || "");
     if (sort === "score") return (b.lead_score || 0) - (a.lead_score || 0);
@@ -230,11 +268,33 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const safePage = Math.min(page, pageCount - 1);
   const paged = sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
-  function splitName(l: LeadRow): { first: string; last: string } {
-    const full = (l.full_name || "").trim();
-    if (!full) return { first: l.company_name || "—", last: "" };
-    const parts = full.split(/\s+/);
-    return { first: parts[0], last: parts.slice(1).join(" ") };
+  function displayName(l: LeadRow): string {
+    return l.full_name || l.company_name || "—";
+  }
+
+  const AVATAR_COLORS = ["bg-blue-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-violet-600", "bg-cyan-600", "bg-pink-600", "bg-indigo-600"];
+
+  /** First letter of the first and last word — "?" for an unnamed lead. */
+  function initials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length || name === "—") return "?";
+    const first = parts[0][0] || "";
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+    return (first + last).toUpperCase() || "?";
+  }
+
+  /** Deterministic color per name so the same lead always gets the same avatar color. */
+  function avatarColor(name: string): string {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  }
+
+  /** AI Score band — e.g. 82 → Hot, 65 → Warm, 32 → Cold. */
+  function scoreLevel(score: number): { label: "Hot" | "Warm" | "Cold"; textClass: string; dotClass: string } {
+    if (score >= 70) return { label: "Hot", textClass: "text-rose-600 dark:text-rose-400", dotClass: "bg-rose-500" };
+    if (score >= 40) return { label: "Warm", textClass: "text-amber-600 dark:text-amber-400", dotClass: "bg-amber-500" };
+    return { label: "Cold", textClass: "text-blue-600 dark:text-blue-400", dotClass: "bg-blue-500" };
   }
 
   /** Clay-style compact status badge for AI column results — booleans and AnySite email
@@ -270,29 +330,20 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
     return <span className="block max-w-[260px] truncate text-slate-700" title={value}>{value || "—"}</span>;
   }
 
-  function emailProvider(email: string | null): { label: string; kind: "google" | "microsoft" | "yahoo" | "other" | "none" } {
-    if (!email || !email.includes("@")) return { label: "—", kind: "none" };
-    const domain = email.split("@")[1]?.toLowerCase() || "";
-    if (/(^|\.)(gmail|googlemail)\./.test("." + domain) || domain === "gmail.com") return { label: "Google", kind: "google" };
-    if (/(outlook|hotmail|live|msn|office365|microsoft)\./.test(domain) || ["outlook.com", "hotmail.com", "live.com"].includes(domain)) return { label: "Microsoft", kind: "microsoft" };
-    if (/yahoo\./.test(domain) || domain === "yahoo.com") return { label: "Yahoo", kind: "yahoo" };
-    return { label: "Other", kind: "other" };
-  }
-
   /** Plain-text value of a column, for the header click-to-search filter. */
   function getColumnText(key: ColKey, l: LeadRow): string {
     switch (key) {
-      case "first_name": return splitName(l).first;
-      case "last_name": return splitName(l).last;
-      case "email": return l.email || "";
+      case "name": return displayName(l);
       case "company": return l.company_name || "";
-      case "industry": return l.industry || "";
-      case "email_provider": return emailProvider(l.email).label;
-      case "score": return String(l.lead_score ?? "");
+      case "email": return l.email || "";
       case "status": return l.status || "";
+      case "score": return `${l.lead_score ?? ""} ${scoreLevel(l.lead_score ?? 0).label}`;
+      case "source": return l.source || "";
+      case "owner": return (l.owner_id && owners[l.owner_id]) || "";
+      case "last_activity": return new Date(l.updated_at).toLocaleDateString();
+      case "industry": return l.industry || "";
       case "phone": return l.phone || "";
       case "interest_area": return l.interest_area || "";
-      case "source": return l.source || "";
       case "linkedin": return l.linkedin || "";
       case "website": return l.website_url || "";
       case "verified": return l.verified ? "Verified" : "No";
@@ -371,38 +422,40 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
     switch (key) {
       case "index":
         return <span className="text-slate-400 dark:text-slate-500 tabular-nums font-mono text-xs">{rowNumber}</span>;
-      case "first_name":
+      case "name": {
+        const name = displayName(l);
         return (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); openLead(l.id); }}
-            className="font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate max-w-[150px] text-left block whitespace-nowrap"
+            className="flex items-center gap-2 max-w-[220px] text-left group"
           >
-            {splitName(l).first || "—"}
+            <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(name))}>
+              {initials(name)}
+            </span>
+            <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
+              {name}
+            </span>
           </button>
         );
-      case "last_name":
-        return <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[160px] block whitespace-nowrap" title={splitName(l).last || ""}>{splitName(l).last || "—"}</span>;
-      case "email":
-        return <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap" title={l.email || ""}>{l.email || "—"}</span>;
+      }
       case "company":
         return <span className="block max-w-[180px] truncate text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap" title={l.company_name || ""}>{l.company_name || "—"}</span>;
+      case "email":
+        return <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap" title={l.email || ""}>{l.email || "—"}</span>;
       case "industry":
         return <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap" title={l.industry || ""}>{l.industry || "—"}</span>;
-      case "email_provider":
-        return <EmailProviderCell provider={emailProvider(l.email)} />;
-      case "score":
+      case "score": {
+        const level = scoreLevel(l.lead_score);
         return (
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex-shrink-0">
-              <div
-                className={`h-full rounded-full ${l.lead_score >= 80 ? "bg-rose-500" : l.lead_score >= 60 ? "bg-amber-500" : "bg-blue-500"}`}
-                style={{ width: `${l.lead_score}%` }}
-              />
-            </div>
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 tabular-nums">{l.lead_score}</span>
-          </div>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap" title={`Score: ${l.lead_score}`}>
+            <span className={cn("h-1.5 w-1.5 rounded-full flex-shrink-0", level.dotClass)} />
+            <span className={cn("text-xs font-bold", level.textClass)}>
+              {level.label}
+            </span>
+          </span>
         );
+      }
       case "status":
         return <Badge variant={statusVariant[l.status] || "default"}>{l.status}</Badge>;
       case "phone":
@@ -411,6 +464,14 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.interest_area || "—"}</span>;
       case "source":
         return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.source || "—"}</span>;
+      case "owner":
+        return (
+          <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">
+            {(l.owner_id && owners[l.owner_id]) || <span className="text-slate-400">Unassigned</span>}
+          </span>
+        );
+      case "last_activity":
+        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{new Date(l.updated_at).toLocaleDateString()}</span>;
       case "linkedin":
         return l.linkedin
           ? <a href={l.linkedin} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
@@ -459,9 +520,9 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             </div>
 
             {/* Count Chip */}
-            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0 whitespace-nowrap">
               <Users2 className="h-3.5 w-3.5 text-slate-400" />
-              <span>{filtered.length}</span>
+              <span>{filtered.length} Lead{filtered.length === 1 ? "" : "s"}</span>
             </div>
 
             {/* Filter Button */}
@@ -498,10 +559,10 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               size="sm"
               onClick={() => setShowAiColumnModal(true)}
               className="rounded-xl gap-1 font-semibold h-8 text-xs px-2.5 border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex-shrink-0"
-              title="Use AI column enrichment"
+              title="AI-powered column enrichment"
             >
               <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-              <span>AI</span>
+              <span>AI Actions</span>
             </Button>
           </div>
 
@@ -520,31 +581,89 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             )}
 
             {/* Sort Dropdown */}
-            <div className="relative inline-flex items-center flex-shrink-0">
+            <div className="relative inline-flex items-center flex-shrink-0 w-[88px]">
               <ArrowUpDown className="h-3 w-3 text-slate-400 absolute left-2 pointer-events-none" />
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="appearance-none rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-6 py-1 h-8 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer"
+                className="appearance-none w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-5 py-1 h-8 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer truncate"
               >
                 <option value="none">Sort</option>
                 <option value="name">Name A–Z</option>
                 <option value="score">Score High→Low</option>
                 <option value="newest">Newest</option>
               </select>
-              <ChevronDown className="h-3 w-3 text-slate-400 absolute right-2 pointer-events-none" />
+              <ChevronDown className="h-3 w-3 text-slate-400 absolute right-1.5 pointer-events-none" />
             </div>
 
-            {/* Add Leads Primary Button */}
-            <Button
-              size="sm"
-              onClick={() => setShowWizard(true)}
-              className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add Leads</span>
-            </Button>
+            {/* Add Lead — primary button with a dropdown for the quickest entry methods */}
+            <div className="relative flex-shrink-0">
+              <Button
+                size="sm"
+                onClick={() => setShowAddMenu((v) => !v)}
+                className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs whitespace-nowrap"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Lead</span>
+                <ChevronDown className={cn("h-3 w-3 transition-transform", showAddMenu && "rotate-180")} />
+              </Button>
+              {showAddMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
+                  <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-50 w-56 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
+                    <button
+                      onClick={() => { setShowAddMenu(false); setWizardSource("manual"); setShowWizard(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
+                    >
+                      <Pencil className="h-4 w-4 text-slate-400 flex-shrink-0" /> Manual entry
+                    </button>
+                    <button
+                      onClick={() => { setShowAddMenu(false); setWizardSource("csv"); setShowWizard(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
+                    >
+                      <FileSpreadsheet className="h-4 w-4 text-slate-400 flex-shrink-0" /> Import CSV
+                    </button>
+                    <button
+                      onClick={() => { setShowAddMenu(false); setWizardSource("buy"); setShowWizard(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
+                    >
+                      <ShoppingCart className="h-4 w-4 text-slate-400 flex-shrink-0" /> Find new leads
+                    </button>
+                    <button
+                      onClick={() => { setShowAddMenu(false); setWizardSource(null); setShowWizard(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 mt-1 border-t border-slate-100 dark:border-slate-800 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
+                    >
+                      <Search className="h-4 w-4 flex-shrink-0" /> More sources…
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* Quick status/score filters */}
+        <div className="px-3 sm:px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+          {([
+            ["all", "All"],
+            ["new", "New"],
+            ["qualified", "Qualified"],
+            ["hot", "Hot Leads"],
+            ["followup", "Needs Follow-up"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setQuickFilter(key)}
+              className={cn(
+                "flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap",
+                quickFilter === key
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+              )}
+            >
+              {label} <span className={cn("tabular-nums", quickFilter === key ? "text-white/80" : "text-slate-400")}>({quickFilterCounts[key]})</span>
+            </button>
+          ))}
         </div>
 
         {/* Table Container */}
@@ -710,7 +829,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         </div>
       </Card>
 
-      <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
+      <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} initialSource={wizardSource} />
 
       {/* AI column header menu — run on all rows, or delete the column */}
       {aiColMenu && (
@@ -909,45 +1028,3 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   );
 }
 
-function GoogleG({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z" />
-      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
-      <path fill="#FBBC05" d="M5.84 14.11A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.45.35-2.11V7.05H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.95l3.66-2.84Z" />
-      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.05l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z" />
-    </svg>
-  );
-}
-
-function EmailProviderCell({ provider }: { provider: { label: string; kind: "google" | "microsoft" | "yahoo" | "other" | "none" } }) {
-  if (provider.kind === "none") return <span className="text-slate-400">—</span>;
-  if (provider.kind === "google") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-slate-700">
-        <GoogleG className="h-4 w-4" /> Google
-      </span>
-    );
-  }
-  if (provider.kind === "microsoft") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-slate-700">
-        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
-          <rect x="1" y="1" width="10" height="10" fill="#F25022" />
-          <rect x="13" y="1" width="10" height="10" fill="#7FBA00" />
-          <rect x="1" y="13" width="10" height="10" fill="#00A4EF" />
-          <rect x="13" y="13" width="10" height="10" fill="#FFB900" />
-        </svg>
-        Microsoft
-      </span>
-    );
-  }
-  if (provider.kind === "yahoo") {
-    return <span className="inline-flex items-center gap-1.5 text-slate-700"><span className="text-[#6001D2] font-bold text-sm">Y!</span> Yahoo</span>;
-  }
-  return (
-    <span className="inline-flex items-center gap-1 text-slate-500" title="Custom / business domain">
-      Other <Info className="h-3.5 w-3.5 text-slate-400" />
-    </span>
-  );
-}

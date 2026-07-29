@@ -18,7 +18,7 @@ import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options
 import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
 
-type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
+export type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
 
 interface SourceDef {
   id: SourceId;
@@ -166,7 +166,16 @@ const entryStarted = (e: ManualEntry) =>
      e.streetAddress.trim() || e.city.trim() || e.state.trim() || e.country.trim() || e.postalCode.trim());
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
-export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AddLeadsWizard({
+  open,
+  onClose,
+  initialSource,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Jumps straight to that source's data-entry screen (step 2) instead of the source picker — used by toolbar quick-add shortcuts. */
+  initialSource?: SourceId | null;
+}) {
   const router = useRouter();
   const { confirm } = useFeedback();
   const [step, setStep] = useState(1);
@@ -231,6 +240,20 @@ export function AddLeadsWizard({ open, onClose }: { open: boolean; onClose: () =
       hasLinkedInAccount().then(setLiConnected).catch(() => setLiConnected(false));
     }
   }, [open, isLinkedIn, liConnected]);
+
+  // Toolbar quick-add shortcuts skip the source picker entirely — jump
+  // straight to that source's data-entry screen (step 2) when opened this way.
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time jump straight to step 2 when the wizard is opened via a toolbar quick-add shortcut */
+    if (open && initialSource) {
+      setSource(initialSource);
+      setStep2Error(null);
+      setStep2Warning(null);
+      setInputValue("");
+      setStep(2);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open, initialSource]);
 
   if (!open) return null;
 

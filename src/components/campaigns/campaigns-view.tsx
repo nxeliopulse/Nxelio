@@ -86,6 +86,7 @@ export function CampaignsView({
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const tplRef = useRef<HTMLDivElement | null>(null);
 
@@ -155,6 +156,15 @@ export function CampaignsView({
     const matchApproval = approvalFilter === "All" || r.approvalStatus === approvalFilter;
     return matchSearch && matchActive && matchApproval;
   });
+
+  const rowKey = (r: UnifiedRow) => `${r.kind}-${r.id}`;
+  const toggleSelected = (key: string) =>
+    setSelected((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
+  const toggleSelectAll = () =>
+    setSelected(selected.length === filtered.length ? [] : filtered.map(rowKey));
+  const selectedRows = filtered.filter((r) => selected.includes(rowKey(r)));
+  // Only rows an approver can actually approve — bulk-approve silently skips the rest.
+  const selectedApprovable = selectedRows.filter((r) => r.kind === "email" && r.approvalStatus === "Pending review" && isApprover);
 
   function toggleStatus(r: UnifiedRow) {
     setOpenId(null);
@@ -231,6 +241,27 @@ export function CampaignsView({
       } catch (err) {
         toast(err instanceof Error ? err.message : "Couldn't archive campaign.", "error");
       }
+    });
+  }
+
+  function handleBulkApprove() {
+    const ids = selectedApprovable.map((r) => r.id);
+    if (!ids.length) return;
+    start(async () => {
+      const results = await Promise.allSettled(ids.map((id) => approveCampaign(id)));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      setSelected([]);
+      if (failed) toast(`Approved ${ids.length - failed} of ${ids.length} — ${failed} failed.`, failed === ids.length ? "error" : "info");
+      else toast(`${ids.length} campaign${ids.length === 1 ? "" : "s"} approved.`, "success");
+    });
+  }
+
+  async function handleBulkDelete() {
+    if (!(await confirm({ title: "Delete campaigns?", message: `Delete ${selectedRows.length} item(s)? This can't be undone.`, confirmLabel: "Delete", danger: true }))) return;
+    const rowsToDelete = selectedRows;
+    setSelected([]);
+    start(async () => {
+      await Promise.allSettled(rowsToDelete.map((r) => (r.kind === "email" ? deleteCampaign(r.id) : deleteSequence(r.id))));
     });
   }
 
@@ -345,6 +376,14 @@ export function CampaignsView({
             <table className="w-full text-sm min-w-[880px]">
               <thead>
                 <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100">
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selected.length === filtered.length && filtered.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded border-slate-300"
+                    />
+                  </th>
                   <th className="px-5 py-3 font-semibold">Name</th>
                   <th className="px-3 py-3 font-semibold">Status</th>
                   <th className="px-3 py-3 font-semibold">Leads</th>
@@ -358,13 +397,23 @@ export function CampaignsView({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtered.length === 0 && (
-                  <tr><td colSpan={9} className="px-5 py-12 text-center text-slate-500 text-sm">No campaigns match your filters.</td></tr>
+                  <tr><td colSpan={10} className="px-5 py-12 text-center text-slate-500 text-sm">No campaigns match your filters.</td></tr>
                 )}
                 {filtered.map((r) => {
                   const isActive = r.status === "Active";
                   const ownerName = r.ownerId ? owners[r.ownerId] : null;
+                  const key = rowKey(r);
+                  const canApproveHere = r.kind === "email" && r.approvalStatus === "Pending review" && isApprover;
                   return (
-                    <tr key={`${r.kind}-${r.id}`} onClick={() => router.push(r.href)} className="cursor-pointer hover:bg-slate-50/60 transition-colors">
+                    <tr key={key} onClick={() => router.push(r.href)} className="cursor-pointer hover:bg-slate-50/60 transition-colors">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(key)}
+                          onChange={() => toggleSelected(key)}
+                          className="rounded border-slate-300"
+                        />
+                      </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
@@ -373,11 +422,24 @@ export function CampaignsView({
                         </div>
                       </td>
                       <td className="px-3 py-3">
-                        {r.approvalStatus ? (
-                          <Badge variant={approvalBadgeVariant(r.approvalStatus)}>{r.approvalStatus}</Badge>
-                        ) : (
-                          <Badge variant={isActive ? "success" : "default"}>{r.status}</Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {r.approvalStatus ? (
+                            <Badge variant={approvalBadgeVariant(r.approvalStatus)}>{r.approvalStatus}</Badge>
+                          ) : (
+                            <Badge variant={isActive ? "success" : "default"}>{r.status}</Badge>
+                          )}
+                          {canApproveHere && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => { e.stopPropagation(); handleApprove(r); }}
+                              disabled={pending}
+                              className="h-7 px-2 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                            </Button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-slate-600">{r.leads === null ? "—" : r.leads.toLocaleString()}</td>
                       <td className="px-3 py-3 text-slate-600">{r.sent ? r.sent.toLocaleString() : "—"}</td>
@@ -463,6 +525,40 @@ export function CampaignsView({
       </Card>
 
       <ConnectionsModal open={connectionsOpen} onClose={() => setConnectionsOpen(false)} />
+
+      {/* Floating selection action bar — mirrors the Leads table's bulk-action pill */}
+      {selected.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lp-anim-pop max-w-[calc(100vw-2rem)]">
+          <div className="flex items-center gap-3 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/30 pl-5 pr-3 py-2.5">
+            <span className="text-sm font-medium whitespace-nowrap">
+              <span className="font-semibold">{selected.length}</span> selected
+            </span>
+            <span className="h-5 w-px bg-white/20" />
+            {selectedApprovable.length > 0 && (
+              <button
+                onClick={handleBulkApprove}
+                disabled={pending}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" /> Approve ({selectedApprovable.length})
+              </button>
+            )}
+            <button
+              onClick={handleBulkDelete}
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white text-red-600 hover:bg-red-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+            <button
+              onClick={() => setSelected([])}
+              className="rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

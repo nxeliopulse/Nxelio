@@ -113,6 +113,14 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
     });
   }
 
+  const AVATAR_COLORS = ["bg-blue-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-violet-600", "bg-cyan-600", "bg-pink-600", "bg-indigo-600"];
+
+  function avatarColor(name: string): string {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  }
+
   function renderCell(key: ColKey, a: AccountRow, rowNumber: number) {
     switch (key) {
       case "index":
@@ -122,9 +130,14 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); openAccount(a.id); }}
-            className="font-semibold text-slate-900 hover:text-blue-600 truncate max-w-[220px] text-left block whitespace-nowrap"
+            className="flex items-center gap-2 max-w-[220px] text-left group"
           >
-            {a.account_name}
+            <span className={cn("h-7 w-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0", avatarColor(a.account_name))}>
+              {a.account_name.trim()[0]?.toUpperCase() || "?"}
+            </span>
+            <span className="font-semibold text-slate-900 group-hover:text-blue-600 truncate whitespace-nowrap">
+              {a.account_name}
+            </span>
           </button>
         );
       case "industry":
