@@ -9,6 +9,8 @@ import { updateLead, type LeadRow } from "@/lib/queries/leads";
 import { industries, interestAreas } from "@/lib/mock-data";
 
 const STATUSES = ["New", "Contacted", "Qualified", "Nurturing"];
+const COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
+const SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
 
 export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose: () => void; lead: LeadRow }) {
   const router = useRouter();
@@ -23,6 +25,15 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
     industry: lead.industry || "",
     interest_area: lead.interest_area || "",
     status: lead.status || "New",
+    job_title: lead.job_title || "",
+    seniority: lead.seniority || "",
+    company_size: lead.company_size || "",
+    twitter_handle: lead.twitter_handle || "",
+    street_address: lead.street_address || "",
+    city: lead.city || "",
+    state: lead.state || "",
+    country: lead.country || "",
+    postal_code: lead.postal_code || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +66,15 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
         industry: form.industry || null,
         interest_area: form.interest_area || null,
         status: form.status,
+        job_title: form.job_title.trim() || null,
+        seniority: form.seniority || null,
+        company_size: form.company_size || null,
+        twitter_handle: form.twitter_handle.trim() || null,
+        street_address: form.street_address.trim() || null,
+        city: form.city.trim() || null,
+        state: form.state.trim() || null,
+        country: form.country.trim() || null,
+        postal_code: form.postal_code.trim() || null,
       });
       toast("Lead updated.", "success");
       onClose();
@@ -129,7 +149,7 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
                 {interestAreas.map((i) => <option key={i} value={i}>{i}</option>)}
               </Select>
             </div>
-            <div className="col-span-2">
+            <div>
               <label className={label}>Status</label>
               <Select className={field} value={form.status} onChange={(e) => set("status", e.target.value)}>
                 {/* Include the lead's current status even if it's a legacy value (e.g. "Converted")
@@ -139,6 +159,48 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
                   <option key={s} value={s}>{s}</option>
                 ))}
               </Select>
+            </div>
+            <div>
+              <label className={label}>Job title</label>
+              <input className={field} value={form.job_title} onChange={(e) => set("job_title", e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>Seniority</label>
+              <Select className={field} value={form.seniority} onChange={(e) => set("seniority", e.target.value)}>
+                <option value="">—</option>
+                {SENIORITY_LEVELS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </Select>
+            </div>
+            <div>
+              <label className={label}>Company size</label>
+              <Select className={field} value={form.company_size} onChange={(e) => set("company_size", e.target.value)}>
+                <option value="">—</option>
+                {COMPANY_SIZE_BUCKETS.map((b) => <option key={b} value={b}>{b}</option>)}
+              </Select>
+            </div>
+            <div>
+              <label className={label}>Twitter / X handle</label>
+              <input className={field} value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <label className={label}>Street address</label>
+              <input className={field} value={form.street_address} onChange={(e) => set("street_address", e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>City</label>
+              <input className={field} value={form.city} onChange={(e) => set("city", e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>State</label>
+              <input className={field} value={form.state} onChange={(e) => set("state", e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>Country</label>
+              <input className={field} value={form.country} onChange={(e) => set("country", e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>Postal code</label>
+              <input className={field} value={form.postal_code} onChange={(e) => set("postal_code", e.target.value)} />
             </div>
           </div>
         </div>
