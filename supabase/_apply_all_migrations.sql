@@ -3966,7 +3966,7 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT 
 
 CREATE INDEX IF NOT EXISTS idx_leads_is_favorite ON leads(is_favorite) WHERE is_favorite = true;
 
--- >>> FILE: 0080_workspace_members.sql
+-- >>> FILE: 0081_workspace_members.sql
 -- Multi-workspace support: a login can belong to several workspaces and
 -- switch between them. get_current_workspace_id() keeps reading users.workspace_id
 -- (the "currently active" workspace pointer) unchanged, so every existing RLS
@@ -4047,7 +4047,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog;
 REVOKE UPDATE ON users FROM authenticated;
 GRANT UPDATE (full_name, manager_id, status, avatar_url, last_login, nav_access, phone, job_title, updated_at) ON users TO authenticated;
 
--- >>> FILE: 0081_workspace_read_own_memberships.sql
+-- >>> FILE: 0082_workspace_read_own_memberships.sql
 -- Fix: the workspace switcher's getMyWorkspaces() joins workspace_members -> workspaces
 -- to show each workspace's name. The old "Read own workspace" SELECT policy only allowed
 -- reading the CURRENTLY ACTIVE workspace (id = get_current_workspace_id()), so every OTHER
@@ -4061,5 +4061,30 @@ CREATE POLICY "Read own workspace" ON workspaces FOR SELECT TO authenticated
     OR EXISTS (
       SELECT 1 FROM workspace_members wm
       WHERE wm.workspace_id = workspaces.id AND wm.user_id = auth.uid() AND wm.status = 'ACTIVE'
+    )
+  );
+
+-- >>> FILE: 0083_users_read_via_workspace_members.sql
+-- Fix: getUsers() (the /users "People" roster) joins workspace_members -> users
+-- to show each member's profile (name, email, avatar). The old "ws_select_users"
+-- SELECT policy only allowed reading a user row when workspace_id = the CALLER's
+-- currently active workspace — but that column is the TARGET's own active
+-- pointer, which may point at a different workspace than the one they're
+-- actually being looked up in (a member can belong to several workspaces and
+-- only one is "active" for them at a time). So a legitimate member whose own
+-- active pointer happens to be elsewhere silently vanished from the roster —
+-- the exact same class of bug fixed for the `workspaces` table in migration
+-- 0081, just on `users`. Widen SELECT to also allow reading any user who has
+-- an ACTIVE workspace_members row in the caller's current workspace.
+DROP POLICY IF EXISTS "ws_select_users" ON users;
+CREATE POLICY "ws_select_users" ON users FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR workspace_id = get_current_workspace_id()
+    OR EXISTS (
+      SELECT 1 FROM workspace_members wm
+      WHERE wm.user_id = users.user_id
+        AND wm.workspace_id = get_current_workspace_id()
+        AND wm.status = 'ACTIVE'
     )
   );
