@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0078 — Per-lead favorite/star flag
+-- 0080 — Per-lead favorite/star flag
 -- Lets a user star a lead for quick reference in the Leads table, independent
 -- of status/score. Defaults to false so every existing row is unaffected.
 -- ============================================================================
