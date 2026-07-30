@@ -3931,3 +3931,26 @@ BEGIN
     EXECUTE format('CREATE POLICY ws_delete_%s ON %I FOR DELETE TO authenticated USING (workspace_id = get_current_workspace_id());', t, t);
   END LOOP;
 END $$;
+
+-- >>> FILE: 0078_campaign_requires_approval.sql
+-- ============================================================================
+-- Per-campaign approval toggle — lets the creator choose, at build time,
+-- whether this campaign must go through the review/approval lifecycle
+-- (0033_campaign_approval_lifecycle.sql) before it can launch, or can be
+-- launched directly. Defaults to TRUE so existing behavior (every campaign
+-- requires approval) is unchanged for campaigns created before this column
+-- existed.
+-- ============================================================================
+
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN NOT NULL DEFAULT true;
+
+-- >>> FILE: 0079_lead_contact_info_requested.sql
+-- ============================================================================
+-- Dedup guard for the LinkedIn "auto-ask for contact info" feature: when a
+-- lead replies to a LinkedIn message with positive intent (AI-classified),
+-- we send one automatic follow-up asking for their email/phone. This column
+-- is set the first time we ask, so a lead who keeps replying positively never
+-- gets asked more than once.
+-- ============================================================================
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_info_requested_at TIMESTAMPTZ;

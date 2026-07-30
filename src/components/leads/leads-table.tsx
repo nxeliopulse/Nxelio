@@ -15,7 +15,7 @@ import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
-import { deleteLead, bulkDeleteLeads, updateLead, type LeadRow } from "@/lib/queries/leads";
+import { updateLead, type LeadRow } from "@/lib/queries/leads";
 import { createStaticSegment } from "@/lib/queries/segments";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
@@ -119,7 +119,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
 
   // Selection contextual bar — replaces the toolbar controls while rows are selected.
   const [showOwnerMenu, setShowOwnerMenu] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
   const [segmentName, setSegmentName] = useState("");
   const [segmentDescription, setSegmentDescription] = useState("");
@@ -444,17 +443,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const selectedWithEmail = selectedLeads.filter((l) => l.email).length;
   const selectedMissingEmail = selectedLeads.length - selectedWithEmail;
 
-  async function handleBulkDelete() {
-    setShowMoreMenu(false);
-    const n = selected.length;
-    if (!(await confirm({ title: "Delete lead?", message: `Delete ${n} lead${n === 1 ? "" : "s"}? This action cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
-    const ids = [...selected];
-    setSelected([]);
-    start(async () => {
-      await bulkDeleteLeads(ids); // single query instead of N round-trips
-    });
-  }
-
   function openSegmentDialog() {
     setSegmentName("");
     setSegmentDescription("");
@@ -497,14 +485,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       await Promise.allSettled(ids.map((id) => updateLead(id, { owner_id: ownerId })));
       toast(`${ids.length} lead${ids.length === 1 ? "" : "s"} assigned to ${ownerName}.`, "success");
       router.refresh();
-    });
-  }
-
-  async function handleDelete(id: string) {
-    if (!(await confirm({ title: "Delete lead?", message: "Delete this lead? This action cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
-    start(async () => {
-      await deleteLead(id);
-      setSelected((s) => s.filter((x) => x !== id));
     });
   }
 
@@ -749,7 +729,10 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         {/* Table Container */}
         <div className="relative">
           <div ref={scrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
-            <table className="w-full text-sm border-collapse min-w-[900px]">
+            {/* border-separate (not border-collapse) — collapse renders duplicated/
+                dashed hairline artifacts at sticky (frozen) column boundaries in
+                Chrome/Safari when combined with position:sticky cells. */}
+            <table className="w-full text-sm border-separate border-spacing-0 min-w-[900px]">
               <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <th className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-2.5 w-10">
@@ -884,16 +867,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                         </td>
                       );
                     })}
-                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleDelete(l.id)}
-                        disabled={pending}
-                        title="Delete lead"
-                        className="p-1 rounded-md hover:bg-red-50 disabled:opacity-50"
-                      >
-                        <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
-                      </button>
-                    </td>
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()} />
                   </tr>
                 ))}
               </tbody>
@@ -1261,28 +1235,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                         {name}
                       </button>
                     ))}
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setShowMoreMenu((v) => !v)}
-                className="inline-flex items-center gap-1 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
-              >
-                More <ChevronDown className={cn("h-3 w-3 transition-transform", showMoreMenu && "rotate-180")} />
-              </button>
-              {showMoreMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
-                  <div className="lp-anim-pop origin-bottom-left absolute left-0 bottom-full mb-1 z-50 w-44 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
-                    <button
-                      onClick={handleBulkDelete}
-                      disabled={pending}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 text-left"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </button>
                   </div>
                 </>
               )}

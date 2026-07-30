@@ -7,7 +7,6 @@ import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import { SidebarProvider, useSidebar } from "@/components/layout/sidebar-context";
 import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { FeedbackProvider } from "@/components/ui/feedback";
-import { OnboardingBanner } from "@/components/layout/onboarding-banner";
 import { NoMailboxBanner } from "@/components/layout/no-mailbox-banner";
 import { AssistantProvider } from "@/components/layout/assistant-context";
 
@@ -38,7 +37,7 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
             onToggleAssistant={() => setAssistantOpen((v) => !v)}
             assistantOpen={assistantOpen}
           />
-          {!onboardingCompleted ? <OnboardingBanner /> : !mailboxConnected && <NoMailboxBanner />}
+          {onboardingCompleted && !mailboxConnected && <NoMailboxBanner />}
           {/* Its own scroll region (not the page) — keeps the rounded top-left
               corner anchored to the viewport instead of scrolling away with content. */}
           <main className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-6 bg-slate-50 rounded-tl-2xl">{children}</main>

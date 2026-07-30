@@ -86,7 +86,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   }
 
   return (
-    <header className="h-16 py-2.5 bg-[var(--primary)] px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-3 sticky top-0 z-30 text-white shadow-sm">
+    <header className="h-16 py-2.5 bg-[var(--primary)] px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-3 sticky top-0 z-30 text-white shadow-sm rounded-br-2xl">
       {/* Left side: hamburger (mobile) + global search */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {/* Hamburger — mobile/tablet only */}

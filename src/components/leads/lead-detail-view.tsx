@@ -1,11 +1,11 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, X, Mail, Phone, Globe, Calendar, Star, Send, Building2,
   Target, Users, BarChart3, FileDown, MailOpen,
-  Mouse, Briefcase, Pencil, Trash2, CalendarDays, ChevronDown, ChevronUp,
+  Mouse, Briefcase, Pencil, CalendarDays, ChevronDown, ChevronUp,
   RefreshCw, Sparkles, Filter, CheckCircle2, UserCheck, Plus, ExternalLink, History as HistoryIcon, Megaphone
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import { ConvertOpportunityModal } from "@/components/leads/convert-opportunity-
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { LeadNotesCard } from "@/components/leads/lead-notes-card";
-import { deleteLead, type LeadRow } from "@/lib/queries/leads";
+import type { LeadRow } from "@/lib/queries/leads";
 import { STAGE_LABELS, type OpportunityRow } from "@/lib/opportunities";
 import type { MeetingRow } from "@/lib/queries/meetings";
 import type { LeadHistory } from "@/lib/queries/lead-detail";
@@ -99,8 +99,7 @@ export function LeadDetailView({
   embedded?: boolean;
 }) {
   const router = useRouter();
-  const { confirm, toast } = useFeedback();
-  const [, startDelete] = useTransition();
+  const { toast } = useFeedback();
   const [emailOpen, setEmailOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -120,21 +119,6 @@ export function LeadDetailView({
 
   const displayName = lead.full_name || lead.company_name || "—";
   const firstName = lead.first_name || displayName.split(" ")[0] || "";
-
-  async function handleDelete() {
-    const ok = await confirm({ title: "Delete contact?", message: `Delete ${displayName}? This can't be undone.`, confirmLabel: "Delete", danger: true });
-    if (!ok) return;
-    startDelete(async () => {
-      try {
-        await deleteLead(lead.id);
-        toast("Contact deleted.", "success");
-        if (onClose) onClose();
-        else router.push("/leads");
-      } catch {
-        toast("Couldn't delete contact.", "error");
-      }
-    });
-  }
 
   const timeline = [
     ...activities.map((a) => ({
@@ -196,10 +180,6 @@ export function LeadDetailView({
 
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="rounded-lg text-xs font-semibold">
               <Pencil className="h-3.5 w-3.5 text-slate-500" /> Edit
-            </Button>
-
-            <Button variant="outline" size="sm" onClick={handleDelete} className="rounded-lg text-xs font-semibold text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900/60 dark:hover:bg-rose-950/40">
-              <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>
           </div>
         </div>

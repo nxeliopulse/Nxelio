@@ -59,24 +59,24 @@ const APP_NAV = [
 const TOKENS = {
   light: {
     panel: "#ffffff",
-    panelBorder: "#E2E8F0",
-    headerBorder: "#E2E8F0",
+    panelBorder: "#CBD5E1",
+    headerBorder: "#CBD5E1",
     msgAi: "#F8FAFC",
-    msgAiBorder: "#E2E8F0",
+    msgAiBorder: "#CBD5E1",
     msgAiText: "#1E293B",
     msgErr: "#FEF2F2",
-    msgErrBorder: "#FECACA",
+    msgErrBorder: "#FCA5A5",
     msgErrText: "#B91C1C",
     approvalBg: "#FFFBEB",
-    approvalBorder: "#FDE68A",
+    approvalBorder: "#FCD34D",
     approvalText: "#92400E",
     inputBg: "#F8FAFC",
-    inputBorder: "#E2E8F0",
+    inputBorder: "#94A3B8",
     dropdownBg: "#ffffff",
-    dropdownBorder: "#E2E8F0",
+    dropdownBorder: "#CBD5E1",
     hoverBg: "#F1F5F9",
     suggBg: "#F8FAFC",
-    suggBorder: "#E2E8F0",
+    suggBorder: "#CBD5E1",
     suggHoverBg: "var(--color-blue-50, #eff6ff)",
     suggHoverBorder: "var(--primary, #2563eb)",
     textPrimary: "#0F172A",
@@ -84,7 +84,7 @@ const TOKENS = {
     textMuted: "#94A3B8",
     iconColor: "#64748B",
     appsPillBg: "var(--color-blue-50, #eff6ff)",
-    appsPillBorder: "var(--color-blue-200, #bfdbfe)",
+    appsPillBorder: "var(--color-blue-300, #93c5fd)",
     appsPillActiveBg: "var(--color-blue-100, #dbeafe)",
     appsPillActiveBorder: "var(--primary, #2563eb)",
     historyActiveBg: "#F1F5F9",
@@ -92,21 +92,21 @@ const TOKENS = {
   },
   dark: {
     panel: "#0F172A",
-    panelBorder: "rgba(255,255,255,0.1)",
-    headerBorder: "rgba(255,255,255,0.1)",
+    panelBorder: "rgba(255,255,255,0.2)",
+    headerBorder: "rgba(255,255,255,0.2)",
     msgAi: "#1E293B",
-    msgAiBorder: "rgba(255,255,255,0.1)",
+    msgAiBorder: "rgba(255,255,255,0.2)",
     msgAiText: "#f1f5f9",
     msgErr: "rgba(239,68,68,0.18)",
-    msgErrBorder: "rgba(239,68,68,0.3)",
+    msgErrBorder: "rgba(239,68,68,0.4)",
     msgErrText: "#fca5a5",
     approvalBg: "rgba(245,158,11,0.12)",
-    approvalBorder: "rgba(245,158,11,0.3)",
+    approvalBorder: "rgba(245,158,11,0.4)",
     approvalText: "#fde68a",
     inputBg: "#1E293B",
-    inputBorder: "rgba(255,255,255,0.12)",
+    inputBorder: "rgba(255,255,255,0.25)",
     dropdownBg: "#1E293B",
-    dropdownBorder: "rgba(255,255,255,0.12)",
+    dropdownBorder: "rgba(255,255,255,0.2)",
     hoverBg: "rgba(255,255,255,0.08)",
     suggBg: "#1E293B",
     suggBorder: "rgba(255,255,255,0.1)",
@@ -376,7 +376,7 @@ export function AssistantWidget({
           innerWidth,
           "max-sm:w-[calc(100vw-20px)] max-sm:h-[calc(100%-20px)]"
         )}
-        style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, ${PURPLE} 100%)`, padding: expanded ? "3px" : "1.5px" }}
+        style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, ${PURPLE} 100%)`, padding: expanded ? "4px" : "3px" }}
       >
         {/* Inner panel */}
         <div className="flex flex-col h-full rounded-[13px] overflow-hidden" style={{ background: T.panel }}>
@@ -505,8 +505,8 @@ export function AssistantWidget({
                             m.role === "user"
                               ? { background: `linear-gradient(135deg, ${PRIMARY}, ${PURPLE})`, color: "#ffffff" }
                               : m.error
-                                ? { background: T.msgErr, border: `1px solid ${T.msgErrBorder}`, color: T.msgErrText }
-                                : { background: T.msgAi, border: `1px solid ${T.msgAiBorder}`, color: T.msgAiText }
+                                ? { background: T.msgErr, border: `1.5px solid ${T.msgErrBorder}`, color: T.msgErrText }
+                                : { background: T.msgAi, border: `1.5px solid ${T.msgAiBorder}`, color: T.msgAiText }
                           }
                         >
                           {m.error && <AlertCircle className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" style={{ color: T.msgErrText }} />}
@@ -654,7 +654,7 @@ export function AssistantWidget({
                   )}
 
                   {/* Textarea box */}
-                  <div className="relative rounded-2xl transition-all" style={{ border: `1px solid ${T.inputBorder}`, background: T.inputBg }}>
+                  <div className="relative rounded-2xl transition-all" style={{ border: `2px solid ${T.inputBorder}`, background: T.inputBg }}>
                     <textarea
                       ref={inputRef}
                       rows={3}
