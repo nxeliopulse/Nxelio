@@ -3,13 +3,12 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, MoreHorizontal, Pause, Play, Copy, Trash2, Pencil, Search, LayoutTemplate, ChevronDown, ChevronRight, Megaphone, Link2, Send, CheckCircle2, Undo2, Archive } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Copy, Trash2, Pencil, Search, LayoutTemplate, ChevronDown, ChevronRight, Megaphone, Link2, Send, CheckCircle2, Undo2, Archive, Star, LayoutGrid, List, Columns3, ArrowUp, ArrowDown, ArrowUpDown, Eye, MessageSquare, Filter as FilterIcon, X } from "lucide-react";
 import { ConnectionsModal } from "@/components/campaigns/connections-modal";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/ui/page-header";
 import { useFeedback } from "@/components/ui/feedback";
 import { setCampaignStatus, deleteCampaign, duplicateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { setSequenceStatus, deleteSequence, duplicateSequence, type OutreachSequenceRow } from "@/lib/queries/outreach";
@@ -57,6 +56,50 @@ function ChannelBadge({ label }: { label: "Email" | "LinkedIn" | "Multichannel" 
   return <Badge variant={variant}>{label}</Badge>;
 }
 
+// Solid-colored status pill matching the reference design — kept local to this
+// table instead of changing the shared (subtle-toned) Badge component used elsewhere.
+function StatusPill({ label, tone }: { label: string; tone: "success" | "warning" | "danger" | "info" | "default" }) {
+  const toneClass = {
+    success: "bg-emerald-500 text-white",
+    warning: "bg-amber-500 text-white",
+    danger: "bg-red-500 text-white",
+    info: "bg-blue-500 text-white",
+    default: "bg-slate-400 text-white",
+  }[tone];
+  return <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${toneClass}`}>{label}</span>;
+}
+
+function statusPillTone(status: string): "success" | "warning" | "danger" | "info" | "default" {
+  switch (status) {
+    case "Approved": case "Active": return "success";
+    case "Pending review": return "warning";
+    case "Archived": return "default";
+    case "Live/Distributing": return "info";
+    default: return "default"; // Draft (AI-generated), Paused
+  }
+}
+
+type SortField = "updatedAt" | "name" | "leads" | "sent" | "replyRate" | "bounceRate";
+
+function SortTh({ label, field, defaultDir = "desc", sortField, sortDir, onSort }: {
+  label: string;
+  field: SortField;
+  defaultDir?: "asc" | "desc";
+  sortField: SortField;
+  sortDir: "asc" | "desc";
+  onSort: (field: SortField, defaultDir: "asc" | "desc") => void;
+}) {
+  const active = sortField === field;
+  return (
+    <th className="px-3 py-3 font-semibold">
+      <button onClick={() => onSort(field, defaultDir)} className="inline-flex items-center gap-1 hover:text-slate-700">
+        {label}
+        {active ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+      </button>
+    </th>
+  );
+}
+
 export function CampaignsView({
   campaigns,
   sequences,
@@ -87,18 +130,71 @@ export function CampaignsView({
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [sortField, setSortField] = useState<SortField>("updatedAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  function toggleSort(field: SortField, defaultDir: "asc" | "desc" = "desc") {
+    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(field); setSortDir(defaultDir); }
+  }
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<string[]>([]); // channel labels; empty = all
+  function toggleTypeFilter(t: string) {
+    setTypeFilter((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  }
+  function resetFilters() {
+    setSearch(""); setActiveOnly(false); setApprovalFilter("All"); setTypeFilter([]); setDateFrom(""); setDateTo("");
+  }
+  const activeFilterCount = (search ? 1 : 0) + (activeOnly ? 1 : 0) + (approvalFilter !== "All" ? 1 : 0) + (typeFilter.length > 0 ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
+  const [visibleCols, setVisibleCols] = useState({
+    status: true,
+    leads: true,
+    sent: true,
+    replyRate: true,
+    bounceRate: true,
+    owner: true,
+    lastModified: true,
+  });
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const menuRef = useRef<HTMLDivElement | null>(null);
   const tplRef = useRef<HTMLDivElement | null>(null);
+  const colsRef = useRef<HTMLDivElement | null>(null);
+  const filterRef = useRef<HTMLDivElement | null>(null);
+
+  // Favorites are per-browser only — campaigns have no "favorite" column in the DB.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("lp-campaigns-favorites") || "[]");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (Array.isArray(saved)) setFavorites(new Set(saved));
+    } catch { /* ignore malformed storage */ }
+  }, []);
+  function toggleFavorite(key: string) {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      localStorage.setItem("lp-campaigns-favorites", JSON.stringify([...next]));
+      return next;
+    });
+  }
+  function toggleColumn(key: keyof typeof visibleCols) {
+    setVisibleCols((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       const t = e.target as Node;
       if (openId && menuRef.current && !menuRef.current.contains(t)) setOpenId(null);
       if (templatesOpen && tplRef.current && !tplRef.current.contains(t)) setTemplatesOpen(false);
+      if (columnsOpen && colsRef.current && !colsRef.current.contains(t)) setColumnsOpen(false);
+      if (filterOpen && filterRef.current && !filterRef.current.contains(t)) setFilterOpen(false);
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
-  }, [openId, templatesOpen]);
+  }, [openId, templatesOpen, columnsOpen, filterOpen]);
 
   // Table rows paint over each other's overflowing content, so the row-action menu is
   // rendered in a portal instead — close it on scroll since its position is fixed at open time.
@@ -150,12 +246,28 @@ export function CampaignsView({
   ].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   const hasAny = rows.length > 0;
-  const filtered = rows.filter((r) => {
-    const matchSearch = !search || r.name.toLowerCase().includes(search.toLowerCase());
-    const matchActive = !activeOnly || r.status === "Active";
-    const matchApproval = approvalFilter === "All" || r.approvalStatus === approvalFilter;
-    return matchSearch && matchActive && matchApproval;
-  });
+  const filtered = rows
+    .filter((r) => {
+      const matchSearch = !search || r.name.toLowerCase().includes(search.toLowerCase());
+      const matchActive = !activeOnly || r.status === "Active";
+      const matchApproval = approvalFilter === "All" || r.approvalStatus === approvalFilter;
+      const matchDateFrom = !dateFrom || r.updatedAt >= dateFrom;
+      const matchDateTo = !dateTo || r.updatedAt <= `${dateTo}T23:59:59.999Z`;
+      const matchType = typeFilter.length === 0 || typeFilter.includes(r.channelLabel);
+      return matchSearch && matchActive && matchApproval && matchDateFrom && matchDateTo && matchType;
+    })
+    .sort((a, b) => {
+      let cmp: number;
+      switch (sortField) {
+        case "name": cmp = a.name.localeCompare(b.name); break;
+        case "leads": cmp = (a.leads ?? 0) - (b.leads ?? 0); break;
+        case "sent": cmp = a.sent - b.sent; break;
+        case "replyRate": cmp = a.replyRate - b.replyRate; break;
+        case "bounceRate": cmp = (a.bounceRate ?? 0) - (b.bounceRate ?? 0); break;
+        default: cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
 
   const rowKey = (r: UnifiedRow) => `${r.kind}-${r.id}`;
   const toggleSelected = (key: string) =>
@@ -266,36 +378,54 @@ export function CampaignsView({
   }
 
   const statCards = [
-    { label: "Active campaigns", value: cStats.active + sStats.active },
-    { label: "Messages sent", value: (cStats.totalSent + sStats.sent).toLocaleString() },
-    { label: "Avg. open rate", value: `${cStats.avgOpen}%` },
-    { label: "Avg. reply rate", value: `${cStats.avgReply || sStats.replyRate}%` },
+    { label: "Active campaigns", value: cStats.active + sStats.active, icon: Megaphone, accent: "bg-amber-500" },
+    { label: "Messages sent", value: (cStats.totalSent + sStats.sent).toLocaleString(), icon: Send, accent: "bg-blue-500" },
+    { label: "Avg. open rate", value: `${cStats.avgOpen}%`, icon: Eye, accent: "bg-rose-500" },
+    { label: "Avg. reply rate", value: `${cStats.avgReply || sStats.replyRate}%`, icon: MessageSquare, accent: "bg-emerald-500" },
   ];
 
   return (
     <div className="max-w-[1600px] mx-auto">
-      <PageHeader
-        title="Campaigns"
-        description="Create, launch and track your outreach — email or multichannel."
-        actions={
-          <>
-            <Button variant="outline" onClick={() => setConnectionsOpen(true)}>
-              <Link2 className="h-4 w-4" /> Connections
-            </Button>
-            <Link href="/campaigns/builder">
-              <Button><Plus className="h-4 w-4" /> New Campaign</Button>
-            </Link>
-          </>
-        }
-      />
+      {/* Custom header (breadcrumb + count badge) — kept local to this page, doesn't touch the shared PageHeader used elsewhere */}
+      <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Campaigns</h1>
+            <span className="inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">
+              {rows.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
+            <span>Home</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-slate-600 font-medium">Campaigns</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setConnectionsOpen(true)}>
+            <Link2 className="h-4 w-4" /> Connections
+          </Button>
+          <Link href="/campaigns/builder">
+            <Button><Plus className="h-4 w-4" /> New Campaign</Button>
+          </Link>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {statCards.map((s) => (
-          <Card key={s.label} className="p-4">
-            <p className="text-xs text-slate-500">{s.label}</p>
-            <p className="text-xl font-bold text-slate-900 mt-1">{s.value}</p>
-          </Card>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {statCards.map((s) => {
+          const Icon = s.icon;
+          return (
+            <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
+              <span className={`h-11 w-11 rounded-full ${s.accent} text-white flex items-center justify-center flex-shrink-0`}>
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 truncate">{s.label}</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">{s.value}</p>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       <Card className="overflow-visible">
@@ -322,8 +452,196 @@ export function CampaignsView({
             <option value="All">All approval stages</option>
             {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </Select>
+        </div>
+
+        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
+          <Select
+            value={`${sortField}:${sortDir}`}
+            onChange={(e) => { const [f, d] = e.target.value.split(":"); setSortField(f as SortField); setSortDir(d as "asc" | "desc"); }}
+            className="w-auto max-w-[190px]"
+          >
+            <option value="updatedAt:desc">Sort: Newest first</option>
+            <option value="updatedAt:asc">Sort: Oldest first</option>
+            <option value="name:asc">Sort: Name A-Z</option>
+            <option value="leads:desc">Sort: Most leads</option>
+            <option value="sent:desc">Sort: Most sent</option>
+            <option value="replyRate:desc">Sort: Best reply rate</option>
+          </Select>
+
+          <div className="flex items-center gap-1.5 text-sm text-slate-500">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              max={dateTo || undefined}
+              className="h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Last modified from"
+            />
+            <span className="text-slate-400">–</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              min={dateFrom || undefined}
+              className="h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Last modified to"
+            />
+          </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* Filter dropdown — consolidates search/status/type/date into one panel;
+                each field mirrors the standalone controls above, so both stay in sync. */}
+            <div className="relative" ref={filterRef}>
+              <Button variant="outline" onClick={() => setFilterOpen((v) => !v)}>
+                <FilterIcon className="h-4 w-4" /> Filter
+                {activeFilterCount > 0 && (
+                  <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+                    {activeFilterCount}
+                  </span>
+                )}
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
+              </Button>
+              {filterOpen && (
+                <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-72 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900"><FilterIcon className="h-4 w-4" /> Filter</span>
+                    <button onClick={() => setFilterOpen(false)} aria-label="Close" className="p-1 rounded-md hover:bg-slate-100 text-slate-400">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Name</p>
+                      <Input
+                        leftIcon={<Search className="h-4 w-4" />}
+                        placeholder="Search campaigns..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Type</p>
+                      <div className="flex flex-col gap-1.5">
+                        {(["Email", "LinkedIn", "Multichannel"] as const).map((t) => (
+                          <label key={t} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={typeFilter.includes(t)}
+                              onChange={() => toggleTypeFilter(t)}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            {t}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Start date</p>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        max={dateTo || undefined}
+                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">End date</p>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        min={dateFrom || undefined}
+                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
+                      <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none mb-2">
+                        <input
+                          type="checkbox"
+                          checked={activeOnly}
+                          onChange={(e) => setActiveOnly(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        Active only
+                      </label>
+                      <Select value={approvalFilter} onChange={(e) => setApprovalFilter(e.target.value)}>
+                        <option value="All">All approval stages</option>
+                        {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 p-3 border-t border-slate-100">
+                    <Button variant="outline" className="flex-1" onClick={resetFilters}>Reset</Button>
+                    <Button className="flex-1" onClick={() => setFilterOpen(false)}>Filter</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Manage Columns dropdown — list view only */}
+            {viewMode === "list" && (
+              <div className="relative" ref={colsRef}>
+                <button
+                  onClick={() => setColumnsOpen((v) => !v)}
+                  className={`inline-flex items-center gap-2 h-10 px-3.5 rounded-lg border text-sm font-medium transition-colors ${
+                    columnsOpen ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-indigo-50/60 border-indigo-100 text-indigo-600 hover:bg-indigo-50"
+                  }`}
+                >
+                  <Columns3 className="h-4 w-4" /> Manage Columns
+                </button>
+                {columnsOpen && (
+                  <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-56 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden p-1">
+                    <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
+                    {([
+                      ["status", "Status"],
+                      ["leads", "Leads"],
+                      ["sent", "Sent"],
+                      ["replyRate", "Reply rate"],
+                      ["bounceRate", "Bounce rate"],
+                      ["owner", "Owner"],
+                      ["lastModified", "Last modified"],
+                    ] as const).map(([key, label]) => (
+                      <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={visibleCols[key]}
+                          onChange={() => toggleColumn(key)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* List / grid view toggle */}
+            <div className="flex items-center rounded-lg border border-slate-200 p-0.5">
+              <button
+                onClick={() => setViewMode("list")}
+                aria-label="List view"
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("grid")}
+                aria-label="Grid view"
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
+
             {/* Templates dropdown */}
             <div className="relative" ref={tplRef}>
               <Button variant="outline" onClick={() => setTemplatesOpen((v) => !v)}>
@@ -371,11 +689,80 @@ export function CampaignsView({
             <p className="text-sm text-slate-500 mt-1 mb-5">Create your first campaign or start from a template.</p>
             <Link href="/campaigns/builder"><Button><Plus className="h-4 w-4" /> Create campaign</Button></Link>
           </div>
+        ) : viewMode === "grid" ? (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filtered.length === 0 && (
+              <p className="col-span-full px-1 py-12 text-center text-slate-500 text-sm">No campaigns match your filters.</p>
+            )}
+            {filtered.map((r) => {
+              const isActive = r.status === "Active";
+              const ownerName = r.ownerId ? owners[r.ownerId] : null;
+              const key = rowKey(r);
+              const isFav = favorites.has(key);
+              return (
+                <Card key={key} onClick={() => router.push(r.href)} className="p-4 cursor-pointer hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="h-9 w-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                        <Megaphone className="h-4 w-4" />
+                      </span>
+                      <span className="font-medium text-slate-900 truncate">{r.name}</span>
+                    </div>
+                    <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => toggleFavorite(key)} aria-label="Toggle favorite" className="p-1 rounded-md hover:bg-slate-100">
+                        <Star className={`h-4 w-4 ${isFav ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          if (openId === r.id) { setOpenId(null); return; }
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                          setOpenId(r.id);
+                        }}
+                        aria-label="Campaign actions"
+                        className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 mt-3">
+                    <ChannelBadge label={r.channelLabel} />
+                    {r.approvalStatus ? (
+                      <Badge variant={approvalBadgeVariant(r.approvalStatus)}>{r.approvalStatus}</Badge>
+                    ) : (
+                      <Badge variant={isActive ? "success" : "default"}>{r.status}</Badge>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
+                    <div><p className="text-slate-400">Leads</p><p className="font-medium text-slate-900">{r.leads === null ? "—" : r.leads.toLocaleString()}</p></div>
+                    <div><p className="text-slate-400">Sent</p><p className="font-medium text-slate-900">{r.sent ? r.sent.toLocaleString() : "—"}</p></div>
+                    <div><p className="text-slate-400">Reply rate</p><p className="font-medium text-slate-900">{r.sent ? `${r.replyRate}%` : "—"}</p></div>
+                    <div><p className="text-slate-400">Bounce rate</p><p className="font-medium text-slate-900">{r.bounceRate === null ? "—" : r.sent ? `${r.bounceRate}%` : "—"}</p></div>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                    {ownerName ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-700 min-w-0">
+                        <span className="h-5 w-5 rounded-full bg-blue-600 text-white text-[10px] font-semibold flex items-center justify-center flex-shrink-0">
+                          {ownerName.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="truncate max-w-[100px]">{ownerName}</span>
+                      </span>
+                    ) : <span />}
+                    <span className="text-xs text-slate-400 whitespace-nowrap">{formatDate(r.updatedAt)}</span>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[880px]">
               <thead>
-                <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100">
+                <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100 bg-slate-50">
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
@@ -384,25 +771,32 @@ export function CampaignsView({
                       className="rounded border-slate-300"
                     />
                   </th>
-                  <th className="px-5 py-3 font-semibold">Name</th>
-                  <th className="px-3 py-3 font-semibold">Status</th>
-                  <th className="px-3 py-3 font-semibold">Leads</th>
-                  <th className="px-3 py-3 font-semibold">Sent</th>
-                  <th className="px-3 py-3 font-semibold">Reply rate</th>
-                  <th className="px-3 py-3 font-semibold">Bounce rate</th>
-                  <th className="px-3 py-3 font-semibold">Owner</th>
-                  <th className="px-3 py-3 font-semibold">Last modified</th>
+                  <th className="px-3 py-3 w-8" />
+                  <SortTh label="Name" field="name" defaultDir="asc" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
+                  {visibleCols.status && <th className="px-3 py-3 font-semibold">Status</th>}
+                  {(visibleCols.leads || visibleCols.sent || visibleCols.replyRate || visibleCols.bounceRate) && (
+                    <SortTh label="Progress" field="leads" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
+                  )}
+                  {visibleCols.owner && <th className="px-3 py-3 font-semibold">Owner</th>}
+                  {visibleCols.lastModified && <SortTh label="Last modified" field="updatedAt" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />}
                   <th className="px-3 py-3 w-8" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtered.length === 0 && (
-                  <tr><td colSpan={10} className="px-5 py-12 text-center text-slate-500 text-sm">No campaigns match your filters.</td></tr>
+                  <tr><td colSpan={
+                    4
+                    + (visibleCols.status ? 1 : 0)
+                    + ((visibleCols.leads || visibleCols.sent || visibleCols.replyRate || visibleCols.bounceRate) ? 1 : 0)
+                    + (visibleCols.owner ? 1 : 0)
+                    + (visibleCols.lastModified ? 1 : 0)
+                  } className="px-5 py-12 text-center text-slate-500 text-sm">No campaigns match your filters.</td></tr>
                 )}
                 {filtered.map((r) => {
                   const isActive = r.status === "Active";
                   const ownerName = r.ownerId ? owners[r.ownerId] : null;
                   const key = rowKey(r);
+                  const isFav = favorites.has(key);
                   const canApproveHere = r.kind === "email" && r.approvalStatus === "Pending review" && isApprover;
                   return (
                     <tr key={key} onClick={() => router.push(r.href)} className="cursor-pointer hover:bg-slate-50/60 transition-colors">
@@ -414,6 +808,11 @@ export function CampaignsView({
                           className="rounded border-slate-300"
                         />
                       </td>
+                      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => toggleFavorite(key)} aria-label="Toggle favorite" className="p-1 rounded-md hover:bg-slate-100">
+                          <Star className={`h-4 w-4 ${isFav ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                        </button>
+                      </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
@@ -421,43 +820,61 @@ export function CampaignsView({
                           <ChannelBadge label={r.channelLabel} />
                         </div>
                       </td>
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-2">
-                          {r.approvalStatus ? (
-                            <Badge variant={approvalBadgeVariant(r.approvalStatus)}>{r.approvalStatus}</Badge>
-                          ) : (
-                            <Badge variant={isActive ? "success" : "default"}>{r.status}</Badge>
-                          )}
-                          {canApproveHere && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => { e.stopPropagation(); handleApprove(r); }}
-                              disabled={pending}
-                              className="h-7 px-2 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Approve
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-slate-600">{r.leads === null ? "—" : r.leads.toLocaleString()}</td>
-                      <td className="px-3 py-3 text-slate-600">{r.sent ? r.sent.toLocaleString() : "—"}</td>
-                      <td className="px-3 py-3 text-slate-600">{r.sent ? `${r.replyRate}%` : "—"}</td>
-                      <td className="px-3 py-3 text-slate-600">{r.bounceRate === null ? "—" : r.sent ? `${r.bounceRate}%` : "—"}</td>
-                      <td className="px-3 py-3">
-                        {ownerName ? (
-                          <span className="inline-flex items-center gap-2 text-slate-700">
-                            <span className="h-6 w-6 rounded-full bg-blue-600 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
-                              {ownerName.charAt(0).toUpperCase()}
+                      {visibleCols.status && (
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            {r.approvalStatus ? (
+                              <StatusPill label={r.approvalStatus} tone={statusPillTone(r.approvalStatus)} />
+                            ) : (
+                              <StatusPill label={r.status} tone={statusPillTone(r.status)} />
+                            )}
+                            {canApproveHere && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); handleApprove(r); }}
+                                disabled={pending}
+                                className="h-7 px-2 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                      {(visibleCols.leads || visibleCols.sent || visibleCols.replyRate || visibleCols.bounceRate) && (
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-4">
+                            {visibleCols.leads && (
+                              <div className="text-xs"><p className="font-semibold text-slate-900">{r.leads === null ? "—" : r.leads.toLocaleString()}</p><p className="text-slate-400">Leads</p></div>
+                            )}
+                            {visibleCols.sent && (
+                              <div className="text-xs"><p className="font-semibold text-slate-900">{r.sent ? r.sent.toLocaleString() : "—"}</p><p className="text-slate-400">Sent</p></div>
+                            )}
+                            {visibleCols.replyRate && (
+                              <div className="text-xs"><p className="font-semibold text-slate-900">{r.sent ? `${r.replyRate}%` : "—"}</p><p className="text-slate-400">Reply</p></div>
+                            )}
+                            {visibleCols.bounceRate && (
+                              <div className="text-xs"><p className="font-semibold text-slate-900">{r.bounceRate === null ? "—" : r.sent ? `${r.bounceRate}%` : "—"}</p><p className="text-slate-400">Bounce</p></div>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                      {visibleCols.owner && (
+                        <td className="px-3 py-3">
+                          {ownerName ? (
+                            <span className="inline-flex items-center gap-2 text-slate-700">
+                              <span className="h-6 w-6 rounded-full bg-blue-600 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
+                                {ownerName.charAt(0).toUpperCase()}
+                              </span>
+                              <span className="truncate max-w-[140px]">{ownerName}</span>
                             </span>
-                            <span className="truncate max-w-[140px]">{ownerName}</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{formatDate(r.updatedAt)}</td>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                      )}
+                      {visibleCols.lastModified && <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{formatDate(r.updatedAt)}</td>}
                       <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="relative">
                           <button
