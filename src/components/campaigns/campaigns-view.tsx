@@ -3,15 +3,15 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, MoreHorizontal, Pause, Play, Copy, Trash2, Pencil, Search, LayoutTemplate, ChevronDown, ChevronRight, Megaphone, Link2, Send, CheckCircle2, Undo2, Archive, Star, LayoutGrid, List, Columns3, ArrowUp, ArrowDown, ArrowUpDown, Eye, MessageSquare, Filter as FilterIcon, X } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Copy, Pencil, Search, LayoutTemplate, ChevronDown, ChevronRight, Megaphone, Link2, Send, CheckCircle2, Undo2, Archive, Star, LayoutGrid, List, Columns3, ArrowUp, ArrowDown, ArrowUpDown, Eye, MessageSquare, Filter as FilterIcon, X } from "lucide-react";
 import { ConnectionsModal } from "@/components/campaigns/connections-modal";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFeedback } from "@/components/ui/feedback";
-import { setCampaignStatus, deleteCampaign, duplicateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
-import { setSequenceStatus, deleteSequence, duplicateSequence, type OutreachSequenceRow } from "@/lib/queries/outreach";
+import { setCampaignStatus, duplicateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
+import { setSequenceStatus, duplicateSequence, type OutreachSequenceRow } from "@/lib/queries/outreach";
 import { submitForReview, approveCampaign, sendBackToDraft, archiveCampaign } from "@/lib/queries/campaign-approval";
 import { APPROVAL_STATUSES, approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { campaignTemplates } from "@/lib/campaign-templates";
@@ -119,7 +119,7 @@ export function CampaignsView({
   isApprover: boolean;
   owners: Record<string, string>;
 }) {
-  const { confirm, toast, prompt } = useFeedback();
+  const { toast, prompt } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [search, setSearch] = useState("");
@@ -286,14 +286,6 @@ export function CampaignsView({
       else await setSequenceStatus(r.id, next);
     });
   }
-  async function handleDelete(r: UnifiedRow) {
-    setOpenId(null);
-    if (!(await confirm({ title: "Delete campaign?", message: `Delete “${r.name}”? This can't be undone.`, confirmLabel: "Delete", danger: true }))) return;
-    start(async () => {
-      if (r.kind === "email") await deleteCampaign(r.id);
-      else await deleteSequence(r.id);
-    });
-  }
   function handleDuplicate(r: UnifiedRow) {
     setOpenId(null);
     start(async () => {
@@ -365,15 +357,6 @@ export function CampaignsView({
       setSelected([]);
       if (failed) toast(`Approved ${ids.length - failed} of ${ids.length} — ${failed} failed.`, failed === ids.length ? "error" : "info");
       else toast(`${ids.length} campaign${ids.length === 1 ? "" : "s"} approved.`, "success");
-    });
-  }
-
-  async function handleBulkDelete() {
-    if (!(await confirm({ title: "Delete campaigns?", message: `Delete ${selectedRows.length} item(s)? This can't be undone.`, confirmLabel: "Delete", danger: true }))) return;
-    const rowsToDelete = selectedRows;
-    setSelected([]);
-    start(async () => {
-      await Promise.allSettled(rowsToDelete.map((r) => (r.kind === "email" ? deleteCampaign(r.id) : deleteSequence(r.id))));
     });
   }
 
@@ -924,9 +907,6 @@ export function CampaignsView({
                                   <Archive className="h-4 w-4 text-slate-400" /> Archive
                                 </button>
                               )}
-                              <button onClick={() => handleDelete(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50">
-                                <Trash2 className="h-4 w-4" /> Delete
-                              </button>
                             </div>,
                             document.body
                           )}
@@ -960,13 +940,6 @@ export function CampaignsView({
                 <CheckCircle2 className="h-3.5 w-3.5" /> Approve ({selectedApprovable.length})
               </button>
             )}
-            <button
-              onClick={handleBulkDelete}
-              disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white text-red-600 hover:bg-red-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
-            </button>
             <button
               onClick={() => setSelected([])}
               className="rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-medium transition-colors"

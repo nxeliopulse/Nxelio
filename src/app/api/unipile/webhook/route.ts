@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { recomputeCampaignStats } from "@/lib/email/campaign-stats";
 import { webhookSecretValid } from "@/lib/webhook-auth";
+import { maybeAutoRequestContactInfo } from "@/lib/outreach/auto-reply";
 
 export const dynamic = "force-dynamic";
 
@@ -201,6 +202,13 @@ export async function POST(request: NextRequest) {
     body: bodyText.slice(0, 4000),
     is_read: false,
   });
+
+  // If this was a LinkedIn reply (no email candidate matched) showing genuine
+  // positive interest, auto-ask for the lead's email/phone once. Never blocks
+  // or fails the webhook — errors are swallowed inside the helper itself.
+  if (emails.length === 0 && accountId) {
+    await maybeAutoRequestContactInfo({ db, leadId: lead.id, accountId, bodyText });
+  }
 
   await log("processed");
   return NextResponse.json({ ok: true, lead_id: lead.id, stopped: enrollments?.length ?? 0 });
