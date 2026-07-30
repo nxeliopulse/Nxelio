@@ -17,7 +17,7 @@ const COUNTRIES = ["United States", "Canada", "United Kingdom", "Australia", "In
 function FormRow({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[130px_1fr] items-center gap-3">
-      <label className="text-xs font-medium text-slate-600 text-right whitespace-nowrap truncate" title={label}>
+      <label className="text-xs font-medium text-slate-600 dark:text-slate-400 text-right whitespace-nowrap truncate" title={label}>
         {label}
       </label>
       <div className="relative flex items-center w-full">
@@ -138,8 +138,8 @@ export function EditAccountModal({ open, onClose, account }: { open: boolean; on
     }
   }
 
-  const inputStyle = "w-full h-8 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50";
-  const selectStyle = "w-full h-8 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none pr-7";
+  const inputStyle = "w-full h-8 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 dark:disabled:bg-slate-800/50";
+  const selectStyle = "w-full h-8 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none pr-7";
   const { collapsed } = useSidebar();
 
   if (!open) return null;
@@ -147,42 +147,42 @@ export function EditAccountModal({ open, onClose, account }: { open: boolean; on
   return (
     <div
       className={cn(
-        "fixed top-16 bottom-0 right-0 z-20 bg-slate-100 flex flex-col overflow-hidden text-slate-900 transition-all duration-300 ease-in-out",
+        "fixed top-16 bottom-0 right-0 z-20 bg-slate-100 dark:bg-slate-950 flex flex-col overflow-hidden text-slate-900 dark:text-white transition-all duration-300 ease-in-out",
         collapsed ? "left-0 lg:left-[84px]" : "left-0 lg:left-[210px]"
       )}
     >
       {/* Subheader Action Bar */}
-      <div className="px-6 py-3 bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0 shadow-sm">
-        <h2 className="text-base font-bold text-slate-900">{isEdit ? "Edit Account" : "Create Account"}</h2>
+      <div className="px-6 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-shrink-0 shadow-sm">
+        <h2 className="text-base font-bold text-slate-900 dark:text-white">{isEdit ? "Edit Account" : "Create Account"}</h2>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={saving} className="h-7 text-xs px-3 text-slate-700">Cancel</Button>
-          <Button variant="outline" size="sm" onClick={() => handleSave(true)} disabled={saving} className="h-7 text-xs px-3 text-slate-700">Save and New</Button>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={saving} className="h-7 text-xs px-3">Cancel</Button>
+          <Button variant="outline" size="sm" onClick={() => handleSave(true)} disabled={saving} className="h-7 text-xs px-3">Save and New</Button>
           <Button size="sm" onClick={() => handleSave(false)} disabled={saving} className="h-7 text-xs px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium">Save</Button>
-          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600 p-1 ml-2">
+          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 ml-2">
             <X className="h-5 w-5" />
           </button>
         </div>
       </div>
 
       {/* Form Content */}
-      <div className="overflow-auto flex-1 p-6 sm:p-8 space-y-8 bg-white w-full">
+      <div className="overflow-auto flex-1 p-6 sm:p-8 space-y-8 bg-white dark:bg-slate-900 w-full">
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-xs text-red-700 font-medium">
+          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-md text-xs text-red-700 dark:text-red-400 font-medium">
             {error}
           </div>
         )}
 
         {/* Account Image */}
         <div>
-          <h3 className="text-xs font-bold text-slate-800 mb-3">Account Image</h3>
-          <div className="h-16 w-16 rounded border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-300">
+          <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-3">Account Image</h3>
+          <div className="h-16 w-16 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-center text-slate-300 dark:text-slate-600">
             <Building2 className="h-8 w-8" />
           </div>
         </div>
 
         {/* Account Information */}
         <div>
-          <h3 className="text-xs font-bold text-slate-800 mb-4 pb-1 border-b border-slate-100">Account Information</h3>
+          <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-4 pb-1 border-b border-slate-100 dark:border-slate-800">Account Information</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-3">
             {/* Left Column */}
             <FormRow label="Account Owner">
@@ -190,7 +190,7 @@ export function EditAccountModal({ open, onClose, account }: { open: boolean; on
                 <select className={selectStyle} value={form.account_owner} onChange={(e) => set("account_owner", e.target.value)}>
                   <option value="Hari">Hari</option>
                 </select>
-                <div className="absolute right-2 top-1.5 pointer-events-none text-slate-400 bg-slate-100 p-0.5 rounded border border-slate-200">
+                <div className="absolute right-2 top-1.5 pointer-events-none text-slate-400 bg-slate-100 dark:bg-slate-800 p-0.5 rounded border border-slate-200 dark:border-slate-700">
                   <User className="h-3 w-3" />
                 </div>
               </div>
@@ -222,7 +222,7 @@ export function EditAccountModal({ open, onClose, account }: { open: boolean; on
             <FormRow label="Parent Account">
               <div className="relative w-full">
                 <input type="text" className={inputStyle + " pr-7"} value={form.parent_account} onChange={(e) => set("parent_account", e.target.value)} />
-                <div className="absolute right-2 top-1.5 text-slate-400 bg-slate-100 p-0.5 rounded border border-slate-200">
+                <div className="absolute right-2 top-1.5 text-slate-400 bg-slate-100 dark:bg-slate-800 p-0.5 rounded border border-slate-200 dark:border-slate-700">
                   <Building2 className="h-3 w-3" />
                 </div>
               </div>
@@ -281,15 +281,15 @@ export function EditAccountModal({ open, onClose, account }: { open: boolean; on
 
         {/* Address Information */}
         <div>
-          <div className="flex items-center justify-between mb-4 pb-1 border-b border-slate-100">
-            <h3 className="text-xs font-bold text-slate-800">Address Information</h3>
-            <Button variant="outline" size="sm" onClick={handleCopyAddress} className="h-7 text-xs px-3 text-slate-700 bg-slate-50 border-slate-200 hover:bg-slate-100">Copy Address</Button>
+          <div className="flex items-center justify-between mb-4 pb-1 border-b border-slate-100 dark:border-slate-800">
+            <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">Address Information</h3>
+            <Button variant="outline" size="sm" onClick={handleCopyAddress} className="h-7 text-xs px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800">Copy Address</Button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Billing Address Box */}
-            <fieldset className="border border-slate-200 rounded-lg p-4 pt-3 relative bg-slate-50/30">
-              <legend className="px-2 text-xs font-semibold text-slate-700">Billing Address</legend>
+            <fieldset className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 pt-3 relative bg-slate-50/30 dark:bg-slate-950/40">
+              <legend className="px-2 text-xs font-semibold text-slate-700 dark:text-slate-300">Billing Address</legend>
               <div className="space-y-3">
                 <FormRow label="Country / Region">
                   <select className={selectStyle} value={form.billing_country} onChange={(e) => set("billing_country", e.target.value)}>
@@ -316,8 +316,8 @@ export function EditAccountModal({ open, onClose, account }: { open: boolean; on
             </fieldset>
 
             {/* Shipping Address Box */}
-            <fieldset className="border border-slate-200 rounded-lg p-4 pt-3 relative bg-slate-50/30">
-              <legend className="px-2 text-xs font-semibold text-slate-700">Shipping Address</legend>
+            <fieldset className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 pt-3 relative bg-slate-50/30 dark:bg-slate-950/40">
+              <legend className="px-2 text-xs font-semibold text-slate-700 dark:text-slate-300">Shipping Address</legend>
               <div className="space-y-3">
                 <FormRow label="Country / Region">
                   <select className={selectStyle} value={form.shipping_country} onChange={(e) => set("shipping_country", e.target.value)}>

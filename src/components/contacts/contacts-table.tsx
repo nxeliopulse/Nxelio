@@ -142,23 +142,23 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
             <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(`${c.first_name} ${c.last_name}`))}>
               {initials(c)}
             </span>
-            <span className="font-semibold text-slate-900 group-hover:text-blue-600 truncate whitespace-nowrap">
+            <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
               {c.first_name || "—"}
             </span>
           </button>
         );
       case "last_name":
-        return <span className="text-slate-700 font-medium truncate max-w-[160px] block whitespace-nowrap">{c.last_name || "—"}</span>;
+        return <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[160px] block whitespace-nowrap">{c.last_name || "—"}</span>;
       case "email":
-        return <span className="block max-w-[240px] truncate text-slate-600 font-medium whitespace-nowrap">{c.email || "—"}</span>;
+        return <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">{c.email || "—"}</span>;
       case "phone":
-        return <span className="text-slate-600 font-mono text-xs whitespace-nowrap">{c.phone || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{c.phone || "—"}</span>;
       case "job_title":
-        return <span className="block max-w-[180px] truncate text-slate-600 font-medium whitespace-nowrap">{c.job_title || "—"}</span>;
+        return <span className="block max-w-[180px] truncate text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">{c.job_title || "—"}</span>;
       case "department":
-        return <span className="text-slate-600 whitespace-nowrap">{c.department || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">{c.department || "—"}</span>;
       case "lead_source":
-        return <span className="text-slate-600 whitespace-nowrap">{c.lead_source || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">{c.lead_source || "—"}</span>;
       default:
         return null;
     }
@@ -166,16 +166,47 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
 
   return (
     <div className="max-w-[1600px] mx-auto w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="h-11 w-11 rounded-2xl bg-[var(--primary)] flex items-center justify-center shadow-md shadow-black/10 flex-shrink-0">
+            <Users2 className="h-6 w-6 text-white" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Contacts</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">People you&apos;re building relationships with across your accounts.</p>
+          </div>
+        </div>
+        <Button size="sm" onClick={() => setShowModal(true)} className="rounded-xl gap-1.5 font-bold h-10 px-4 flex-shrink-0 whitespace-nowrap self-start sm:self-auto">
+          <Plus className="h-4 w-4" />
+          <span>Add Contact</span>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-blue-500 p-4 sm:p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Contacts</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{scoped.length}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-emerald-500 p-4 sm:p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Linked to Account</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{scoped.filter((c) => c.account_id).length}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-amber-500 p-4 sm:p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Unassigned</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{scoped.filter((c) => !c.account_id).length}</p>
+        </div>
+      </div>
+
       {accountFilterId && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
-          <p className="text-sm text-blue-900">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 px-4 py-2.5">
+          <p className="text-sm text-blue-900 dark:text-blue-200">
             Showing <span className="font-semibold">{scoped.length}</span> contact{scoped.length === 1 ? "" : "s"} for this account
           </p>
-          <Link href="/contacts" className="text-sm font-medium text-blue-700 hover:text-blue-900">Clear filter ✕</Link>
+          <Link href="/contacts" className="text-sm font-medium text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100">Clear filter ✕</Link>
         </div>
       )}
       <Card className="overflow-hidden">
-        <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
+        <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
           <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
             <div className="w-36 sm:w-48 md:w-56 flex-shrink-0">
               <Input
@@ -186,11 +217,11 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                 className="h-8 text-xs rounded-xl"
               />
             </div>
-            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 flex-shrink-0">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0">
               <Users2 className="h-3.5 w-3.5 text-slate-400" />
               <span>{filtered.length}</span>
             </div>
-            <Button variant="outline" size="sm" onClick={openColsMenu} className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 text-slate-700 flex-shrink-0" title="Customize visible columns">
+            <Button variant="outline" size="sm" onClick={openColsMenu} className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0" title="Customize visible columns">
               <Settings2 className="h-3.5 w-3.5 text-slate-400" />
               <span>Columns</span>
             </Button>
@@ -208,7 +239,7 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="appearance-none rounded-xl border border-slate-200 bg-white pl-6 pr-6 py-1 h-8 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer"
+                className="appearance-none rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-6 py-1 h-8 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer"
               >
                 <option value="none">Sort</option>
                 <option value="name">Name A–Z</option>
@@ -216,18 +247,14 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
               </select>
               <ChevronDown className="h-3 w-3 text-slate-400 absolute right-2 pointer-events-none" />
             </div>
-            <Button size="sm" onClick={() => setShowModal(true)} className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap">
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add Contact</span>
-            </Button>
           </div>
         </div>
 
         <div className="relative">
           <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
             <table className="w-full text-sm border-collapse min-w-[900px]">
-              <thead className="bg-slate-50/90 border-b border-slate-200/80 sticky top-0 z-10 backdrop-blur-md">
-                <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
+              <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-10 backdrop-blur-md">
+                <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <th className="px-4 py-3.5 w-10">
                     <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} className="rounded border-slate-300" />
                   </th>
@@ -242,16 +269,16 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                   <th className="px-4 py-3.5 w-12 text-right font-bold text-slate-400"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500 dark:text-slate-400">
                       No contacts yet. Click <strong>Add Contact</strong> to create one.
                     </td>
                   </tr>
                 )}
                 {paged.map((c, i) => (
-                  <tr key={c.id} onClick={() => openContact(c.id)} className="hover:bg-slate-50 transition-colors cursor-pointer">
+                  <tr key={c.id} onClick={() => openContact(c.id)} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors cursor-pointer">
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="rounded border-slate-300" />
                     </td>
@@ -259,8 +286,8 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                       <td key={col.key} className="px-4 py-3">{renderCell(col.key, c, safePage * PAGE_SIZE + i + 1)}</td>
                     ))}
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => handleDelete(c.id)} disabled={pending} title="Delete contact" className="p-1 rounded-md hover:bg-red-50 disabled:opacity-50">
-                        <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
+                      <button onClick={() => handleDelete(c.id)} disabled={pending} title="Delete contact" className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-rose-950/50 disabled:opacity-50">
+                        <Trash2 className="h-4 w-4 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-rose-400" />
                       </button>
                     </td>
                   </tr>
@@ -289,11 +316,11 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
       {showCols && colsPos && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowCols(false)} />
-          <div className="fixed z-50 w-60 rounded-xl border border-slate-200 bg-white shadow-xl p-2" style={{ top: colsPos.top, right: colsPos.right }}>
+          <div className="fixed z-50 w-60 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-2" style={{ top: colsPos.top, right: colsPos.right }}>
             <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
             <div className="max-h-80 overflow-y-auto">
               {COLUMNS.map((c) => (
-                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm text-slate-700 dark:text-slate-300">
                   <input type="checkbox" checked={cols[c.key]} onChange={() => toggleCol(c.key)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                   <span className="inline-flex items-center gap-1.5">
                     {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}

@@ -43,6 +43,7 @@ export interface LeadRow {
   ai_score: AiScoreResult | null;
   status: string;
   verified: boolean;
+  is_favorite: boolean;
   owner_id: string | null;
   created_at: string;
   updated_at: string;

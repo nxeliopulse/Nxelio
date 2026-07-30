@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import {
   X, Send, Loader2, CheckCircle2, AlertCircle, History, SquarePen,
   ArrowLeft, Trash2, MessageSquare, Sparkles, Bell, Maximize2, Minimize2,
-  Paperclip, Bookmark, BookmarkCheck, AtSign, Bot, ShieldAlert,
+  Paperclip, Bookmark, BookmarkCheck, AtSign, Bot, ShieldAlert, Mic, MicOff,
   LayoutDashboard, Users, BarChart2, Settings, Inbox, Mail,
   FileText, Layers, Newspaper, Zap, ChevronRight,
 } from "lucide-react";
@@ -21,7 +21,31 @@ interface ChatItem extends AssistantMessage {
   actions?: string[];
   error?: boolean;
   proposal?: ProposedAction[];
-  proposalStatus?: "pending" | "approved" | "rejected";
+  proposalStatus?: "pending" | "processing" | "approved" | "failed" | "rejected";
+  /** Fixed set of valid answers for this question — rendered as clickable options instead of free text. */
+  choices?: string[];
+}
+
+// Minimal ambient types for the (still non-standard, vendor-prefixed) Web Speech API —
+// mirrors the shape used by the landing page's voice input (src/components/landing/ai-assistant-widget.tsx).
+interface SpeechRecognitionResultLike { transcript: string }
+interface SpeechRecognitionEventLike { results: { 0: SpeechRecognitionResultLike }[] }
+interface SpeechRecognitionErrorEventLike { error: string }
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((e: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor };
+  return w.SpeechRecognition || w.webkitSpeechRecognition;
 }
 
 // Static fallback — replaced at runtime by dynamic suggestions from AssistantContext
@@ -137,7 +161,7 @@ export function AssistantWidget({
   const { suggestions: ctxSuggestions } = useAssistant();
   const activeSuggestions = ctxSuggestions.length > 0 ? ctxSuggestions : STATIC_SUGGESTIONS;
 
-  const [view, setView] = useState<"chat" | "history">("chat");
+  const [view, setView] = useState<"chat" | "history" | "bookmarks">("chat");
   const [input, setInput] = useState("");
   const [chat, setChat] = useState<ChatItem[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
@@ -154,12 +178,16 @@ export function AssistantWidget({
   const [showApps, setShowApps] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [bookmarkSaved, setBookmarkSaved] = useState(false);
+  const [bookmarksList, setBookmarksList] = useState<{ content: string; date: string }[]>([]);
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mentionRef = useRef<HTMLDivElement>(null);
   const appsRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   // Sync with app theme (.dark class and data-accent-color on <html>)
   useEffect(() => {
@@ -188,6 +216,16 @@ export function AssistantWidget({
       setUserName(name.split(" ")[0]);
     });
   }, []);
+
+  // Stop any in-flight mic recording when the panel closes or unmounts.
+  useEffect(() => {
+    if (!open) {
+      recognitionRef.current?.stop();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- stops in-flight mic when the panel closes
+      setListening(false);
+    }
+    return () => { recognitionRef.current?.stop(); };
+  }, [open]);
 
   useEffect(() => {
     if (open && view === "chat") inputRef.current?.focus();
@@ -277,6 +315,7 @@ export function AssistantWidget({
       const finalChat: ChatItem[] = [...nextChat, {
         role: "assistant", content: res.reply, actions: res.actions,
         ...(res.proposal?.length ? { proposal: res.proposal, proposalStatus: "pending" as const } : {}),
+        ...(res.choices?.length ? { choices: res.choices } : {}),
       }];
       setChat(finalChat); persist(finalChat);
       notifyCreditsChanged();
@@ -287,15 +326,19 @@ export function AssistantWidget({
     const item = chat[index];
     if (!item?.proposal || item.proposalStatus !== "pending" || pending) return;
     const proposal = item.proposal;
-    const approvedChat = chat.map((m, i) => i === index ? { ...m, proposalStatus: "approved" as const } : m);
-    setChat(approvedChat);
+    // Mark "processing" (not "approved") until the actual result is known — the card must
+    // never claim success before the write has actually completed.
+    const processingChat = chat.map((m, i) => i === index ? { ...m, proposalStatus: "processing" as const } : m);
+    setChat(processingChat);
     start(async () => {
       const res = await approveAssistantActions(proposal);
       const lines = [...res.results.map((r) => `✓ ${r}`), ...res.errors.map((e) => `✗ ${e}`)].join("\n");
+      const finalStatus: ChatItem["proposalStatus"] = res.ok ? "approved" : "failed";
+      const settledChat = processingChat.map((m, i) => i === index ? { ...m, proposalStatus: finalStatus } : m);
       const followUp: ChatItem = res.ok
         ? { role: "assistant", content: lines || "Approved — done.", actions: [] }
         : { role: "assistant", content: lines || "Some actions failed.", error: res.results.length === 0 };
-      const next = [...approvedChat, followUp];
+      const next = [...settledChat, followUp];
       setChat(next); persist(next);
     });
   }
@@ -310,6 +353,7 @@ export function AssistantWidget({
   function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value;
     setInput(val);
+    if (voiceError) setVoiceError(null);
     const match = val.match(/@(\w*)$/);
     if (match) { setMentionFilter(match[1].toLowerCase()); setShowMention(true); }
     else setShowMention(false);
@@ -338,6 +382,65 @@ export function AssistantWidget({
       localStorage.setItem("nxl_bookmarks", JSON.stringify(saved.slice(0, 50)));
     } catch { /* ignore */ }
     setBookmarkSaved(true); setTimeout(() => setBookmarkSaved(false), 2000);
+  }
+
+  function openBookmarks() {
+    setView("bookmarks");
+    try {
+      const saved = JSON.parse(localStorage.getItem("nxl_bookmarks") || "[]");
+      setBookmarksList(Array.isArray(saved) ? saved : []);
+    } catch {
+      setBookmarksList([]);
+    }
+  }
+
+  function removeBookmark(index: number) {
+    setBookmarksList((list) => {
+      const next = list.filter((_, i) => i !== index);
+      try { localStorage.setItem("nxl_bookmarks", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  // Voice input — records into the text box for the user to review/edit, it never auto-sends.
+  function toggleMic() {
+    setVoiceError(null);
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const SR = getSpeechRecognitionCtor();
+    if (!SR) {
+      setVoiceError("Voice input isn't supported in this browser. Try Chrome or Edge.");
+      return;
+    }
+    const recognition = new SR();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (e) => {
+      const transcript = e.results[0]?.[0]?.transcript?.trim();
+      if (!transcript) return;
+      setInput((prev) => (prev.trim() ? `${prev.trim()} ${transcript}` : transcript));
+      inputRef.current?.focus();
+    };
+    recognition.onerror = (e) => {
+      setListening(false);
+      if (e.error === "not-allowed" || e.error === "permission-denied" || e.error === "service-not-allowed") {
+        setVoiceError("Microphone access was denied. Please allow microphone permission for this site and try again.");
+      } else if (e.error === "no-speech") {
+        setVoiceError("No speech detected — please try again.");
+      } else if (e.error === "audio-capture") {
+        setVoiceError("No microphone was found. Please connect one and try again.");
+      } else if (e.error !== "aborted") {
+        setVoiceError("Voice input failed. Please try again.");
+      }
+    };
+    recognition.onend = () => setListening(false);
+    recognitionRef.current = recognition;
+    setListening(true);
+    recognition.start();
   }
 
   function handleInputKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -386,6 +489,7 @@ export function AssistantWidget({
             <div className="flex items-center gap-0.5">
               <IconBtn onClick={openHistory} title="Chat history" hoverBg={T.hoverBg} color={T.iconColor}><History className="h-4 w-4" /></IconBtn>
               <IconBtn title="Notifications" hoverBg={T.hoverBg} color={T.iconColor}><Bell className="h-4 w-4" /></IconBtn>
+              <IconBtn onClick={openBookmarks} title="Bookmarks" hoverBg={T.hoverBg} color={T.iconColor}><Bookmark className="h-4 w-4" /></IconBtn>
             </div>
 
             <div className="flex items-center gap-2">
@@ -446,6 +550,41 @@ export function AssistantWidget({
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Bookmarks view ── */}
+          {view === "bookmarks" && (
+            <div className="flex flex-col flex-1 overflow-hidden" style={{ background: T.panel }}>
+              <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: T.panelBorder }}>
+                <IconBtn onClick={() => setView("chat")} hoverBg={T.hoverBg} color={T.iconColor}><ArrowLeft className="h-4 w-4" /></IconBtn>
+                <span className="text-sm font-medium" style={{ color: T.textPrimary }}>Bookmarks</span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {bookmarksList.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Bookmark className="h-8 w-8 mx-auto mb-3" style={{ color: PRIMARY, opacity: 0.4 }} />
+                    <p className="text-sm" style={{ color: T.textSecondary }}>No bookmarks yet.</p>
+                    <p className="text-xs mt-1 max-w-[220px] mx-auto" style={{ color: T.textMuted }}>
+                      Tap the bookmark icon under a reply to save it here.
+                    </p>
+                  </div>
+                ) : bookmarksList.map((b, i) => (
+                  <div key={i} className="group rounded-xl px-3 py-2.5 border" style={{ borderColor: T.panelBorder, background: T.msgAi }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm whitespace-pre-wrap line-clamp-4 flex-1 min-w-0" style={{ color: T.textPrimary }}>{b.content}</p>
+                      <button
+                        onClick={() => removeBookmark(i)}
+                        className="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:text-red-400 flex-shrink-0"
+                        style={{ color: T.textMuted }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-[11px] mt-1.5" style={{ color: T.textMuted }}>{formatRelative(b.date)}</p>
                   </div>
                 ))}
               </div>
@@ -522,6 +661,31 @@ export function AssistantWidget({
                             </div>
                           )}
 
+                          {m.choices && m.choices.length > 0 && i === chat.length - 1 && (
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {m.choices.map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => send(c)}
+                                  disabled={pending}
+                                  className="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50"
+                                  style={{ borderColor: T.suggBorder, background: T.suggBg, color: T.textPrimary }}
+                                  onMouseEnter={(e) => {
+                                    (e.currentTarget as HTMLButtonElement).style.borderColor = T.suggHoverBorder;
+                                    (e.currentTarget as HTMLButtonElement).style.background = T.suggHoverBg;
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    (e.currentTarget as HTMLButtonElement).style.borderColor = T.suggBorder;
+                                    (e.currentTarget as HTMLButtonElement).style.background = T.suggBg;
+                                  }}
+                                >
+                                  {c}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
                           {m.proposal && (
                             <div className="mt-3 rounded-xl p-3 border" style={{ background: T.approvalBg, borderColor: T.approvalBorder }}>
                               <div className="flex items-center gap-1.5 mb-2">
@@ -555,9 +719,13 @@ export function AssistantWidget({
                                     Reject
                                   </button>
                                 </div>
+                              ) : m.proposalStatus === "processing" ? (
+                                <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                                  <Loader2 className="h-3 w-3 animate-spin" /> Processing…
+                                </p>
                               ) : (
-                                <p className={cn("text-xs font-semibold", m.proposalStatus === "approved" ? "text-emerald-500" : "text-slate-400")}>
-                                  {m.proposalStatus === "approved" ? "✓ Approved" : "✗ Rejected"}
+                                <p className={cn("text-xs font-semibold", m.proposalStatus === "approved" ? "text-emerald-500" : "text-red-500")}>
+                                  {m.proposalStatus === "approved" ? "✓ Approved" : m.proposalStatus === "failed" ? "✗ Failed — see message below" : "✗ Rejected"}
                                 </p>
                               )}
                             </div>
@@ -653,6 +821,17 @@ export function AssistantWidget({
                     </div>
                   )}
 
+                  {/* Voice input error */}
+                  {voiceError && (
+                    <div className="flex items-start gap-1.5 mb-2 px-3 py-2 rounded-lg text-xs" style={{ background: T.msgErr, border: `1px solid ${T.msgErrBorder}`, color: T.msgErrText }}>
+                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                      <span className="flex-1">{voiceError}</span>
+                      <button onClick={() => setVoiceError(null)} className="flex-shrink-0 opacity-70 hover:opacity-100">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+
                   {/* Textarea box */}
                   <div className="relative rounded-2xl transition-all" style={{ border: `1px solid ${T.inputBorder}`, background: T.inputBg }}>
                     <textarea
@@ -661,7 +840,7 @@ export function AssistantWidget({
                       value={input}
                       onChange={handleInputChange}
                       onKeyDown={handleInputKey}
-                      placeholder="Type @ to mention a record"
+                      placeholder={listening ? "Listening…" : "Type @ to mention a record"}
                       disabled={pending}
                       className="w-full resize-none rounded-2xl px-4 pt-3 pb-12 text-sm focus:outline-none bg-transparent placeholder:text-slate-400"
                       style={{ color: T.textPrimary }}
@@ -712,16 +891,27 @@ export function AssistantWidget({
                         </IconBtn>
                       </div>
 
-                      {/* Send button */}
-                      <button
-                        onClick={() => send()}
-                        disabled={pending || (!input.trim() && attachments.length === 0)}
-                        aria-label="Send"
-                        className="h-7 w-7 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30 hover:opacity-85 shadow-sm"
-                        style={{ background: `linear-gradient(135deg, ${PRIMARY}, ${PURPLE})` }}
-                      >
-                        {pending ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" /> : <Send className="h-3.5 w-3.5 text-white" />}
-                      </button>
+                      {/* Mic + Send button — mic sits immediately before send */}
+                      <div className="flex items-center gap-1.5">
+                        <IconBtn
+                          title={listening ? "Listening… tap to stop" : "Voice input"}
+                          onClick={toggleMic}
+                          hoverBg={T.hoverBg}
+                          color={listening ? "#ef4444" : T.iconColor}
+                          className={listening ? "animate-pulse" : undefined}
+                        >
+                          {listening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                        </IconBtn>
+                        <button
+                          onClick={() => send()}
+                          disabled={pending || (!input.trim() && attachments.length === 0)}
+                          aria-label="Send"
+                          className="h-7 w-7 rounded-full flex items-center justify-center transition-opacity disabled:opacity-30 hover:opacity-85 shadow-sm"
+                          style={{ background: `linear-gradient(135deg, ${PRIMARY}, ${PURPLE})` }}
+                        >
+                          {pending ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" /> : <Send className="h-3.5 w-3.5 text-white" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

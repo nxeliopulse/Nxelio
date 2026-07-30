@@ -2,14 +2,13 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, type LucideIcon } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
@@ -18,21 +17,6 @@ import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { deleteLead, bulkDeleteLeads, updateLead, type LeadRow } from "@/lib/queries/leads";
 import { createStaticSegment } from "@/lib/queries/segments";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
-
-// "Hot"/"Warm"/"Scored" are legacy values (never set by any live code path,
-// kept only so old data — if any — still renders a real color instead of a
-// gray "default" badge) alongside the current New/Contacted/Qualified/
-// Nurturing/Converted vocabulary.
-const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | "success" | "purple"> = {
-  New: "blue",
-  Contacted: "purple",
-  Qualified: "success",
-  Nurturing: "warning",
-  Converted: "success",
-  Warm: "warning",
-  Hot: "danger",
-  Scored: "purple",
-};
 
 // Customizable columns. Users toggle these via the gear menu in the header; the
 // choice persists in localStorage so it survives reloads. `index`, the checkbox,
@@ -57,19 +41,19 @@ const FIRST_COLUMNS: ColumnDef[] = [
 ];
 const REORDERABLE_COLUMNS: ColumnDef[] = [
   { key: "company", label: "Company", icon: Building2, defaultOn: true },
-  { key: "email", label: "Email", icon: Mail, defaultOn: true },
+  { key: "phone", label: "Phone", icon: Phone, defaultOn: true },
   { key: "status", label: "Status", defaultOn: true },
-  { key: "score", label: "AI Score", icon: Sparkles, defaultOn: true },
-  { key: "source", label: "Source", icon: Globe, defaultOn: true },
   { key: "owner", label: "Owner", icon: UserCog, defaultOn: true },
-  { key: "last_activity", label: "Last Activity", icon: Clock, defaultOn: true },
+  { key: "created_at", label: "Created Date", icon: Calendar, defaultOn: true },
+  { key: "email", label: "Email", icon: Mail, defaultOn: false },
+  { key: "score", label: "AI Score", icon: Sparkles, defaultOn: false },
+  { key: "source", label: "Source", icon: Globe, defaultOn: false },
+  { key: "last_activity", label: "Last Activity", icon: Clock, defaultOn: false },
   { key: "industry", label: "Industry", icon: Briefcase, defaultOn: false },
-  { key: "phone", label: "Phone", icon: Phone, defaultOn: false },
   { key: "interest_area", label: "Interest area", icon: Tag, defaultOn: false },
   { key: "linkedin", label: "LinkedIn", icon: Share2, defaultOn: false },
   { key: "website", label: "Website", icon: Link2, defaultOn: false },
   { key: "verified", label: "Verified", icon: CheckCircle2, defaultOn: false },
-  { key: "created_at", label: "Added", icon: Calendar, defaultOn: false },
 ];
 const COLUMNS: ColumnDef[] = [...FIRST_COLUMNS, ...REORDERABLE_COLUMNS];
 const DEFAULT_ORDER: ColKey[] = REORDERABLE_COLUMNS.map((c) => c.key);
@@ -94,6 +78,44 @@ interface Props {
   owners?: Record<string, string>;
 }
 
+/** Bold solid status pill — same real status vocabulary as before (plus the legacy
+ *  Warm/Hot/Scored values, kept only so old data still renders a real color instead
+ *  of a gray fallback), just restyled from an outline Badge to a filled pill. */
+function StatusPill({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    New: "bg-blue-500 dark:bg-blue-600",
+    Contacted: "bg-indigo-500 dark:bg-indigo-600",
+    Qualified: "bg-teal-500 dark:bg-teal-600",
+    Nurturing: "bg-amber-500 dark:bg-amber-600",
+    Converted: "bg-emerald-500 dark:bg-emerald-600",
+    Warm: "bg-amber-500 dark:bg-amber-600",
+    Hot: "bg-rose-500 dark:bg-rose-600",
+    Scored: "bg-violet-500 dark:bg-violet-600",
+  };
+  return (
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white whitespace-nowrap", styles[status] || "bg-slate-400 dark:bg-slate-600")}>
+      {status}
+    </span>
+  );
+}
+
+/** Deterministic color per company/owner name, for the Company logo and Owner avatar chips. */
+function logoColor(name: string): string {
+  const palette = ["bg-blue-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-violet-600", "bg-cyan-600", "bg-pink-600", "bg-indigo-600"];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return palette[Math.abs(hash) % palette.length];
+}
+
+/** Small colored square "logo" for the Company column — first letter of the company name. */
+function CompanyLogo({ name }: { name: string }) {
+  return (
+    <span className={cn("h-6 w-6 rounded-md flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", logoColor(name))}>
+      {name.trim()[0]?.toUpperCase() || "?"}
+    </span>
+  );
+}
+
 export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
@@ -106,6 +128,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const [dateTo, setDateTo] = useState("");
   const [showWizard, setShowWizard] = useState(false);
   const [page, setPage] = useState(0);
+  const [view, setView] = useState<"list" | "grid">("list");
 
   // Quick status/score filters — a row of pill shortcuts above the table.
   // "Needs Follow-up" is a chosen proxy (no dedicated field exists): a lead
@@ -116,6 +139,10 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   // Missing-data quick actions — inline instead of a bare "—".
   const [editingLead, setEditingLead] = useState<LeadRow | null>(null);
   const [findEmailFor, setFindEmailFor] = useState<{ lead: LeadRow; top: number; left: number } | null>(null);
+  const [rowMenu, setRowMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+
+  // Page header — Export dropdown.
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Selection contextual bar — replaces the toolbar controls while rows are selected.
   const [showOwnerMenu, setShowOwnerMenu] = useState(false);
@@ -131,23 +158,51 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   function openLead(id: string) {
     router.push(`/leads/${id}`);
   }
-  const [sort, setSort] = useState<"none" | "name" | "score" | "newest">("none");
+  // Per-column header sort — click any column's arrow to sort by it, click again
+  // to flip direction. The "Sort By" toolbar dropdown is just a few named presets
+  // over this same state, so both controls always stay in sync.
+  const [sortKey, setSortKey] = useState<ColKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  function toggleColumnSort(key: ColKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  }
   const scrollRef = useRef<HTMLDivElement>(null);
-  const PAGE_SIZE = 15;
+  const [pageSize, setPageSize] = useState(10);
 
   // Per-column header search (click a header to filter by that column's value).
   const [columnFilters, setColumnFilters] = useState<Partial<Record<ColKey, string>>>({});
   const [filterPopover, setFilterPopover] = useState<{ key: ColKey; top: number; left: number } | null>(null);
   const [filterDraft, setFilterDraft] = useState("");
 
-  // Industry/interest/date filters — opened as a popover next to the count chip.
+  // Industry/interest filters — opened as a popover next to the count chip.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersPos, setFiltersPos] = useState<{ top: number; left: number } | null>(null);
-  const hasActiveFilters = Boolean(industryFilter || interestFilter || dateFrom || dateTo || quickFilter !== "all");
+  const hasActiveFilters = Boolean(industryFilter || interestFilter || quickFilter !== "all");
   function openFiltersPopover(e: React.MouseEvent<HTMLButtonElement>) {
     const r = e.currentTarget.getBoundingClientRect();
     setFiltersPos({ top: r.bottom + 6, left: r.left });
     setFiltersOpen(true);
+  }
+
+  // "Added between" date-range filter — its own dedicated toolbar button/popover.
+  const [datesOpen, setDatesOpen] = useState(false);
+  const [datesPos, setDatesPos] = useState<{ top: number; left: number } | null>(null);
+  const hasActiveDateFilter = Boolean(dateFrom || dateTo);
+  function openDatesPopover(e: React.MouseEvent<HTMLButtonElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    setDatesPos({ top: r.bottom + 6, left: r.left });
+    setDatesOpen(true);
+  }
+  function dateRangeLabel(): string {
+    // Append a local-midnight time so formatDate's `new Date(...)` parses this
+    // as local time, not UTC — a bare "YYYY-MM-DD" parses as UTC midnight and
+    // renders a day early for anyone west of UTC (matches the T00:00:00 pattern
+    // already used for dateFrom/dateTo filtering above).
+    if (dateFrom && dateTo) return `${formatDate(`${dateFrom}T00:00:00`)} – ${formatDate(`${dateTo}T00:00:00`)}`;
+    if (dateFrom) return `From ${formatDate(`${dateFrom}T00:00:00`)}`;
+    if (dateTo) return `Until ${formatDate(`${dateTo}T00:00:00`)}`;
+    return "All dates";
   }
 
   // Column visibility (persisted). Hydrate from localStorage after mount to avoid SSR mismatch.
@@ -315,15 +370,17 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const filtered = baseFiltered.filter((l) => matchesQuickFilter(l, quickFilter));
 
   const sorted = [...filtered].sort((a, b) => {
-    if (sort === "name") return (a.full_name || a.company_name || "").localeCompare(b.full_name || b.company_name || "");
-    if (sort === "score") return (b.lead_score || 0) - (a.lead_score || 0);
-    if (sort === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    return 0;
+    if (!sortKey) return 0;
+    // Reuses the same plain-text-per-column logic the header search filter already
+    // relies on (getColumnText), so every column sorts on exactly what it displays —
+    // no separate comparator to keep in sync per column.
+    const cmp = getColumnText(sortKey, a).localeCompare(getColumnText(sortKey, b), undefined, { numeric: true, sensitivity: "base" });
+    return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
-  const paged = sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const paged = sorted.slice(safePage * pageSize, safePage * pageSize + pageSize);
 
   function displayName(l: LeadRow): string {
     return l.full_name || l.company_name || "—";
@@ -397,14 +454,14 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       case "score": return `${l.lead_score ?? ""} ${scoreLevel(l.lead_score ?? 0).label}`;
       case "source": return l.source || "";
       case "owner": return (l.owner_id && owners[l.owner_id]) || "";
-      case "last_activity": return new Date(l.updated_at).toLocaleDateString();
+      case "last_activity": return formatDate(l.updated_at);
       case "industry": return l.industry || "";
       case "phone": return l.phone || "";
       case "interest_area": return l.interest_area || "";
       case "linkedin": return l.linkedin || "";
       case "website": return l.website_url || "";
       case "verified": return l.verified ? "Verified" : "No";
-      case "created_at": return new Date(l.created_at).toLocaleDateString();
+      case "created_at": return formatDateTime(l.created_at);
       default: return "";
     }
   }
@@ -443,6 +500,71 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const selectedLeads = leads.filter((l) => selected.includes(l.id));
   const selectedWithEmail = selectedLeads.filter((l) => l.email).length;
   const selectedMissingEmail = selectedLeads.length - selectedWithEmail;
+
+  /** Plain-text rows for export (Name/Email/Company/Phone/Status/Owner/Created), scoped to
+   *  the currently filtered/searched leads, not just the current page. Shared by both export formats. */
+  function exportRows(): { header: string[]; rows: string[][] } {
+    const header = ["Name", "Email", "Company", "Phone", "Status", "Owner", "Created"];
+    const rows = filtered.map((l) => [
+      displayName(l),
+      l.email || "",
+      l.company_name || "",
+      l.phone || "",
+      l.status || "",
+      (l.owner_id && owners[l.owner_id]) || "",
+      formatDateTime(l.created_at),
+    ]);
+    return { header, rows };
+  }
+
+  function escapeHtml(s: string): string {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function downloadBlob(content: string, mime: string, filename: string) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /** No xlsx library needed — Excel opens a plain HTML <table> saved with a .xls
+   *  extension natively, same trick used by many lightweight "export to Excel" features. */
+  function handleExportExcel() {
+    setShowExportMenu(false);
+    const { header, rows } = exportRows();
+    const table = `<table><tr>${header.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>${rows
+      .map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`)
+      .join("")}</table>`;
+    const html = `<html><head><meta charset="utf-8" /></head><body>${table}</body></html>`;
+    downloadBlob(html, "application/vnd.ms-excel", `leads-${new Date().toISOString().slice(0, 10)}.xls`);
+  }
+
+  /** No PDF library needed — opens a print-formatted window and triggers the browser's
+   *  native print dialog, where "Save as PDF" produces the file. */
+  function handleExportPdf() {
+    setShowExportMenu(false);
+    const { header, rows } = exportRows();
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`<html><head><title>Leads</title><style>
+      body { font-family: sans-serif; padding: 24px; color: #0f172a; }
+      h1 { font-size: 18px; margin-bottom: 12px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+      th { background: #f5f5f5; }
+    </style></head><body>
+      <h1>Leads (${rows.length})</h1>
+      <table><thead><tr>${header.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c || "—")}</td>`).join("")}</tr>`).join("")}</tbody></table>
+    </body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
 
   async function handleBulkDelete() {
     setShowMoreMenu(false);
@@ -500,6 +622,13 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
     });
   }
 
+  function toggleFavorite(lead: LeadRow) {
+    start(async () => {
+      await updateLead(lead.id, { is_favorite: !lead.is_favorite });
+      router.refresh();
+    });
+  }
+
   async function handleDelete(id: string) {
     if (!(await confirm({ title: "Delete lead?", message: "Delete this lead? This action cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
     start(async () => {
@@ -515,23 +644,36 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       case "name": {
         const name = displayName(l);
         return (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); openLead(l.id); }}
-            className="flex items-center gap-2 max-w-[220px] text-left group"
-          >
-            <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(name))}>
-              {initials(name)}
-            </span>
-            <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
-              {name}
-            </span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); toggleFavorite(l); }}
+              title={l.is_favorite ? "Remove from favorites" : "Add to favorites"}
+              className="p-0.5 rounded flex-shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <Star className={cn("h-4 w-4", l.is_favorite ? "fill-amber-400 text-amber-400" : "text-slate-300 dark:text-slate-600")} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); openLead(l.id); }}
+              className="flex items-center gap-2 max-w-[220px] text-left group"
+            >
+              <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(name))}>
+                {initials(name)}
+              </span>
+              <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
+                {name}
+              </span>
+            </button>
+          </div>
         );
       }
       case "company":
         return l.company_name ? (
-          <span className="block max-w-[180px] truncate text-slate-700 dark:text-slate-300 whitespace-nowrap" title={l.company_name}>{l.company_name}</span>
+          <span className="flex items-center gap-1.5 max-w-[180px]">
+            <CompanyLogo name={l.company_name} />
+            <span className="truncate text-slate-700 dark:text-slate-300 whitespace-nowrap" title={l.company_name}>{l.company_name}</span>
+          </span>
         ) : (
           <button
             type="button"
@@ -581,7 +723,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         );
       }
       case "status":
-        return <Badge variant={statusVariant[l.status] || "default"}>{l.status}</Badge>;
+        return <StatusPill status={l.status} />;
       case "phone":
         return l.phone ? (
           <span className="text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{l.phone}</span>
@@ -598,12 +740,19 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.interest_area || "—"}</span>;
       case "source":
         return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.source || "—"}</span>;
-      case "owner":
-        return (
-          <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">
-            {(l.owner_id && owners[l.owner_id]) || <span className="text-slate-400">Unassigned</span>}
+      case "owner": {
+        const ownerName = l.owner_id ? owners[l.owner_id] : undefined;
+        return ownerName ? (
+          <span className="flex items-center gap-1.5 max-w-[140px]">
+            <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0", logoColor(ownerName))}>
+              {ownerName.trim()[0]?.toUpperCase() || "?"}
+            </span>
+            <span className="truncate text-slate-600 dark:text-slate-400 whitespace-nowrap">{ownerName}</span>
           </span>
+        ) : (
+          <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap"><span className="text-slate-400">Unassigned</span></span>
         );
+      }
       case "last_activity":
         return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(l.updated_at)}</span>;
       case "linkedin":
@@ -635,7 +784,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
           : <span className="text-xs text-slate-400 whitespace-nowrap">No</span>;
       case "created_at":
-        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(l.created_at)}</span>;
+        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDateTime(l.created_at)}</span>;
       default:
         return null;
     }
@@ -644,6 +793,49 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   return (
     <div className="flex items-start gap-4">
     <div className={showAiColumnModal ? "flex-1 min-w-0" : "max-w-[1600px] mx-auto w-full"}>
+      {/* Page header — title + total count badge, breadcrumb, Export/Refresh/Import actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Leads
+            <span className="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-0.5">
+              {leads.length}
+            </span>
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-300">Home</Link>
+            <span className="mx-1">›</span>
+            <span className="text-slate-700 dark:text-slate-300 font-medium">Leads</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative">
+            <Button size="sm" onClick={() => setShowExportMenu((v) => !v)} className="rounded-xl gap-1.5 font-semibold h-8 text-xs px-3">
+              <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
+            </Button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-1">
+                  <button onClick={handleExportPdf} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">
+                    <FileText className="h-3.5 w-3.5 text-slate-400" /> Export as PDF
+                  </button>
+                  <button onClick={handleExportExcel} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-slate-400" /> Export as Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <Button variant="outline" size="icon" onClick={() => router.refresh()} title="Refresh" className="rounded-xl h-8 w-8">
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import leads" className="rounded-xl h-8 w-8">
+            <Upload className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
           <p className="text-sm text-blue-900">
@@ -675,6 +867,21 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               <span>{filtered.length} Lead{filtered.length === 1 ? "" : "s"}</span>
             </div>
 
+            {/* Date Range Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openDatesPopover}
+              className={cn(
+                "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
+                hasActiveDateFilter && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
+              )}
+              title="Filter by date added"
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              <span>{dateRangeLabel()}</span>
+            </Button>
+
             {/* Filter Button */}
             <Button
               variant="outline"
@@ -688,6 +895,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             >
               <Filter className="h-3.5 w-3.5" />
               <span>Filter</span>
+              <ChevronDown className="h-3 w-3" />
               {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
             </Button>
 
@@ -696,11 +904,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               variant="outline"
               size="sm"
               onClick={openColsMenu}
-              className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 text-slate-700 dark:text-slate-300 flex-shrink-0"
+              className="rounded-xl gap-1 font-semibold h-8 text-xs px-2.5 flex-shrink-0 border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950/60"
               title="Customize visible columns"
             >
-              <Settings2 className="h-3.5 w-3.5 text-slate-400" />
-              <span>Columns</span>
+              <Settings2 className="h-3.5 w-3.5" />
+              <span>Manage Columns</span>
             </Button>
 
             {/* Use AI Button */}
@@ -716,22 +924,41 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             </Button>
           </div>
 
-          {/* Right Controls: Sort Dropdown + Add Lead */}
+          {/* Right Controls: Sort Dropdown + View Toggle + Add Lead */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
             {/* Sort Dropdown */}
-            <div className="relative inline-flex items-center flex-shrink-0 w-[88px]">
-              <ArrowUpDown className="h-3 w-3 text-slate-400 absolute left-2 pointer-events-none" />
+            <div className="relative inline-flex items-center gap-1 flex-shrink-0 w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 pl-2.5 pr-1.5 shadow-sm">
+              <ArrowUpDown className="h-3 w-3 text-slate-400 flex-shrink-0" />
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0 whitespace-nowrap">Sort By</span>
               <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="appearance-none w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-5 py-1 h-8 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer truncate"
+                value={
+                  !sortKey ? "none"
+                  : sortKey === "name" && sortDir === "asc" ? "name"
+                  : sortKey === "score" && sortDir === "desc" ? "score"
+                  : sortKey === "created_at" && sortDir === "desc" ? "newest"
+                  : "none"
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "none") { setSortKey(null); setSortDir("asc"); }
+                  else if (v === "name") { setSortKey("name"); setSortDir("asc"); }
+                  else if (v === "score") { setSortKey("score"); setSortDir("desc"); }
+                  else if (v === "newest") { setSortKey("created_at"); setSortDir("desc"); }
+                }}
+                className="appearance-none bg-transparent border-0 pl-1 pr-4 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer truncate"
               >
-                <option value="none">Sort</option>
+                <option value="none">Default</option>
                 <option value="name">Name A–Z</option>
                 <option value="score">Score High→Low</option>
                 <option value="newest">Newest</option>
               </select>
               <ChevronDown className="h-3 w-3 text-slate-400 absolute right-1.5 pointer-events-none" />
+            </div>
+
+            {/* List/Grid View Toggle */}
+            <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0">
+              <button type="button" onClick={() => setView("list")} className={cn("h-8 w-8 flex items-center justify-center transition-colors", view === "list" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800")} title="List view"><LayoutList className="h-3.5 w-3.5" /></button>
+              <button type="button" onClick={() => setView("grid")} className={cn("h-8 w-8 flex items-center justify-center transition-colors border-l border-slate-200 dark:border-slate-800", view === "grid" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800")} title="Grid view"><LayoutGrid className="h-3.5 w-3.5" /></button>
             </div>
 
             {/* Add Lead — opens the source-picker screen directly (Manual, CSV, LinkedIn, Buy Leads, etc.) */}
@@ -747,8 +974,9 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         </div>
 
         {/* Table Container */}
+        {view === "list" && (
         <div className="relative">
-          <div ref={scrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
+          <div ref={scrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)]">
             <table className="w-full text-sm border-collapse min-w-[900px]">
               <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -762,7 +990,9 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                   </th>
                   {visibleCols.map((c) => {
                     const filterable = c.key !== "index";
+                    const sortable = c.key !== "index";
                     const active = Boolean(columnFilters[c.key]);
+                    const isSorted = sortKey === c.key;
                     return (
                       <th
                         key={c.key}
@@ -784,6 +1014,20 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                         >
                           {c.icon && <c.icon className={cn("h-3.5 w-3.5", active ? "text-blue-500" : "text-slate-400")} />}
                           {c.label === "Row #" ? "#" : c.label}
+                          {sortable && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); toggleColumnSort(c.key); }}
+                              title={`Sort by ${c.label}`}
+                              className={cn("p-0.5 rounded hover:bg-slate-200/70 dark:hover:bg-slate-700", isSorted && "text-blue-600 dark:text-blue-400")}
+                            >
+                              {isSorted ? (
+                                sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                              ) : (
+                                <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                              )}
+                            </button>
+                          )}
                           {active && (
                             <span
                               role="button"
@@ -825,7 +1069,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                       </th>
                     );
                   })}
-                  <th className="px-3 py-2.5 w-12 text-right font-bold text-slate-400"></th>
+                  <th className="px-3 py-2.5 w-16 text-right font-bold whitespace-nowrap">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -860,7 +1104,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                         )}
                         onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
                       >
-                        {renderCell(c.key, l, safePage * PAGE_SIZE + i + 1)}
+                        {renderCell(c.key, l, safePage * pageSize + i + 1)}
                       </td>
                     ))}
                     {aiColumns.map((col) => {
@@ -886,12 +1130,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                     })}
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => handleDelete(l.id)}
-                        disabled={pending}
-                        title="Delete lead"
-                        className="p-1 rounded-md hover:bg-red-50 disabled:opacity-50"
+                        onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setRowMenu({ id: l.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) }); }}
+                        title="Row actions"
+                        className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
                       >
-                        <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
+                        <MoreVertical className="h-4 w-4 text-slate-400" />
                       </button>
                     </td>
                   </tr>
@@ -900,22 +1143,110 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             </table>
           </div>
         </div>
+        )}
+
+        {/* Grid/card view — a simpler secondary view over the same filtered/sorted/paged leads;
+            intentionally skips sticky columns, missing-data quick actions, AI columns, and
+            bulk-select, which stay list-view-only. */}
+        {view === "grid" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-3 sm:p-4">
+            {paged.map((l) => (
+              <div key={l.id} onClick={() => openLead(l.id)} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span className={cn("h-8 w-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0", avatarColor(displayName(l)))}>
+                    {initials(displayName(l))}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-slate-900 dark:text-white truncate text-sm">{displayName(l)}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{l.company_name || "—"}</p>
+                  </div>
+                  <StatusPill status={l.status} />
+                </div>
+                <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p>{l.email || "—"}</p>
+                  <p>{l.phone || "—"}</p>
+                  <p>{formatDateTime(l.created_at)}</p>
+                </div>
+              </div>
+            ))}
+            {paged.length === 0 && (
+              <p className="col-span-full text-center text-slate-500 dark:text-slate-400 py-16">No leads yet. Click <strong>Add Lead</strong> to import from LinkedIn, social, or a CSV.</p>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
-          <span>
-            {filtered.length === 0
-              ? "Showing 0 of 0"
-              : `Showing ${safePage * PAGE_SIZE + 1}–${Math.min((safePage + 1) * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Page {safePage + 1} of {pageCount}</span>
-            <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}>
-              Next <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
-            </Button>
+        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-1.5 text-xs">
+            <span>Show</span>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>entries</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              aria-label="Previous page"
+              className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
+            >
+              <ChevronDown className="h-3.5 w-3.5 rotate-90" />
+            </button>
+            {(() => {
+              // 1-indexed page numbers, windowed around the current page with "…" gaps —
+              // always keeps the first/last page visible so long lists (e.g. 125 leads =
+              // 13 pages at 10/page) don't render a button per page.
+              const current = safePage + 1;
+              const around = 1;
+              const nums: number[] = [];
+              for (let i = 1; i <= pageCount; i++) {
+                if (i === 1 || i === pageCount || (i >= current - around && i <= current + around)) nums.push(i);
+              }
+              const withDots: (number | "…")[] = [];
+              let prev: number | undefined;
+              for (const n of nums) {
+                if (prev !== undefined && n - prev > 1) withDots.push("…");
+                withDots.push(n);
+                prev = n;
+              }
+              return withDots.map((n, i) =>
+                n === "…" ? (
+                  <span key={`dots-${i}`} className="px-1 text-xs text-slate-400">…</span>
+                ) : (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setPage(n - 1)}
+                    className={cn(
+                      "h-7 min-w-7 px-2 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors",
+                      n === current
+                        ? "bg-red-600 text-white"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    {n}
+                  </button>
+                )
+              );
+            })()}
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              disabled={safePage >= pageCount - 1}
+              aria-label="Next page"
+              className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
+            >
+              <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
+            </button>
           </div>
         </div>
       </Card>
@@ -947,6 +1278,28 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                 });
               }}
             />
+          </div>
+        </>
+      )}
+
+      {/* Row actions menu — kebab button in the rightmost column, Edit + Delete */}
+      {rowMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setRowMenu(null)} />
+          <div className="fixed z-50 w-36 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-1" style={{ top: rowMenu.top, left: rowMenu.left }}>
+            <button
+              onClick={() => { const id = rowMenu.id; const lead = paged.find((x) => x.id === id) || leads.find((x) => x.id === id); setRowMenu(null); if (lead) setEditingLead(lead); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </button>
+            <button
+              onClick={() => { const id = rowMenu.id; setRowMenu(null); handleDelete(id); }}
+              disabled={pending}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-rose-950/50 rounded-lg disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
           </div>
         </>
       )}
@@ -1149,34 +1502,52 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                 ))}
               </Select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Added between</label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo || undefined}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="flex-1 min-w-0 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
-                  aria-label="From date"
-                />
-                <span className="text-xs text-slate-400 flex-shrink-0">to</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom || undefined}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="flex-1 min-w-0 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
-                  aria-label="To date"
-                />
-              </div>
-            </div>
             {hasActiveFilters && (
               <button
-                onClick={() => { setQuickFilter("all"); setIndustryFilter(""); setInterestFilter(""); setDateFrom(""); setDateTo(""); }}
+                onClick={() => { setQuickFilter("all"); setIndustryFilter(""); setInterestFilter(""); }}
                 className="text-xs text-slate-500 hover:text-slate-700 underline"
               >
                 Clear filters
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Date-range popover — "Added between", its own dedicated toolbar button */}
+      {datesOpen && datesPos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setDatesOpen(false)} />
+          <div
+            className="fixed z-50 w-72 rounded-xl border border-slate-200 bg-white shadow-xl p-3 space-y-3"
+            style={{ top: datesPos.top, left: datesPos.left }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Added between</p>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="flex-1 min-w-0 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                aria-label="From date"
+              />
+              <span className="text-xs text-slate-400 flex-shrink-0">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="flex-1 min-w-0 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                aria-label="To date"
+              />
+            </div>
+            {hasActiveDateFilter && (
+              <button
+                onClick={() => { setDateFrom(""); setDateTo(""); }}
+                className="text-xs text-slate-500 hover:text-slate-700 underline"
+              >
+                Clear dates
               </button>
             )}
           </div>
