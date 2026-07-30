@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
@@ -585,7 +585,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           </span>
         );
       case "last_activity":
-        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{new Date(l.updated_at).toLocaleDateString()}</span>;
+        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(l.updated_at)}</span>;
       case "linkedin":
         return l.linkedin ? (
           <a href={l.linkedin} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
@@ -615,7 +615,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
           : <span className="text-xs text-slate-400 whitespace-nowrap">No</span>;
       case "created_at":
-        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</span>;
+        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(l.created_at)}</span>;
       default:
         return null;
     }
