@@ -101,18 +101,19 @@ function StatusPill({ status }: { status: string }) {
 }
 
 /** Deterministic color per company/owner name, for the Company logo and Owner avatar chips. */
-function logoColor(name: string): string {
+function logoColor(name?: string | null): string {
+  const str = name || "";
   const palette = ["bg-blue-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-violet-600", "bg-cyan-600", "bg-pink-600", "bg-indigo-600"];
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
   return palette[Math.abs(hash) % palette.length];
 }
 
 /** Small colored square "logo" for the Company column — first letter of the company name. */
-function CompanyLogo({ name }: { name: string }) {
+function CompanyLogo({ name }: { name?: string | null }) {
   return (
     <span className={cn("h-6 w-6 rounded-md flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", logoColor(name))}>
-      {name.trim()[0]?.toUpperCase() || "?"}
+      {name?.trim()[0]?.toUpperCase() || "?"}
     </span>
   );
 }
@@ -230,7 +231,6 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       setIsBulkFindingCompany(false);
     }
   }
->>>>>>> c1255a5 (Company finding)
 
   // Selection contextual bar — replaces the toolbar controls while rows are selected.
   const [showOwnerMenu, setShowOwnerMenu] = useState(false);
@@ -760,7 +760,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           return (
             <span className="flex items-center gap-1.5 max-w-[180px]">
               <CompanyLogo name={l.company_name} />
-              <span className="truncate text-slate-700 dark:text-slate-300 whitespace-nowrap" title={l.company_name}>{l.company_name}</span>
+              <span className="truncate text-slate-700 dark:text-slate-300 whitespace-nowrap" title={l.company_name || undefined}>{l.company_name}</span>
             </span>
           );
         }
