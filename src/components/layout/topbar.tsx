@@ -47,9 +47,13 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
     setSwitchError(null);
     setSwitchingId(id);
     const result = await switchWorkspace(id);
+    // Reset the spinner either way — the client component instance survives
+    // the router navigation below (same layout shell), so leaving switchingId
+    // set on success left the spinner stuck next to that workspace forever,
+    // only clearing on a full manual page reload.
+    setSwitchingId(null);
     if (!result.ok) {
       setSwitchError(result.error || "Couldn't switch workspace.");
-      setSwitchingId(null);
       return;
     }
     setOpen(false);
