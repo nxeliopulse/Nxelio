@@ -756,6 +756,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           </div>
         );
       }
+      case "company": {
         if (l.company_name) {
           return (
             <span className="flex items-center gap-1.5 max-w-[180px]">
@@ -786,6 +787,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             )}
           </button>
         );
+      }
       case "email":
         return l.email ? (
           <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-300 whitespace-nowrap" title={l.email}>{l.email}</span>
