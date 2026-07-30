@@ -3954,3 +3954,14 @@ ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN NOT NUL
 -- ============================================================================
 
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_info_requested_at TIMESTAMPTZ;
+
+-- >>> FILE: 0080_lead_favorites.sql
+-- ============================================================================
+-- 0080 — Per-lead favorite/star flag
+-- Lets a user star a lead for quick reference in the Leads table, independent
+-- of status/score. Defaults to false so every existing row is unaffected.
+-- ============================================================================
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS idx_leads_is_favorite ON leads(is_favorite) WHERE is_favorite = true;
