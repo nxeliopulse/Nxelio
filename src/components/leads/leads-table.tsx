@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import { cn, formatDate, formatDateTime, mapWithConcurrency } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { deleteLead, bulkDeleteLeads, updateLead, type LeadRow } from "@/lib/queries/leads";
+import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
 import { createStaticSegment } from "@/lib/queries/segments";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
@@ -140,9 +141,96 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const [editingLead, setEditingLead] = useState<LeadRow | null>(null);
   const [findEmailFor, setFindEmailFor] = useState<{ lead: LeadRow; top: number; left: number } | null>(null);
   const [rowMenu, setRowMenu] = useState<{ id: string; top: number; left: number } | null>(null);
-
-  // Page header — Export dropdown.
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [findingCompanyId, setFindingCompanyId] = useState<string | null>(null);
+  const [isBulkFindingCompany, setIsBulkFindingCompany] = useState(false);
+
+  async function handleFindCompany(l: LeadRow) {
+    if (!l.linkedin) {
+      toast("Add a LinkedIn URL for this lead to find the company automatically.", "info");
+      setEditingLead(l);
+      return;
+    }
+
+    setFindingCompanyId(l.id);
+    try {
+      const res = await findAndSaveLeadCompany(l.id, l.linkedin, l.full_name);
+      if (res.ok && res.companyName) {
+        toast(`Saved company "${res.companyName}" for ${l.full_name || "lead"}.`, "success");
+        start(() => {
+          router.refresh();
+        });
+      } else {
+        toast(res.error || "Could not find company name.", "error");
+      }
+    } catch {
+      toast("Failed to connect to company finder service.", "error");
+    } finally {
+      setFindingCompanyId(null);
+    }
+  }
+
+  async function handleBulkFindCompany() {
+    const targetList = selected.length > 0
+      ? leads.filter((l) => selected.includes(l.id) && !l.company_name)
+      : filtered.filter((l) => !l.company_name);
+
+    if (!targetList.length) {
+      toast(
+        selected.length > 0
+          ? "All selected leads already have a company name."
+          : "No leads missing a company name.",
+        "info"
+      );
+      return;
+    }
+
+    const leadsWithLinkedin = targetList.filter((l) => Boolean(l.linkedin));
+    if (!leadsWithLinkedin.length) {
+      toast("None of the targeted leads have a LinkedIn URL.", "error");
+      return;
+    }
+
+    // Limit to max 10 leads per batch for ultra-fast execution
+    const leadsToProcess = leadsWithLinkedin.slice(0, 10).map((l) => ({ id: l.id, linkedin: l.linkedin, full_name: l.full_name }));
+    const hasMore = leadsWithLinkedin.length > 10;
+
+    setIsBulkFindingCompany(true);
+    toast(
+      hasMore
+        ? `Finding company names for 10 leads simultaneously...`
+        : `Finding company names for ${leadsToProcess.length} lead(s) simultaneously...`,
+      "info"
+    );
+
+    try {
+      const response = await fetch("/api/leads/find-companies-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: leadsToProcess }),
+      });
+      const data = await response.json();
+
+      if (data.ok && data.successCount > 0) {
+        toast(
+          hasMore
+            ? `Finished! Updated ${data.successCount} company name(s). Click Play again for remaining leads.`
+            : `Finished! Successfully updated ${data.successCount} company name(s).`,
+          "success"
+        );
+        start(() => {
+          router.refresh();
+        });
+      } else {
+        toast(data.error || "Could not find company names for the targeted leads.", "error");
+      }
+    } catch {
+      toast("Failed to connect to bulk company finder API.", "error");
+    } finally {
+      setIsBulkFindingCompany(false);
+    }
+  }
+>>>>>>> c1255a5 (Company finding)
 
   // Selection contextual bar — replaces the toolbar controls while rows are selected.
   const [showOwnerMenu, setShowOwnerMenu] = useState(false);
@@ -668,19 +756,34 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           </div>
         );
       }
-      case "company":
-        return l.company_name ? (
-          <span className="flex items-center gap-1.5 max-w-[180px]">
-            <CompanyLogo name={l.company_name} />
-            <span className="truncate text-slate-700 dark:text-slate-300 whitespace-nowrap" title={l.company_name}>{l.company_name}</span>
-          </span>
-        ) : (
+        if (l.company_name) {
+          return (
+            <span className="flex items-center gap-1.5 max-w-[180px]">
+              <CompanyLogo name={l.company_name} />
+              <span className="truncate text-slate-700 dark:text-slate-300 whitespace-nowrap" title={l.company_name}>{l.company_name}</span>
+            </span>
+          );
+        }
+        const isFindingCompany = findingCompanyId === l.id;
+        return (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
-            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
+            disabled={isFindingCompany}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleFindCompany(l);
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap disabled:opacity-75"
           >
-            <Plus className="h-3 w-3" /> Add company
+            {isFindingCompany ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin text-blue-600 dark:text-blue-400" /> Finding...
+              </>
+            ) : (
+              <>
+                <Plus className="h-3 w-3" /> Add company
+              </>
+            )}
           </button>
         );
       case "email":
@@ -1028,6 +1131,28 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                                 sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
                               ) : (
                                 <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                              )}
+                            </button>
+                          )}
+                          {c.key === "company" && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBulkFindCompany();
+                              }}
+                              disabled={isBulkFindingCompany}
+                              title={
+                                selected.length > 0
+                                  ? `Run company search for ${selected.length} selected lead(s)`
+                                  : "Run company search for all leads missing a company name"
+                              }
+                              className="ml-1 inline-flex items-center justify-center p-1 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/70 transition-transform active:scale-95 disabled:opacity-50"
+                            >
+                              {isBulkFindingCompany ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600 dark:text-blue-400" />
+                              ) : (
+                                <Play className="h-3.5 w-3.5 fill-current text-blue-600 dark:text-blue-400 hover:scale-110" />
                               )}
                             </button>
                           )}
@@ -1611,6 +1736,18 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               className="inline-flex items-center gap-1.5 rounded-full text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
             >
               <Megaphone className="h-3.5 w-3.5" /> Add to Campaign
+            </button>
+            <button
+              onClick={handleBulkFindCompany}
+              disabled={isBulkFindingCompany}
+              className="inline-flex items-center gap-1.5 rounded-full text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              {isBulkFindingCompany ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600 dark:text-blue-400" />
+              ) : (
+                <Play className="h-3.5 w-3.5 fill-current text-blue-600 dark:text-blue-400" />
+              )}
+              Find Companies
             </button>
             <div className="relative">
               <button

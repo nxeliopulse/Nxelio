@@ -9,6 +9,7 @@ import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { FeedbackProvider } from "@/components/ui/feedback";
 import { NoMailboxBanner } from "@/components/layout/no-mailbox-banner";
 import { AssistantProvider } from "@/components/layout/assistant-context";
+import type { MyWorkspaceRow } from "@/lib/queries/workspaces";
 
 interface Props {
   userName: string;
@@ -17,10 +18,11 @@ interface Props {
   navAccess?: Record<string, boolean> | null;
   onboardingCompleted?: boolean;
   mailboxConnected?: boolean;
+  workspaces?: MyWorkspaceRow[];
   children: React.ReactNode;
 }
 
-function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted = true, mailboxConnected = true, children }: Props) {
+function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted = true, mailboxConnected = true, workspaces = [], children }: Props) {
   const { mobileOpen, setMobileOpen } = useSidebar();
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantExpanded, setAssistantExpanded] = useState(false);
@@ -34,6 +36,7 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
             userName={userName}
             userEmail={userEmail}
             userRole={userRole}
+            workspaces={workspaces}
             onToggleAssistant={() => setAssistantOpen((v) => !v)}
             assistantOpen={assistantOpen}
           />
