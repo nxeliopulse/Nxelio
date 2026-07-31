@@ -310,7 +310,7 @@ How your tools work:
 Reporting style:
 - Precise and factual — cite real values from tool results (names, emails, counts, statuses).
 - Never invent or estimate data. If a tool errors, quote the error and state the action did NOT complete.
-- Use short bullets for multiple items. Clearly separate Done / Needs Approval / Not Possible.
+- Use short bullets for multiple items. Clearly separate Done / Needs Approval / Clarifying Questions.
 - If the target is ambiguous, ask ONE specific clarifying question rather than guessing.
 
 === PRICING & PLANS — STRICT KNOWLEDGE ===
@@ -732,6 +732,31 @@ function runLeadCreationWizard(history: AssistantMessage[]): AssistantResult | n
   return { reply: buildWizardSummary(updated), actions: [] };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Auto-resolves a lead reference to a real database UUID — the model may pass
+ * a name ("Mani"/"Tamilmani"), an email, or a truncated/remembered id instead
+ * of the full UUID from search_leads. Tries, in order: exact id, id prefix,
+ * exact name, exact email (against either the raw id arg or the display
+ * name), partial name match either direction. Returns null if nothing matches
+ * so the caller can report "not found" rather than silently acting on the
+ * wrong lead.
+ */
+async function resolveLeadId(rawId: string, display?: string): Promise<string | null> {
+  if (UUID_RE.test(rawId)) return rawId;
+  const all = await getLeads();
+  const searchTerm = (display || rawId).toLowerCase();
+  const found =
+    all.find((l) => l.id.startsWith(rawId)) ||
+    all.find((l) => l.full_name?.toLowerCase() === searchTerm) ||
+    all.find((l) => l.email?.toLowerCase() === rawId.toLowerCase()) ||
+    all.find((l) => l.email?.toLowerCase() === searchTerm) ||
+    all.find((l) => l.full_name?.toLowerCase().includes(searchTerm)) ||
+    all.find((l) => searchTerm.includes(l.full_name?.toLowerCase() || ""));
+  return found?.id ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Write-tool execution — ONLY called from approveAssistantActions after the
 // admin clicked Approve in the UI.
@@ -778,13 +803,8 @@ async function executeWriteTool(name: string, args: Record<string, unknown>, req
         if (args[k] !== undefined) fields[k] = args[k];
       }
       if (!Object.keys(fields).length) return { ok: false, detail: "No fields to update." };
-      // Resolve partial/truncated IDs the AI may have remembered from earlier messages
-      let leadId = String(args.lead_id);
-      if (leadId.length < 36) {
-        const all = await getLeads();
-        const found = all.find((l) => l.id.startsWith(leadId)) || all.find((l) => l.full_name === String(args.display || ""));
-        if (found) leadId = found.id;
-      }
+      const leadId = await resolveLeadId(String(args.lead_id), args.display ? String(args.display) : undefined);
+      if (!leadId) return { ok: false, detail: `Lead "${args.display || args.lead_id}" not found in active leads list.` };
       await updateLead(leadId, fields);
       return { ok: true, detail: `Updated ${args.display}: ${Object.entries(fields).map(([k, v]) => `${k} -> ${v}`).join(", ")}` };
     }
@@ -838,7 +858,9 @@ async function executeWriteTool(name: string, args: Record<string, unknown>, req
       await deleteEmailTemplate(String(args.template_id));
       return { ok: true, detail: `Deleted template ${args.display}` };
     case "send_email_to_lead": {
-      const res = await sendLeadEmail(String(args.lead_id), String(args.subject), String(args.body));
+      const leadId = await resolveLeadId(String(args.lead_id), args.display ? String(args.display) : undefined);
+      if (!leadId) return { ok: false, detail: `Lead "${args.display || args.lead_id}" not found in active leads list.` };
+      const res = await sendLeadEmail(leadId, String(args.subject), String(args.body));
       if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
       return { ok: true, detail: `Sent "${args.subject}" to ${args.display}` };
     }
