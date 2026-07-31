@@ -156,7 +156,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
   return (
     <div className="max-w-[1600px] mx-auto">
       <PageHeader
-        title="Administration"
+        title="User Management"
         description="Click any user to view details or reset their password."
         actions={isAdmin ? <Button onClick={() => { setShowInvite(true); setError(null); setSuccess(null); }}><Plus className="h-4 w-4" /> Create User</Button> : null}
       />
