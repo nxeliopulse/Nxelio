@@ -5,10 +5,11 @@ import {
   ArrowRight, Check, Star, ChevronDown, Sparkles, Zap,
   Mail, BarChart3, Users, Inbox, Target, Globe,
   Menu, X, MessageSquare, TrendingUp, CheckCircle,
-  Play, Layers, Megaphone, PieChart, Rss, Lock,
+  Play, Layers, Megaphone, PieChart, Rss, Lock, CheckCircle2,
 } from "lucide-react";
 import { BookDemoModal } from "./book-demo-modal";
 import { AiAssistantWidget } from "./ai-assistant-widget";
+import { LogoMark } from "@/components/brand/logo";
 
 // ─── Infographic colour palette ───────────────────────────────────────────────
 // Primary teal + 7 vivid accent hues — no dark backgrounds anywhere
@@ -215,15 +216,9 @@ function Navbar({ scrolled, mobileOpen, toggle, onBookDemo }: { scrolled: boolea
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl flex items-center justify-center"
-            style={scrolled
-              ? { background:"linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow:"0 4px 12px rgba(24,167,184,.3)" }
-              : { background:"rgba(255,255,255,.2)", border:"1.5px solid rgba(255,255,255,.35)" }}>
-            <svg viewBox="0 0 32 32" fill="none" className="h-5 w-5">
-              <path d="M7 24 L7 8 L19 22 L19 8" stroke="white" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M19 15 L26 8" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.75"/>
-              <circle cx="26" cy="8" r="2.2" fill="white"/>
-            </svg>
+          <div className="h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-sm"
+            style={scrolled ? { boxShadow:"0 4px 12px rgba(24,167,184,.3)" } : { border:"1.5px solid rgba(255,255,255,.35)" }}>
+            <LogoMark className="h-full w-full" />
           </div>
           <span className={`font-bold text-lg tracking-tight transition-colors duration-300 ${scrolled ? "text-slate-900" : "text-white"}`}>
             Nx<span style={{ color: scrolled ? "#18A7B8" : "rgba(255,255,255,.9)" }}>elio</span>
@@ -1305,13 +1300,9 @@ function Footer() {
             {/* Glass logo card */}
             <div className="inline-flex items-center gap-2.5 mb-5 px-4 py-3 rounded-2xl"
               style={{ background:"rgba(255,255,255,.15)", border:"1.5px solid rgba(255,255,255,.25)", backdropFilter:"blur(8px)" }}>
-              <div className="h-9 w-9 rounded-xl flex items-center justify-center"
-                style={{ background:"rgba(255,255,255,.2)", border:"1.5px solid rgba(255,255,255,.35)" }}>
-                <svg viewBox="0 0 32 32" fill="none" className="h-5 w-5">
-                  <path d="M7 24 L7 8 L19 22 L19 8" stroke="white" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M19 15 L26 8" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.75"/>
-                  <circle cx="26" cy="8" r="2.2" fill="white"/>
-                </svg>
+              <div className="h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center bg-white"
+                style={{ border:"1.5px solid rgba(255,255,255,.35)" }}>
+                <LogoMark className="h-full w-full" />
               </div>
               <div>
                 <p className="font-bold text-white text-lg leading-none">Nxelio Nurture</p>
@@ -1557,12 +1548,8 @@ function DemoVideo() {
             {/* Modal header */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor:"rgba(255,255,255,.08)" }}>
               <div className="flex items-center gap-2.5">
-                <div className="h-7 w-7 rounded-lg flex items-center justify-center" style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                  <svg viewBox="0 0 32 32" fill="none" className="h-4 w-4">
-                    <path d="M7 24 L7 8 L19 22 L19 8" stroke="white" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M19 15 L26 8" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.75"/>
-                    <circle cx="26" cy="8" r="2.2" fill="white"/>
-                  </svg>
+                <div className="h-7 w-7 rounded-lg overflow-hidden flex items-center justify-center bg-white">
+                  <LogoMark className="h-full w-full" />
                 </div>
                 <span className="text-sm font-bold text-white">Nxelio Nurture — Product Demo</span>
               </div>
@@ -1601,7 +1588,35 @@ function DemoVideo() {
 }
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
-export function LandingPage() {
+export interface LandingPageNotice {
+  kind: "signed_up" | "verified";
+  email?: string;
+}
+
+/** Post-signup / post-verification toast — a bottom banner deliberately, so it
+ * never has to coordinate z-index/offset with the fixed top Navbar above. */
+function PostSignupNotice({ notice }: { notice: LandingPageNotice }) {
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return null;
+  const loginHref = `/login${notice.email ? `?email=${encodeURIComponent(notice.email)}` : ""}`;
+  const message = notice.kind === "signed_up"
+    ? "Account created — log in to continue setting up your workspace."
+    : "Email verified — you can now log in.";
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-[60] flex flex-wrap items-center justify-center gap-3 bg-slate-900 px-4 py-3 text-sm text-white">
+      <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-400" />
+      <span>{message}</span>
+      <Link href={loginHref} className="rounded-lg px-3 py-1.5 font-bold" style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
+        Log in
+      </Link>
+      <button onClick={() => setHidden(true)} aria-label="Dismiss" className="ml-2 text-white/50 hover:text-white flex-shrink-0">
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = {}) {
   const [scrolled,    setScrolled]    = useState(false);
   const [mobileOpen,  setMobileOpen]  = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
@@ -1617,6 +1632,7 @@ export function LandingPage() {
 
   return (
     <div className="landing-page min-h-screen bg-white text-slate-900 overflow-x-hidden">
+      {notice && <PostSignupNotice notice={notice} />}
       <Navbar scrolled={scrolled} mobileOpen={mobileOpen} toggle={() => setMobileOpen((v)=>!v)} onBookDemo={openDemoModal}/>
       <Hero onBookDemo={openDemoModal}/>
       <DemoVideo/>

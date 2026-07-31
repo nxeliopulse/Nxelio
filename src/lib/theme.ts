@@ -1,9 +1,9 @@
 export type Theme = "light" | "dark" | "system";
 export type FontSize = "default" | "compact" | "large" | "xl";
-export type FontStyle = "sans" | "inter" | "roboto" | "outfit" | "serif" | "mono" | "rounded";
+export type FontStyle = "golos" | "sans" | "inter" | "roboto" | "outfit" | "serif" | "mono" | "rounded";
 export type LightPreset = "light" | "warm" | "slate";
 export type DarkPreset = "dark" | "midnight" | "obsidian" | "emerald";
-export type AccentColor = "blue" | "indigo" | "emerald" | "teal" | "black";
+export type AccentColor = "vermilion" | "blue" | "indigo" | "emerald" | "teal" | "black";
 export type SidebarBadgeStyle = "default" | "numeric" | "dot" | "hidden";
 export type SidebarDensity = "default" | "compact";
 
@@ -23,12 +23,12 @@ export interface AppearanceSettings {
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   theme: "system",
   fontSize: "default",
-  fontStyle: "sans",
+  fontStyle: "golos",
   pointerCursors: true,
   underlineLinks: false,
   lightPreset: "light",
   darkPreset: "dark",
-  accentColor: "teal",
+  accentColor: "vermilion",
   sidebarBadgeStyle: "default",
   sidebarDensity: "default",
 };

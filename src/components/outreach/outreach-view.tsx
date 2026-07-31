@@ -14,6 +14,8 @@ import { Card } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/tabs";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import {
   setSequenceStatus, deleteSequence, duplicateSequence, getSequenceActivityFeed,
@@ -62,6 +64,8 @@ export function OutreachView({ sequences, stats, leads, accounts, unipileReady }
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [enrollFor, setEnrollFor] = useState<OutreachSequenceRow | null>(null);
   const [activityFor, setActivityFor] = useState<OutreachSequenceRow | null>(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 15;
   const menuRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
 
@@ -73,6 +77,9 @@ export function OutreachView({ sequences, stats, leads, accounts, unipileReady }
   }
 
   const filtered = sequences.filter((s) => !search || s.name.toLowerCase().includes(search.toLowerCase()));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -165,79 +172,78 @@ export function OutreachView({ sequences, stats, leads, accounts, unipileReady }
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
-                  <th className="px-4 py-3 font-semibold">Sequence</th>
-                  <th className="px-4 py-3 font-semibold">Channels</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Enrolled</th>
-                  <th className="px-4 py-3 font-semibold">Sent</th>
-                  <th className="px-4 py-3 font-semibold">Replies</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-500">No sequences yet. Click <strong>New Sequence</strong> to build one.</td></tr>
-                )}
-                {filtered.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <Link href={`/outreach/builder?id=${s.id}`} className="block group">
-                        <p className="font-medium text-slate-900 group-hover:text-blue-600">{s.name}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">Modified {formatDate(s.updated_at)}</p>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3"><ChannelBadges channel={s.channel} /></td>
-                    <td className="px-4 py-3"><Badge variant={statusVariant[s.status] || "default"}>{s.status}</Badge></td>
-                    <td className="px-4 py-3 text-slate-600">{s.enrolled_count.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-slate-600">{s.sent_count.toLocaleString()}</td>
-                    <td className="px-4 py-3"><span className="text-emerald-700 font-medium">{s.reply_count.toLocaleString()}</span></td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 justify-end">
-                        <Button variant="outline" size="sm" onClick={() => setEnrollFor(s)} disabled={pending}>
-                          <UserPlus className="h-4 w-4" /> Enroll
-                        </Button>
-                        {s.status === "Active" ? (
-                          <Button variant="ghost" size="icon" title="Pause" onClick={() => toggleStatus(s)} disabled={pending}><Pause className="h-4 w-4" /></Button>
-                        ) : s.status === "Paused" ? (
-                          <Button variant="ghost" size="icon" title="Resume" onClick={() => toggleStatus(s)} disabled={pending}><Play className="h-4 w-4" /></Button>
-                        ) : null}
-                        <div className="relative" ref={openId === s.id ? menuRef : undefined}>
-                          <button className="p-1.5 rounded-md hover:bg-slate-100" onClick={(e) => openMenu(e, s.id)} aria-haspopup="menu" aria-expanded={openId === s.id}>
-                            <MoreHorizontal className="h-4 w-4 text-slate-400" />
-                          </button>
-                          {openId === s.id && menuPos && (
-                            <div
-                              role="menu"
-                              style={{ position: "fixed", top: menuPos.top, right: menuPos.right }}
-                              className="z-50 w-44 bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-sm"
-                            >
-                              <button className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700" onClick={() => { setOpenId(null); setActivityFor(s); }}>
-                                <Eye className="h-4 w-4" /> View activity
-                              </button>
-                              <button className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700" onClick={() => { setOpenId(null); router.push(`/outreach/builder?id=${s.id}`); }}>
-                                <Pencil className="h-4 w-4" /> Edit
-                              </button>
-                              <button className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 disabled:opacity-50" onClick={() => handleDuplicate(s.id)} disabled={pending}>
-                                <Copy className="h-4 w-4" /> Duplicate
-                              </button>
-                              <div className="my-1 border-t border-slate-100" />
-                              <button className="w-full text-left px-3 py-2 hover:bg-red-50 flex items-center gap-2 text-red-600 disabled:opacity-50" onClick={() => { setOpenId(null); handleDelete(s.id); }} disabled={pending}>
-                                <Trash2 className="h-4 w-4" /> Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
+          <DataTable>
+            <DataTableHead>
+              <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
+                <DataTableTh>Sequence</DataTableTh>
+                <DataTableTh>Channels</DataTableTh>
+                <DataTableTh>Status</DataTableTh>
+                <DataTableTh>Enrolled</DataTableTh>
+                <DataTableTh>Sent</DataTableTh>
+                <DataTableTh>Replies</DataTableTh>
+                <DataTableTh></DataTableTh>
+              </tr>
+            </DataTableHead>
+            <DataTableBody className="divide-y divide-slate-100">
+              {paged.length === 0 && (
+                <DataTableEmpty colSpan={7}>No sequences yet. Click <strong>New Sequence</strong> to build one.</DataTableEmpty>
+              )}
+              {paged.map((s) => (
+                <DataTableRow key={s.id}>
+                  <DataTableTd>
+                    <Link href={`/outreach/builder?id=${s.id}`} className="block group">
+                      <p className="font-medium text-slate-900 group-hover:text-blue-600">{s.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Modified {formatDate(s.updated_at)}</p>
+                    </Link>
+                  </DataTableTd>
+                  <DataTableTd><ChannelBadges channel={s.channel} /></DataTableTd>
+                  <DataTableTd><Badge variant={statusVariant[s.status] || "default"}>{s.status}</Badge></DataTableTd>
+                  <DataTableTd className="text-slate-600">{s.enrolled_count.toLocaleString()}</DataTableTd>
+                  <DataTableTd className="text-slate-600">{s.sent_count.toLocaleString()}</DataTableTd>
+                  <DataTableTd><span className="text-emerald-700 font-medium">{s.reply_count.toLocaleString()}</span></DataTableTd>
+                  <DataTableTd>
+                    <div className="flex items-center gap-1 justify-end">
+                      <Button variant="outline" size="sm" onClick={() => setEnrollFor(s)} disabled={pending}>
+                        <UserPlus className="h-4 w-4" /> Enroll
+                      </Button>
+                      {s.status === "Active" ? (
+                        <Button variant="ghost" size="icon" title="Pause" onClick={() => toggleStatus(s)} disabled={pending}><Pause className="h-4 w-4" /></Button>
+                      ) : s.status === "Paused" ? (
+                        <Button variant="ghost" size="icon" title="Resume" onClick={() => toggleStatus(s)} disabled={pending}><Play className="h-4 w-4" /></Button>
+                      ) : null}
+                      <div className="relative" ref={openId === s.id ? menuRef : undefined}>
+                        <button className="p-1.5 rounded-md hover:bg-slate-100" onClick={(e) => openMenu(e, s.id)} aria-haspopup="menu" aria-expanded={openId === s.id}>
+                          <MoreHorizontal className="h-4 w-4 text-slate-400" />
+                        </button>
+                        {openId === s.id && menuPos && (
+                          <div
+                            role="menu"
+                            style={{ position: "fixed", top: menuPos.top, right: menuPos.right }}
+                            className="z-50 w-44 bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-sm"
+                          >
+                            <button className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700" onClick={() => { setOpenId(null); setActivityFor(s); }}>
+                              <Eye className="h-4 w-4" /> View activity
+                            </button>
+                            <button className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700" onClick={() => { setOpenId(null); router.push(`/outreach/builder?id=${s.id}`); }}>
+                              <Pencil className="h-4 w-4" /> Edit
+                            </button>
+                            <button className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 disabled:opacity-50" onClick={() => handleDuplicate(s.id)} disabled={pending}>
+                              <Copy className="h-4 w-4" /> Duplicate
+                            </button>
+                            <div className="my-1 border-t border-slate-100" />
+                            <button className="w-full text-left px-3 py-2 hover:bg-red-50 flex items-center gap-2 text-red-600 disabled:opacity-50" onClick={() => { setOpenId(null); handleDelete(s.id); }} disabled={pending}>
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </DataTableTd>
+                </DataTableRow>
+              ))}
+            </DataTableBody>
+          </DataTable>
+          <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={(p) => setPage(p - 1)} />
         </Card>
       )}
 

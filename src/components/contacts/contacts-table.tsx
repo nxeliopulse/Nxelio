@@ -6,6 +6,8 @@ import { Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, Settings2
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { EditContactModal } from "@/components/contacts/edit-contact-modal";
@@ -224,64 +226,51 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
         </div>
 
         <div className="relative">
-          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
-            <table className="w-full text-sm border-collapse min-w-[900px]">
-              <thead className="bg-slate-50/90 border-b border-slate-200/80 sticky top-0 z-10 backdrop-blur-md">
+          <div className="overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
+            <DataTable className="min-w-[900px]">
+              <DataTableHead className="sticky top-0 z-10 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
-                  <th className="px-4 py-3.5 w-10">
+                  <DataTableTh className="w-10">
                     <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} className="rounded border-slate-300" />
-                  </th>
+                  </DataTableTh>
                   {visibleCols.map((c) => (
-                    <th key={c.key} className={cn("px-4 py-3.5 font-bold whitespace-nowrap", c.key === "index" && "w-12")}>
+                    <DataTableTh key={c.key} className={cn(c.key === "index" && "w-12")}>
                       <span className="inline-flex items-center gap-1.5">
                         {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}
                         {c.label === "Row #" ? "#" : c.label}
                       </span>
-                    </th>
+                    </DataTableTh>
                   ))}
-                  <th className="px-4 py-3.5 w-12 text-right font-bold text-slate-400"></th>
+                  <DataTableTh className="w-12 text-right"></DataTableTh>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+              </DataTableHead>
+              <DataTableBody className="divide-y divide-slate-100">
                 {paged.length === 0 && (
-                  <tr>
-                    <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
-                      No contacts yet. Click <strong>Add Contact</strong> to create one.
-                    </td>
-                  </tr>
+                  <DataTableEmpty colSpan={visibleCols.length + 2}>
+                    No contacts yet. Click <strong>Add Contact</strong> to create one.
+                  </DataTableEmpty>
                 )}
                 {paged.map((c, i) => (
-                  <tr key={c.id} onClick={() => openContact(c.id)} className="hover:bg-slate-50 transition-colors cursor-pointer">
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <DataTableRow key={c.id} onClick={() => openContact(c.id)} className="cursor-pointer">
+                    <DataTableTd onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="rounded border-slate-300" />
-                    </td>
+                    </DataTableTd>
                     {visibleCols.map((col) => (
-                      <td key={col.key} className="px-4 py-3">{renderCell(col.key, c, safePage * PAGE_SIZE + i + 1)}</td>
+                      <DataTableTd key={col.key}>{renderCell(col.key, c, safePage * PAGE_SIZE + i + 1)}</DataTableTd>
                     ))}
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <DataTableTd onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => handleDelete(c.id)} disabled={pending} title="Delete contact" className="p-1 rounded-md hover:bg-red-50 disabled:opacity-50">
                         <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
                       </button>
-                    </td>
-                  </tr>
+                    </DataTableTd>
+                  </DataTableRow>
                 ))}
-              </tbody>
-            </table>
+              </DataTableBody>
+            </DataTable>
           </div>
         </div>
 
-        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
-          <span>
-            {filtered.length === 0 ? "Showing 0 of 0" : `Showing ${safePage * PAGE_SIZE + 1}–${Math.min((safePage + 1) * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Page {safePage + 1} of {pageCount}</span>
-            <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Previous</Button>
-            <Button variant="outline" size="sm" disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}>
-              Next <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
-            </Button>
-          </div>
-        </div>
+        <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={(p) => setPage(p - 1)} />
       </Card>
 
       <EditContactModal open={showModal} onClose={() => setShowModal(false)} defaultAccountId={accountFilterId || undefined} />

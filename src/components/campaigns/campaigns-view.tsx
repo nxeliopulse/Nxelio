@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import { setCampaignStatus, deleteCampaign, duplicateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { setSequenceStatus, deleteSequence, duplicateSequence, type OutreachSequenceRow } from "@/lib/queries/outreach";
@@ -87,6 +89,8 @@ export function CampaignsView({
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 15;
   const menuRef = useRef<HTMLDivElement | null>(null);
   const tplRef = useRef<HTMLDivElement | null>(null);
 
@@ -156,6 +160,9 @@ export function CampaignsView({
     const matchApproval = approvalFilter === "All" || r.approvalStatus === approvalFilter;
     return matchSearch && matchActive && matchApproval;
   });
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   const rowKey = (r: UnifiedRow) => `${r.kind}-${r.id}`;
   const toggleSelected = (key: string) =>
@@ -372,56 +379,56 @@ export function CampaignsView({
             <Link href="/campaigns/builder"><Button><Plus className="h-4 w-4" /> Create campaign</Button></Link>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[880px]">
-              <thead>
-                <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100">
-                  <th className="px-4 py-3 w-10">
+          <>
+          <DataTable className="min-w-[880px]">
+              <DataTableHead>
+                <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <DataTableTh className="w-10">
                     <input
                       type="checkbox"
                       checked={selected.length === filtered.length && filtered.length > 0}
                       onChange={toggleSelectAll}
                       className="rounded border-slate-300"
                     />
-                  </th>
-                  <th className="px-5 py-3 font-semibold">Name</th>
-                  <th className="px-3 py-3 font-semibold">Status</th>
-                  <th className="px-3 py-3 font-semibold">Leads</th>
-                  <th className="px-3 py-3 font-semibold">Sent</th>
-                  <th className="px-3 py-3 font-semibold">Reply rate</th>
-                  <th className="px-3 py-3 font-semibold">Bounce rate</th>
-                  <th className="px-3 py-3 font-semibold">Owner</th>
-                  <th className="px-3 py-3 font-semibold">Last modified</th>
-                  <th className="px-3 py-3 w-8" />
+                  </DataTableTh>
+                  <DataTableTh>Name</DataTableTh>
+                  <DataTableTh>Status</DataTableTh>
+                  <DataTableTh>Leads</DataTableTh>
+                  <DataTableTh>Sent</DataTableTh>
+                  <DataTableTh>Reply rate</DataTableTh>
+                  <DataTableTh>Bounce rate</DataTableTh>
+                  <DataTableTh>Owner</DataTableTh>
+                  <DataTableTh>Last modified</DataTableTh>
+                  <DataTableTh className="w-8" />
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.length === 0 && (
-                  <tr><td colSpan={10} className="px-5 py-12 text-center text-slate-500 text-sm">No campaigns match your filters.</td></tr>
+              </DataTableHead>
+              <DataTableBody className="divide-y divide-slate-100">
+                {paged.length === 0 && (
+                  <DataTableEmpty colSpan={10}>No campaigns match your filters.</DataTableEmpty>
                 )}
-                {filtered.map((r) => {
+                {paged.map((r) => {
                   const isActive = r.status === "Active";
                   const ownerName = r.ownerId ? owners[r.ownerId] : null;
                   const key = rowKey(r);
                   const canApproveHere = r.kind === "email" && r.approvalStatus === "Pending review" && isApprover;
                   return (
-                    <tr key={key} onClick={() => router.push(r.href)} className="cursor-pointer hover:bg-slate-50/60 transition-colors">
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <DataTableRow key={key} onClick={() => router.push(r.href)} className="cursor-pointer">
+                      <DataTableTd onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selected.includes(key)}
                           onChange={() => toggleSelected(key)}
                           className="rounded border-slate-300"
                         />
-                      </td>
-                      <td className="px-5 py-3">
+                      </DataTableTd>
+                      <DataTableTd>
                         <div className="flex items-center gap-1.5 min-w-0">
                           <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
                           <span className="font-medium text-slate-900 truncate">{r.name}</span>
                           <ChannelBadge label={r.channelLabel} />
                         </div>
-                      </td>
-                      <td className="px-3 py-3">
+                      </DataTableTd>
+                      <DataTableTd>
                         <div className="flex items-center gap-2">
                           {r.approvalStatus ? (
                             <Badge variant={approvalBadgeVariant(r.approvalStatus)}>{r.approvalStatus}</Badge>
@@ -440,12 +447,12 @@ export function CampaignsView({
                             </Button>
                           )}
                         </div>
-                      </td>
-                      <td className="px-3 py-3 text-slate-600">{r.leads === null ? "—" : r.leads.toLocaleString()}</td>
-                      <td className="px-3 py-3 text-slate-600">{r.sent ? r.sent.toLocaleString() : "—"}</td>
-                      <td className="px-3 py-3 text-slate-600">{r.sent ? `${r.replyRate}%` : "—"}</td>
-                      <td className="px-3 py-3 text-slate-600">{r.bounceRate === null ? "—" : r.sent ? `${r.bounceRate}%` : "—"}</td>
-                      <td className="px-3 py-3">
+                      </DataTableTd>
+                      <DataTableTd className="text-slate-600">{r.leads === null ? "—" : r.leads.toLocaleString()}</DataTableTd>
+                      <DataTableTd className="text-slate-600">{r.sent ? r.sent.toLocaleString() : "—"}</DataTableTd>
+                      <DataTableTd className="text-slate-600">{r.sent ? `${r.replyRate}%` : "—"}</DataTableTd>
+                      <DataTableTd className="text-slate-600">{r.bounceRate === null ? "—" : r.sent ? `${r.bounceRate}%` : "—"}</DataTableTd>
+                      <DataTableTd>
                         {ownerName ? (
                           <span className="inline-flex items-center gap-2 text-slate-700">
                             <span className="h-6 w-6 rounded-full bg-blue-600 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
@@ -456,9 +463,9 @@ export function CampaignsView({
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
-                      </td>
-                      <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{formatDate(r.updatedAt)}</td>
-                      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      </DataTableTd>
+                      <DataTableTd className="text-slate-500 whitespace-nowrap">{formatDate(r.updatedAt)}</DataTableTd>
+                      <DataTableTd onClick={(e) => e.stopPropagation()}>
                         <div className="relative">
                           <button
                             onClick={(e) => {
@@ -514,13 +521,14 @@ export function CampaignsView({
                             document.body
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </DataTableTd>
+                    </DataTableRow>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </DataTableBody>
+            </DataTable>
+            <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={(p) => setPage(p - 1)} />
+          </>
         )}
       </Card>
 

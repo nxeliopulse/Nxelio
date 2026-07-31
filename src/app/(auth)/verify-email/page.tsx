@@ -56,9 +56,10 @@ function VerifyEmailForm() {
     setVerifying(false);
     if (!result.ok) { setError(result.error || "Verification failed"); return; }
 
-    // Verified — never carry the password forward (e.g. via a URL param), just
-    // send them to log in normally with a success notice.
-    router.push(`/login?verified=1&email=${encodeURIComponent(email)}`);
+    // Verified — never carry the password forward (e.g. via a URL param).
+    // Land on the public landing page, not straight to /login, so email
+    // signups get the same "never straight into the app" journey as OAuth.
+    router.push(`/?verified=1&email=${encodeURIComponent(email)}`);
   }
 
   async function handleResend() {
@@ -82,24 +83,24 @@ function VerifyEmailForm() {
         </div>
       </div>
 
-      <h1 className="text-2xl font-black text-white mb-2 text-center">Confirm your email address</h1>
-      <p className="text-sm mb-8 text-center" style={{ color: "rgba(255,255,255,.45)" }}>
+      <h1 className="text-2xl font-black text-slate-900 mb-2 text-center">Confirm your email address</h1>
+      <p className="text-sm mb-8 text-center text-slate-500">
         For security, we&apos;ve sent a code to{" "}
-        <span className="font-semibold" style={{ color: "rgba(255,255,255,.75)" }}>{email || "your email"}</span>.
+        <span className="font-semibold text-slate-700">{email || "your email"}</span>.
         Enter it below to finish setting up your account.
       </p>
 
       <form onSubmit={handleVerify} className="space-y-5">
         {error && (
           <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
-            style={{ background: "rgba(244,81,30,.12)", border: "1.5px solid rgba(244,81,30,.3)", color: "#ff8a65" }}>
+            style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
         {notice && (
           <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
-            style={{ background: "rgba(24,167,184,.12)", border: "1.5px solid rgba(24,167,184,.3)", color: "#4dd6e5" }}>
+            style={{ background: "rgba(24,167,184,.08)", border: "1.5px solid rgba(24,167,184,.25)", color: "#0d7d8c" }}>
             <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{notice}</span>
           </div>
@@ -117,22 +118,22 @@ function VerifyEmailForm() {
               onChange={(e) => handleDigitChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onPaste={handlePaste}
-              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold text-white rounded-xl outline-none transition-all"
-              style={{ background: "rgba(255,255,255,.06)", border: "1.5px solid rgba(255,255,255,.1)" }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "#18A7B8"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.15)"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,.1)"; e.currentTarget.style.boxShadow = "none"; }}
+              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold text-slate-800 rounded-xl outline-none transition-all"
+              style={{ background: "#F3F4F8", border: "1.5px solid transparent" }}
+              onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.25)"; }}
+              onBlur={(e) => { e.currentTarget.style.boxShadow = "none"; }}
             />
           ))}
         </div>
 
         <button type="submit" disabled={verifying || digits.join("").length !== CODE_LENGTH}
-          className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full py-3.5 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow: "0 4px 20px rgba(24,167,184,.3)" }}>
           {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {verifying ? "Verifying…" : "Verify email"}
         </button>
 
-        <div className="text-center text-sm" style={{ color: "rgba(255,255,255,.4)" }}>
+        <div className="text-center text-sm text-slate-500">
           Haven&apos;t received the code?{" "}
           <button type="button" onClick={handleResend} disabled={resending || cooldown > 0}
             className="font-bold hover:underline disabled:opacity-50 disabled:no-underline"
@@ -141,7 +142,7 @@ function VerifyEmailForm() {
           </button>
         </div>
 
-        <p className="text-center text-sm pt-2" style={{ color: "rgba(255,255,255,.4)" }}>
+        <p className="text-center text-sm pt-2 text-slate-500">
           Wrong email?{" "}
           <Link href="/signup" className="font-bold hover:underline" style={{ color: "#18A7B8" }}>
             Sign up again
@@ -154,7 +155,7 @@ function VerifyEmailForm() {
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-center py-8" style={{ color: "rgba(255,255,255,.4)" }}>Loading…</div>}>
+    <Suspense fallback={<div className="text-sm text-center py-8 text-slate-400">Loading…</div>}>
       <VerifyEmailForm />
     </Suspense>
   );

@@ -2,6 +2,9 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import type { LeadArchiveRow } from "@/lib/queries/lead-import-archive";
+import { Card } from "@/components/ui/card";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -39,8 +42,11 @@ function exportCsv(rows: (LeadArchiveRow & { workspace_name: string | null })[])
   URL.revokeObjectURL(url);
 }
 
+const PAGE_SIZE = 15;
+
 export function AdminLeadArchiveView({ rows }: { rows: (LeadArchiveRow & { workspace_name: string | null })[] }) {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
 
   const q = search.trim().toLowerCase();
   const filtered = q
@@ -50,6 +56,9 @@ export function AdminLeadArchiveView({ rows }: { rows: (LeadArchiveRow & { works
           .some((v) => v!.toLowerCase().includes(q))
       )
     : rows;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <div>
@@ -74,39 +83,35 @@ export function AdminLeadArchiveView({ rows }: { rows: (LeadArchiveRow & { works
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto max-h-[calc(100vh-320px)] overflow-y-auto scrollbar-hide">
-          <table className="w-full text-sm min-w-[900px]">
-            <thead className="bg-slate-50/80 dark:bg-slate-950/60 text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-wider sticky top-0 z-10 border-b border-slate-200/80 dark:border-slate-800">
+      <Card className="overflow-hidden">
+        <div className="max-h-[calc(100vh-320px)] overflow-y-auto scrollbar-hide">
+          <DataTable className="min-w-[900px]">
+            <DataTableHead className="sticky top-0 z-10">
               <tr className="text-left">
-                <th className="px-5 py-3.5 font-bold">Name</th>
-                <th className="px-5 py-3.5 font-bold">Email</th>
-                <th className="px-5 py-3.5 font-bold">Company</th>
-                <th className="px-5 py-3.5 font-bold">Workspace</th>
-                <th className="px-5 py-3.5 font-bold">Imported by</th>
-                <th className="px-5 py-3.5 font-bold">Source</th>
-                <th className="px-5 py-3.5 font-bold">Imported</th>
-                <th className="px-5 py-3.5 font-bold">Status</th>
+                <DataTableTh>Name</DataTableTh>
+                <DataTableTh>Email</DataTableTh>
+                <DataTableTh>Company</DataTableTh>
+                <DataTableTh>Workspace</DataTableTh>
+                <DataTableTh>Imported by</DataTableTh>
+                <DataTableTh>Source</DataTableTh>
+                <DataTableTh>Imported</DataTableTh>
+                <DataTableTh>Status</DataTableTh>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center text-slate-400 dark:text-slate-500 font-medium">
-                    No archived leads yet.
-                  </td>
-                </tr>
+            </DataTableHead>
+            <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+              {paged.length === 0 && (
+                <DataTableEmpty colSpan={8}>No archived leads yet.</DataTableEmpty>
               )}
-              {filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
-                  <td className="px-5 py-3.5 font-semibold text-slate-900 dark:text-white">{r.full_name || "—"}</td>
-                  <td className="px-5 py-3.5 text-slate-600 dark:text-slate-300 font-medium">{r.email || "—"}</td>
-                  <td className="px-5 py-3.5 text-slate-600 dark:text-slate-300 font-medium">{r.company_name || "—"}</td>
-                  <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">{r.workspace_name || "—"}</td>
-                  <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">{r.imported_by_name || "—"}</td>
-                  <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">{r.source || "—"}</td>
-                  <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDate(r.imported_at)}</td>
-                  <td className="px-5 py-3.5">
+              {paged.map((r) => (
+                <DataTableRow key={r.id}>
+                  <DataTableTd className="font-semibold text-slate-900 dark:text-white">{r.full_name || "—"}</DataTableTd>
+                  <DataTableTd className="text-slate-600 dark:text-slate-300 font-medium">{r.email || "—"}</DataTableTd>
+                  <DataTableTd className="text-slate-600 dark:text-slate-300 font-medium">{r.company_name || "—"}</DataTableTd>
+                  <DataTableTd className="text-slate-500 dark:text-slate-400">{r.workspace_name || "—"}</DataTableTd>
+                  <DataTableTd className="text-slate-500 dark:text-slate-400">{r.imported_by_name || "—"}</DataTableTd>
+                  <DataTableTd className="text-slate-500 dark:text-slate-400">{r.source || "—"}</DataTableTd>
+                  <DataTableTd className="text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDate(r.imported_at)}</DataTableTd>
+                  <DataTableTd>
                     {r.deleted_from_leads_at ? (
                       <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 text-xs font-semibold">
                         Deleted from Leads
@@ -116,13 +121,14 @@ export function AdminLeadArchiveView({ rows }: { rows: (LeadArchiveRow & { works
                         Active
                       </span>
                     )}
-                  </td>
-                </tr>
+                  </DataTableTd>
+                </DataTableRow>
               ))}
-            </tbody>
-          </table>
+            </DataTableBody>
+          </DataTable>
         </div>
-      </div>
+        <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={(p) => setPage(p - 1)} />
+      </Card>
     </div>
   );
 }

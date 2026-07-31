@@ -2,6 +2,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { hasConnectedMailbox } from "@/lib/queries/outreach-accounts";
 
 export interface OnboardingData {
   // Company identity
@@ -48,6 +49,78 @@ export async function getOnboarding(): Promise<{ data: OnboardingData | null; co
     data: (data?.onboarding as OnboardingData) ?? null,
     completed: Boolean(data?.onboarding_completed),
   };
+}
+
+export interface OnboardingProfile {
+  full_name: string;
+  email: string;
+  phone: string | null;
+  job_title: string | null;
+  avatar_url: string | null;
+}
+
+export interface OnboardingStatus {
+  completed: boolean;
+  profileComplete: boolean;
+  businessComplete: boolean;
+  mailboxComplete: boolean;
+  grandfathered: boolean;
+  data: OnboardingData | null;
+  profile: OnboardingProfile | null;
+}
+
+/**
+ * Stricter onboarding-completeness check for the hard gate — computed live
+ * from users/workspaces/outreach_accounts rather than a single persisted
+ * flag, since "mailbox connected" isn't write-once (disconnecting flips it
+ * back). Each sub-check fails open independently (defaults to true on its
+ * own query error), so a hiccup in any one table can never lock out every
+ * workspace. getOnboarding() above is untouched — this is additive, used
+ * only by the two call sites that need the stricter 3-part definition.
+ */
+export async function getOnboardingStatus(): Promise<OnboardingStatus> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { completed: false, profileComplete: false, businessComplete: false, mailboxComplete: false, grandfathered: false, data: null, profile: null };
+  }
+
+  const wsId = await currentWorkspaceId(supabase);
+  let businessComplete = true;
+  let grandfathered = false;
+  let onboardingData: OnboardingData | null = null;
+  if (wsId) {
+    const { data: ws, error } = await supabase
+      .from("workspaces")
+      .select("onboarding, onboarding_completed, onboarding_grandfathered")
+      .eq("id", wsId)
+      .single();
+    if (!error) {
+      onboardingData = (ws?.onboarding as OnboardingData) ?? null;
+      businessComplete = Boolean(ws?.onboarding_completed);
+      grandfathered = Boolean(ws?.onboarding_grandfathered);
+    }
+    // else: fail open, businessComplete stays true
+  }
+
+  let profileComplete = true;
+  let profile: OnboardingProfile | null = null;
+  const { data: userRow, error: userErr } = await supabase
+    .from("users")
+    .select("full_name, email, phone, job_title, avatar_url")
+    .eq("user_id", user.id)
+    .single();
+  if (!userErr && userRow) {
+    profile = userRow as OnboardingProfile;
+    profileComplete = Boolean(profile.phone?.trim() && profile.job_title?.trim());
+  }
+  // else: fail open, profileComplete stays true, profile stays null
+
+  const mailboxComplete = await hasConnectedMailbox();
+
+  const completed = businessComplete && (grandfathered || (profileComplete && mailboxComplete));
+
+  return { completed, profileComplete, businessComplete, mailboxComplete, grandfathered, data: onboardingData, profile };
 }
 
 export async function saveOnboarding(data: OnboardingData): Promise<{ ok: boolean; error?: string }> {

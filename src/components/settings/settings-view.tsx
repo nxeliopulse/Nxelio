@@ -117,6 +117,7 @@ function CustomSelect<T extends string>({
 }
 
 const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
+  { id: "vermilion", name: "Vermilion", bg: "bg-[#E41F07]" },
   { id: "black", name: "Onyx Black", bg: "bg-[#22252a]" },
   { id: "blue", name: "Blue", bg: "bg-blue-600" },
   { id: "indigo", name: "Indigo", bg: "bg-indigo-600" },
@@ -350,10 +351,11 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
                     <p className="text-xs text-slate-500">Customize typography and font family for the application interface</p>
                   </div>
                   <CustomSelect<FontStyle>
-                    value={appearance.fontStyle || "sans"}
+                    value={appearance.fontStyle || "golos"}
                     onChange={(val) => updateAppearance({ fontStyle: val })}
                     options={[
-                      { value: "sans", label: "Default (Geist Sans)" },
+                      { value: "golos", label: "Golos Text (Default)" },
+                      { value: "sans", label: "Geist Sans" },
                       { value: "inter", label: "Inter (Modern Sans)" },
                       { value: "roboto", label: "Roboto (Classic)" },
                       { value: "outfit", label: "Outfit (Geometric)" },

@@ -7,6 +7,8 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
@@ -668,23 +670,23 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
 
         {/* Table Container */}
         <div className="relative">
-          <div ref={scrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
-            <table className="w-full text-sm border-collapse min-w-[900px]">
-              <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-10 backdrop-blur-md">
+          <div ref={scrollRef} className="overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
+            <DataTable className="min-w-[900px]">
+              <DataTableHead className="dark:bg-slate-950/80 sticky top-0 z-10 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <th className="px-4 py-3.5 w-10">
+                  <DataTableTh className="w-10">
                     <input
                       type="checkbox"
                       checked={selected.length === filtered.length && filtered.length > 0}
                       onChange={toggleAll}
                       className="rounded border-slate-300 dark:border-slate-700"
                     />
-                  </th>
+                  </DataTableTh>
                   {visibleCols.map((c) => {
                     const filterable = c.key !== "index";
                     const active = Boolean(columnFilters[c.key]);
                     return (
-                      <th key={c.key} className={cn("px-4 py-3.5 font-bold whitespace-nowrap", c.key === "index" && "w-12")}>
+                      <DataTableTh key={c.key} className={cn(c.key === "index" && "w-12")}>
                         <span
                           role={filterable ? "button" : undefined}
                           title={filterable ? `Click to search ${c.label}` : undefined}
@@ -708,14 +710,14 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                             </span>
                           )}
                         </span>
-                      </th>
+                      </DataTableTh>
                     );
                   })}
                   {aiColumns.map((col) => {
                     const running = runProgress?.columnId === col.id;
                     const pct = running && runProgress.total > 0 ? Math.round((runProgress.done / runProgress.total) * 100) : 0;
                     return (
-                      <th key={col.id} className="px-4 py-3.5 font-bold w-[200px] max-w-[200px] whitespace-nowrap">
+                      <DataTableTh key={col.id} className="w-[200px] max-w-[200px]">
                         <span className="flex items-center gap-1.5 min-w-0">
                           <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                           <span className="truncate" title={col.name}>{col.name}</span>
@@ -735,49 +737,46 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                             <span className="text-[10px] font-normal normal-case text-slate-400 tabular-nums flex-shrink-0">{pct}%</span>
                           </div>
                         )}
-                      </th>
+                      </DataTableTh>
                     );
                   })}
-                  <th className="px-4 py-3.5 w-12 text-right font-bold text-slate-400"></th>
+                  <DataTableTh className="w-12 text-right"></DataTableTh>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+              </DataTableHead>
+              <DataTableBody className="divide-y divide-slate-100">
                 {paged.length === 0 && (
-                  <tr>
-                    <td colSpan={visibleCols.length + aiColumns.length + 2} className="px-4 py-16 text-center text-slate-500">
-                      No leads yet. Click <strong>Add Leads</strong> to import from LinkedIn, social, or a CSV.
-                    </td>
-                  </tr>
+                  <DataTableEmpty colSpan={visibleCols.length + aiColumns.length + 2}>
+                    No leads yet. Click <strong>Add Leads</strong> to import from LinkedIn, social, or a CSV.
+                  </DataTableEmpty>
                 )}
                 {paged.map((l, i) => (
-                  <tr
+                  <DataTableRow
                     key={l.id}
                     onClick={() => openLead(l.id)}
-                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="cursor-pointer"
                   >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <DataTableTd onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.includes(l.id)}
                         onChange={() => toggle(l.id)}
                         className="rounded border-slate-300"
                       />
-                    </td>
+                    </DataTableTd>
                     {visibleCols.map((c) => (
-                      <td
+                      <DataTableTd
                         key={c.key}
-                        className="px-4 py-3"
                         onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
                       >
                         {renderCell(c.key, l, safePage * PAGE_SIZE + i + 1)}
-                      </td>
+                      </DataTableTd>
                     ))}
                     {aiColumns.map((col) => {
                       const cellKey = `${col.id}:${l.id}`;
                       const computed = l.custom_fields?.[col.id];
                       const running = runningCellKey === cellKey || runningColumnId === col.id;
                       return (
-                        <td key={col.id} className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <DataTableTd key={col.id} onClick={(e) => e.stopPropagation()}>
                           {running ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
                           ) : computed ? (
@@ -790,10 +789,10 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                               <Play className="h-3 w-3" /> Generate
                             </button>
                           )}
-                        </td>
+                        </DataTableTd>
                       );
                     })}
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <DataTableTd onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleDelete(l.id)}
                         disabled={pending}
@@ -802,31 +801,15 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                       >
                         <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
                       </button>
-                    </td>
-                  </tr>
+                    </DataTableTd>
+                  </DataTableRow>
                 ))}
-              </tbody>
-            </table>
+              </DataTableBody>
+            </DataTable>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
-          <span>
-            {filtered.length === 0
-              ? "Showing 0 of 0"
-              : `Showing ${safePage * PAGE_SIZE + 1}–${Math.min((safePage + 1) * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Page {safePage + 1} of {pageCount}</span>
-            <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={safePage >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}>
-              Next <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
-            </Button>
-          </div>
-        </div>
+        <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={(p) => setPage(p - 1)} />
       </Card>
 
       <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} initialSource={wizardSource} />
