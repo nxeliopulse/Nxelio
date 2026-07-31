@@ -31,6 +31,8 @@ import { campaignTemplates, getCampaignTemplate, TEMPLATE_CATEGORIES, type Campa
 import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { SequenceFlow, MiniSequencePreview } from "@/components/campaigns/sequence-flow";
+import { substituteMergeTags } from "@/lib/email/merge-tags";
+import { getCurrentUserProfile } from "@/lib/queries/users";
 
 // Analytics and Replies live on the campaign details page, not the builder —
 // there's nothing to show for either until the campaign exists and has run.
@@ -127,10 +129,19 @@ export default function CampaignBuilderPage() {
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiInput, setAiInput] = useState("");
 
+  // Sequence preview — merge tags filled in with a real audience lead (or a
+  // sample one if the audience hasn't loaded/isn't picked yet), like the
+  // newsletter builder's "Preview" button.
+  const [showPreview, setShowPreview] = useState(false);
+  const [senderName, setSenderName] = useState("The Nxelio Nurture team");
+
   // Settings tab
   const [schedule, setSchedule] = useState("Send immediately");
   const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string, only used when schedule === "Schedule for later"
   const [minScheduleAt] = useState(() => new Date(Date.now() + 5 * 60000).toISOString().slice(0, 16));
+  // Defaults to true (existing behavior) — unchecking lets this campaign launch
+  // directly, bypassing the review/approval lifecycle entirely.
+  const [requiresApproval, setRequiresApproval] = useState(true);
 
   // Sender accounts tab
   const [senderAccounts, setSenderAccounts] = useState<OutreachAccountRow[]>([]);
@@ -151,6 +162,7 @@ export default function CampaignBuilderPage() {
     }).catch(() => {});
     getOutreachAccounts().then(setSenderAccounts).catch(() => {});
     getEmailStatus().then(setEmailStatus).catch(() => {});
+    getCurrentUserProfile().then((p) => { if (p?.full_name) setSenderName(p.full_name); }).catch(() => {});
 
     // Deep-link: ?template=<id> jumps straight into a pre-built sequence
     const id = new URLSearchParams(window.location.search).get("template");
@@ -170,7 +182,7 @@ export default function CampaignBuilderPage() {
   useEffect(() => {
     if (mountedRef.current) setDirty(true);
     else mountedRef.current = true;
-  }, [name, lists, sequence, enableHtml, pauseSameCompany, schedule, scheduledAt]);
+  }, [name, lists, sequence, enableHtml, pauseSameCompany, schedule, scheduledAt, requiresApproval]);
 
   function patchStep(i: number, patch: Partial<GeneratedEmail>) {
     setSequence((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -303,9 +315,10 @@ export default function CampaignBuilderPage() {
   // blocked for this campaign — sending would silently skip those leads.
   const missingEmailCount = audienceLeads.filter((l) => !l.email).length;
   const missingLinkedinCount = audienceLeads.filter((l) => !l.linkedin).length;
+  const readyToEmailCount = audienceLeads.length - missingEmailCount;
   const emailBlocked = audienceLeads.length > 0 && missingEmailCount > 0;
   const linkedinBlocked = audienceLeads.length > 0 && missingLinkedinCount > 0;
-  const EMAIL_BLOCKED_MSG = `${missingEmailCount} lead${missingEmailCount === 1 ? "" : "s"} in this audience ${missingEmailCount === 1 ? "doesn't" : "don't"} have an email — remove them or use LinkedIn instead.`;
+  const EMAIL_BLOCKED_MSG = `${readyToEmailCount} lead${readyToEmailCount === 1 ? "" : "s"} ready to email · ${missingEmailCount} lead${missingEmailCount === 1 ? "" : "s"} missing an email address — remove them or use LinkedIn instead.`;
   const LINKEDIN_BLOCKED_MSG = `${missingLinkedinCount} lead${missingLinkedinCount === 1 ? "" : "s"} in this audience ${missingLinkedinCount === 1 ? "doesn't" : "don't"} have a LinkedIn profile — remove them or use Email instead.`;
 
   function templateBlockReason(t: CampaignTemplate): string | null {
@@ -334,8 +347,9 @@ export default function CampaignBuilderPage() {
 
   // A campaign's content must be reviewed and approved before it can be launched —
   // enforced again server-side in sendCampaign(), this is just the UI-level gate.
+  // Unchecking "Requires approval" below bypasses this entirely.
   const approvalStatus = campaign?.approval_status || "Draft (AI-generated)";
-  const approvalGate = approvalStatus === "Approved";
+  const approvalGate = !requiresApproval || approvalStatus === "Approved";
   const APPROVAL_GATE_MESSAGE = approvalStatus === "Pending review"
     ? "Waiting on reviewer approval."
     : "Submit this campaign for review and get it approved before launching.";
@@ -363,6 +377,7 @@ export default function CampaignBuilderPage() {
       content_is_html: enableHtml,
       pause_same_company_on_reply: pauseSameCompany,
       scheduled_at: isScheduled && scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      requires_approval: requiresApproval,
     };
     if (campaign) {
       await updateCampaign(campaign.id, payload);
@@ -462,15 +477,17 @@ export default function CampaignBuilderPage() {
               once it's actually true; before that, the review stage is what matters. */}
           {campaign?.status === "Active" || campaign?.status === "Scheduled" ? (
             <Badge variant={campaign.status === "Active" ? "success" : "warning"}>{campaign.status}</Badge>
+          ) : !requiresApproval ? (
+            <Badge variant="blue">No approval required</Badge>
           ) : (
             <Badge variant={approvalBadgeVariant(approvalStatus)}>{approvalStatus}</Badge>
           )}
-          {campaign && (
+          {campaign && requiresApproval && (
             <button onClick={openHistory} title="Approval history" className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2">
               History
             </button>
           )}
-          {campaign && approvalStatus === "Draft (AI-generated)" && (
+          {campaign && requiresApproval && approvalStatus === "Draft (AI-generated)" && (
             <Button variant="outline" onClick={handleSubmitForReview} disabled={pending || submittingReview}>
               {submittingReview ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Submit for review
             </Button>
@@ -657,6 +674,9 @@ export default function CampaignBuilderPage() {
                   <LayoutTemplate className="h-4 w-4" /> Change template
                 </button>
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setShowPreview(true)} disabled={sequence.length === 0}>
+                    <Eye className="h-3.5 w-3.5" /> Preview
+                  </Button>
                   <Button variant="outline" size="sm" onClick={openAiRewrite} disabled={generating}>
                     <Wand2 className="h-3.5 w-3.5" /> AI rewrite
                   </Button>
@@ -853,6 +873,65 @@ export default function CampaignBuilderPage() {
               </Button>
             </div>
           </Modal>
+
+          {/* Sequence preview — merge tags filled in with a real audience lead
+              (or a sample one), like the newsletter builder's Preview. */}
+          {showPreview && (() => {
+            const previewLead = audienceLeads[0] || { full_name: "Alex Morgan", company_name: "Acme Inc", industry: "Technology", email: "alex@acme-inc.example.com" };
+            const tag = (s: string) => substituteMergeTags(s, previewLead, senderName);
+            return (
+              <div className="fixed inset-0 z-50 bg-white flex flex-col">
+                <div className="px-6 sm:px-10 py-4 border-b border-slate-100 flex-shrink-0 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-semibold text-lg text-slate-900">Sequence preview</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Merge tags filled in with {audienceLeads[0] ? "a real lead from this audience" : "a sample lead"} — {previewLead.full_name || previewLead.company_name}
+                    </p>
+                  </div>
+                  <button onClick={() => setShowPreview(false)} aria-label="Close" className="text-slate-400 hover:text-slate-700 rounded-md p-1">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                <div className="overflow-auto flex-1 px-6 sm:px-10 py-8 bg-slate-50">
+                  <div className="max-w-2xl mx-auto space-y-5">
+                    {sequence.map((s, i) => {
+                      const isLi = s.channel === "linkedin";
+                      return (
+                        <div key={i}>
+                          <p className="text-xs font-semibold text-slate-500 mb-2">Step {i + 1} · {s.day} · {isLi ? "LinkedIn" : "Email"}</p>
+                          {isLi ? (
+                            <div className="rounded-2xl border border-sky-200 bg-white shadow-sm overflow-hidden">
+                              <div className="px-4 py-2.5 bg-sky-50 border-b border-sky-100 flex items-center gap-2">
+                                <Share2 className="h-3.5 w-3.5 text-sky-600" />
+                                <span className="text-xs font-semibold text-sky-700">
+                                  {s.action === "linkedin_message" ? "LinkedIn message" : "Connection request note"}
+                                </span>
+                              </div>
+                              <div className="p-4 text-sm text-slate-800 whitespace-pre-wrap">{tag(s.body) || <span className="text-slate-400 italic">Empty</span>}</div>
+                            </div>
+                          ) : (
+                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                              <div className="px-4 py-3 border-b border-slate-100 space-y-0.5">
+                                <p className="text-[11px] text-slate-400">Subject</p>
+                                <p className="text-sm font-semibold text-slate-900">{tag(s.subject) || <span className="text-slate-400 italic font-normal">No subject</span>}</p>
+                              </div>
+                              <div
+                                className="p-4 text-sm text-slate-700 [&_a]:text-blue-600 [&_a]:underline"
+                                dangerouslySetInnerHTML={{ __html: tag(s.body) || "<span class='text-slate-400 italic'>Empty</span>" }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {sequence.length === 0 && (
+                      <p className="text-center text-sm text-slate-500 py-16">No steps in this sequence yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -941,6 +1020,24 @@ export default function CampaignBuilderPage() {
                 <p className="text-xs text-slate-400 mt-1">Step 1 goes out at this time in your local timezone.</p>
               </div>
             )}
+            <div className="border-t border-slate-100 pt-4">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={requiresApproval}
+                  onChange={(e) => setRequiresApproval(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-slate-700">Requires approval before launch</span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    {requiresApproval
+                      ? "Someone else must review and approve this campaign before it can be launched."
+                      : "This campaign can be launched directly — no review step."}
+                  </span>
+                </span>
+              </label>
+            </div>
             <div className="text-sm text-slate-500 flex items-center gap-2 bg-slate-50 rounded-lg p-3">
               <Filter className="h-4 w-4 flex-shrink-0" /> Leads who reply are automatically put on hold — no further steps are sent.
             </div>

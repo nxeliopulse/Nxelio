@@ -5,11 +5,31 @@ import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { getSubscription } from "@/lib/queries/subscriptions";
 import { SubscriptionGate } from "@/components/billing/subscription-gate";
 import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
+import { getMyWorkspaces } from "@/lib/queries/workspaces";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // If an admin removed this login's access to its currently-active workspace
+  // (updateUserStatus on workspace_members) since their last request, their
+  // users.workspace_id pointer may now point at a workspace they're no longer
+  // a member of — don't silently render with stale access.
+  const { data: activeCheck } = await supabase.from("users").select("workspace_id").eq("user_id", user.id).single();
+  if (activeCheck?.workspace_id) {
+    const { data: activeMembership } = await supabase
+      .from("workspace_members")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("workspace_id", activeCheck.workspace_id)
+      .eq("status", "ACTIVE")
+      .maybeSingle();
+    if (!activeMembership) {
+      await supabase.auth.signOut();
+      redirect("/login");
+    }
+  }
 
   // Hard onboarding gate — runs BEFORE the subscription check, since a
   // brand-new workspace has no subscription row yet either; checking
@@ -36,12 +56,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const navAccess =
     (profile as { nav_access?: Record<string, boolean> | null } | null)?.nav_access ?? null;
 
+  const workspaces = await getMyWorkspaces();
+
   return (
     <AppShell
       userName={userName}
       userEmail={userEmail}
       userRole={userRole}
       navAccess={navAccess}
+      workspaces={workspaces}
     >
       {children}
     </AppShell>

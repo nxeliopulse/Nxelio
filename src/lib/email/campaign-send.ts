@@ -33,7 +33,8 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
 
   // A campaign's content must be human-approved before it can reach anyone's inbox —
   // this is the real enforcement point, not just a disabled button in the UI.
-  if (campaign.approval_status !== "Approved") {
+  // Campaigns created with "requires approval" unchecked skip this gate entirely.
+  if (campaign.requires_approval && campaign.approval_status !== "Approved") {
     return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "This campaign must be approved before it can be launched." };
   }
 

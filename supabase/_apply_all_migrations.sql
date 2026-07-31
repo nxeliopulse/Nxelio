@@ -3931,3 +3931,294 @@ BEGIN
     EXECUTE format('CREATE POLICY ws_delete_%s ON %I FOR DELETE TO authenticated USING (workspace_id = get_current_workspace_id());', t, t);
   END LOOP;
 END $$;
+
+-- >>> FILE: 0077_zoom_accounts.sql
+-- ============================================================================
+-- Zoom OAuth connection — lets a workspace create real Zoom meetings (a stable
+-- join_url shared by host and lead) instead of a placeholder link. Deliberately
+-- a separate table from calendar_accounts: Zoom has no availability/busy-sync
+-- concept in this app, it's purely for meeting creation, so it shouldn't be
+-- swept into the calendar busy-sync loops.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS zoom_accounts (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id     UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  email            TEXT,
+  access_token     TEXT,
+  refresh_token    TEXT,
+  token_expires_at TIMESTAMPTZ,
+  scope            TEXT,
+  status           TEXT NOT NULL DEFAULT 'connected',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (workspace_id, email)
+);
+
+CREATE INDEX IF NOT EXISTS zoom_accounts_workspace_idx ON zoom_accounts(workspace_id);
+
+DROP TRIGGER IF EXISTS auto_workspace_trigger ON zoom_accounts;
+CREATE TRIGGER auto_workspace_trigger BEFORE INSERT ON zoom_accounts
+  FOR EACH ROW EXECUTE FUNCTION set_workspace_from_user();
+
+DROP TRIGGER IF EXISTS set_updated_at ON zoom_accounts;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON zoom_accounts
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE zoom_accounts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ws_select_zoom_accounts ON zoom_accounts;
+DROP POLICY IF EXISTS ws_insert_zoom_accounts ON zoom_accounts;
+DROP POLICY IF EXISTS ws_update_zoom_accounts ON zoom_accounts;
+DROP POLICY IF EXISTS ws_delete_zoom_accounts ON zoom_accounts;
+CREATE POLICY ws_select_zoom_accounts ON zoom_accounts FOR SELECT TO authenticated USING (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_insert_zoom_accounts ON zoom_accounts FOR INSERT TO authenticated WITH CHECK (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_update_zoom_accounts ON zoom_accounts FOR UPDATE TO authenticated USING (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_delete_zoom_accounts ON zoom_accounts FOR DELETE TO authenticated USING (workspace_id = get_current_workspace_id());
+
+-- >>> FILE: 0078_campaign_requires_approval.sql
+-- ============================================================================
+-- Per-campaign approval toggle — lets the creator choose, at build time,
+-- whether this campaign must go through the review/approval lifecycle
+-- (0033_campaign_approval_lifecycle.sql) before it can launch, or can be
+-- launched directly. Defaults to TRUE so existing behavior (every campaign
+-- requires approval) is unchanged for campaigns created before this column
+-- existed.
+-- ============================================================================
+
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN NOT NULL DEFAULT true;
+
+-- >>> FILE: 0079_lead_contact_info_requested.sql
+-- ============================================================================
+-- Dedup guard for the LinkedIn "auto-ask for contact info" feature: when a
+-- lead replies to a LinkedIn message with positive intent (AI-classified),
+-- we send one automatic follow-up asking for their email/phone. This column
+-- is set the first time we ask, so a lead who keeps replying positively never
+-- gets asked more than once.
+-- ============================================================================
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_info_requested_at TIMESTAMPTZ;
+
+-- >>> FILE: 0080_lead_favorites.sql
+-- ============================================================================
+-- 0080 — Per-lead favorite/star flag
+-- Lets a user star a lead for quick reference in the Leads table, independent
+-- of status/score. Defaults to false so every existing row is unaffected.
+-- ============================================================================
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS idx_leads_is_favorite ON leads(is_favorite) WHERE is_favorite = true;
+
+-- >>> FILE: 0081_workspace_members.sql
+-- Multi-workspace support: a login can belong to several workspaces and
+-- switch between them. get_current_workspace_id() keeps reading users.workspace_id
+-- (the "currently active" workspace pointer) unchanged, so every existing RLS
+-- policy across ~30 tenant tables keeps working as-is. workspace_members is the
+-- new many-to-many membership source of truth (which workspaces a login can
+-- switch into, and their role in each) — "switching" = updating that single
+-- pointer after validating membership here.
+CREATE TABLE IF NOT EXISTS workspace_members (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  role_id      INT NOT NULL REFERENCES roles(role_id),
+  status       VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', -- ACTIVE | REMOVED
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, workspace_id)
+);
+CREATE INDEX IF NOT EXISTS workspace_members_workspace_idx ON workspace_members(workspace_id);
+CREATE INDEX IF NOT EXISTS workspace_members_user_idx ON workspace_members(user_id);
+DROP TRIGGER IF EXISTS trg_workspace_members_updated ON workspace_members;
+CREATE TRIGGER trg_workspace_members_updated BEFORE UPDATE ON workspace_members FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS ws_select_workspace_members ON workspace_members;
+-- Self-select (for the workspace switcher UI) OR same-workspace-as-caller
+-- select (for the /users roster, which needs to see every member of the
+-- CURRENT workspace regardless of which workspace they're currently "active" in).
+CREATE POLICY ws_select_workspace_members ON workspace_members FOR SELECT TO authenticated
+  USING (user_id = auth.uid() OR workspace_id = get_current_workspace_id());
+-- No INSERT/UPDATE/DELETE policies for workspace_members — every write goes
+-- through server actions using the service-role admin client (mirrors the
+-- existing requireSuperAdmin()/inviteUser() pattern), never a raw RLS-bound write.
+
+-- Backfill: every existing single-workspace user becomes a membership row.
+INSERT INTO workspace_members (user_id, workspace_id, role_id)
+SELECT user_id, workspace_id, COALESCE(role_id, 1) FROM users WHERE workspace_id IS NOT NULL
+ON CONFLICT (user_id, workspace_id) DO NOTHING;
+
+-- Every new signup also gets a membership row for their first workspace.
+CREATE OR REPLACE FUNCTION handle_new_auth_user_with_workspace() RETURNS TRIGGER AS $$
+DECLARE
+  new_ws UUID;
+  display_name TEXT;
+BEGIN
+  -- Skip if profile already exists (admin-invited user)
+  IF EXISTS (SELECT 1 FROM public.users WHERE user_id = NEW.id) THEN
+    RETURN NEW;
+  END IF;
+
+  display_name := COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1));
+
+  INSERT INTO public.workspaces (name, owner_id)
+  VALUES (display_name || '''s workspace', NEW.id)
+  RETURNING id INTO new_ws;
+
+  INSERT INTO public.users (user_id, full_name, email, role_id, status, workspace_id)
+  VALUES (NEW.id, display_name, NEW.email, 1, 'ACTIVE', new_ws);
+
+  INSERT INTO public.workspace_members (user_id, workspace_id, role_id)
+  VALUES (NEW.id, new_ws, 1);
+
+  RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE WARNING 'handle_new_auth_user_with_workspace failed for %: %', NEW.email, SQLERRM;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog;
+
+-- Close a pre-existing self-escalation gap: the ws_update_users UPDATE policy
+-- has no separate WITH CHECK, so a plain authenticated client update could
+-- previously set its own workspace_id/role_id to any value and pass RLS.
+-- Supabase grants table-wide UPDATE to `authenticated` by default, so a plain
+-- column-level REVOKE alone is a no-op here — the table-wide grant still lets
+-- every column through. Revoke table-wide, then re-grant UPDATE on every
+-- column EXCEPT workspace_id/role_id, so those two may only change via server
+-- actions using the service-role client (which bypasses grants entirely).
+REVOKE UPDATE ON users FROM authenticated;
+GRANT UPDATE (full_name, manager_id, status, avatar_url, last_login, nav_access, phone, job_title, updated_at) ON users TO authenticated;
+
+-- >>> FILE: 0082_workspace_read_own_memberships.sql
+-- Fix: the workspace switcher's getMyWorkspaces() joins workspace_members -> workspaces
+-- to show each workspace's name. The old "Read own workspace" SELECT policy only allowed
+-- reading the CURRENTLY ACTIVE workspace (id = get_current_workspace_id()), so every OTHER
+-- workspace a login belongs to came back null from that join and got silently dropped from
+-- the switcher list — a member could see and switch INTO a workspace once, but never back
+-- out of it via the switcher. Widen SELECT to also allow any workspace you're a member of.
+DROP POLICY IF EXISTS "Read own workspace" ON workspaces;
+CREATE POLICY "Read own workspace" ON workspaces FOR SELECT TO authenticated
+  USING (
+    id = get_current_workspace_id()
+    OR EXISTS (
+      SELECT 1 FROM workspace_members wm
+      WHERE wm.workspace_id = workspaces.id AND wm.user_id = auth.uid() AND wm.status = 'ACTIVE'
+    )
+  );
+
+-- >>> FILE: 0083_users_read_via_workspace_members.sql
+-- Fix: getUsers() (the /users "People" roster) joins workspace_members -> users
+-- to show each member's profile (name, email, avatar). The old "ws_select_users"
+-- SELECT policy only allowed reading a user row when workspace_id = the CALLER's
+-- currently active workspace — but that column is the TARGET's own active
+-- pointer, which may point at a different workspace than the one they're
+-- actually being looked up in (a member can belong to several workspaces and
+-- only one is "active" for them at a time). So a legitimate member whose own
+-- active pointer happens to be elsewhere silently vanished from the roster —
+-- the exact same class of bug fixed for the `workspaces` table in migration
+-- 0081, just on `users`. Widen SELECT to also allow reading any user who has
+-- an ACTIVE workspace_members row in the caller's current workspace.
+DROP POLICY IF EXISTS "ws_select_users" ON users;
+CREATE POLICY "ws_select_users" ON users FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR workspace_id = get_current_workspace_id()
+    OR EXISTS (
+      SELECT 1 FROM workspace_members wm
+      WHERE wm.user_id = users.user_id
+        AND wm.workspace_id = get_current_workspace_id()
+        AND wm.status = 'ACTIVE'
+    )
+  );
+
+-- >>> FILE: 0084_lead_conversion.sql
+-- Lead Conversion workflow: converting a Lead creates/links a real Account +
+-- Contact + optional Opportunity, and the Lead keeps a permanent record of
+-- what it became (never deleted).
+
+-- Contacts didn't have a linkedin field (Leads already do) — needed so the
+-- conversion modal's duplicate-contact matching can check it.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS linkedin VARCHAR(500);
+
+-- Opportunities only had a denormalized company/contact_name/contact_email
+-- snapshot — add real FKs so a converted lead's deal actually links to the
+-- Account/Contact records instead of just free text.
+ALTER TABLE opportunities
+  ADD COLUMN IF NOT EXISTS account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_opportunities_account_id ON opportunities(account_id);
+CREATE INDEX IF NOT EXISTS idx_opportunities_contact_id ON opportunities(contact_id);
+
+-- The lead itself keeps permanent links to whatever it converted into.
+ALTER TABLE leads
+  ADD COLUMN IF NOT EXISTS converted_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS converted_contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS converted_opportunity_id UUID REFERENCES opportunities(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_leads_converted_account_id ON leads(converted_account_id);
+CREATE INDEX IF NOT EXISTS idx_leads_converted_contact_id ON leads(converted_contact_id);
+CREATE INDEX IF NOT EXISTS idx_leads_converted_opportunity_id ON leads(converted_opportunity_id);
+
+-- >>> FILE: 0085_onboarding_hard_gate.sql
+-- ============================================================================
+-- Onboarding hard-gate: per-user profile fields, grandfathering flag for
+-- workspaces that already finished onboarding under the old (looser) rules,
+-- an avatar upload bucket, and a broadened signup trigger that captures
+-- whatever name/avatar OAuth actually hands Supabase.
+-- ============================================================================
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS job_title TEXT;
+
+-- Existing workspaces that already completed onboarding under the old
+-- definition (business info only) are permanently exempt from the new
+-- profile+mailbox requirements — see plan doc for full reasoning.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS onboarding_grandfathered BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE workspaces SET onboarding_grandfathered = TRUE WHERE onboarding_completed = TRUE;
+
+-- Avatar uploads — same public-bucket, admin-client-only-writes pattern as
+-- the existing newsletter-images / lead-notes buckets (no storage.objects RLS
+-- policy needed since uploads only ever happen via the service-role key).
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Broaden the signup trigger (originally from 0013_fix_signup_trigger.sql) to
+-- also capture an avatar/picture claim and a wider name fallback — Google and
+-- LinkedIn OIDC don't reliably land the same fields under raw_user_meta_data.
+CREATE OR REPLACE FUNCTION handle_new_auth_user_with_workspace() RETURNS TRIGGER AS $$
+DECLARE
+  new_ws UUID;
+  display_name TEXT;
+  picture_url TEXT;
+BEGIN
+  -- Skip if profile already exists (admin-invited user)
+  IF EXISTS (SELECT 1 FROM public.users WHERE user_id = NEW.id) THEN
+    RETURN NEW;
+  END IF;
+
+  display_name := COALESCE(
+    NEW.raw_user_meta_data->>'full_name',
+    NEW.raw_user_meta_data->>'name',
+    split_part(NEW.email, '@', 1)
+  );
+  picture_url := COALESCE(
+    NEW.raw_user_meta_data->>'avatar_url',
+    NEW.raw_user_meta_data->>'picture'
+  );
+
+  INSERT INTO public.workspaces (name, owner_id)
+  VALUES (display_name || '''s workspace', NEW.id)
+  RETURNING id INTO new_ws;
+
+  INSERT INTO public.users (user_id, full_name, email, role_id, status, workspace_id, avatar_url)
+  VALUES (NEW.id, display_name, NEW.email, 1, 'ACTIVE', new_ws, picture_url);
+
+  RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE WARNING 'handle_new_auth_user_with_workspace failed for %: %', NEW.email, SQLERRM;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog;

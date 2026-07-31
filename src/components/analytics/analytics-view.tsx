@@ -1381,7 +1381,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
     <div style={{margin:"-20px -24px",minHeight:"100vh"}} className={cn(presentMode?"p-8":"", "font-sans text-slate-800 bg-slate-50 dark:bg-slate-950")}>
 
       {/* ── Header Toolbar ─────────────────────────────────────────────────── */}
-      <div className="shadow-xs sticky top-0 z-20 bg-white dark:bg-slate-50 border-b border-slate-200 dark:border-slate-100">
+      <div className="shadow-xs bg-white dark:bg-slate-50 border-b border-slate-200 dark:border-slate-100">
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-3.5 flex-wrap gap-4">
           <div className="flex items-center gap-3">

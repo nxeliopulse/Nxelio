@@ -15,6 +15,12 @@ export async function getOpportunities(): Promise<OpportunityRow[]> {
 }
 
 /** A single lead's opportunities, newest-first — for the lead detail page's related list. */
+export async function getOpportunityById(id: string): Promise<OpportunityRow | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("opportunities").select("*").eq("id", id).single();
+  return data as OpportunityRow | null;
+}
+
 export async function getOpportunitiesForLead(leadId: string): Promise<OpportunityRow[]> {
   const supabase = await createClient();
   const { data } = await supabase

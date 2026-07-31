@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
+import { Badge } from "@/components/ui/badge";
 import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { EditAccountModal } from "@/components/accounts/edit-account-modal";
@@ -25,7 +26,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "account_type", label: "Type", defaultOn: false },
   { key: "employees", label: "Employees", icon: Users2, defaultOn: false },
   { key: "annual_revenue", label: "Annual revenue", defaultOn: false },
-  { key: "rating", label: "Rating", defaultOn: false },
+  { key: "rating", label: "Rating", defaultOn: true },
 ];
 
 const DEFAULT_COLS = COLUMNS.reduce((acc, c) => { acc[c.key] = c.defaultOn; return acc; }, {} as Record<ColKey, boolean>);
@@ -137,27 +138,27 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
             <span className={cn("h-7 w-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0", avatarColor(a.account_name))}>
               {a.account_name.trim()[0]?.toUpperCase() || "?"}
             </span>
-            <span className="font-semibold text-slate-900 group-hover:text-blue-600 truncate whitespace-nowrap">
+            <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
               {a.account_name}
             </span>
           </button>
         );
       case "industry":
-        return <span className="block max-w-[160px] truncate text-slate-600 font-medium whitespace-nowrap">{a.industry || "—"}</span>;
+        return <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">{a.industry || "—"}</span>;
       case "phone":
-        return <span className="text-slate-600 font-mono text-xs whitespace-nowrap">{a.phone || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{a.phone || "—"}</span>;
       case "website":
         return a.website
-          ? <a href={a.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 hover:underline font-medium text-xs whitespace-nowrap"><Globe className="h-3.5 w-3.5 flex-shrink-0" />{a.website.replace(/^https?:\/\//, "")}</a>
+          ? <a href={a.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Globe className="h-3.5 w-3.5 flex-shrink-0" />{a.website.replace(/^https?:\/\//, "")}</a>
           : <span className="text-slate-400">—</span>;
       case "account_type":
-        return <span className="text-slate-600 whitespace-nowrap">{a.account_type || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">{a.account_type || "—"}</span>;
       case "employees":
-        return <span className="text-slate-600 tabular-nums whitespace-nowrap">{a.employees ?? "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 tabular-nums whitespace-nowrap">{a.employees ?? "—"}</span>;
       case "annual_revenue":
-        return <span className="text-slate-600 tabular-nums whitespace-nowrap">{a.annual_revenue != null ? a.annual_revenue.toLocaleString() : "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-400 tabular-nums whitespace-nowrap">{a.annual_revenue != null ? a.annual_revenue.toLocaleString() : "—"}</span>;
       case "rating":
-        return <span className="text-slate-600 whitespace-nowrap">{a.rating || "—"}</span>;
+        return a.rating ? <Badge variant={a.rating === "Hot" ? "danger" : a.rating === "Warm" ? "warning" : "blue"}>{a.rating}</Badge> : <span className="text-slate-400">—</span>;
       default:
         return null;
     }
@@ -165,8 +166,39 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
 
   return (
     <div className="max-w-[1600px] mx-auto w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="h-11 w-11 rounded-2xl bg-[var(--primary)] flex items-center justify-center shadow-md shadow-black/10 flex-shrink-0">
+            <Building2 className="h-6 w-6 text-white" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Accounts</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Companies you&apos;re nurturing across every campaign.</p>
+          </div>
+        </div>
+        <Button size="sm" onClick={() => setShowModal(true)} className="rounded-xl gap-1.5 font-bold h-10 px-4 flex-shrink-0 whitespace-nowrap self-start sm:self-auto">
+          <Plus className="h-4 w-4" />
+          <span>Add Account</span>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-blue-500 p-4 sm:p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Accounts</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{accounts.length}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-emerald-500 p-4 sm:p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Customers</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{accounts.filter((a) => a.account_type === "Customer").length}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-amber-500 p-4 sm:p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Prospects</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{accounts.filter((a) => a.account_type === "Prospect").length}</p>
+        </div>
+      </div>
+
       <Card className="overflow-hidden">
-        <div className="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
+        <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
           <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
             <div className="w-36 sm:w-48 md:w-56 flex-shrink-0">
               <Input
@@ -177,11 +209,11 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                 className="h-8 text-xs rounded-xl"
               />
             </div>
-            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 flex-shrink-0">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0">
               <Building2 className="h-3.5 w-3.5 text-slate-400" />
               <span>{filtered.length}</span>
             </div>
-            <Button variant="outline" size="sm" onClick={openColsMenu} className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 text-slate-700 flex-shrink-0" title="Customize visible columns">
+            <Button variant="outline" size="sm" onClick={openColsMenu} className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0" title="Customize visible columns">
               <Settings2 className="h-3.5 w-3.5 text-slate-400" />
               <span>Columns</span>
             </Button>
@@ -199,7 +231,7 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="appearance-none rounded-xl border border-slate-200 bg-white pl-6 pr-6 py-1 h-8 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer"
+                className="appearance-none rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-6 py-1 h-8 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer"
               >
                 <option value="none">Sort</option>
                 <option value="name">Name A–Z</option>
@@ -207,18 +239,14 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
               </select>
               <ChevronDown className="h-3 w-3 text-slate-400 absolute right-2 pointer-events-none" />
             </div>
-            <Button size="sm" onClick={() => setShowModal(true)} className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap">
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add Account</span>
-            </Button>
           </div>
         </div>
 
         <div className="relative">
           <div className="overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
             <DataTable className="min-w-[900px]">
-              <DataTableHead className="sticky top-0 z-10 backdrop-blur-md">
-                <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
+              <DataTableHead className="sticky top-0 z-10 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800">
+                <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <DataTableTh className="w-10">
                     <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} className="rounded border-slate-300" />
                   </DataTableTh>
@@ -233,7 +261,7 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                   <DataTableTh className="w-12 text-right"></DataTableTh>
                 </tr>
               </DataTableHead>
-              <DataTableBody className="divide-y divide-slate-100">
+              <DataTableBody>
                 {paged.length === 0 && (
                   <DataTableEmpty colSpan={visibleCols.length + 2}>
                     No accounts yet. Click <strong>Add Account</strong> to create one.
@@ -248,8 +276,8 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                       <DataTableTd key={c.key}>{renderCell(c.key, a, safePage * PAGE_SIZE + i + 1)}</DataTableTd>
                     ))}
                     <DataTableTd onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => handleDelete(a.id)} disabled={pending} title="Delete account" className="p-1 rounded-md hover:bg-red-50 disabled:opacity-50">
-                        <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
+                      <button onClick={() => handleDelete(a.id)} disabled={pending} title="Delete account" className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-rose-950/50 disabled:opacity-50">
+                        <Trash2 className="h-4 w-4 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-rose-400" />
                       </button>
                     </DataTableTd>
                   </DataTableRow>
@@ -267,11 +295,11 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
       {showCols && colsPos && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowCols(false)} />
-          <div className="fixed z-50 w-60 rounded-xl border border-slate-200 bg-white shadow-xl p-2" style={{ top: colsPos.top, right: colsPos.right }}>
+          <div className="fixed z-50 w-60 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-2" style={{ top: colsPos.top, right: colsPos.right }}>
             <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
             <div className="max-h-80 overflow-y-auto">
               {COLUMNS.map((c) => (
-                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm text-slate-700 dark:text-slate-300">
                   <input type="checkbox" checked={cols[c.key]} onChange={() => toggleCol(c.key)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                   <span className="inline-flex items-center gap-1.5">
                     {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}

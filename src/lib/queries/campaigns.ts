@@ -19,6 +19,8 @@ export interface CampaignRow {
   pause_same_company_on_reply: boolean;
   scheduled_at: string | null;
   approval_status: string;
+  /** When false, this campaign can launch directly without going through the review/approval lifecycle. */
+  requires_approval: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;

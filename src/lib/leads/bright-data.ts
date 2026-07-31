@@ -45,7 +45,7 @@ function estimateSeniority(title: string): string {
 
 /** Retries transient failures (network/5xx) with exponential backoff — does
  *  NOT retry a legitimately empty result, that's a real "no matches" response. */
-async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   let lastErr: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -65,7 +65,7 @@ interface SerpOrganic {
 }
 
 /** One page of Google SERP via Bright Data, parsed to organic results. */
-async function brightDataSerp(query: string, start: number, timeoutMs: number): Promise<SerpOrganic[]> {
+export async function brightDataSerp(query: string, start: number, timeoutMs: number): Promise<SerpOrganic[]> {
   const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&start=${start}&brd_json=1`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);

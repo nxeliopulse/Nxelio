@@ -2,36 +2,22 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Pencil, FileSpreadsheet, ShoppingCart, type LucideIcon } from "lucide-react";
-import { Input, Select } from "@/components/ui/input";
+import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, type LucideIcon } from "lucide-react";
+import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
-import { Pagination } from "@/components/ui/pagination";
+import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { industries, interestAreas } from "@/lib/mock-data";
-import { AddLeadsWizard, type SourceId } from "@/components/leads/add-leads-wizard";
+import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
-import { deleteLead, bulkDeleteLeads, type LeadRow } from "@/lib/queries/leads";
+import { EditLeadModal } from "@/components/leads/edit-lead-modal";
+import { FindEmailPicker } from "@/components/leads/find-email-picker";
+import { deleteLead, bulkDeleteLeads, updateLead, type LeadRow } from "@/lib/queries/leads";
+import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
 import { createStaticSegment } from "@/lib/queries/segments";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
-
-// "Hot"/"Warm"/"Scored" are legacy values (never set by any live code path,
-// kept only so old data — if any — still renders a real color instead of a
-// gray "default" badge) alongside the current New/Contacted/Qualified/
-// Nurturing/Converted vocabulary.
-const statusVariant: Record<string, "default" | "blue" | "warning" | "danger" | "success" | "purple"> = {
-  New: "blue",
-  Contacted: "purple",
-  Qualified: "success",
-  Nurturing: "warning",
-  Converted: "success",
-  Warm: "warning",
-  Hot: "danger",
-  Scored: "purple",
-};
 
 // Customizable columns. Users toggle these via the gear menu in the header; the
 // choice persists in localStorage so it survives reloads. `index`, the checkbox,
@@ -43,28 +29,39 @@ type ColKey =
 interface ColumnDef { key: ColKey; label: string; icon?: LucideIcon; defaultOn: boolean }
 
 // Default order/visibility follows the recommended layout:
-// Lead | Company | Email | Status | AI Score | Source | Owner | Last Activity | Actions
-const COLUMNS: ColumnDef[] = [
+// Row # | Lead | Company | Email | Status | AI Score | Source | Owner | Last Activity | Actions
+//
+// "index" (Row #) and "name" (Lead) are both frozen (sticky-left) alongside the
+// checkbox column, and always render in that fixed order — Row # first, Lead
+// second — regardless of the user's custom column order below, since their
+// sticky-left pixel offsets assume that exact position. Every other column is
+// freely reorderable via the Columns picker.
+const FIRST_COLUMNS: ColumnDef[] = [
   { key: "index", label: "Row #", defaultOn: true },
   { key: "name", label: "Lead", icon: User, defaultOn: true },
+];
+const REORDERABLE_COLUMNS: ColumnDef[] = [
   { key: "company", label: "Company", icon: Building2, defaultOn: true },
-  { key: "email", label: "Email", icon: Mail, defaultOn: true },
+  { key: "phone", label: "Phone", icon: Phone, defaultOn: true },
   { key: "status", label: "Status", defaultOn: true },
-  { key: "score", label: "AI Score", icon: Sparkles, defaultOn: true },
-  { key: "source", label: "Source", icon: Globe, defaultOn: true },
   { key: "owner", label: "Owner", icon: UserCog, defaultOn: true },
-  { key: "last_activity", label: "Last Activity", icon: Clock, defaultOn: true },
+  { key: "created_at", label: "Created Date", icon: Calendar, defaultOn: true },
+  { key: "email", label: "Email", icon: Mail, defaultOn: false },
+  { key: "score", label: "AI Score", icon: Sparkles, defaultOn: false },
+  { key: "source", label: "Source", icon: Globe, defaultOn: false },
+  { key: "last_activity", label: "Last Activity", icon: Clock, defaultOn: false },
   { key: "industry", label: "Industry", icon: Briefcase, defaultOn: false },
-  { key: "phone", label: "Phone", icon: Phone, defaultOn: false },
   { key: "interest_area", label: "Interest area", icon: Tag, defaultOn: false },
   { key: "linkedin", label: "LinkedIn", icon: Share2, defaultOn: false },
   { key: "website", label: "Website", icon: Link2, defaultOn: false },
   { key: "verified", label: "Verified", icon: CheckCircle2, defaultOn: false },
-  { key: "created_at", label: "Added", icon: Calendar, defaultOn: false },
 ];
+const COLUMNS: ColumnDef[] = [...FIRST_COLUMNS, ...REORDERABLE_COLUMNS];
+const DEFAULT_ORDER: ColKey[] = REORDERABLE_COLUMNS.map((c) => c.key);
 
 const DEFAULT_COLS = COLUMNS.reduce((acc, c) => { acc[c.key] = c.defaultOn; return acc; }, {} as Record<ColKey, boolean>);
 const COLS_STORAGE_KEY = "lp_leads_columns";
+const COLS_ORDER_STORAGE_KEY = "lp_leads_column_order";
 
 interface Props {
   leads: LeadRow[];
@@ -82,8 +79,47 @@ interface Props {
   owners?: Record<string, string>;
 }
 
+/** Bold solid status pill — same real status vocabulary as before (plus the legacy
+ *  Warm/Hot/Scored values, kept only so old data still renders a real color instead
+ *  of a gray fallback), just restyled from an outline Badge to a filled pill. */
+function StatusPill({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    New: "bg-blue-500 dark:bg-blue-600",
+    Contacted: "bg-indigo-500 dark:bg-indigo-600",
+    Qualified: "bg-teal-500 dark:bg-teal-600",
+    Nurturing: "bg-amber-500 dark:bg-amber-600",
+    Converted: "bg-emerald-500 dark:bg-emerald-600",
+    Warm: "bg-amber-500 dark:bg-amber-600",
+    Hot: "bg-rose-500 dark:bg-rose-600",
+    Scored: "bg-violet-500 dark:bg-violet-600",
+  };
+  return (
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white whitespace-nowrap", styles[status] || "bg-slate-400 dark:bg-slate-600")}>
+      {status}
+    </span>
+  );
+}
+
+/** Deterministic color per company/owner name, for the Company logo and Owner avatar chips. */
+function logoColor(name?: string | null): string {
+  const str = name || "";
+  const palette = ["bg-blue-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-violet-600", "bg-cyan-600", "bg-pink-600", "bg-indigo-600"];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return palette[Math.abs(hash) % palette.length];
+}
+
+/** Small colored square "logo" for the Company column — first letter of the company name. */
+function CompanyLogo({ name }: { name?: string | null }) {
+  return (
+    <span className={cn("h-6 w-6 rounded-md flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", logoColor(name))}>
+      {name?.trim()[0]?.toUpperCase() || "?"}
+    </span>
+  );
+}
+
 export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
-  const { confirm, prompt, toast } = useFeedback();
+  const { confirm, toast } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
@@ -93,9 +129,8 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showWizard, setShowWizard] = useState(false);
-  const [wizardSource, setWizardSource] = useState<SourceId | null>(null);
-  const [showAddMenu, setShowAddMenu] = useState(false);
   const [page, setPage] = useState(0);
+  const [view, setView] = useState<"list" | "grid">("list");
 
   // Quick status/score filters — a row of pill shortcuts above the table.
   // "Needs Follow-up" is a chosen proxy (no dedicated field exists): a lead
@@ -103,42 +138,184 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup";
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
 
+  // Missing-data quick actions — inline instead of a bare "—".
+  const [editingLead, setEditingLead] = useState<LeadRow | null>(null);
+  const [findEmailFor, setFindEmailFor] = useState<{ lead: LeadRow; top: number; left: number } | null>(null);
+  const [rowMenu, setRowMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [findingCompanyId, setFindingCompanyId] = useState<string | null>(null);
+  const [isBulkFindingCompany, setIsBulkFindingCompany] = useState(false);
+
+  async function handleFindCompany(l: LeadRow) {
+    if (!l.linkedin) {
+      toast("Add a LinkedIn URL for this lead to find the company automatically.", "info");
+      setEditingLead(l);
+      return;
+    }
+
+    setFindingCompanyId(l.id);
+    try {
+      const res = await findAndSaveLeadCompany(l.id, l.linkedin, l.full_name);
+      if (res.ok && res.companyName) {
+        toast(`Saved company "${res.companyName}" for ${l.full_name || "lead"}.`, "success");
+        start(() => {
+          router.refresh();
+        });
+      } else {
+        toast(res.error || "Could not find company name.", "error");
+      }
+    } catch {
+      toast("Failed to connect to company finder service.", "error");
+    } finally {
+      setFindingCompanyId(null);
+    }
+  }
+
+  async function handleBulkFindCompany() {
+    const targetList = selected.length > 0
+      ? leads.filter((l) => selected.includes(l.id) && !l.company_name)
+      : filtered.filter((l) => !l.company_name);
+
+    if (!targetList.length) {
+      toast(
+        selected.length > 0
+          ? "All selected leads already have a company name."
+          : "No leads missing a company name.",
+        "info"
+      );
+      return;
+    }
+
+    const leadsWithLinkedin = targetList.filter((l) => Boolean(l.linkedin));
+    if (!leadsWithLinkedin.length) {
+      toast("None of the targeted leads have a LinkedIn URL.", "error");
+      return;
+    }
+
+    // Limit to max 10 leads per batch for ultra-fast execution
+    const leadsToProcess = leadsWithLinkedin.slice(0, 10).map((l) => ({ id: l.id, linkedin: l.linkedin, full_name: l.full_name }));
+    const hasMore = leadsWithLinkedin.length > 10;
+
+    setIsBulkFindingCompany(true);
+    toast(
+      hasMore
+        ? `Finding company names for 10 leads simultaneously...`
+        : `Finding company names for ${leadsToProcess.length} lead(s) simultaneously...`,
+      "info"
+    );
+
+    try {
+      const response = await fetch("/api/leads/find-companies-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: leadsToProcess }),
+      });
+      const data = await response.json();
+
+      if (data.ok && data.successCount > 0) {
+        toast(
+          hasMore
+            ? `Finished! Updated ${data.successCount} company name(s). Click Play again for remaining leads.`
+            : `Finished! Successfully updated ${data.successCount} company name(s).`,
+          "success"
+        );
+        start(() => {
+          router.refresh();
+        });
+      } else {
+        toast(data.error || "Could not find company names for the targeted leads.", "error");
+      }
+    } catch {
+      toast("Failed to connect to bulk company finder API.", "error");
+    } finally {
+      setIsBulkFindingCompany(false);
+    }
+  }
+
+  // Selection contextual bar — replaces the toolbar controls while rows are selected.
+  const [showOwnerMenu, setShowOwnerMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
+  const [segmentName, setSegmentName] = useState("");
+  const [segmentDescription, setSegmentDescription] = useState("");
+  const [segmentType, setSegmentType] = useState<"static" | "dynamic">("static");
+
   // Clicking a lead navigates to its own full page (/leads/[id]) — matches how
   // campaign-detail-view.tsx gives each campaign a real standalone page instead
   // of an overlay on the list.
   function openLead(id: string) {
     router.push(`/leads/${id}`);
   }
-  const [sort, setSort] = useState<"none" | "name" | "score" | "newest">("none");
+  // Per-column header sort — click any column's arrow to sort by it, click again
+  // to flip direction. The "Sort By" toolbar dropdown is just a few named presets
+  // over this same state, so both controls always stay in sync.
+  const [sortKey, setSortKey] = useState<ColKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  function toggleColumnSort(key: ColKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  }
   const scrollRef = useRef<HTMLDivElement>(null);
-  const PAGE_SIZE = 15;
+  const [pageSize, setPageSize] = useState(10);
 
   // Per-column header search (click a header to filter by that column's value).
   const [columnFilters, setColumnFilters] = useState<Partial<Record<ColKey, string>>>({});
   const [filterPopover, setFilterPopover] = useState<{ key: ColKey; top: number; left: number } | null>(null);
   const [filterDraft, setFilterDraft] = useState("");
 
-  // Industry/interest/date filters — opened as a popover next to the count chip.
+  // Industry/interest filters — opened as a popover next to the count chip.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersPos, setFiltersPos] = useState<{ top: number; left: number } | null>(null);
-  const hasActiveFilters = Boolean(industryFilter || interestFilter || dateFrom || dateTo);
+  const hasActiveFilters = Boolean(industryFilter || interestFilter || quickFilter !== "all");
   function openFiltersPopover(e: React.MouseEvent<HTMLButtonElement>) {
     const r = e.currentTarget.getBoundingClientRect();
     setFiltersPos({ top: r.bottom + 6, left: r.left });
     setFiltersOpen(true);
   }
 
+  // "Added between" date-range filter — its own dedicated toolbar button/popover.
+  const [datesOpen, setDatesOpen] = useState(false);
+  const [datesPos, setDatesPos] = useState<{ top: number; left: number } | null>(null);
+  const hasActiveDateFilter = Boolean(dateFrom || dateTo);
+  function openDatesPopover(e: React.MouseEvent<HTMLButtonElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    setDatesPos({ top: r.bottom + 6, left: r.left });
+    setDatesOpen(true);
+  }
+  function dateRangeLabel(): string {
+    // Append a local-midnight time so formatDate's `new Date(...)` parses this
+    // as local time, not UTC — a bare "YYYY-MM-DD" parses as UTC midnight and
+    // renders a day early for anyone west of UTC (matches the T00:00:00 pattern
+    // already used for dateFrom/dateTo filtering above).
+    if (dateFrom && dateTo) return `${formatDate(`${dateFrom}T00:00:00`)} – ${formatDate(`${dateTo}T00:00:00`)}`;
+    if (dateFrom) return `From ${formatDate(`${dateFrom}T00:00:00`)}`;
+    if (dateTo) return `Until ${formatDate(`${dateTo}T00:00:00`)}`;
+    return "All dates";
+  }
+
   // Column visibility (persisted). Hydrate from localStorage after mount to avoid SSR mismatch.
   const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
   const [showCols, setShowCols] = useState(false);
   const [colsPos, setColsPos] = useState<{ top: number; right: number } | null>(null);
+  // Custom order for the reorderable columns (everything after the fixed Row #/Lead pair).
+  const [colOrder, setColOrder] = useState<ColKey[]>(DEFAULT_ORDER);
 
-  // Hydrate saved column choices after mount (localStorage is client-only).
+  // Hydrate saved column choices/order after mount (localStorage is client-only).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COLS_STORAGE_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setCols({ ...DEFAULT_COLS, ...JSON.parse(raw) });
+    } catch { /* ignore malformed storage */ }
+    try {
+      const rawOrder = localStorage.getItem(COLS_ORDER_STORAGE_KEY);
+      if (rawOrder) {
+        const saved = JSON.parse(rawOrder) as ColKey[];
+        // Merge with the current default order so a newly-added column key
+        // (e.g. shipped after a user already saved a custom order) still shows up.
+        const merged = [...saved.filter((k) => DEFAULT_ORDER.includes(k)), ...DEFAULT_ORDER.filter((k) => !saved.includes(k))];
+        setColOrder(merged);
+      }
     } catch { /* ignore malformed storage */ }
   }, []);
 
@@ -151,7 +328,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   }
   function resetCols() {
     setCols(DEFAULT_COLS);
-    try { localStorage.removeItem(COLS_STORAGE_KEY); } catch { /* ignore */ }
+    setColOrder(DEFAULT_ORDER);
+    try {
+      localStorage.removeItem(COLS_STORAGE_KEY);
+      localStorage.removeItem(COLS_ORDER_STORAGE_KEY);
+    } catch { /* ignore */ }
   }
   function openColsMenu(e: React.MouseEvent<HTMLButtonElement>) {
     const r = e.currentTarget.getBoundingClientRect();
@@ -159,7 +340,24 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
     setShowCols(true);
   }
 
-  const visibleCols = COLUMNS.filter((c) => cols[c.key]);
+  /** Moves a reorderable column up/down in the custom order — Row # and Lead are never part of this list. */
+  function moveCol(k: ColKey, direction: -1 | 1) {
+    setColOrder((order) => {
+      const i = order.indexOf(k);
+      const j = i + direction;
+      if (i < 0 || j < 0 || j >= order.length) return order;
+      const next = [...order];
+      [next[i], next[j]] = [next[j], next[i]];
+      try { localStorage.setItem(COLS_ORDER_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  const columnByKey = new Map(COLUMNS.map((c) => [c.key, c]));
+  const visibleCols = [
+    ...FIRST_COLUMNS.filter((c) => cols[c.key]),
+    ...colOrder.filter((k) => cols[k]).map((k) => columnByKey.get(k)!),
+  ];
 
   // Clay-style custom AI columns — creation/run/delete + per-row single-cell generation.
   const [showAiColumnModal, setShowAiColumnModal] = useState(false);
@@ -260,15 +458,17 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const filtered = baseFiltered.filter((l) => matchesQuickFilter(l, quickFilter));
 
   const sorted = [...filtered].sort((a, b) => {
-    if (sort === "name") return (a.full_name || a.company_name || "").localeCompare(b.full_name || b.company_name || "");
-    if (sort === "score") return (b.lead_score || 0) - (a.lead_score || 0);
-    if (sort === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    return 0;
+    if (!sortKey) return 0;
+    // Reuses the same plain-text-per-column logic the header search filter already
+    // relies on (getColumnText), so every column sorts on exactly what it displays —
+    // no separate comparator to keep in sync per column.
+    const cmp = getColumnText(sortKey, a).localeCompare(getColumnText(sortKey, b), undefined, { numeric: true, sensitivity: "base" });
+    return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
-  const paged = sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const paged = sorted.slice(safePage * pageSize, safePage * pageSize + pageSize);
 
   function displayName(l: LeadRow): string {
     return l.full_name || l.company_name || "—";
@@ -342,14 +542,14 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       case "score": return `${l.lead_score ?? ""} ${scoreLevel(l.lead_score ?? 0).label}`;
       case "source": return l.source || "";
       case "owner": return (l.owner_id && owners[l.owner_id]) || "";
-      case "last_activity": return new Date(l.updated_at).toLocaleDateString();
+      case "last_activity": return formatDate(l.updated_at);
       case "industry": return l.industry || "";
       case "phone": return l.phone || "";
       case "interest_area": return l.interest_area || "";
       case "linkedin": return l.linkedin || "";
       case "website": return l.website_url || "";
       case "verified": return l.verified ? "Verified" : "No";
-      case "created_at": return new Date(l.created_at).toLocaleDateString();
+      case "created_at": return formatDateTime(l.created_at);
       default: return "";
     }
   }
@@ -385,8 +585,79 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const toggleAll = () =>
     setSelected(selected.length === filtered.length ? [] : filtered.map((l) => l.id));
 
+  const selectedLeads = leads.filter((l) => selected.includes(l.id));
+  const selectedWithEmail = selectedLeads.filter((l) => l.email).length;
+  const selectedMissingEmail = selectedLeads.length - selectedWithEmail;
+
+  /** Plain-text rows for export (Name/Email/Company/Phone/Status/Owner/Created), scoped to
+   *  the currently filtered/searched leads, not just the current page. Shared by both export formats. */
+  function exportRows(): { header: string[]; rows: string[][] } {
+    const header = ["Name", "Email", "Company", "Phone", "Status", "Owner", "Created"];
+    const rows = filtered.map((l) => [
+      displayName(l),
+      l.email || "",
+      l.company_name || "",
+      l.phone || "",
+      l.status || "",
+      (l.owner_id && owners[l.owner_id]) || "",
+      formatDateTime(l.created_at),
+    ]);
+    return { header, rows };
+  }
+
+  function escapeHtml(s: string): string {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function downloadBlob(content: string, mime: string, filename: string) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /** No xlsx library needed — Excel opens a plain HTML <table> saved with a .xls
+   *  extension natively, same trick used by many lightweight "export to Excel" features. */
+  function handleExportExcel() {
+    setShowExportMenu(false);
+    const { header, rows } = exportRows();
+    const table = `<table><tr>${header.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>${rows
+      .map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`)
+      .join("")}</table>`;
+    const html = `<html><head><meta charset="utf-8" /></head><body>${table}</body></html>`;
+    downloadBlob(html, "application/vnd.ms-excel", `leads-${new Date().toISOString().slice(0, 10)}.xls`);
+  }
+
+  /** No PDF library needed — opens a print-formatted window and triggers the browser's
+   *  native print dialog, where "Save as PDF" produces the file. */
+  function handleExportPdf() {
+    setShowExportMenu(false);
+    const { header, rows } = exportRows();
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`<html><head><title>Leads</title><style>
+      body { font-family: sans-serif; padding: 24px; color: #0f172a; }
+      h1 { font-size: 18px; margin-bottom: 12px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+      th { background: #f5f5f5; }
+    </style></head><body>
+      <h1>Leads (${rows.length})</h1>
+      <table><thead><tr>${header.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c || "—")}</td>`).join("")}</tr>`).join("")}</tbody></table>
+    </body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
   async function handleBulkDelete() {
-    if (!(await confirm({ title: "Delete leads?", message: `Delete ${selected.length} leads?`, confirmLabel: "Delete", danger: true }))) return;
+    setShowMoreMenu(false);
+    const n = selected.length;
+    if (!(await confirm({ title: "Delete lead?", message: `Delete ${n} lead${n === 1 ? "" : "s"}? This action cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
     const ids = [...selected];
     setSelected([]);
     start(async () => {
@@ -394,26 +665,60 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
     });
   }
 
+  function openSegmentDialog() {
+    setSegmentName("");
+    setSegmentDescription("");
+    setSegmentType("static");
+    setSegmentDialogOpen(true);
+  }
+
   async function handleCreateSegment() {
-    const name = await prompt({
-      title: "Create segment",
-      message: `Create a segment with the ${selected.length} selected lead${selected.length === 1 ? "" : "s"}?`,
-      label: "Segment name",
-      placeholder: "e.g. Q3 conference leads",
-      confirmLabel: "Create",
-      required: true,
-    });
-    if (name === null) return;
+    const name = segmentName.trim();
+    if (!name) return;
     const ids = [...selected];
+    setSegmentDialogOpen(false);
     setSelected([]);
     start(async () => {
-      await createStaticSegment(name, "", ids);
-      toast(`Segment "${name}" created with ${ids.length} lead${ids.length === 1 ? "" : "s"}`, "success");
+      await createStaticSegment(name, segmentDescription.trim(), ids);
+      toast(`Segment "${name}" created with ${ids.length} lead${ids.length === 1 ? "" : "s"}.`, "success");
+    });
+  }
+
+  /** Bulk "Add to Campaign" has no notion of an ad-hoc lead-ID audience in the
+   *  campaign builder today — it only accepts "All leads" or a Segment. So this
+   *  quietly creates a Static segment from the selection first, then hands off
+   *  to the builder with that segment pre-selected. */
+  async function handleAddToCampaign() {
+    const ids = [...selected];
+    const count = ids.length;
+    setSelected([]);
+    start(async () => {
+      const seg = await createStaticSegment(`Campaign audience (${count} leads)`, "", ids);
+      router.push(`/campaigns/builder?segment=${seg.id}`);
+    });
+  }
+
+  function handleAssignOwner(ownerId: string) {
+    setShowOwnerMenu(false);
+    const ids = [...selected];
+    const ownerName = owners[ownerId] || "owner";
+    setSelected([]);
+    start(async () => {
+      await Promise.allSettled(ids.map((id) => updateLead(id, { owner_id: ownerId })));
+      toast(`${ids.length} lead${ids.length === 1 ? "" : "s"} assigned to ${ownerName}.`, "success");
+      router.refresh();
+    });
+  }
+
+  function toggleFavorite(lead: LeadRow) {
+    start(async () => {
+      await updateLead(lead.id, { is_favorite: !lead.is_favorite });
+      router.refresh();
     });
   }
 
   async function handleDelete(id: string) {
-    if (!(await confirm({ title: "Delete lead?", message: "Delete this lead?", confirmLabel: "Delete", danger: true }))) return;
+    if (!(await confirm({ title: "Delete lead?", message: "Delete this lead? This action cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
     start(async () => {
       await deleteLead(id);
       setSelected((s) => s.filter((x) => x !== id));
@@ -427,26 +732,90 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       case "name": {
         const name = displayName(l);
         return (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); toggleFavorite(l); }}
+              title={l.is_favorite ? "Remove from favorites" : "Add to favorites"}
+              className="p-0.5 rounded flex-shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <Star className={cn("h-4 w-4", l.is_favorite ? "fill-amber-400 text-amber-400" : "text-slate-300 dark:text-slate-600")} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); openLead(l.id); }}
+              className="flex items-center gap-2 max-w-[220px] text-left group"
+            >
+              <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(name))}>
+                {initials(name)}
+              </span>
+              <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
+                {name}
+              </span>
+            </button>
+          </div>
+        );
+      }
+      case "company": {
+        if (l.company_name) {
+          return (
+            <span className="flex items-center gap-1.5 max-w-[180px]">
+              <CompanyLogo name={l.company_name} />
+              <span className="truncate text-slate-700 dark:text-slate-300 whitespace-nowrap" title={l.company_name || undefined}>{l.company_name}</span>
+            </span>
+          );
+        }
+        const isFindingCompany = findingCompanyId === l.id;
+        return (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); openLead(l.id); }}
-            className="flex items-center gap-2 max-w-[220px] text-left group"
+            disabled={isFindingCompany}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleFindCompany(l);
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap disabled:opacity-75"
           >
-            <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(name))}>
-              {initials(name)}
-            </span>
-            <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
-              {name}
-            </span>
+            {isFindingCompany ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin text-blue-600 dark:text-blue-400" /> Finding...
+              </>
+            ) : (
+              <>
+                <Plus className="h-3 w-3" /> Add company
+              </>
+            )}
           </button>
         );
       }
-      case "company":
-        return <span className="block max-w-[180px] truncate text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap" title={l.company_name || ""}>{l.company_name || "—"}</span>;
       case "email":
-        return <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap" title={l.email || ""}>{l.email || "—"}</span>;
+        return l.email ? (
+          <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-300 whitespace-nowrap" title={l.email}>{l.email}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const r = e.currentTarget.getBoundingClientRect();
+              setFindEmailFor({ lead: l, top: r.bottom + 6, left: r.left });
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
+          >
+            <Mail className="h-3 w-3" /> Find email
+          </button>
+        );
       case "industry":
-        return <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap" title={l.industry || ""}>{l.industry || "—"}</span>;
+        return l.industry ? (
+          <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-400 whitespace-nowrap" title={l.industry}>{l.industry}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowAiColumnModal(true); }}
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
+          >
+            <Sparkles className="h-3 w-3" /> Enrich with AI
+          </button>
+        );
       case "score": {
         const level = scoreLevel(l.lead_score);
         return (
@@ -459,35 +828,68 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         );
       }
       case "status":
-        return <Badge variant={statusVariant[l.status] || "default"}>{l.status}</Badge>;
+        return <StatusPill status={l.status} />;
       case "phone":
-        return <span className="text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{l.phone || "—"}</span>;
+        return l.phone ? (
+          <span className="text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{l.phone}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
+          >
+            <Plus className="h-3 w-3" /> Add phone
+          </button>
+        );
       case "interest_area":
         return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.interest_area || "—"}</span>;
       case "source":
         return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.source || "—"}</span>;
-      case "owner":
-        return (
-          <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">
-            {(l.owner_id && owners[l.owner_id]) || <span className="text-slate-400">Unassigned</span>}
+      case "owner": {
+        const ownerName = l.owner_id ? owners[l.owner_id] : undefined;
+        return ownerName ? (
+          <span className="flex items-center gap-1.5 max-w-[140px]">
+            <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0", logoColor(ownerName))}>
+              {ownerName.trim()[0]?.toUpperCase() || "?"}
+            </span>
+            <span className="truncate text-slate-600 dark:text-slate-400 whitespace-nowrap">{ownerName}</span>
           </span>
+        ) : (
+          <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap"><span className="text-slate-400">Unassigned</span></span>
         );
+      }
       case "last_activity":
-        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{new Date(l.updated_at).toLocaleDateString()}</span>;
+        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(l.updated_at)}</span>;
       case "linkedin":
-        return l.linkedin
-          ? <a href={l.linkedin} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
-          : <span className="text-slate-400">—</span>;
+        return l.linkedin ? (
+          <a href={l.linkedin} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
+          >
+            <Plus className="h-3 w-3" /> Add LinkedIn
+          </button>
+        );
       case "website":
-        return l.website_url
-          ? <a href={l.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Link2 className="h-3.5 w-3.5 flex-shrink-0" />{l.website_url.replace(/^https?:\/\//, "")}</a>
-          : <span className="text-slate-400">—</span>;
+        return l.website_url ? (
+          <a href={l.website_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Link2 className="h-3.5 w-3.5 flex-shrink-0" />{l.website_url.replace(/^https?:\/\//, "")}</a>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setEditingLead(l); }}
+            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
+          >
+            <Plus className="h-3 w-3" /> Add website
+          </button>
+        );
       case "verified":
         return l.verified
           ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
           : <span className="text-xs text-slate-400 whitespace-nowrap">No</span>;
       case "created_at":
-        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</span>;
+        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDateTime(l.created_at)}</span>;
       default:
         return null;
     }
@@ -496,6 +898,49 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   return (
     <div className="flex items-start gap-4">
     <div className={showAiColumnModal ? "flex-1 min-w-0" : "max-w-[1600px] mx-auto w-full"}>
+      {/* Page header — title + total count badge, breadcrumb, Export/Refresh/Import actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Leads
+            <span className="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-0.5">
+              {leads.length}
+            </span>
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-300">Home</Link>
+            <span className="mx-1">›</span>
+            <span className="text-slate-700 dark:text-slate-300 font-medium">Leads</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative">
+            <Button size="sm" onClick={() => setShowExportMenu((v) => !v)} className="rounded-xl gap-1.5 font-semibold h-8 text-xs px-3">
+              <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
+            </Button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-1">
+                  <button onClick={handleExportPdf} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">
+                    <FileText className="h-3.5 w-3.5 text-slate-400" /> Export as PDF
+                  </button>
+                  <button onClick={handleExportExcel} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-slate-400" /> Export as Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <Button variant="outline" size="icon" onClick={() => router.refresh()} title="Refresh" className="rounded-xl h-8 w-8">
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import leads" className="rounded-xl h-8 w-8">
+            <Upload className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
           <p className="text-sm text-blue-900">
@@ -506,7 +951,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         </div>
       )}
       <Card className="overflow-hidden">
-        {/* Compact Single-Line Toolbar */}
+        {/* Toolbar */}
         <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
           {/* Left Controls: Search + Count + Compact Tool Buttons */}
           <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
@@ -527,6 +972,21 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               <span>{filtered.length} Lead{filtered.length === 1 ? "" : "s"}</span>
             </div>
 
+            {/* Date Range Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openDatesPopover}
+              className={cn(
+                "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
+                hasActiveDateFilter && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
+              )}
+              title="Filter by date added"
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              <span>{dateRangeLabel()}</span>
+            </Button>
+
             {/* Filter Button */}
             <Button
               variant="outline"
@@ -540,6 +1000,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             >
               <Filter className="h-3.5 w-3.5" />
               <span>Filter</span>
+              <ChevronDown className="h-3 w-3" />
               {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
             </Button>
 
@@ -548,11 +1009,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               variant="outline"
               size="sm"
               onClick={openColsMenu}
-              className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 text-slate-700 dark:text-slate-300 flex-shrink-0"
+              className="rounded-xl gap-1 font-semibold h-8 text-xs px-2.5 flex-shrink-0 border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950/60"
               title="Customize visible columns"
             >
-              <Settings2 className="h-3.5 w-3.5 text-slate-400" />
-              <span>Columns</span>
+              <Settings2 className="h-3.5 w-3.5" />
+              <span>Manage Columns</span>
             </Button>
 
             {/* Use AI Button */}
@@ -568,29 +1029,30 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             </Button>
           </div>
 
-          {/* Right Controls: Bulk Delete + Sort Dropdown + Add Leads Primary Button */}
+          {/* Right Controls: Sort Dropdown + View Toggle + Add Lead */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-            {selected.length > 0 && (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={handleBulkDelete}
-                className="rounded-xl gap-1 font-semibold h-8 px-2.5 text-xs flex-shrink-0"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Delete</span> ({selected.length})
-              </Button>
-            )}
-
             {/* Sort Dropdown */}
-            <div className="relative inline-flex items-center flex-shrink-0 w-[88px]">
-              <ArrowUpDown className="h-3 w-3 text-slate-400 absolute left-2 pointer-events-none" />
+            <div className="relative inline-flex items-center gap-1 flex-shrink-0 w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 pl-2.5 pr-1.5 shadow-sm">
+              <ArrowUpDown className="h-3 w-3 text-slate-400 flex-shrink-0" />
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0 whitespace-nowrap">Sort By</span>
               <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as typeof sort)}
-                className="appearance-none w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-5 py-1 h-8 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm cursor-pointer truncate"
+                value={
+                  !sortKey ? "none"
+                  : sortKey === "name" && sortDir === "asc" ? "name"
+                  : sortKey === "score" && sortDir === "desc" ? "score"
+                  : sortKey === "created_at" && sortDir === "desc" ? "newest"
+                  : "none"
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "none") { setSortKey(null); setSortDir("asc"); }
+                  else if (v === "name") { setSortKey("name"); setSortDir("asc"); }
+                  else if (v === "score") { setSortKey("score"); setSortDir("desc"); }
+                  else if (v === "newest") { setSortKey("created_at"); setSortDir("desc"); }
+                }}
+                className="appearance-none bg-transparent border-0 pl-1 pr-4 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer truncate"
               >
-                <option value="none">Sort</option>
+                <option value="none">Default</option>
                 <option value="name">Name A–Z</option>
                 <option value="score">Score High→Low</option>
                 <option value="newest">Newest</option>
@@ -598,95 +1060,56 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               <ChevronDown className="h-3 w-3 text-slate-400 absolute right-1.5 pointer-events-none" />
             </div>
 
-            {/* Add Lead — primary button with a dropdown for the quickest entry methods */}
-            <div className="relative flex-shrink-0">
-              <Button
-                size="sm"
-                onClick={() => setShowAddMenu((v) => !v)}
-                className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs whitespace-nowrap"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add Lead</span>
-                <ChevronDown className={cn("h-3 w-3 transition-transform", showAddMenu && "rotate-180")} />
-              </Button>
-              {showAddMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
-                  <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-50 w-56 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
-                    <button
-                      onClick={() => { setShowAddMenu(false); setWizardSource("manual"); setShowWizard(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
-                    >
-                      <Pencil className="h-4 w-4 text-slate-400 flex-shrink-0" /> Manual entry
-                    </button>
-                    <button
-                      onClick={() => { setShowAddMenu(false); setWizardSource("csv"); setShowWizard(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
-                    >
-                      <FileSpreadsheet className="h-4 w-4 text-slate-400 flex-shrink-0" /> Import CSV
-                    </button>
-                    <button
-                      onClick={() => { setShowAddMenu(false); setWizardSource("buy"); setShowWizard(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
-                    >
-                      <ShoppingCart className="h-4 w-4 text-slate-400 flex-shrink-0" /> Find new leads
-                    </button>
-                    <button
-                      onClick={() => { setShowAddMenu(false); setWizardSource(null); setShowWizard(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 mt-1 border-t border-slate-100 dark:border-slate-800 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
-                    >
-                      <Search className="h-4 w-4 flex-shrink-0" /> More sources…
-                    </button>
-                  </div>
-                </>
-              )}
+            {/* List/Grid View Toggle */}
+            <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0">
+              <button type="button" onClick={() => setView("list")} className={cn("h-8 w-8 flex items-center justify-center transition-colors", view === "list" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800")} title="List view"><LayoutList className="h-3.5 w-3.5" /></button>
+              <button type="button" onClick={() => setView("grid")} className={cn("h-8 w-8 flex items-center justify-center transition-colors border-l border-slate-200 dark:border-slate-800", view === "grid" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800")} title="Grid view"><LayoutGrid className="h-3.5 w-3.5" /></button>
             </div>
+
+            {/* Add Lead — opens the source-picker screen directly (Manual, CSV, LinkedIn, Buy Leads, etc.) */}
+            <Button
+              size="sm"
+              onClick={() => setShowWizard(true)}
+              className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Lead</span>
+            </Button>
           </div>
         </div>
 
-        {/* Quick status/score filters */}
-        <div className="px-3 sm:px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-          {([
-            ["all", "All"],
-            ["new", "New"],
-            ["qualified", "Qualified"],
-            ["hot", "Hot Leads"],
-            ["followup", "Needs Follow-up"],
-          ] as const).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setQuickFilter(key)}
-              className={cn(
-                "flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap",
-                quickFilter === key
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-              )}
-            >
-              {label} <span className={cn("tabular-nums", quickFilter === key ? "text-white/80" : "text-slate-400")}>({quickFilterCounts[key]})</span>
-            </button>
-          ))}
-        </div>
-
         {/* Table Container */}
+        {view === "list" && (
         <div className="relative">
-          <div ref={scrollRef} className="overflow-y-auto max-h-[calc(100vh-260px)] scrollbar-hide">
-            <DataTable className="min-w-[900px]">
-              <DataTableHead className="dark:bg-slate-950/80 sticky top-0 z-10 backdrop-blur-md">
+          <div ref={scrollRef} className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)]">
+            {/* border-separate (not border-collapse) — collapse renders duplicated/
+                dashed hairline artifacts at sticky (frozen) column boundaries in
+                Chrome/Safari when combined with position:sticky cells. */}
+            <table className="w-full text-sm border-separate border-spacing-0 min-w-[900px]">
+              <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <DataTableTh className="w-10">
+                  <th className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-2.5 w-10">
                     <input
                       type="checkbox"
                       checked={selected.length === filtered.length && filtered.length > 0}
                       onChange={toggleAll}
                       className="rounded border-slate-300 dark:border-slate-700"
                     />
-                  </DataTableTh>
+                  </th>
                   {visibleCols.map((c) => {
                     const filterable = c.key !== "index";
+                    const sortable = c.key !== "index";
                     const active = Boolean(columnFilters[c.key]);
+                    const isSorted = sortKey === c.key;
                     return (
-                      <DataTableTh key={c.key} className={cn(c.key === "index" && "w-12")}>
+                      <th
+                        key={c.key}
+                        className={cn(
+                          "px-3 py-2.5 font-bold whitespace-nowrap",
+                          c.key === "index" && "w-12 sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
+                          c.key === "name" && "sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
+                        )}
+                      >
                         <span
                           role={filterable ? "button" : undefined}
                           title={filterable ? `Click to search ${c.label}` : undefined}
@@ -699,6 +1122,42 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                         >
                           {c.icon && <c.icon className={cn("h-3.5 w-3.5", active ? "text-blue-500" : "text-slate-400")} />}
                           {c.label === "Row #" ? "#" : c.label}
+                          {sortable && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); toggleColumnSort(c.key); }}
+                              title={`Sort by ${c.label}`}
+                              className={cn("p-0.5 rounded hover:bg-slate-200/70 dark:hover:bg-slate-700", isSorted && "text-blue-600 dark:text-blue-400")}
+                            >
+                              {isSorted ? (
+                                sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                              ) : (
+                                <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                              )}
+                            </button>
+                          )}
+                          {c.key === "company" && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBulkFindCompany();
+                              }}
+                              disabled={isBulkFindingCompany}
+                              title={
+                                selected.length > 0
+                                  ? `Run company search for ${selected.length} selected lead(s)`
+                                  : "Run company search for all leads missing a company name"
+                              }
+                              className="ml-1 inline-flex items-center justify-center p-1 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/70 transition-transform active:scale-95 disabled:opacity-50"
+                            >
+                              {isBulkFindingCompany ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600 dark:text-blue-400" />
+                              ) : (
+                                <Play className="h-3.5 w-3.5 fill-current text-blue-600 dark:text-blue-400 hover:scale-110" />
+                              )}
+                            </button>
+                          )}
                           {active && (
                             <span
                               role="button"
@@ -710,14 +1169,14 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                             </span>
                           )}
                         </span>
-                      </DataTableTh>
+                      </th>
                     );
                   })}
                   {aiColumns.map((col) => {
                     const running = runProgress?.columnId === col.id;
                     const pct = running && runProgress.total > 0 ? Math.round((runProgress.done / runProgress.total) * 100) : 0;
                     return (
-                      <DataTableTh key={col.id} className="w-[200px] max-w-[200px]">
+                      <th key={col.id} className="px-3 py-2.5 font-bold w-[200px] max-w-[200px] whitespace-nowrap">
                         <span className="flex items-center gap-1.5 min-w-0">
                           <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                           <span className="truncate" title={col.name}>{col.name}</span>
@@ -737,46 +1196,53 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                             <span className="text-[10px] font-normal normal-case text-slate-400 tabular-nums flex-shrink-0">{pct}%</span>
                           </div>
                         )}
-                      </DataTableTh>
+                      </th>
                     );
                   })}
-                  <DataTableTh className="w-12 text-right"></DataTableTh>
+                  <th className="px-3 py-2.5 w-16 text-right font-bold whitespace-nowrap">Action</th>
                 </tr>
-              </DataTableHead>
-              <DataTableBody className="divide-y divide-slate-100">
+              </thead>
+              <tbody className="divide-y divide-slate-100">
                 {paged.length === 0 && (
-                  <DataTableEmpty colSpan={visibleCols.length + aiColumns.length + 2}>
-                    No leads yet. Click <strong>Add Leads</strong> to import from LinkedIn, social, or a CSV.
-                  </DataTableEmpty>
+                  <tr>
+                    <td colSpan={visibleCols.length + aiColumns.length + 2} className="px-4 py-16 text-center text-slate-500">
+                      No leads yet. Click <strong>Add Leads</strong> to import from LinkedIn, social, or a CSV.
+                    </td>
+                  </tr>
                 )}
                 {paged.map((l, i) => (
-                  <DataTableRow
+                  <tr
                     key={l.id}
                     onClick={() => openLead(l.id)}
-                    className="cursor-pointer"
+                    className="group hover:bg-slate-50 transition-colors cursor-pointer"
                   >
-                    <DataTableTd onClick={(e) => e.stopPropagation()}>
+                    <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.includes(l.id)}
                         onChange={() => toggle(l.id)}
                         className="rounded border-slate-300"
                       />
-                    </DataTableTd>
+                    </td>
                     {visibleCols.map((c) => (
-                      <DataTableTd
+                      <td
                         key={c.key}
+                        className={cn(
+                          "px-3 py-2",
+                          c.key === "index" && "sticky left-10 z-10 bg-white group-hover:bg-slate-50 transition-colors",
+                          c.key === "name" && "sticky left-[88px] z-10 bg-white group-hover:bg-slate-50 transition-colors"
+                        )}
                         onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
                       >
-                        {renderCell(c.key, l, safePage * PAGE_SIZE + i + 1)}
-                      </DataTableTd>
+                        {renderCell(c.key, l, safePage * pageSize + i + 1)}
+                      </td>
                     ))}
                     {aiColumns.map((col) => {
                       const cellKey = `${col.id}:${l.id}`;
                       const computed = l.custom_fields?.[col.id];
                       const running = runningCellKey === cellKey || runningColumnId === col.id;
                       return (
-                        <DataTableTd key={col.id} onClick={(e) => e.stopPropagation()}>
+                        <td key={col.id} className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                           {running ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
                           ) : computed ? (
@@ -789,30 +1255,250 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                               <Play className="h-3 w-3" /> Generate
                             </button>
                           )}
-                        </DataTableTd>
+                        </td>
                       );
                     })}
-                    <DataTableTd onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => handleDelete(l.id)}
-                        disabled={pending}
-                        title="Delete lead"
-                        className="p-1 rounded-md hover:bg-red-50 disabled:opacity-50"
+                        onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setRowMenu({ id: l.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) }); }}
+                        title="Row actions"
+                        className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
                       >
-                        <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" />
+                        <MoreVertical className="h-4 w-4 text-slate-400" />
                       </button>
-                    </DataTableTd>
-                  </DataTableRow>
+                    </td>
+                  </tr>
                 ))}
-              </DataTableBody>
-            </DataTable>
+              </tbody>
+            </table>
           </div>
         </div>
+        )}
 
-        <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={(p) => setPage(p - 1)} />
+        {/* Grid/card view — a simpler secondary view over the same filtered/sorted/paged leads;
+            intentionally skips sticky columns, missing-data quick actions, AI columns, and
+            bulk-select, which stay list-view-only. */}
+        {view === "grid" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-3 sm:p-4">
+            {paged.map((l) => (
+              <div key={l.id} onClick={() => openLead(l.id)} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span className={cn("h-8 w-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0", avatarColor(displayName(l)))}>
+                    {initials(displayName(l))}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-slate-900 dark:text-white truncate text-sm">{displayName(l)}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{l.company_name || "—"}</p>
+                  </div>
+                  <StatusPill status={l.status} />
+                </div>
+                <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p>{l.email || "—"}</p>
+                  <p>{l.phone || "—"}</p>
+                  <p>{formatDateTime(l.created_at)}</p>
+                </div>
+              </div>
+            ))}
+            {paged.length === 0 && (
+              <p className="col-span-full text-center text-slate-500 dark:text-slate-400 py-16">No leads yet. Click <strong>Add Lead</strong> to import from LinkedIn, social, or a CSV.</p>
+            )}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-1.5 text-xs">
+            <span>Show</span>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>entries</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              aria-label="Previous page"
+              className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
+            >
+              <ChevronDown className="h-3.5 w-3.5 rotate-90" />
+            </button>
+            {(() => {
+              // 1-indexed page numbers, windowed around the current page with "…" gaps —
+              // always keeps the first/last page visible so long lists (e.g. 125 leads =
+              // 13 pages at 10/page) don't render a button per page.
+              const current = safePage + 1;
+              const around = 1;
+              const nums: number[] = [];
+              for (let i = 1; i <= pageCount; i++) {
+                if (i === 1 || i === pageCount || (i >= current - around && i <= current + around)) nums.push(i);
+              }
+              const withDots: (number | "…")[] = [];
+              let prev: number | undefined;
+              for (const n of nums) {
+                if (prev !== undefined && n - prev > 1) withDots.push("…");
+                withDots.push(n);
+                prev = n;
+              }
+              return withDots.map((n, i) =>
+                n === "…" ? (
+                  <span key={`dots-${i}`} className="px-1 text-xs text-slate-400">…</span>
+                ) : (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setPage(n - 1)}
+                    className={cn(
+                      "h-7 min-w-7 px-2 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors",
+                      n === current
+                        ? "bg-red-600 text-white"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    {n}
+                  </button>
+                )
+              );
+            })()}
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              disabled={safePage >= pageCount - 1}
+              aria-label="Next page"
+              className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
+            >
+              <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
+            </button>
+          </div>
+        </div>
       </Card>
 
-      <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} initialSource={wizardSource} />
+      <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
+
+      {editingLead && (
+        <EditLeadModal open={Boolean(editingLead)} onClose={() => setEditingLead(null)} lead={editingLead} />
+      )}
+
+      {/* Find-email popover — anchored to the row's Email cell */}
+      {findEmailFor && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setFindEmailFor(null)} />
+          <div
+            className="fixed z-50 w-72 rounded-xl border border-slate-200 bg-white shadow-xl p-3"
+            style={{ top: findEmailFor.top, left: findEmailFor.left }}
+          >
+            <FindEmailPicker
+              leadId={findEmailFor.lead.id}
+              linkedinUrl={findEmailFor.lead.linkedin}
+              onFound={(email) => {
+                const leadId = findEmailFor.lead.id;
+                setFindEmailFor(null);
+                start(async () => {
+                  await updateLead(leadId, { email });
+                  toast("Email found and saved.", "success");
+                  router.refresh();
+                });
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Row actions menu — kebab button in the rightmost column, Edit + Delete */}
+      {rowMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setRowMenu(null)} />
+          <div className="fixed z-50 w-36 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-1" style={{ top: rowMenu.top, left: rowMenu.left }}>
+            <button
+              onClick={() => { const id = rowMenu.id; const lead = paged.find((x) => x.id === id) || leads.find((x) => x.id === id); setRowMenu(null); if (lead) setEditingLead(lead); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </button>
+            <button
+              onClick={() => { const id = rowMenu.id; setRowMenu(null); handleDelete(id); }}
+              disabled={pending}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-rose-950/50 rounded-lg disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Create Segment dialog */}
+      <Modal open={segmentDialogOpen} onClose={() => setSegmentDialogOpen(false)} title="Create Segment" description="Save the selected leads as a segment you can target with campaigns." size="md">
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="text-xs font-medium text-slate-600">Segment name</label>
+            <input
+              autoFocus
+              value={segmentName}
+              onChange={(e) => setSegmentName(e.target.value)}
+              placeholder="e.g. E-learning Prospects"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600">Description <span className="text-slate-400">(optional)</span></label>
+            <Textarea
+              value={segmentDescription}
+              onChange={(e) => setSegmentDescription(e.target.value)}
+              rows={2}
+              className="mt-1 text-sm"
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            <span>Selected leads</span>
+            <span className="font-semibold text-slate-900">{selected.length}</span>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1.5 block">Segment type</label>
+            <div className="space-y-2">
+              <label className={cn("flex items-start gap-2.5 rounded-lg border p-3 cursor-pointer", segmentType === "static" ? "border-blue-500 bg-blue-50/50" : "border-slate-200")}>
+                <input type="radio" name="segment-type" className="mt-0.5" checked={segmentType === "static"} onChange={() => setSegmentType("static")} />
+                <span>
+                  <span className="block text-sm font-medium text-slate-900">Static segment</span>
+                  <span className="block text-xs text-slate-500">Always contains exactly these {selected.length} selected leads.</span>
+                </span>
+              </label>
+              <label className={cn("flex items-start gap-2.5 rounded-lg border p-3 cursor-pointer", segmentType === "dynamic" ? "border-blue-500 bg-blue-50/50" : "border-slate-200")}>
+                <input type="radio" name="segment-type" className="mt-0.5" checked={segmentType === "dynamic"} onChange={() => setSegmentType("dynamic")} />
+                <span>
+                  <span className="block text-sm font-medium text-slate-900">Dynamic segment</span>
+                  <span className="block text-xs text-slate-500">Automatically adds leads matching defined conditions.</span>
+                </span>
+              </label>
+            </div>
+            {segmentType === "dynamic" && (
+              <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Dynamic segments are built from rule conditions in the full{" "}
+                <Link href="/segments/builder" className="underline font-medium">Segment Builder</Link>. This dialog can only create a Static segment from your selection.
+              </p>
+            )}
+          </div>
+          {selected.length > 0 && (
+            <p className="text-xs text-slate-500">
+              {selectedWithEmail} lead{selectedWithEmail === 1 ? "" : "s"} ready to email
+              {selectedMissingEmail > 0 && <> · {selectedMissingEmail} lead{selectedMissingEmail === 1 ? "" : "s"} missing an email address</>}
+            </p>
+          )}
+        </div>
+        <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setSegmentDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleCreateSegment} disabled={!segmentName.trim() || segmentType === "dynamic" || pending}>
+            Create Segment
+          </Button>
+        </div>
+      </Modal>
 
       {/* AI column header menu — run on all rows, or delete the column */}
       {aiColMenu && (
@@ -843,25 +1529,62 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowCols(false)} />
           <div
-            className="fixed z-50 w-60 rounded-xl border border-slate-200 bg-white shadow-xl p-2"
+            className="fixed z-50 w-64 rounded-xl border border-slate-200 bg-white shadow-xl p-2"
             style={{ top: colsPos.top, right: colsPos.right }}
           >
             <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
             <div className="max-h-80 overflow-y-auto">
-              {COLUMNS.map((c) => (
-                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm text-slate-700">
+              {FIRST_COLUMNS.map((c) => (
+                <div key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm text-slate-700">
                   <input
                     type="checkbox"
                     checked={cols[c.key]}
                     onChange={() => toggleCol(c.key)}
                     className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="flex-1 inline-flex items-center gap-1.5">
                     {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}
                     {c.label}
                   </span>
-                </label>
+                  <span title="Always shown first — position is fixed" className="text-slate-300"><Lock className="h-3 w-3" /></span>
+                </div>
               ))}
+              <div className="my-1 border-t border-slate-100" />
+              {colOrder.map((key, i) => {
+                const c = columnByKey.get(key)!;
+                return (
+                  <div key={key} className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={cols[c.key]}
+                      onChange={() => toggleCol(c.key)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                    />
+                    <span className="flex-1 inline-flex items-center gap-1.5 min-w-0 truncate">
+                      {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />}
+                      <span className="truncate">{c.label}</span>
+                    </span>
+                    <div className="flex items-center flex-shrink-0">
+                      <button
+                        onClick={() => moveCol(key, -1)}
+                        disabled={i === 0}
+                        title="Move up"
+                        className="p-0.5 rounded hover:bg-slate-200/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                      </button>
+                      <button
+                        onClick={() => moveCol(key, 1)}
+                        disabled={i === colOrder.length - 1}
+                        title="Move down"
+                        className="p-0.5 rounded hover:bg-slate-200/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div className="border-t border-slate-100 mt-1 pt-1">
               <button onClick={resetCols} className="w-full text-left px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-50">
@@ -882,6 +1605,16 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           >
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
             <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
+              <Select value={quickFilter} onChange={(e) => setQuickFilter(e.target.value as QuickFilter)}>
+                <option value="all">All ({quickFilterCounts.all})</option>
+                <option value="new">New ({quickFilterCounts.new})</option>
+                <option value="qualified">Qualified ({quickFilterCounts.qualified})</option>
+                <option value="hot">Hot Leads ({quickFilterCounts.hot})</option>
+                <option value="followup">Needs Follow-up ({quickFilterCounts.followup})</option>
+              </Select>
+            </div>
+            <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Industry</label>
               <Select value={industryFilter} onChange={(e) => setIndustryFilter(e.target.value)}>
                 <option value="">All industries</option>
@@ -899,34 +1632,52 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                 ))}
               </Select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Added between</label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo || undefined}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
-                  aria-label="From date"
-                />
-                <span className="text-xs text-slate-400">to</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom || undefined}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
-                  aria-label="To date"
-                />
-              </div>
-            </div>
             {hasActiveFilters && (
               <button
-                onClick={() => { setIndustryFilter(""); setInterestFilter(""); setDateFrom(""); setDateTo(""); }}
+                onClick={() => { setQuickFilter("all"); setIndustryFilter(""); setInterestFilter(""); }}
                 className="text-xs text-slate-500 hover:text-slate-700 underline"
               >
                 Clear filters
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Date-range popover — "Added between", its own dedicated toolbar button */}
+      {datesOpen && datesPos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setDatesOpen(false)} />
+          <div
+            className="fixed z-50 w-72 rounded-xl border border-slate-200 bg-white shadow-xl p-3 space-y-3"
+            style={{ top: datesPos.top, left: datesPos.left }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Added between</p>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="flex-1 min-w-0 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                aria-label="From date"
+              />
+              <span className="text-xs text-slate-400 flex-shrink-0">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="flex-1 min-w-0 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                aria-label="To date"
+              />
+            </div>
+            {hasActiveDateFilter && (
+              <button
+                onClick={() => { setDateFrom(""); setDateTo(""); }}
+                className="text-xs text-slate-500 hover:text-slate-700 underline"
+              >
+                Clear dates
               </button>
             )}
           </div>
@@ -965,33 +1716,96 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
         </>
       )}
 
-      {/* LP-15 — floating selection action bar */}
+      {/* Floating selection action bar — white with a subtle shadow + green accents,
+          positioned above rows without covering the toolbar. */}
       {selected.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lp-anim-pop max-w-[calc(100vw-2rem)]">
-          <div className="flex items-center gap-3 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/30 pl-5 pr-3 py-2.5">
-            <span className="text-sm font-medium whitespace-nowrap">
-              <span className="font-semibold">{selected.length}</span> selected
+          <div className="flex items-center gap-3 rounded-full bg-white dark:bg-slate-900 shadow-xl shadow-slate-900/10 ring-1 ring-slate-200 dark:ring-slate-800 pl-5 pr-3 py-2.5">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+              <Check className="h-4 w-4 text-emerald-600" />
+              {selected.length} lead{selected.length === 1 ? "" : "s"} selected
             </span>
-            <span className="h-5 w-px bg-white/20" />
+            <span className="h-5 w-px bg-slate-200 dark:bg-slate-800" />
             <button
-              onClick={handleCreateSegment}
-              disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white text-blue-600 hover:bg-blue-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+              onClick={openSegmentDialog}
+              className="inline-flex items-center gap-1.5 rounded-full text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
             >
-              <Layers3 className="h-3.5 w-3.5" /> Create segment
+              <Layers3 className="h-3.5 w-3.5" /> Create Segment
             </button>
             <button
-              onClick={handleBulkDelete}
+              onClick={handleAddToCampaign}
               disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white text-red-600 hover:bg-red-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
             >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
+              <Megaphone className="h-3.5 w-3.5" /> Add to Campaign
             </button>
+            <button
+              onClick={handleBulkFindCompany}
+              disabled={isBulkFindingCompany}
+              className="inline-flex items-center gap-1.5 rounded-full text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              {isBulkFindingCompany ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600 dark:text-blue-400" />
+              ) : (
+                <Play className="h-3.5 w-3.5 fill-current text-blue-600 dark:text-blue-400" />
+              )}
+              Find Companies
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowOwnerMenu((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-full text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+              >
+                <UserPlus className="h-3.5 w-3.5" /> Assign Owner
+              </button>
+              {showOwnerMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowOwnerMenu(false)} />
+                  <div className="lp-anim-pop origin-bottom-left absolute left-0 bottom-full mb-1 z-50 w-52 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
+                    {Object.keys(owners).length === 0 && (
+                      <p className="px-3 py-2 text-xs text-slate-400">No users found.</p>
+                    )}
+                    {Object.entries(owners).map(([id, name]) => (
+                      <button
+                        key={id}
+                        onClick={() => handleAssignOwner(id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left truncate"
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setShowMoreMenu((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+              >
+                More <ChevronDown className={cn("h-3 w-3 transition-transform", showMoreMenu && "rotate-180")} />
+              </button>
+              {showMoreMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
+                  <div className="lp-anim-pop origin-bottom-left absolute left-0 bottom-full mb-1 z-50 w-44 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={pending}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 text-left"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <span className="h-5 w-px bg-slate-200 dark:bg-slate-800" />
             <button
               onClick={() => setSelected([])}
-              className="rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 px-2 whitespace-nowrap"
             >
-              Clear
+              Deselect all
             </button>
           </div>
         </div>

@@ -4,22 +4,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown, LogOut, User as UserIcon, Settings, Menu, Sparkles,
-  Phone, ShoppingBag, HelpCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2
+  Phone, ShoppingBag, HelpCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2,
+  Building2, Check, Plus
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { globalSearch, type GlobalSearchResult } from "@/lib/queries/global-search";
+import { switchWorkspace, createWorkspace, type MyWorkspaceRow } from "@/lib/queries/workspaces";
 import { NotificationsBell } from "./notifications-bell";
 import { useSidebar } from "./sidebar-context";
+import { Modal } from "@/components/ui/modal";
 
 interface TopbarProps {
   userName?: string;
   userEmail?: string;
   userRole?: string;
+  workspaces?: MyWorkspaceRow[];
   onToggleAssistant?: () => void;
   assistantOpen?: boolean;
 }
 
-export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, assistantOpen = false }: TopbarProps) {
+export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], onToggleAssistant, assistantOpen = false }: TopbarProps) {
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [open, setOpen] = useState(false);
@@ -27,10 +31,51 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<GlobalSearchResult>({ leads: [], campaigns: [] });
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initials = userName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+
+  async function handleSwitchWorkspace(id: string) {
+    setSwitchError(null);
+    setSwitchingId(id);
+    const result = await switchWorkspace(id);
+    // Reset the spinner either way — the client component instance survives
+    // the router navigation below (same layout shell), so leaving switchingId
+    // set on success left the spinner stuck next to that workspace forever,
+    // only clearing on a full manual page reload.
+    setSwitchingId(null);
+    if (!result.ok) {
+      setSwitchError(result.error || "Couldn't switch workspace.");
+      return;
+    }
+    setOpen(false);
+    router.push("/dashboard");
+    router.refresh();
+  }
+
+  async function handleCreateWorkspace() {
+    setCreateError(null);
+    setCreating(true);
+    const result = await createWorkspace(newWorkspaceName);
+    setCreating(false);
+    if (!result.ok) {
+      setCreateError(result.error || "Couldn't create the workspace.");
+      return;
+    }
+    setCreateOpen(false);
+    setNewWorkspaceName("");
+    setOpen(false);
+    router.push("/dashboard");
+    router.refresh();
+  }
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -53,10 +98,15 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
     }
     setSearchLoading(true);
     setSearchOpen(true);
+    setSearchError(null);
     searchDebounceRef.current = setTimeout(async () => {
       try {
         const res = await globalSearch(q);
         setSearchResults(res);
+      } catch (err) {
+        console.error("globalSearch failed:", err);
+        setSearchResults({ leads: [], campaigns: [] });
+        setSearchError("Search failed. Try again.");
       } finally {
         setSearchLoading(false);
       }
@@ -80,7 +130,7 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
   }
 
   return (
-    <header className="h-16 py-2.5 bg-[var(--primary)] px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-3 sticky top-0 z-30 text-white shadow-sm">
+    <header className="h-16 py-2.5 bg-[var(--primary)] px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-3 sticky top-0 z-30 text-white shadow-sm rounded-br-2xl">
       {/* Left side: hamburger (mobile) + global search */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {/* Hamburger — mobile/tablet only */}
@@ -115,7 +165,10 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
 
           {searchOpen && (
             <div className="lp-anim-pop absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden z-40 max-h-96 overflow-y-auto text-slate-900">
-              {!searchLoading && !hasSearchResults && (
+              {!searchLoading && searchError && (
+                <p className="px-4 py-6 text-sm text-red-600 text-center">{searchError}</p>
+              )}
+              {!searchLoading && !searchError && !hasSearchResults && (
                 <p className="px-4 py-6 text-sm text-slate-500 text-center">No leads or campaigns match &quot;{searchQuery.trim()}&quot;.</p>
               )}
               {searchResults.leads.length > 0 && (
@@ -249,6 +302,36 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
                 <p className="text-sm font-semibold text-slate-900">{userName}</p>
                 <p className="text-xs text-slate-500 truncate">{userEmail}</p>
               </div>
+
+              {workspaces.length > 0 && (
+                <div className="p-1 border-b border-slate-100">
+                  <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Workspaces</p>
+                  {switchError && <p className="px-3 pb-1.5 text-xs text-red-600">{switchError}</p>}
+                  {workspaces.map((ws) => (
+                    <button
+                      key={ws.id}
+                      onClick={() => !ws.isActive && handleSwitchWorkspace(ws.id)}
+                      disabled={switchingId !== null}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      <Building2 className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                      <span className="flex-1 min-w-0 truncate text-left">{ws.name}</span>
+                      {switchingId === ws.id ? (
+                        <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin text-slate-400" />
+                      ) : ws.isActive ? (
+                        <Check className="h-3.5 w-3.5 flex-shrink-0 text-emerald-600" />
+                      ) : null}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => { setOpen(false); setCreateOpen(true); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <Plus className="h-4 w-4 text-slate-400" /> Create workspace
+                  </button>
+                </div>
+              )}
+
               <div className="p-1">
                 <Link
                   href="/settings"
@@ -277,6 +360,40 @@ export function Topbar({ userName = "Guest", userEmail = "", onToggleAssistant, 
           )}
         </div>
       </div>
+
+      <Modal open={createOpen} onClose={() => { setCreateOpen(false); setCreateError(null); }} title="Create workspace" description="Start a brand-new, separate company account. You'll need to set up billing for it separately." size="sm">
+        <div className="p-5 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Workspace name</label>
+            <input
+              type="text"
+              autoFocus
+              value={newWorkspaceName}
+              onChange={(e) => setNewWorkspaceName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && newWorkspaceName.trim() && !creating) handleCreateWorkspace(); }}
+              placeholder="e.g. My Side Business"
+              className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]"
+            />
+          </div>
+          {createError && <p className="text-sm text-red-600">{createError}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              onClick={() => { setCreateOpen(false); setCreateError(null); }}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateWorkspace}
+              disabled={creating || !newWorkspaceName.trim()}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 disabled:opacity-50"
+            >
+              {creating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Create workspace
+            </button>
+          </div>
+        </div>
+      </Modal>
     </header>
   );
 }

@@ -16,34 +16,34 @@ export function DataTable({ className, children, ...props }: React.TableHTMLAttr
 }
 
 export function DataTableHead({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("bg-slate-50/70", className)} {...props} />;
+  return <thead className={cn("bg-slate-50/70 dark:bg-slate-950/80", className)} {...props} />;
 }
 
 export function DataTableBody({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody className={className} {...props} />;
+  return <tbody className={cn("divide-y divide-slate-100 dark:divide-slate-800/70", className)} {...props} />;
 }
 
 export function DataTableRow({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("hover:bg-slate-50/60 transition-colors", className)} {...props} />;
+  return <tr className={cn("hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors", className)} {...props} />;
 }
 
 export function DataTableTh({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={cn("text-left text-xs font-semibold text-slate-600 px-3.5 py-2.5 border-b border-slate-100 whitespace-nowrap", className)}
+      className={cn("text-left text-xs font-semibold text-slate-600 dark:text-slate-400 px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap", className)}
       {...props}
     />
   );
 }
 
 export function DataTableTd({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("px-3.5 py-3 border-b border-slate-100 text-slate-800", className)} {...props} />;
+  return <td className={cn("px-3.5 py-3 border-b border-slate-100 dark:border-slate-800 text-slate-800 dark:text-slate-200", className)} {...props} />;
 }
 
 export function DataTableEmpty({ colSpan, children }: { colSpan: number; children: React.ReactNode }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-3.5 py-12 text-center text-sm text-slate-400">
+      <td colSpan={colSpan} className="px-3.5 py-12 text-center text-sm text-slate-400 dark:text-slate-500">
         {children}
       </td>
     </tr>

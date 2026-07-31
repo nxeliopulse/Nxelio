@@ -3,7 +3,7 @@ import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Users2, Send, MailOpen, Reply, AlertTriangle, Clock, Trash2,
+  ArrowLeft, Users2, Send, MailOpen, Reply, AlertTriangle, Clock,
   BarChart3, MousePointerClick, CalendarClock, Loader2,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd } from "@/components/ui/table";
 import { useFeedback } from "@/components/ui/feedback";
-import { setCampaignStatus, updateCampaign, deleteCampaign, type CampaignRow } from "@/lib/queries/campaigns";
+import { setCampaignStatus, updateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { sendCampaign } from "@/lib/email/campaign-send";
 import { approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { SequenceFlow, type FlowStep } from "@/components/campaigns/sequence-flow";
@@ -169,11 +169,6 @@ export function CampaignDetailView({
   function saveName() {
     start(async () => { await updateCampaign(campaign.id, { campaign_name: name.trim() || "Untitled Campaign" }); toast("Campaign updated", "success"); });
   }
-  async function handleDelete() {
-    if (!(await confirm({ title: "Delete campaign?", message: `Delete “${campaign.campaign_name}”? This can't be undone.`, confirmLabel: "Delete", danger: true }))) return;
-    start(async () => { await deleteCampaign(campaign.id); router.push("/campaigns"); });
-  }
-
   return (
     <div className="max-w-[1400px] mx-auto">
       <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4">
@@ -389,11 +384,6 @@ export function CampaignDetailView({
                 <option>Draft</option><option>Active</option><option>Paused</option><option>Completed</option>
               </Select>
             </div>
-          </Card>
-          <Card className="p-5 border-red-100">
-            <p className="font-medium text-slate-900 mb-1">Danger zone</p>
-            <p className="text-sm text-slate-500 mb-3">Permanently delete this campaign and its stats.</p>
-            <Button variant="danger" onClick={handleDelete} disabled={pending}><Trash2 className="h-4 w-4" /> Delete campaign</Button>
           </Card>
         </div>
       )}

@@ -37,6 +37,7 @@ export interface ContactRow {
   skype_id: string | null;
   secondary_email: string | null;
   twitter: string | null;
+  linkedin: string | null;
   description: string | null;
   created_at: string;
   updated_at: string;
@@ -67,6 +68,29 @@ export async function getContactById(id: string): Promise<ContactWithAccount | n
     .eq("id", id)
     .single();
   return data as ContactWithAccount | null;
+}
+
+/**
+ * Finds an existing Contact that plausibly matches a lead being converted —
+ * by email first, then phone, then LinkedIn. Used to offer "Use existing
+ * Contact" in the Convert Lead modal instead of creating a duplicate.
+ */
+export async function findMatchingContact({ email, phone, linkedin }: { email?: string | null; phone?: string | null; linkedin?: string | null }): Promise<ContactRow | null> {
+  const supabase = await createClient();
+
+  if (email?.trim()) {
+    const { data } = await supabase.from("contacts").select("*").ilike("email", email.trim()).limit(1).maybeSingle();
+    if (data) return data;
+  }
+  if (phone?.trim()) {
+    const { data } = await supabase.from("contacts").select("*").eq("phone", phone.trim()).limit(1).maybeSingle();
+    if (data) return data;
+  }
+  if (linkedin?.trim()) {
+    const { data } = await supabase.from("contacts").select("*").ilike("linkedin", `%${linkedin.trim()}%`).limit(1).maybeSingle();
+    if (data) return data;
+  }
+  return null;
 }
 
 export async function createContact(payload: Partial<ContactRow>) {

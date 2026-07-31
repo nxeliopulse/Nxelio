@@ -46,28 +46,28 @@ export function AccountDetailView({ account, contacts }: { account: AccountRow; 
   const shipping = [account.shipping_street, account.shipping_city, account.shipping_state, account.shipping_zip, account.shipping_country].filter(Boolean).join(", ");
 
   return (
-    <div className="max-w-[1650px] mx-auto pb-10 text-slate-800">
+    <div className="max-w-[1650px] mx-auto pb-10 text-slate-800 dark:text-slate-200">
       <div className="flex items-center justify-between mb-3 px-1">
-        <Link href="/accounts" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
+        <Link href="/accounts" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
           <ArrowLeft className="h-4 w-4" /> Accounts
         </Link>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 mb-5 shadow-xs">
+      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 mb-5 shadow-xs dark:bg-slate-900 dark:border-slate-800">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 min-w-0">
             <div className="h-11 w-11 rounded-lg bg-[#1d4ed8] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
               <Building2 className="h-6 w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Account</p>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 truncate tracking-tight">{account.account_name}</h1>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-400">Account</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 truncate tracking-tight dark:text-white">{account.account_name}</h1>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap ml-auto">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="rounded-lg text-xs font-semibold">
-              <Pencil className="h-3.5 w-3.5 text-slate-500" /> Edit
+              <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" /> Edit
             </Button>
             <div className="relative">
               <Button variant="outline" size="icon" onClick={() => setMenuOpen((v) => !v)} className="rounded-lg h-8 w-8">
@@ -76,11 +76,11 @@ export function AccountDetailView({ account, contacts }: { account: AccountRow; 
               {menuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg text-xs">
-                    <button onClick={() => { setMenuOpen(false); setEditOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50">
-                      <Pencil className="h-3.5 w-3.5 text-slate-400" /> Edit Record
+                  <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg text-xs dark:bg-slate-900 dark:border-slate-800">
+                    <button onClick={() => { setMenuOpen(false); setEditOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                      <Pencil className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" /> Edit Record
                     </button>
-                    <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50">
+                    <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
                       <Trash2 className="h-3.5 w-3.5" /> Delete Record
                     </button>
                   </div>
@@ -93,18 +93,18 @@ export function AccountDetailView({ account, contacts }: { account: AccountRow; 
 
       <div className="grid gap-5 grid-cols-1 lg:grid-cols-12">
         <div className="space-y-4 lg:col-span-7 xl:col-span-8">
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-            <button onClick={() => setAboutOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs dark:bg-slate-900 dark:border-slate-800">
+            <button onClick={() => setAboutOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-200">
               <span className="inline-flex items-center gap-2">
-                {aboutOpen ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronUp className="h-4 w-4 text-slate-500" />}
+                {aboutOpen ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
                 About
               </span>
-              <Pencil className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditOpen(true); }} />
+              <Pencil className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 cursor-pointer dark:text-slate-500 dark:hover:text-slate-400" onClick={(e) => { e.stopPropagation(); setEditOpen(true); }} />
             </button>
             {aboutOpen && (
               <div className="p-4 grid grid-cols-2 gap-3.5 text-xs">
                 <Field label="Phone" value={account.phone} icon={<Phone className="h-3 w-3" />} />
-                <Field label="Website" value={account.website ? <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">{account.website} <ExternalLink className="h-3 w-3" /></a> : null} icon={<Globe className="h-3 w-3" />} />
+                <Field label="Website" value={account.website ? <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1 dark:text-blue-400">{account.website} <ExternalLink className="h-3 w-3" /></a> : null} icon={<Globe className="h-3 w-3" />} />
                 <Field label="Industry" value={account.industry} />
                 <Field label="Account type" value={account.account_type} />
                 <Field label="Employees" value={account.employees != null ? String(account.employees) : null} />
@@ -113,31 +113,31 @@ export function AccountDetailView({ account, contacts }: { account: AccountRow; 
                 <Field label="Rating" value={account.rating ? <Badge variant={account.rating === "Hot" ? "danger" : account.rating === "Warm" ? "warning" : "blue"}>{account.rating}</Badge> : null} />
                 <Field label="Ticker symbol" value={account.ticker_symbol} />
                 {account.description && (
-                  <div className="col-span-2 border-t border-slate-100 pt-3">
-                    <span className="block text-slate-500 font-medium mb-0.5">Description</span>
-                    <span className="text-slate-700 whitespace-pre-wrap">{account.description}</span>
+                  <div className="col-span-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                    <span className="block text-slate-500 font-medium mb-0.5 dark:text-slate-400">Description</span>
+                    <span className="text-slate-700 whitespace-pre-wrap dark:text-slate-300">{account.description}</span>
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-            <button onClick={() => setAddressOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs dark:bg-slate-900 dark:border-slate-800">
+            <button onClick={() => setAddressOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-200">
               <span className="inline-flex items-center gap-2">
-                {addressOpen ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronUp className="h-4 w-4 text-slate-500" />}
+                {addressOpen ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
                 Addresses
               </span>
             </button>
             {addressOpen && (
               <div className="p-4 grid grid-cols-2 gap-3.5 text-xs">
                 <div>
-                  <span className="block text-slate-500 font-medium mb-0.5">Billing address</span>
-                  <span className="font-semibold text-slate-800">{billing || "—"}</span>
+                  <span className="block text-slate-500 font-medium mb-0.5 dark:text-slate-400">Billing address</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{billing || "—"}</span>
                 </div>
                 <div>
-                  <span className="block text-slate-500 font-medium mb-0.5">Shipping address</span>
-                  <span className="font-semibold text-slate-800">{shipping || "—"}</span>
+                  <span className="block text-slate-500 font-medium mb-0.5 dark:text-slate-400">Shipping address</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{shipping || "—"}</span>
                 </div>
               </div>
             )}
@@ -145,38 +145,38 @@ export function AccountDetailView({ account, contacts }: { account: AccountRow; 
         </div>
 
         <div className="space-y-4 lg:col-span-5 xl:col-span-4">
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-            <button onClick={() => setContactsOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs dark:bg-slate-900 dark:border-slate-800">
+            <button onClick={() => setContactsOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-200">
               <span className="inline-flex items-center gap-2">
-                {contactsOpen ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronUp className="h-4 w-4 text-slate-500" />}
+                {contactsOpen ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
                 Contacts ({contacts.length})
               </span>
-              <Plus className="h-3.5 w-3.5 text-slate-400 hover:text-blue-600 cursor-pointer" onClick={(e) => { e.stopPropagation(); setAddContactOpen(true); }} />
+              <Plus className="h-3.5 w-3.5 text-slate-400 hover:text-blue-600 cursor-pointer dark:text-slate-500 dark:hover:text-blue-400" onClick={(e) => { e.stopPropagation(); setAddContactOpen(true); }} />
             </button>
             {contactsOpen && (
               <div className="p-4 space-y-3 text-xs">
                 {contacts.length === 0 ? (
-                  <p className="text-slate-400 italic">No contacts linked to this account yet.</p>
+                  <p className="text-slate-400 italic dark:text-slate-500">No contacts linked to this account yet.</p>
                 ) : (
                   contacts.map((c) => (
-                    <Link key={c.id} href={`/contacts/${c.id}`} className="block p-3 rounded-lg border border-slate-200 hover:border-blue-300 transition-colors">
+                    <Link key={c.id} href={`/contacts/${c.id}`} className="block p-3 rounded-lg border border-slate-200 hover:border-blue-300 dark:border-slate-800 dark:hover:border-blue-500/50 transition-colors">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
-                          <Users2 className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" /> {`${c.first_name} ${c.last_name}`.trim()}
+                        <p className="font-semibold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                          <Users2 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" /> {`${c.first_name} ${c.last_name}`.trim()}
                         </p>
-                        <ExternalLink className="h-3 w-3 text-slate-300 flex-shrink-0" />
+                        <ExternalLink className="h-3 w-3 text-slate-300 dark:text-slate-600 flex-shrink-0" />
                       </div>
-                      {c.job_title && <p className="text-slate-500 mt-1 truncate">{c.job_title}</p>}
+                      {c.job_title && <p className="text-slate-500 dark:text-slate-400 mt-1 truncate">{c.job_title}</p>}
                     </Link>
                   ))
                 )}
-                <Link href={`/contacts?account=${account.id}`} className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline pt-1">
+                <Link href={`/contacts?account=${account.id}`} className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline pt-1">
                   View All Contacts →
                 </Link>
               </div>
             )}
           </div>
-          <p className="text-[11px] text-slate-400 px-1">Last updated {formatDateTime(account.updated_at)}</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 px-1">Last updated {formatDateTime(account.updated_at)}</p>
         </div>
       </div>
 
@@ -188,9 +188,9 @@ export function AccountDetailView({ account, contacts }: { account: AccountRow; 
 
 function Field({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
   return (
-    <div className="border-t border-slate-100 pt-3 first:border-t-0 first:pt-0">
-      <span className="flex items-center gap-1 text-slate-500 font-medium mb-0.5">{icon}{label}</span>
-      <span className="font-semibold text-slate-900">{value ?? "—"}</span>
+    <div className="border-t border-slate-100 dark:border-slate-800 pt-3 first:border-t-0 first:pt-0">
+      <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium mb-0.5">{icon}{label}</span>
+      <span className="font-semibold text-slate-900 dark:text-white">{value ?? "—"}</span>
     </div>
   );
 }

@@ -84,7 +84,11 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
     start(async () => {
       const result = await inviteUser(form.email, form.fullName, form.roleId, null);
       if (!result.ok) { setError(result.error || "Failed"); return; }
-      setSuccess(`User created. Temp password: ${result.tempPassword}`);
+      setSuccess(
+        result.existingUser
+          ? "They already have an account — added to this workspace. They can switch to it from their workspace menu next time they log in."
+          : `User created. Temp password: ${result.tempPassword}`
+      );
       const defaultRole = roles.find((r) => r.role_name === "Sales Admin")?.role_id ?? 3;
       setForm({ fullName: "", email: "", roleId: defaultRole });
     });

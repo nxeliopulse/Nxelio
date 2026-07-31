@@ -43,11 +43,16 @@ export interface LeadRow {
   ai_score: AiScoreResult | null;
   status: string;
   verified: boolean;
+  is_favorite: boolean;
   owner_id: string | null;
   created_at: string;
   updated_at: string;
   /** Computed values from custom AI columns, keyed by ai_column_definitions.id. */
   custom_fields: Record<string, { value: string; updated_at: string }> | null;
+  /** Permanent links to whatever this lead became on conversion — set once, never cleared. */
+  converted_account_id: string | null;
+  converted_contact_id: string | null;
+  converted_opportunity_id: string | null;
 }
 
 /** Splits "Jane Doe" into { first: "Jane", last: "Doe" } — same convention used

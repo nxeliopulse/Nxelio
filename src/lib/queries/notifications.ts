@@ -126,7 +126,12 @@ export async function notifyWorkspaceAdmins(workspaceId: string, payload: {
   return notifyUsersByRole(workspaceId, 1, payload);
 }
 
-/** Notifies every user in the workspace with the given role_id (e.g. Reviewers). */
+/**
+ * Notifies every member of the workspace with the given role_id (e.g. Reviewers).
+ * Sourced from workspace_members (not users.workspace_id/role_id directly), so
+ * a member who happens to be "active" in a different workspace right now still
+ * gets notified for THIS workspace's role.
+ */
 export async function notifyUsersByRole(workspaceId: string, roleId: number, payload: {
   type: string;
   title: string;
@@ -134,14 +139,15 @@ export async function notifyUsersByRole(workspaceId: string, roleId: number, pay
   link?: string;
 }) {
   const admin = createAdminClient();
-  const { data: users } = await admin
-    .from("users")
+  const { data: members } = await admin
+    .from("workspace_members")
     .select("user_id")
     .eq("workspace_id", workspaceId)
-    .eq("role_id", roleId);
-  if (!users?.length) return;
+    .eq("role_id", roleId)
+    .eq("status", "ACTIVE");
+  if (!members?.length) return;
   await admin.from("notifications").insert(
-    users.map((a: { user_id: string }) => ({
+    members.map((a: { user_id: string }) => ({
       user_id: a.user_id,
       workspace_id: workspaceId,
       type: payload.type,

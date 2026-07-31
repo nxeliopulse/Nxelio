@@ -28,6 +28,8 @@ export const CLOSED_STAGES: OpportunityStage[] = ["won", "lost"];
 export interface OpportunityRow {
   id: string;
   lead_id: string | null;
+  account_id: string | null;
+  contact_id: string | null;
   name: string;
   company: string | null;
   contact_name: string | null;

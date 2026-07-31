@@ -1,11 +1,11 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, X, Mail, Phone, Globe, Calendar, Star, Send, Building2,
-  Target, Users, BarChart3, MoreHorizontal, FileDown, MailOpen,
-  Mouse, Briefcase, Pencil, Trash2, CalendarDays, ChevronDown, ChevronUp,
+  Target, Users, BarChart3, FileDown, MailOpen,
+  Mouse, Briefcase, Pencil, CalendarDays, ChevronDown, ChevronUp,
   RefreshCw, Sparkles, Filter, CheckCircle2, UserCheck, Plus, ExternalLink, History as HistoryIcon, Megaphone
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -14,11 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { useFeedback } from "@/components/ui/feedback";
 import { ProspectScoreTab } from "@/components/leads/tabs/prospect-score";
 import { SendEmailModal } from "@/components/leads/send-email-modal";
-import { ConvertOpportunityModal } from "@/components/leads/convert-opportunity-modal";
+import { ConvertLeadModal } from "@/components/leads/convert-lead-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { LeadNotesCard } from "@/components/leads/lead-notes-card";
-import { deleteLead, type LeadRow } from "@/lib/queries/leads";
+import type { LeadRow } from "@/lib/queries/leads";
 import { STAGE_LABELS, type OpportunityRow } from "@/lib/opportunities";
 import type { MeetingRow } from "@/lib/queries/meetings";
 import type { LeadHistory } from "@/lib/queries/lead-detail";
@@ -99,13 +99,16 @@ export function LeadDetailView({
   embedded?: boolean;
 }) {
   const router = useRouter();
-  const { confirm, toast } = useFeedback();
-  const [, startDelete] = useTransition();
+  const { toast } = useFeedback();
   const [emailOpen, setEmailOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [converted, setConverted] = useState(lead.status === "Converted");
+  const [convertedIds, setConvertedIds] = useState({
+    accountId: lead.converted_account_id,
+    contactId: lead.converted_contact_id,
+    opportunityId: lead.converted_opportunity_id,
+  });
   const [email, setEmail] = useState(lead.email);
   const [findEmailOpen, setFindEmailOpen] = useState(false);
 
@@ -117,27 +120,10 @@ export function LeadDetailView({
   const [meetingsOpen, setMeetingsOpen] = useState(true);
   const [campaignsOpen, setCampaignsOpen] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(true);
-  const [onlyInsights, setOnlyInsights] = useState(false);
   const [showAiScoreDrawer, setShowAiScoreDrawer] = useState(false);
 
   const displayName = lead.full_name || lead.company_name || "—";
   const firstName = lead.first_name || displayName.split(" ")[0] || "";
-
-  async function handleDelete() {
-    setMenuOpen(false);
-    const ok = await confirm({ title: "Delete contact?", message: `Delete ${displayName}? This can't be undone.`, confirmLabel: "Delete", danger: true });
-    if (!ok) return;
-    startDelete(async () => {
-      try {
-        await deleteLead(lead.id);
-        toast("Contact deleted.", "success");
-        if (onClose) onClose();
-        else router.push("/leads");
-      } catch {
-        toast("Couldn't delete contact.", "error");
-      }
-    });
-  }
 
   const timeline = [
     ...activities.map((a) => ({
@@ -184,12 +170,35 @@ export function LeadDetailView({
           {/* Top-Right Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap ml-auto">
             {converted ? (
-              <Button variant="outline" size="sm" disabled className="rounded-lg text-xs font-semibold">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Converted
-              </Button>
+              <>
+                <Button variant="outline" size="sm" disabled className="rounded-lg text-xs font-semibold">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Converted
+                </Button>
+                {convertedIds.accountId && (
+                  <Link href={`/accounts/${convertedIds.accountId}`}>
+                    <Button variant="outline" size="sm" className="rounded-lg text-xs font-semibold">
+                      <Building2 className="h-3.5 w-3.5 text-slate-500" /> View Account
+                    </Button>
+                  </Link>
+                )}
+                {convertedIds.contactId && (
+                  <Link href={`/contacts/${convertedIds.contactId}`}>
+                    <Button variant="outline" size="sm" className="rounded-lg text-xs font-semibold">
+                      <UserCheck className="h-3.5 w-3.5 text-slate-500" /> View Contact
+                    </Button>
+                  </Link>
+                )}
+                {convertedIds.opportunityId && (
+                  <Link href={`/opportunities/${convertedIds.opportunityId}`}>
+                    <Button variant="outline" size="sm" className="rounded-lg text-xs font-semibold">
+                      <Briefcase className="h-3.5 w-3.5 text-slate-500" /> View Opportunity
+                    </Button>
+                  </Link>
+                )}
+              </>
             ) : (
               <Button variant="outline" size="sm" onClick={() => setConvertOpen(true)} className="rounded-lg text-xs font-semibold">
-                <Briefcase className="h-3.5 w-3.5 text-slate-500" /> New Opportunity
+                <Briefcase className="h-3.5 w-3.5 text-slate-500" /> Convert Lead
               </Button>
             )}
 
@@ -200,25 +209,6 @@ export function LeadDetailView({
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="rounded-lg text-xs font-semibold">
               <Pencil className="h-3.5 w-3.5 text-slate-500" /> Edit
             </Button>
-
-            <div className="relative">
-              <Button variant="outline" size="icon" onClick={() => setMenuOpen((v) => !v)} className="rounded-lg h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-              {menuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-1 shadow-lg text-xs">
-                    <button onClick={() => { setMenuOpen(false); setEditOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-                      <Pencil className="h-3.5 w-3.5 text-slate-400" /> Edit Record
-                    </button>
-                    <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40">
-                      <Trash2 className="h-3.5 w-3.5" /> Delete Record
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -464,23 +454,9 @@ export function LeadDetailView({
               <Button size="sm" variant="outline" onClick={() => setEmailOpen(true)} className="rounded-full text-xs font-semibold gap-1.5 bg-slate-50 dark:bg-slate-800">
                 <Phone className="h-3.5 w-3.5 text-emerald-600" /> Log Call <ChevronDown className="h-3 w-3 text-slate-400" />
               </Button>
-              <Button size="sm" variant="outline" onClick={() => router.push("/workflows")} className="rounded-full text-xs font-semibold gap-1.5 bg-slate-50 dark:bg-slate-800">
-                <Target className="h-3.5 w-3.5 text-amber-600" /> New Task <ChevronDown className="h-3 w-3 text-slate-400" />
-              </Button>
             </div>
 
-            {/* Insights Filter Toggle Bar */}
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <label className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={onlyInsights}
-                  onChange={(e) => setOnlyInsights(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Only show activities with insights
-              </label>
-
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2 text-xs">
               <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[11px] font-medium">
                 <span>Filters: All time · All activities · All types</span>
                 <button onClick={() => toast("Activities refreshed", "info")} className="hover:text-blue-600 inline-flex items-center gap-1 font-semibold">
@@ -726,11 +702,15 @@ export function LeadDetailView({
         leadName={displayName}
       />
 
-      <ConvertOpportunityModal
+      <ConvertLeadModal
         open={convertOpen}
         onClose={() => setConvertOpen(false)}
         lead={lead}
-        onConverted={() => { setConverted(true); setConvertOpen(false); }}
+        onConverted={(result) => {
+          setConverted(true);
+          setConvertedIds({ accountId: result.accountId, contactId: result.contactId, opportunityId: result.opportunityId });
+          setConvertOpen(false);
+        }}
       />
 
       <EditLeadModal open={editOpen} onClose={() => setEditOpen(false)} lead={lead} />

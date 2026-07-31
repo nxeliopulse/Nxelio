@@ -46,24 +46,43 @@ async function requireSuperAdmin(): Promise<{ userId: string; workspaceId: strin
   return { userId: user.id, workspaceId: profile.workspace_id as string };
 }
 
-/** Ensure a target user belongs to the given workspace (prevents cross-tenant IDOR). */
+/**
+ * Ensure a target user is a member of the given workspace (prevents
+ * cross-tenant IDOR). Checked against workspace_members — NOT users.workspace_id
+ * — since a login can now be a member of several workspaces and only one of
+ * them is their "currently active" one at any moment.
+ */
 async function assertTargetInWorkspace(targetUserId: string, workspaceId: string) {
   const admin = createAdminClient();
   const { data: target } = await admin
-    .from("users")
-    .select("workspace_id")
+    .from("workspace_members")
+    .select("id")
     .eq("user_id", targetUserId)
-    .single();
-  if (!target || target.workspace_id !== workspaceId) {
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!target) {
     throw new Error("Forbidden: user is outside your workspace");
   }
 }
 
+/**
+ * The /users page roster — sourced from workspace_members (not users.workspace_id
+ * directly), so a member currently "active" in a different workspace right now
+ * still correctly appears on this workspace's team list with their role/status
+ * IN THIS workspace.
+ */
 export async function getUsers(): Promise<UserWithRole[]> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data: me } = await supabase.from("users").select("workspace_id").eq("user_id", user.id).single();
+  const workspaceId = me?.workspace_id;
+  if (!workspaceId) return [];
+
   const { data, error } = await supabase
-    .from("users")
-    .select(`*, roles(role_name)`)
+    .from("workspace_members")
+    .select("role_id, status, users(*), roles(role_name)")
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
   if (error) {
     console.error("getUsers error:", error.message);
@@ -71,17 +90,23 @@ export async function getUsers(): Promise<UserWithRole[]> {
   }
   if (!data) return [];
 
-  // Build manager_name lookup from same data
-  const byId = new Map(data.map((u) => [u.user_id, u.full_name as string]));
+  const rows: Array<Omit<UserWithRole, "manager_name">> = [];
+  for (const m of data) {
+    const u = m.users as unknown as UserRow | null;
+    if (!u) continue;
+    const roleRow = m.roles as unknown as { role_name?: string } | null;
+    // role_id/status shown here are membership-scoped (this workspace),
+    // not the global users.role_id/status, which may reflect another
+    // workspace this same login is currently active in.
+    rows.push({ ...u, role_id: m.role_id as number, status: m.status as string, role_name: roleRow?.role_name || "—" });
+  }
 
-  return data.map((u) => {
-    const row = u as typeof u & { roles?: { role_name?: string } };
-    return {
-      ...u,
-      role_name: row.roles?.role_name || "—",
-      manager_name: u.manager_id ? byId.get(u.manager_id) || null : null,
-    };
-  });
+  const byId = new Map(rows.map((u) => [u.user_id, u.full_name]));
+
+  return rows.map((u) => ({
+    ...u,
+    manager_name: u.manager_id ? byId.get(u.manager_id) || null : null,
+  }));
 }
 
 export async function getCurrentUserProfile() {
@@ -117,13 +142,19 @@ export async function getUserPermissions(userId: string) {
   return data || [];
 }
 
+/**
+ * Toggles a member's access to THIS workspace (not a global account suspend —
+ * they may still be active in other workspaces). Written on workspace_members,
+ * which has no client-facing write policy, so this always goes through the
+ * admin client.
+ */
 export async function updateUserStatus(userId: string, status: string) {
   const { workspaceId } = await requireSuperAdmin();
   await assertTargetInWorkspace(userId, workspaceId);
-  const supabase = await createClient();
-  await supabase.from("users").update({ status }).eq("user_id", userId);
+  const admin = createAdminClient();
+  await admin.from("workspace_members").update({ status }).eq("user_id", userId).eq("workspace_id", workspaceId);
   revalidatePath("/users");
-  await logAudit({ action: "user.status_updated", entityType: "user", entityId: userId, metadata: { status } });
+  await logAudit({ action: "user.status_updated", entityType: "user", entityId: userId, metadata: { status, workspaceId } });
 }
 
 export async function updateUserRole(userId: string, roleId: number, managerId: string | null) {
@@ -132,10 +163,22 @@ export async function updateUserRole(userId: string, roleId: number, managerId: 
   // A Super Admin can't strip their OWN super-admin role (avoids locking the
   // workspace out of admin access by accident).
   if (userId === callerId && roleId !== 1) throw new Error("You can't change your own role.");
-  const supabase = await createClient();
-  await supabase.from("users").update({ role_id: roleId, manager_id: managerId }).eq("user_id", userId);
+
+  const admin = createAdminClient();
+  // Role is membership-scoped (this workspace) — write it there.
+  await admin.from("workspace_members").update({ role_id: roleId }).eq("user_id", userId).eq("workspace_id", workspaceId);
+
+  // manager_id stays a global (not per-workspace) field on users for now.
+  // Also sync users.role_id when the target is currently ACTIVE in this exact
+  // workspace, so their live session's permissions update immediately (the
+  // same "copy onto the active pointer" mechanism switchWorkspace() uses).
+  const { data: target } = await admin.from("users").select("workspace_id").eq("user_id", userId).single();
+  const patch: Record<string, unknown> = { manager_id: managerId };
+  if (target?.workspace_id === workspaceId) patch.role_id = roleId;
+  await admin.from("users").update(patch).eq("user_id", userId);
+
   revalidatePath("/users");
-  await logAudit({ action: "user.role_updated", entityType: "user", entityId: userId, metadata: { roleId, managerId } });
+  await logAudit({ action: "user.role_updated", entityType: "user", entityId: userId, metadata: { roleId, managerId, workspaceId } });
 }
 
 export async function upsertPermission(userId: string, menuId: number, perms: { can_view?: boolean; can_create?: boolean; can_edit?: boolean; can_delete?: boolean; can_upload?: boolean }) {
@@ -194,6 +237,7 @@ export interface InviteUserResult {
   ok: boolean;
   user?: { id: string; email: string };
   tempPassword?: string;
+  existingUser?: boolean;
   error?: string;
 }
 
@@ -218,12 +262,28 @@ export async function inviteUser(email: string, fullName: string, roleId: number
     if (!role) return { ok: false, error: "Invalid role" };
 
     // Supabase Auth requires every email to be globally unique across the whole
-    // project — a person can't have a separate account per workspace. Catch
-    // this specific, predictable case with a clear message instead of letting
-    // the raw Auth API error surface (or get redacted by Next.js in prod).
-    const { data: existing } = await admin.from("users").select("workspace_id").eq("email", email).maybeSingle();
+    // project, but that's an auth-identity constraint, not a workspace one — a
+    // login can be a member of several workspaces. If this email already has an
+    // account, add them to THIS workspace instead of creating a duplicate login.
+    const { data: existing } = await admin.from("users").select("user_id").eq("email", email).maybeSingle();
     if (existing) {
-      return { ok: false, error: "This email is already registered to another account. Each email can only belong to one workspace — use a different email (e.g. a \"+\" alias) to invite the same person elsewhere." };
+      const { data: alreadyMember } = await admin
+        .from("workspace_members")
+        .select("id")
+        .eq("user_id", existing.user_id)
+        .eq("workspace_id", inviterWorkspaceId)
+        .maybeSingle();
+      if (alreadyMember) {
+        return { ok: false, error: "This person is already a member of this workspace." };
+      }
+      const { error: memberError } = await admin
+        .from("workspace_members")
+        .insert({ user_id: existing.user_id, workspace_id: inviterWorkspaceId, role_id: roleId });
+      if (memberError) return { ok: false, error: memberError.message };
+
+      revalidatePath("/users");
+      await logAudit({ action: "user.invited_existing", entityType: "user", entityId: existing.user_id, entityLabel: email, metadata: { roleId, workspaceId: inviterWorkspaceId } });
+      return { ok: true, user: { id: existing.user_id, email }, existingUser: true };
     }
 
     // 2. Create the auth user via direct REST API (guarantees password is set)
@@ -247,6 +307,12 @@ export async function inviteUser(email: string, fullName: string, roleId: number
       { onConflict: "user_id" }
     );
     if (upsertError) return { ok: false, error: upsertError.message };
+
+    // 4b. Their first/active workspace membership.
+    const { error: memberError } = await admin
+      .from("workspace_members")
+      .insert({ user_id: created.id, workspace_id: inviterWorkspaceId, role_id: roleId });
+    if (memberError) return { ok: false, error: memberError.message };
 
     // 5. Delete orphan workspace that the signup trigger may have created
     await admin
