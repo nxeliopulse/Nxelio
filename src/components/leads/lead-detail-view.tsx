@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useFeedback } from "@/components/ui/feedback";
 import { ProspectScoreTab } from "@/components/leads/tabs/prospect-score";
 import { SendEmailModal } from "@/components/leads/send-email-modal";
-import { ConvertOpportunityModal } from "@/components/leads/convert-opportunity-modal";
+import { ConvertLeadModal } from "@/components/leads/convert-lead-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { LeadNotesCard } from "@/components/leads/lead-notes-card";
@@ -104,6 +104,11 @@ export function LeadDetailView({
   const [convertOpen, setConvertOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [converted, setConverted] = useState(lead.status === "Converted");
+  const [convertedIds, setConvertedIds] = useState({
+    accountId: lead.converted_account_id,
+    contactId: lead.converted_contact_id,
+    opportunityId: lead.converted_opportunity_id,
+  });
   const [email, setEmail] = useState(lead.email);
   const [findEmailOpen, setFindEmailOpen] = useState(false);
 
@@ -165,12 +170,35 @@ export function LeadDetailView({
           {/* Top-Right Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap ml-auto">
             {converted ? (
-              <Button variant="outline" size="sm" disabled className="rounded-lg text-xs font-semibold">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Converted
-              </Button>
+              <>
+                <Button variant="outline" size="sm" disabled className="rounded-lg text-xs font-semibold">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Converted
+                </Button>
+                {convertedIds.accountId && (
+                  <Link href={`/accounts/${convertedIds.accountId}`}>
+                    <Button variant="outline" size="sm" className="rounded-lg text-xs font-semibold">
+                      <Building2 className="h-3.5 w-3.5 text-slate-500" /> View Account
+                    </Button>
+                  </Link>
+                )}
+                {convertedIds.contactId && (
+                  <Link href={`/contacts/${convertedIds.contactId}`}>
+                    <Button variant="outline" size="sm" className="rounded-lg text-xs font-semibold">
+                      <UserCheck className="h-3.5 w-3.5 text-slate-500" /> View Contact
+                    </Button>
+                  </Link>
+                )}
+                {convertedIds.opportunityId && (
+                  <Link href={`/opportunities/${convertedIds.opportunityId}`}>
+                    <Button variant="outline" size="sm" className="rounded-lg text-xs font-semibold">
+                      <Briefcase className="h-3.5 w-3.5 text-slate-500" /> View Opportunity
+                    </Button>
+                  </Link>
+                )}
+              </>
             ) : (
               <Button variant="outline" size="sm" onClick={() => setConvertOpen(true)} className="rounded-lg text-xs font-semibold">
-                <Briefcase className="h-3.5 w-3.5 text-slate-500" /> New Opportunity
+                <Briefcase className="h-3.5 w-3.5 text-slate-500" /> Convert Lead
               </Button>
             )}
 
@@ -674,11 +702,15 @@ export function LeadDetailView({
         leadName={displayName}
       />
 
-      <ConvertOpportunityModal
+      <ConvertLeadModal
         open={convertOpen}
         onClose={() => setConvertOpen(false)}
         lead={lead}
-        onConverted={() => { setConverted(true); setConvertOpen(false); }}
+        onConverted={(result) => {
+          setConverted(true);
+          setConvertedIds({ accountId: result.accountId, contactId: result.contactId, opportunityId: result.opportunityId });
+          setConvertOpen(false);
+        }}
       />
 
       <EditLeadModal open={editOpen} onClose={() => setEditOpen(false)} lead={lead} />

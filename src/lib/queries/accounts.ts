@@ -67,6 +67,36 @@ export async function getAccountContacts(accountId: string): Promise<ContactRow[
   return data ?? [];
 }
 
+/** Strips protocol/www/trailing path so "https://www.acme.com/" and "acme.com" compare equal. */
+function normalizeHost(url: string): string {
+  return url.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+}
+
+/**
+ * Finds an existing Account that plausibly matches a lead being converted —
+ * by website (normalized host) first, then by exact account name. Used to
+ * offer "Use existing Account" in the Convert Lead modal instead of creating
+ * a duplicate.
+ */
+export async function findMatchingAccount({ companyName, website }: { companyName?: string | null; website?: string | null }): Promise<AccountRow | null> {
+  const supabase = await createClient();
+
+  if (website?.trim()) {
+    const host = normalizeHost(website);
+    if (host) {
+      const { data } = await supabase.from("accounts").select("*").ilike("website", `%${host}%`).limit(1).maybeSingle();
+      if (data) return data;
+    }
+  }
+
+  if (companyName?.trim()) {
+    const { data } = await supabase.from("accounts").select("*").ilike("account_name", companyName.trim()).limit(1).maybeSingle();
+    if (data) return data;
+  }
+
+  return null;
+}
+
 export async function createAccount(payload: Partial<AccountRow>) {
   const supabase = await createClient();
   const { data, error } = await supabase.from("accounts").insert(payload).select().single();
