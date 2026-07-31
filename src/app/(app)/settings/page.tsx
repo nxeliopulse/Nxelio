@@ -7,6 +7,7 @@ import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach
 import { getCurrentWorkspace } from "@/lib/queries/workspaces";
 import { getAuditLog } from "@/lib/queries/audit-log";
 import { getSendLimit } from "@/lib/queries/outreach-send-limits";
+import { getPicklistCategories } from "@/lib/queries/picklists";
 import { SettingsView } from "@/components/settings/settings-view";
 
 export default async function SettingsPage() {
@@ -29,6 +30,7 @@ export default async function SettingsPage() {
   const p = profile as { role_id?: number | null; roles?: { role_name?: string } | null } | null;
   const isSuperAdmin = p?.roles?.role_name === "Super Admin" || p?.role_id === 1;
   const auditLog = isSuperAdmin ? await getAuditLog().catch(() => []) : [];
+  const picklistCategories = isSuperAdmin ? await getPicklistCategories().catch(() => []) : [];
   return (
     <SettingsView
       profile={profile}
@@ -46,6 +48,7 @@ export default async function SettingsPage() {
       auditLog={auditLog}
       emailSendLimit={emailSendLimit}
       linkedinSendLimit={linkedinSendLimit}
+      picklistCategories={picklistCategories}
     />
   );
 }

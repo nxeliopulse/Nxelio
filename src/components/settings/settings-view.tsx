@@ -1,15 +1,17 @@
 "use client";
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Mail, Calendar, ScrollText, Sliders, X } from "lucide-react";
+import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Mail, Calendar, ScrollText, Sliders, X, ListChecks } from "lucide-react";
 import { Linkedin } from "@/components/outreach/linkedin-icon";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 import type { ZoomAccountRow } from "@/lib/queries/zoom-accounts";
 import { syncOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type { AuditLogRow } from "@/lib/queries/audit-log";
 import type { SendLimitRow } from "@/lib/queries/outreach-send-limits";
+import type { PicklistCategoryRow } from "@/lib/picklists";
 import { EmailConnectorView, LinkedInConnectorView, CalendarConnectorView } from "@/components/settings/connectors-view";
 import { AuditLogView } from "@/components/settings/audit-log-view";
+import { PicklistsManager } from "@/components/settings/picklists-manager";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -40,6 +42,7 @@ const sections = [
   { id: "blocklist", label: "Blocklist", icon: <Ban className="h-4 w-4" /> },
 ];
 const AUDIT_SECTION = { id: "audit", label: "Audit Log", icon: <ScrollText className="h-4 w-4" /> };
+const PICKLIST_SECTION = { id: "picklists", label: "Picklists", icon: <ListChecks className="h-4 w-4" /> };
 
 interface Profile {
   full_name: string;
@@ -63,6 +66,7 @@ interface Props {
   auditLog: AuditLogRow[];
   emailSendLimit: SendLimitRow | null;
   linkedinSendLimit: SendLimitRow | null;
+  picklistCategories: PicklistCategoryRow[];
 }
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -125,10 +129,10 @@ const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
   { id: "emerald", name: "Emerald", bg: "bg-emerald-600" },
 ];
 
-export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomConfigured, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit }: Props) {
+export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomConfigured, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit, picklistCategories }: Props) {
   const router = useRouter();
   const [active, setActive] = useState("profile");
-  const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
+  const visibleSections = isSuperAdmin ? [...sections, PICKLIST_SECTION, AUDIT_SECTION] : sections;
 
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get("section");
@@ -591,6 +595,8 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
               )}
             </Card>
           )}
+
+          {active === "picklists" && isSuperAdmin && <PicklistsManager categories={picklistCategories} />}
 
           {active === "audit" && isSuperAdmin && <AuditLogView entries={auditLog} />}
         </div>

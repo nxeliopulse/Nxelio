@@ -9,7 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
-import { industries, interestAreas } from "@/lib/mock-data";
+import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
+import { getPicklistValues } from "@/lib/queries/picklists";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
@@ -131,6 +132,13 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const [showWizard, setShowWizard] = useState(false);
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"list" | "grid">("list");
+
+  const [industries, setIndustries] = useState(FALLBACK_INDUSTRIES);
+  const [interestAreas, setInterestAreas] = useState(FALLBACK_INTEREST_AREAS);
+  useEffect(() => {
+    getPicklistValues("lead_industry").then(setIndustries).catch(() => {});
+    getPicklistValues("lead_interest_area").then(setInterestAreas).catch(() => {});
+  }, []);
 
   // Quick status/score filters — a row of pill shortcuts above the table.
   // "Needs Follow-up" is a chosen proxy (no dedicated field exists): a lead

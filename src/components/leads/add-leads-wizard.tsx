@@ -17,6 +17,7 @@ import { searchBuyLeads, type GeneratedProspect } from "@/lib/leads/buy-leads";
 import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
 import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
+import { getPicklistValues } from "@/lib/queries/picklists";
 
 export type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
 
@@ -912,6 +913,13 @@ function ManualReview({ source, manual, setManual }: { source: SourceId; manual:
 // ============================================================================
 // Add Leads Manually — full-detail entry rows
 function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[]; setEntries: (e: ManualEntry[]) => void; error: string | null }) {
+  const [companySizeBuckets, setCompanySizeBuckets] = useState(FALLBACK_COMPANY_SIZE_BUCKETS);
+  const [seniorityLevels, setSeniorityLevels] = useState(FALLBACK_SENIORITY_LEVELS);
+  useEffect(() => {
+    getPicklistValues("lead_company_size").then(setCompanySizeBuckets).catch(() => {});
+    getPicklistValues("lead_seniority").then(setSeniorityLevels).catch(() => {});
+  }, []);
+
   function update(id: string, key: keyof ManualEntry, value: string) {
     setEntries(entries.map((e) => (e.id === id ? { ...e, [key]: value } : e)));
   }
@@ -956,13 +964,13 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
                     <Field label="Company size">
                       <Select value={e.companySize} onChange={(ev) => update(e.id, "companySize", ev.target.value)}>
                         <option value="">Select…</option>
-                        {COMPANY_SIZE_BUCKETS.filter((b) => b !== "Any").map((b) => <option key={b} value={b}>{b}</option>)}
+                        {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
                       </Select>
                     </Field>
                     <Field label="Seniority">
                       <Select value={e.seniority} onChange={(ev) => update(e.id, "seniority", ev.target.value)}>
                         <option value="">Select…</option>
-                        {SENIORITY_LEVELS.filter((s) => s !== "Any").map((s) => <option key={s} value={s}>{s}</option>)}
+                        {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
                       </Select>
                     </Field>
                   </div>
@@ -1029,8 +1037,10 @@ type BuyState = {
   companySize: string; seniority: string; requireVerifiedEmail: boolean; includePhoneAndSocial: boolean;
 };
 
-const COMPANY_SIZE_BUCKETS = ["Any", "1-10", "11-50", "51-200", "201-1000", "1000+"];
-const SENIORITY_LEVELS = ["Any", "C-Level", "VP", "Director", "Manager", "Individual Contributor"];
+// Fallbacks while the workspace's actual (admin-editable, Settings > Picklists)
+// values load in — "Any" is a client-only sentinel for this filter UI, never stored.
+const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
+const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
 function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, maxCount }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
@@ -1046,6 +1056,13 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, max
   // the Buy Leads source/step, so a fresh mount always picks up the latest value
   // (e.g. after the plan-cap clamp on wizard open) without needing a sync effect.
   const [countDraft, setCountDraft] = useState(String(buy.count));
+
+  const [companySizeBuckets, setCompanySizeBuckets] = useState(FALLBACK_COMPANY_SIZE_BUCKETS);
+  const [seniorityLevels, setSeniorityLevels] = useState(FALLBACK_SENIORITY_LEVELS);
+  useEffect(() => {
+    getPicklistValues("lead_company_size").then(setCompanySizeBuckets).catch(() => {});
+    getPicklistValues("lead_seniority").then(setSeniorityLevels).catch(() => {});
+  }, []);
 
   function commitCount() {
     const n = Math.max(1, Math.min(maxCount, parseInt(countDraft, 10) || 1));
@@ -1082,13 +1099,15 @@ function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, max
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Company size / headcount</label>
             <Select value={buy.companySize} onChange={(e) => setBuy({ ...buy, companySize: e.target.value })}>
-              {COMPANY_SIZE_BUCKETS.map((b) => <option key={b} value={b}>{b === "Any" ? "Any size" : b}</option>)}
+              <option value="Any">Any size</option>
+              {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
             </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Seniority level</label>
             <Select value={buy.seniority} onChange={(e) => setBuy({ ...buy, seniority: e.target.value })}>
-              {SENIORITY_LEVELS.map((s) => <option key={s} value={s}>{s === "Any" ? "Any seniority" : s}</option>)}
+              <option value="Any">Any seniority</option>
+              {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
             </Select>
           </div>
         </div>
