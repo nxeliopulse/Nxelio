@@ -87,7 +87,7 @@ function CheckEmailContent() {
         </a>
       )}
 
-      <Button variant="outline" className="w-full" onClick={resend} disabled={resending}>
+      <Button variant="outline" className="w-full" onClick={resend} disabled={resending} style={{ background: "white", borderColor: "#e2e8f0", color: "#334155" }}>
         {resending ? "Resending..." : "Resend confirmation email"}
       </Button>
 

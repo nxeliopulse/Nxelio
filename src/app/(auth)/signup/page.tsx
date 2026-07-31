@@ -7,12 +7,13 @@ import { signUpDirect } from "@/lib/queries/auth";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 
 const INPUT = {
-  className: "w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 outline-none transition-all",
+  className: "w-full px-3.5 py-2 rounded-xl text-sm text-slate-800 placeholder-slate-400 outline-none transition-all",
   style: {
-    background: "rgba(255,255,255,.06)",
-    border: "1.5px solid rgba(255,255,255,.1)",
+    background: "#F3F4F8",
+    border: "1.5px solid transparent",
   } as React.CSSProperties,
 };
+const LABEL = "block text-xs font-semibold text-slate-700 mb-1";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -26,12 +27,10 @@ export default function SignupPage() {
   const valid  = form.fullName.trim() !== "" && form.email.includes("@") && passOk && agreed;
 
   const focusStyle = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.borderColor = "#18A7B8";
-    e.currentTarget.style.boxShadow   = "0 0 0 3px rgba(24,167,184,.15)";
+    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.25)";
   };
   const blurStyle = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.borderColor = "rgba(255,255,255,.1)";
-    e.currentTarget.style.boxShadow   = "none";
+    e.currentTarget.style.boxShadow = "none";
   };
 
   async function handleSubmit(e: React.FormEvent) {
@@ -46,120 +45,124 @@ export default function SignupPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-black text-white mb-1">Sign up</h1>
-      <p className="text-sm mb-8" style={{ color:"rgba(255,255,255,.45)" }}>
-        Start your 7-day free trial — card required, first charge after day 7
+      <h1 className="text-xl font-black text-slate-900 mb-0.5">Sign up</h1>
+      <p className="text-xs mb-3.5 text-slate-500">
+        7-day free trial — card required, no charge until day 7
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-3.5">
+      <form onSubmit={handleSubmit} className="space-y-2">
         {error && (
           <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
-            style={{ background:"rgba(244,81,30,.12)", border:"1.5px solid rgba(244,81,30,.3)", color:"#ff8a65" }}>
+            style={{ background:"rgba(244,81,30,.08)", border:"1.5px solid rgba(244,81,30,.25)", color:"#c2410c" }}>
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0"/>
             <span>{error}</span>
           </div>
         )}
 
         {/* Full name */}
-        <input
-          type="text"
-          placeholder="Full name *"
-          value={form.fullName}
-          onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-          {...INPUT}
-          onFocus={focusStyle}
-          onBlur={blurStyle}
-        />
-
-        {/* Email */}
-        <input
-          type="email"
-          placeholder="Email *"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          {...INPUT}
-          onFocus={focusStyle}
-          onBlur={blurStyle}
-        />
-
-        {/* Password */}
-        <div className="relative">
+        <div>
+          <label className={LABEL}>Full Name</label>
           <input
-            type={showPass ? "text" : "password"}
-            placeholder="Password *"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            type="text"
+            placeholder="Jane Doe"
+            value={form.fullName}
+            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
             {...INPUT}
-            style={{ ...INPUT.style, paddingRight:"2.75rem" }}
             onFocus={focusStyle}
             onBlur={blurStyle}
           />
-          <button type="button" onClick={() => setShowPass(!showPass)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-            style={{ color:"rgba(255,255,255,.35)" }}>
-            {showPass ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
-          </button>
         </div>
 
-        {/* Password rule */}
-        <div className="flex items-center gap-2 px-1">
-          <div className="h-4 w-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
-            style={{ background: passOk ? "#18A7B8" : "rgba(255,255,255,.1)" }}>
-            <Check className="h-2.5 w-2.5 text-white"/>
-          </div>
-          <span className="text-xs transition-colors"
-            style={{ color: passOk ? "#4dd6e5" : "rgba(255,255,255,.3)" }}>
-            At least 8 characters
-          </span>
-        </div>
-
-        {/* Legal agreement — required checkbox */}
-        <label className="flex items-start gap-2.5 px-1 cursor-pointer select-none">
+        {/* Email */}
+        <div>
+          <label className={LABEL}>Email</label>
           <input
-            type="checkbox"
-            checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
-            className="sr-only peer"
+            type="email"
+            placeholder="you@company.com"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            {...INPUT}
+            onFocus={focusStyle}
+            onBlur={blurStyle}
           />
-          <span
-            className="mt-0.5 h-4 w-4 rounded flex items-center justify-center flex-shrink-0 transition-all border"
-            style={{
-              background: agreed ? "#18A7B8" : "transparent",
-              borderColor: agreed ? "#18A7B8" : "rgba(255,255,255,.25)",
-            }}
-          >
-            {agreed && <Check className="h-2.5 w-2.5 text-white" />}
-          </span>
-          <span className="text-xs leading-relaxed" style={{ color:"rgba(255,255,255,.5)" }}>
-            I agree to the{" "}
-            <Link href="/terms" onClick={(e) => e.stopPropagation()} className="hover:underline" style={{ color:"rgba(255,255,255,.75)" }}>Terms of Service</Link>
-            {" "}and{" "}
-            <Link href="/privacy" onClick={(e) => e.stopPropagation()} className="hover:underline" style={{ color:"rgba(255,255,255,.75)" }}>Privacy Policy</Link>.
-          </span>
-        </label>
+        </div>
+
+        {/* Password */}
+        <div>
+          <label className={LABEL}>Password</label>
+          <div className="relative">
+            <input
+              type={showPass ? "text" : "password"}
+              placeholder="••••••••"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              {...INPUT}
+              style={{ ...INPUT.style, paddingRight:"2.75rem" }}
+              onFocus={focusStyle}
+              onBlur={blurStyle}
+            />
+            <button type="button" onClick={() => setShowPass(!showPass)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors text-slate-400 hover:text-slate-600">
+              {showPass ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
+            </button>
+          </div>
+        </div>
+
+        {/* Password rule + legal agreement — grouped tighter than the field gaps above */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 px-1">
+            <div className="h-4 w-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
+              style={{ background: passOk ? "#18A7B8" : "#E2E8F0" }}>
+              <Check className="h-2.5 w-2.5 text-white"/>
+            </div>
+            <span className="text-xs transition-colors"
+              style={{ color: passOk ? "#0d7d8c" : "#94A3B8" }}>
+              At least 8 characters
+            </span>
+          </div>
+
+          <label className="flex items-start gap-2.5 px-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="sr-only peer"
+            />
+            <span
+              className="mt-0.5 h-4 w-4 rounded flex items-center justify-center flex-shrink-0 transition-all border"
+              style={{
+                background: agreed ? "#18A7B8" : "transparent",
+                borderColor: agreed ? "#18A7B8" : "#CBD5E1",
+              }}
+            >
+              {agreed && <Check className="h-2.5 w-2.5 text-white" />}
+            </span>
+            <span className="text-xs leading-snug text-slate-500">
+              I agree to the{" "}
+              <Link href="/terms" onClick={(e) => e.stopPropagation()} className="hover:underline text-slate-700 font-medium">Terms of Service</Link>
+              {" "}and{" "}
+              <Link href="/privacy" onClick={(e) => e.stopPropagation()} className="hover:underline text-slate-700 font-medium">Privacy Policy</Link>.
+            </span>
+          </label>
+        </div>
 
         {/* Submit */}
         <button type="submit" disabled={!valid || loading}
-          className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full py-2.5 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow:"0 4px 20px rgba(24,167,184,.3)" }}>
           {loading ? "Creating account…" : "Sign Up"}
         </button>
 
-        {/* Trial terms */}
-        <p className="text-center text-xs font-medium" style={{ color:"rgba(255,255,255,.35)" }}>
-          ✓ No charge for 7 days · cancel anytime
-        </p>
-
-        {/* OAuth */}
-        <OAuthButtons label="Or sign up with" />
-
         {/* Switch */}
-        <p className="text-center text-sm pt-1" style={{ color:"rgba(255,255,255,.4)" }}>
+        <p className="text-center text-xs text-slate-500">
           Have an account?{" "}
           <Link href="/login" className="font-bold hover:underline" style={{ color:"#18A7B8" }}>
             Sign in
           </Link>
         </p>
+
+        {/* OAuth */}
+        <OAuthButtons />
       </form>
     </div>
   );

@@ -21,16 +21,16 @@ function GoogleIcon() {
   );
 }
 
-function LinkedInIcon() {
+/** The real LinkedIn "in" glyph (standard brand mark), no background — the circular button itself supplies the #0A66C2 fill. */
+function LinkedInGlyph() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="24" height="24" rx="4" fill="#0A66C2"/>
-      <path d="M7.5 10h-2v7h2v-7zm-1-3.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5zM17 10c-1.38 0-2.4.62-2.88 1.19V10H12v7h2.12v-3.67c0-.95.63-1.83 1.63-1.83.99 0 1.25.74 1.25 1.79V17H19v-3.9c0-2.05-1.05-3.1-2.98-3.1z" fill="white"/>
+    <svg width="16" height="16" viewBox="0 0 448 512" fill="white" xmlns="http://www.w3.org/2000/svg">
+      <path d="M100.28 448H7.4V148.9h92.88zM53.79 108.1C24.09 108.1 0 83.5 0 53.8a53.79 53.79 0 0 1 107.58 0c0 29.7-24.1 54.3-53.79 54.3zM447.9 448h-92.68V302.4c0-34.7-.7-79.2-48.29-79.2-48.29 0-55.69 37.7-55.69 76.7V448h-92.78V148.9h89.08v40.8h1.3c12.4-23.5 42.69-48.3 87.88-48.3 94 0 111.28 61.9 111.28 142.3z"/>
     </svg>
   );
 }
 
-export function OAuthButtons({ label = "Or continue with" }: OAuthButtonsProps) {
+export function OAuthButtons({ label = "or" }: OAuthButtonsProps) {
   const [loadingProvider, setLoadingProvider] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,63 +52,43 @@ export function OAuthButtons({ label = "Or continue with" }: OAuthButtonsProps) 
     // On success the browser is redirected — no need to clear loading state
   }
 
-  const btnBase: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px",
-    width: "100%",
-    padding: "11px 16px",
-    borderRadius: "12px",
-    fontSize: "13px",
-    fontWeight: 600,
-    cursor: "pointer",
-    transition: "all .18s",
-    background: "rgba(255,255,255,.07)",
-    border: "1.5px solid rgba(255,255,255,.12)",
-    color: "rgba(255,255,255,.85)",
-    outline: "none",
-  };
+  const circleBase = "h-9 w-9 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100";
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {/* Divider */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,.08)" }} />
-        <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,.3)" }}>{label}</span>
-        <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,.08)" }} />
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-xs font-medium text-slate-400">{label}</span>
+        <div className="flex-1 h-px bg-slate-200" />
       </div>
 
-      {/* Buttons */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Circular provider buttons */}
+      <div className="flex items-center justify-center gap-4">
         <button
           type="button"
+          aria-label="Continue with Google"
           disabled={!!loadingProvider}
           onClick={() => signInWith("google")}
-          style={btnBase}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,.12)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,.2)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,.07)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,.12)"; }}
+          className={circleBase}
+          style={{ background: "white", border: "1.5px solid #E2E8F0" }}
         >
           {loadingProvider === "google"
-            ? <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-            : <GoogleIcon />
-          }
-          Google
+            ? <span className="h-4 w-4 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
+            : <GoogleIcon />}
         </button>
 
         <button
           type="button"
+          aria-label="Continue with LinkedIn"
           disabled={!!loadingProvider}
           onClick={() => signInWith("linkedin_oidc")}
-          style={btnBase}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,.12)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,.2)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,.07)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,.12)"; }}
+          className={circleBase}
+          style={{ background: "#0A66C2" }}
         >
           {loadingProvider === "linkedin_oidc"
-            ? <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-            : <LinkedInIcon />
-          }
-          LinkedIn
+            ? <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+            : <LinkedInGlyph />}
         </button>
       </div>
 

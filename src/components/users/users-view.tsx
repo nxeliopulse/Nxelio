@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Modal } from "@/components/ui/modal";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import { inviteUser, deleteUser, resetUserPassword, getUserAuthInfo, updateUserNavAccess, type UserWithRole } from "@/lib/queries/users";
 import { navMainItems, navAdminItems } from "@/lib/nav-config";
@@ -52,6 +54,8 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
   const [navAccess, setNavAccess] = useState<Record<string, boolean>>({});
   const [savedNavAccess, setSavedNavAccess] = useState<Record<string, boolean>>({});
   const [permsMsg, setPermsMsg] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 15;
 
   useEffect(() => {
     if (!detailUser) {
@@ -70,6 +74,9 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
   }, [detailUser]);
 
   const filtered = visibleUsers.filter((u) => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   async function handleInvite() {
     setError(null); setSuccess(null);
@@ -184,50 +191,49 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
-                <th className="px-4 py-3 font-semibold">User</th>
-                <th className="px-4 py-3 font-semibold">Role</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Created</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-16 text-center text-slate-500">No users found.</td></tr>
-              )}
-              {filtered.map((u) => (
-                <tr key={u.user_id} onClick={() => isAdmin && setDetailUser(u)} className={`hover:bg-slate-50 ${isAdmin ? "cursor-pointer" : ""}`}>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-semibold flex items-center justify-center">
-                        {(u.full_name || "").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900">{u.full_name || "—"}</p>
-                        <p className="text-xs text-slate-500">{u.email}</p>
-                      </div>
+        <DataTable>
+          <DataTableHead>
+            <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
+              <DataTableTh>User</DataTableTh>
+              <DataTableTh>Role</DataTableTh>
+              <DataTableTh>Status</DataTableTh>
+              <DataTableTh>Created</DataTableTh>
+            </tr>
+          </DataTableHead>
+          <DataTableBody className="divide-y divide-slate-100">
+            {paged.length === 0 && (
+              <DataTableEmpty colSpan={4}>No users found.</DataTableEmpty>
+            )}
+            {paged.map((u) => (
+              <DataTableRow key={u.user_id} onClick={() => isAdmin && setDetailUser(u)} className={isAdmin ? "cursor-pointer" : ""}>
+                <DataTableTd>
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-semibold flex items-center justify-center">
+                      {(u.full_name || "").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={roleVariant[u.role_name] || "default"}>
-                      {roleIcon[u.role_name] || null} {u.role_name}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1.5 text-xs ${u.status === "ACTIVE" ? "text-emerald-700" : "text-slate-500"}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${u.status === "ACTIVE" ? "bg-emerald-500" : "bg-slate-300"}`} />
-                      {u.status === "ACTIVE" ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{u.created_at ? formatDate(u.created_at) : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <div>
+                      <p className="font-medium text-slate-900">{u.full_name || "—"}</p>
+                      <p className="text-xs text-slate-500">{u.email}</p>
+                    </div>
+                  </div>
+                </DataTableTd>
+                <DataTableTd>
+                  <Badge variant={roleVariant[u.role_name] || "default"}>
+                    {roleIcon[u.role_name] || null} {u.role_name}
+                  </Badge>
+                </DataTableTd>
+                <DataTableTd>
+                  <span className={`inline-flex items-center gap-1.5 text-xs ${u.status === "ACTIVE" ? "text-emerald-700" : "text-slate-500"}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${u.status === "ACTIVE" ? "bg-emerald-500" : "bg-slate-300"}`} />
+                    {u.status === "ACTIVE" ? "Active" : "Inactive"}
+                  </span>
+                </DataTableTd>
+                <DataTableTd className="text-slate-500">{u.created_at ? formatDate(u.created_at) : "—"}</DataTableTd>
+              </DataTableRow>
+            ))}
+          </DataTableBody>
+        </DataTable>
+        <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={(p) => setPage(p - 1)} />
       </Card>
 
       {/* Create User Modal */}

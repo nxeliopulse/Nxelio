@@ -1,10 +1,26 @@
-import { getOnboarding } from "@/lib/queries/onboarding";
+import { getOnboardingStatus } from "@/lib/queries/onboarding";
+import { getCalendarProviderStatus, getCalendarAccounts } from "@/lib/queries/calendar-accounts";
+import { getZoomProviderStatus, getZoomAccounts } from "@/lib/queries/zoom-accounts";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 
 export default async function OnboardingPage() {
-  // Preload any saved details so this doubles as an edit screen. Onboarding is
-  // soft (the app layout only shows a banner, no hard gate), so we don't redirect
-  // completed users away — they can return here to review or change their answers.
-  const { data, completed } = await getOnboarding();
-  return <OnboardingWizard initial={data} isEdit={completed} />;
+  // Completed workspaces can still return here to review/edit their answers
+  // (OnboardingWizard treats status.completed as edit mode) — this is a hard
+  // gate only for first-run, incomplete workspaces.
+  const [status, calendarProviderStatus, calendarAccounts, zoomConfigured, zoomAccounts] = await Promise.all([
+    getOnboardingStatus(),
+    getCalendarProviderStatus(),
+    getCalendarAccounts(),
+    getZoomProviderStatus(),
+    getZoomAccounts(),
+  ]);
+  return (
+    <OnboardingWizard
+      status={status}
+      calendarProviderStatus={calendarProviderStatus}
+      calendarConnected={calendarAccounts.length > 0}
+      zoomConfigured={zoomConfigured}
+      zoomConnected={zoomAccounts.length > 0}
+    />
+  );
 }

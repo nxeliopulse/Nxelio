@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 /* Enable class-based dark mode (toggled via .dark on <html>) */
@@ -14,17 +14,19 @@
   --muted: #e1e7ef;
   --muted-foreground: #64748b;
   --border: #d7dde7;
-  /* Landing-page brand teal is the true app-wide default accent — Settings >
-     Appearance can override this via data-accent-color below. */
-  --primary: #18A7B8;
+  /* App-wide default accent — "vermilion", matching the CRMS reference
+     redesign (crms.dreamstechnologies.com). Settings > Appearance can
+     override this via data-accent-color below; the landing page keeps its
+     own hardcoded teal (see .landing-page overrides) regardless of this. */
+  --primary: #E41F07;
   --primary-foreground: #ffffff;
-  --color-blue-50: #e0f7fa;
-  --color-blue-100: #b2ebf2;
-  --color-blue-500: #18A7B8;
-  --color-blue-600: #18A7B8;
-  --color-blue-700: #14929f;
-  --color-teal-600: #18A7B8;
-  --color-emerald-600: #18A7B8;
+  --color-blue-50: #FCE9E6;
+  --color-blue-100: #F8CDC5;
+  --color-blue-500: #EF4B30;
+  --color-blue-600: #E41F07;
+  --color-blue-700: #C11A06;
+  --color-teal-600: #E41F07;
+  --color-emerald-600: #E41F07;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
@@ -33,6 +35,13 @@
      whole canvas drops a notch in brightness (dark mode re-inverts these). */
   --color-slate-50:  #e9edf3;
   --color-slate-100: #dfe5ee;
+
+  /* Card radius/shadow — tighter, flatter than the previous rounded-3xl look,
+     matching the CRMS reference (measured: 5px radius, soft 4px shadow).
+     Dark mode overrides --card-shadow below (a light-gray shadow disappears
+     on a dark surface, so dark gets a soft dark shadow instead). */
+  --card-radius: 5px;
+  --card-shadow: 0 4px 4px rgba(219,219,219,.35);
 }
 
 /* Dynamic font sizing */
@@ -42,6 +51,7 @@ html[data-font-size="large"] { font-size: 17.5px; }
 html[data-font-size="xl"] { font-size: 19px; }
 
 /* Dynamic font style / family */
+html[data-font-style="golos"], html[data-font-style="golos"] body { font-family: 'Golos Text', var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important; }
 html[data-font-style="sans"], html[data-font-style="sans"] body { font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important; }
 html[data-font-style="inter"], html[data-font-style="inter"] body { font-family: 'Inter', var(--font-geist-sans), -apple-system, sans-serif !important; }
 html[data-font-style="roboto"], html[data-font-style="roboto"] body { font-family: 'Roboto', var(--font-geist-sans), sans-serif !important; }
@@ -108,6 +118,16 @@ html.dark[data-dark-preset="emerald"] {
 }
 
 /* Accent Color Customizations */
+html[data-accent-color="vermilion"] {
+  --primary: #E41F07;
+  --color-blue-50: #FCE9E6;
+  --color-blue-100: #F8CDC5;
+  --color-blue-500: #EF4B30;
+  --color-blue-600: #E41F07;
+  --color-blue-700: #C11A06;
+  --color-teal-600: #E41F07;
+  --color-emerald-600: #E41F07;
+}
 html[data-accent-color="black"] {
   --primary: #22252a;
   --color-blue-50: #f4f4f6;
@@ -198,6 +218,10 @@ html[data-sidebar-badge="dot"] .sidebar-badge {
   --muted-foreground: #9aa6b8;
   --border: #2b3444;          /* visible-but-subtle separators */
 
+  /* A light-gray shadow (the light-mode --card-shadow) disappears against a
+     dark surface — dark mode gets a soft dark shadow instead, same radius. */
+  --card-shadow: 0 4px 10px rgba(0,0,0,.32);
+
   /* invert the slate ramp: light shades become dark, dark shades become light */
   --color-slate-50:  #121620;
   --color-slate-100: #242c3a;
@@ -262,7 +286,7 @@ html[data-sidebar-badge="dot"] .sidebar-badge {
 html, body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: 'Golos Text', var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -372,7 +396,9 @@ html, body {
    logged-in user's dark UI.
    ============================================================================ */
 .landing-page,
-.dark .landing-page {
+.dark .landing-page,
+.force-light-theme,
+.dark .force-light-theme {
   /* Reset slate ramp to light values even when html has .dark */
   --color-slate-50:  #f8fafc !important;
   --color-slate-100: #f1f5f9 !important;
@@ -393,22 +419,43 @@ html, body {
   color-scheme: light;
 }
 
-/* Wrapper itself uses bg-white — override the .dark rule for self-match */
+/* Wrapper itself uses bg-white — override the .dark rule for self-match.
+   force-light-theme is the same escape hatch as .landing-page (opts a
+   subtree out of the global .dark repaint below), used by the auth pages
+   and onboarding — pages that, like the landing page, aren't part of the
+   logged-in dashboard's dark-mode-aware design and should always render light. */
 .dark .landing-page.bg-white,
-.dark .landing-page .bg-white { background-color: #ffffff !important; }
-.dark .landing-page .bg-slate-50 { background-color: #f8fafc !important; }
-.dark .landing-page .bg-slate-100 { background-color: #f1f5f9 !important; }
-.dark .landing-page .bg-slate-200 { background-color: #e2e8f0 !important; }
-.dark .landing-page .bg-slate-900 { background-color: #0f172a !important; }
-.dark .landing-page .bg-slate-800 { background-color: #1e293b !important; }
-.dark .landing-page .bg-white\/80 { background-color: rgb(255 255 255 / 0.8) !important; }
-.dark .landing-page .text-slate-900 { color: #0f172a !important; }
-.dark .landing-page .text-slate-700 { color: #334155 !important; }
-.dark .landing-page .text-slate-600 { color: #475569 !important; }
-.dark .landing-page .text-slate-500 { color: #64748b !important; }
-.dark .landing-page .text-slate-400 { color: #94a3b8 !important; }
-.dark .landing-page .border-slate-100 { border-color: #f1f5f9 !important; }
-.dark .landing-page .border-slate-200 { border-color: #e2e8f0 !important; }
+.dark .landing-page .bg-white,
+.dark .force-light-theme.bg-white,
+.dark .force-light-theme .bg-white { background-color: #ffffff !important; }
+.dark .landing-page .bg-slate-50,
+.dark .force-light-theme .bg-slate-50 { background-color: #f8fafc !important; }
+.dark .landing-page .bg-slate-100,
+.dark .force-light-theme .bg-slate-100 { background-color: #f1f5f9 !important; }
+.dark .landing-page .bg-slate-200,
+.dark .force-light-theme .bg-slate-200 { background-color: #e2e8f0 !important; }
+.dark .landing-page .bg-slate-900,
+.dark .force-light-theme .bg-slate-900 { background-color: #0f172a !important; }
+.dark .landing-page .bg-slate-800,
+.dark .force-light-theme .bg-slate-800 { background-color: #1e293b !important; }
+.dark .landing-page .bg-white\/80,
+.dark .force-light-theme .bg-white\/80 { background-color: rgb(255 255 255 / 0.8) !important; }
+.dark .landing-page .text-slate-900,
+.dark .force-light-theme .text-slate-900 { color: #0f172a !important; }
+.dark .landing-page .text-slate-700,
+.dark .force-light-theme .text-slate-700 { color: #334155 !important; }
+.dark .landing-page .text-slate-600,
+.dark .force-light-theme .text-slate-600 { color: #475569 !important; }
+.dark .landing-page .text-slate-500,
+.dark .force-light-theme .text-slate-500 { color: #64748b !important; }
+.dark .landing-page .text-slate-400,
+.dark .force-light-theme .text-slate-400 { color: #94a3b8 !important; }
+.dark .landing-page .border-slate-100,
+.dark .force-light-theme .border-slate-100 { border-color: #f1f5f9 !important; }
+.dark .landing-page .border-slate-200,
+.dark .force-light-theme .border-slate-200 { border-color: #e2e8f0 !important; }
+.dark .force-light-theme .bg-slate-700 { background-color: #334155 !important; }
+.dark .force-light-theme .border-slate-300 { border-color: #cbd5e1 !important; }
 
 /* In-app toast/dialog entrance animation */
 @keyframes lp-toast-in {

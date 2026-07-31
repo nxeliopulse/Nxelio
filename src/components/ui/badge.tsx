@@ -5,9 +5,9 @@ type Variant = "default" | "success" | "warning" | "danger" | "info" | "outline"
 
 const variants: Record<Variant, string> = {
   default: "bg-slate-100 text-slate-700",
-  success: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
-  warning: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
-  danger: "bg-red-50 text-red-700 ring-1 ring-red-200",
+  success: "bg-[#E8F9E8] text-[#1ABE17]",
+  warning: "bg-[#FEF8E6] text-[#C98A00]",
+  danger: "bg-[#FCE9E6] text-[#E41F07]",
   info: "bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200",
   blue: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",
   purple: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200",

@@ -10,6 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import { deleteNewsletter, duplicateNewsletter, type NewsletterRow } from "@/lib/queries/newsletters";
 import { formatDate, cn } from "@/lib/utils";
@@ -38,12 +41,17 @@ export function NewslettersView({ newsletters, stats }: Props) {
   const [pending, start] = useTransition();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 15;
 
   const filtered = newsletters.filter((n) => {
     const matchesSearch = !search || n.title.toLowerCase().includes(search.toLowerCase()) || (n.subject || "").toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "All" || n.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   async function handleDelete(id: string) {
     if (!(await confirm({ title: "Delete newsletter?", message: "Are you sure you want to delete this newsletter?", confirmLabel: "Delete", danger: true }))) return;
@@ -71,34 +79,31 @@ export function NewslettersView({ newsletters, stats }: Props) {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Newsletters</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Send rich content updates, digests, and product announcements to your subscribed leads
-          </p>
-        </div>
-        <Link href="/newsletters/builder" className="self-start sm:self-auto">
-          <Button className="rounded-xl font-bold px-4 py-2.5 gap-2">
-            <Plus className="h-4 w-4" /> New Newsletter
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Newsletters"
+        description="Send rich content updates, digests, and product announcements to your subscribed leads"
+        actions={
+          <Link href="/newsletters/builder">
+            <Button className="rounded-xl font-bold px-4 py-2.5 gap-2">
+              <Plus className="h-4 w-4" /> New Newsletter
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Top Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-2">
+        <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Total Newsletters</span>
-            <div className="h-9 w-9 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-[#18A7B8] flex items-center justify-center font-bold">
+            <div className="h-9 w-9 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-[var(--primary)] flex items-center justify-center font-bold">
               <Mail className="h-4 w-4" />
             </div>
           </div>
           <p className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{stats.total}</p>
-        </div>
+        </Card>
 
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-2">
+        <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Sent Campaigns</span>
             <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
@@ -106,9 +111,9 @@ export function NewslettersView({ newsletters, stats }: Props) {
             </div>
           </div>
           <p className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{stats.sent}</p>
-        </div>
+        </Card>
 
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-2">
+        <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Avg. Open Rate</span>
             <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
@@ -121,9 +126,9 @@ export function NewslettersView({ newsletters, stats }: Props) {
               Avg
             </span>
           </div>
-        </div>
+        </Card>
 
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-2">
+        <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Avg. Click Rate</span>
             <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
@@ -136,11 +141,11 @@ export function NewslettersView({ newsletters, stats }: Props) {
               Clicks
             </span>
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Main Table Card */}
-      <Card className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+      <Card className="overflow-hidden">
         {/* Toolbar with Search and Status Filter Pills */}
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
@@ -177,42 +182,42 @@ export function NewslettersView({ newsletters, stats }: Props) {
             <p className="text-xs">No newsletters match your current filter criteria.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50/80 dark:bg-slate-950/60 border-b border-slate-100 dark:border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          <>
+          <DataTable>
+              <DataTableHead>
                 <tr>
-                  <th className="px-5 py-3.5">Title & Subject</th>
-                  <th className="px-5 py-3.5">Status</th>
-                  <th className="px-5 py-3.5">Recipients</th>
-                  <th className="px-5 py-3.5">Open Rate</th>
-                  <th className="px-5 py-3.5">Click Rate</th>
-                  <th className="px-5 py-3.5">Sent Date</th>
-                  <th className="px-5 py-3.5 w-12 text-right">Actions</th>
+                  <DataTableTh>Title & Subject</DataTableTh>
+                  <DataTableTh>Status</DataTableTh>
+                  <DataTableTh>Recipients</DataTableTh>
+                  <DataTableTh>Open Rate</DataTableTh>
+                  <DataTableTh>Click Rate</DataTableTh>
+                  <DataTableTh>Sent Date</DataTableTh>
+                  <DataTableTh className="w-12 text-right">Actions</DataTableTh>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                {filtered.map((n) => {
+              </DataTableHead>
+              <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                {paged.map((n) => {
                   const openRate = n.sent_count > 0 ? Math.round((n.open_count / n.sent_count) * 1000) / 10 : 0;
                   const clickRate = n.sent_count > 0 ? Math.round((n.click_count / n.sent_count) * 1000) / 10 : 0;
                   return (
-                    <tr key={n.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="px-5 py-4">
+                    <DataTableRow key={n.id}>
+                      <DataTableTd>
                         <Link href={`/newsletters/builder?id=${n.id}`} className="block group">
-                          <p className="font-bold text-slate-900 dark:text-white group-hover:text-[#18A7B8] transition-colors text-sm">
+                          <p className="font-bold text-slate-900 dark:text-white group-hover:text-[var(--primary)] transition-colors text-sm">
                             {n.title}
                           </p>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
                             {n.subject || "(No subject line)"}
                           </p>
                         </Link>
-                      </td>
-                      <td className="px-5 py-4">
+                      </DataTableTd>
+                      <DataTableTd>
                         <Badge variant={statusVariant[n.status] || "default"}>{n.status}</Badge>
-                      </td>
-                      <td className="px-5 py-4 text-slate-900 dark:text-slate-200 font-bold">
+                      </DataTableTd>
+                      <DataTableTd className="text-slate-900 dark:text-slate-200 font-bold">
                         {n.recipient_count.toLocaleString()}
-                      </td>
-                      <td className="px-5 py-4">
+                      </DataTableTd>
+                      <DataTableTd>
                         {n.sent_count > 0 ? (
                           <div className="flex items-center gap-2">
                             <div className="w-16 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -223,18 +228,18 @@ export function NewslettersView({ newsletters, stats }: Props) {
                         ) : (
                           <span className="text-slate-400 dark:text-slate-600">—</span>
                         )}
-                      </td>
-                      <td className="px-5 py-4">
+                      </DataTableTd>
+                      <DataTableTd>
                         {n.sent_count > 0 ? (
                           <span className="text-amber-600 dark:text-amber-400 font-bold text-xs">{clickRate}%</span>
                         ) : (
                           <span className="text-slate-400 dark:text-slate-600">—</span>
                         )}
-                      </td>
-                      <td className="px-5 py-4 text-slate-500 dark:text-slate-400 text-xs">
+                      </DataTableTd>
+                      <DataTableTd className="text-slate-500 dark:text-slate-400 text-xs">
                         {n.sent_at ? formatDate(n.sent_at) : "—"}
-                      </td>
-                      <td className="px-5 py-4 text-right relative">
+                      </DataTableTd>
+                      <DataTableTd className="text-right relative">
                         <button
                           onClick={(e) => {
                             if (menuOpen === n.id) { setMenuOpen(null); return; }
@@ -258,7 +263,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                                 className="flex items-center gap-2 px-3.5 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80"
                                 onClick={() => setMenuOpen(null)}
                               >
-                                <Eye className="h-3.5 w-3.5 text-[#18A7B8]" /> Edit / View
+                                <Eye className="h-3.5 w-3.5 text-[var(--primary)]" /> Edit / View
                               </Link>
                               <button
                                 onClick={() => handleDuplicate(n.id)}
@@ -286,13 +291,14 @@ export function NewslettersView({ newsletters, stats }: Props) {
                             </div>
                           </>
                         )}
-                      </td>
-                    </tr>
+                      </DataTableTd>
+                    </DataTableRow>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </DataTableBody>
+            </DataTable>
+            <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={(p) => setPage(p - 1)} />
+          </>
         )}
       </Card>
     </div>

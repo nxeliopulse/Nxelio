@@ -6,14 +6,16 @@ import { Eye, EyeOff, AlertCircle, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { sendVerificationCode } from "@/lib/queries/email-verification";
+import { getOnboardingStatus } from "@/lib/queries/onboarding";
 
 const INPUT = {
-  className: "w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 outline-none transition-all",
+  className: "w-full px-3.5 py-2 rounded-xl text-sm text-slate-800 placeholder-slate-400 outline-none transition-all",
   style: {
-    background: "rgba(255,255,255,.06)",
-    border: "1.5px solid rgba(255,255,255,.1)",
+    background: "#F3F4F8",
+    border: "1.5px solid transparent",
   } as React.CSSProperties,
 };
+const LABEL = "block text-xs font-semibold text-slate-700 mb-1";
 
 function LoginForm() {
   const router  = useRouter();
@@ -62,97 +64,115 @@ function LoginForm() {
       return;
     }
 
-    setLoading(false);
     // The platform admin account lands in the standalone admin panel, not the customer app.
-    router.push(form.email.trim().toLowerCase() === "admin@nxelio.com" ? "/admin" : "/dashboard");
-    router.refresh();
+    if (form.email.trim().toLowerCase() === "admin@nxelio.com") {
+      setLoading(false);
+      router.push("/admin");
+      router.refresh();
+      return;
+    }
+
+    // Onboarding-aware routing — mirrors what the OAuth callback does for
+    // returning users. Subscription status is deliberately not checked here;
+    // that's (app)/layout.tsx's job. Wrapped in try/catch so a failure here
+    // (e.g. a transient network/DB hiccup) shows an error instead of leaving
+    // the button stuck on "Signing in…" forever with no feedback — the user
+    // is already authenticated at this point, so falling back to /dashboard
+    // on error is safe (its own layout will re-check onboarding/subscription).
+    try {
+      const status = await getOnboardingStatus();
+      router.push(status.completed ? "/dashboard" : "/onboarding");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? `Signed in, but couldn't finish loading your account: ${err.message}` : "Signed in, but something went wrong loading your account.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div>
-      <h1 className="text-3xl font-black text-white mb-1">Sign in</h1>
-      <p className="text-sm mb-8" style={{ color:"rgba(255,255,255,.45)" }}>
+      <h1 className="text-xl font-black text-slate-900 mb-0.5">Sign in</h1>
+      <p className="text-xs mb-3.5 text-slate-500">
         Welcome back to your Nxelio Nurture workspace
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
           <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
-            style={{ background:"rgba(244,81,30,.12)", border:"1.5px solid rgba(244,81,30,.3)", color:"#ff8a65" }}>
+            style={{ background:"rgba(244,81,30,.08)", border:"1.5px solid rgba(244,81,30,.25)", color:"#c2410c" }}>
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0"/>
             <span>{error}</span>
           </div>
         )}
         {notice && (
           <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
-            style={{ background:"rgba(24,167,184,.12)", border:"1.5px solid rgba(24,167,184,.3)", color:"#4dd6e5" }}>
+            style={{ background:"rgba(24,167,184,.08)", border:"1.5px solid rgba(24,167,184,.25)", color:"#0d7d8c" }}>
             <Mail className="h-4 w-4 mt-0.5 flex-shrink-0"/>
             <span>{notice}</span>
           </div>
         )}
 
         {/* Email */}
-        <input
-          type="email"
-          placeholder="Email *"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          {...INPUT}
-          onFocus={(e) => { e.currentTarget.style.borderColor = "#18A7B8"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.15)"; }}
-          onBlur={(e)  => { e.currentTarget.style.borderColor = "rgba(255,255,255,.1)"; e.currentTarget.style.boxShadow = "none"; }}
-        />
-
-        {/* Password */}
-        <div className="relative">
+        <div>
+          <label className={LABEL}>Email</label>
           <input
-            type={showPass ? "text" : "password"}
-            placeholder="Password *"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            type="email"
+            placeholder="you@company.com"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
             {...INPUT}
-            style={{ ...INPUT.style, paddingRight: "2.75rem" }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = "#18A7B8"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.15)"; }}
-            onBlur={(e)  => { e.currentTarget.style.borderColor = "rgba(255,255,255,.1)"; e.currentTarget.style.boxShadow = "none"; }}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(122,143,255,.4)"; }}
+            onBlur={(e)  => { e.currentTarget.style.boxShadow = "none"; }}
           />
-          <button type="button" onClick={() => setShowPass(!showPass)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-            style={{ color:"rgba(255,255,255,.35)" }}>
-            {showPass ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
-          </button>
         </div>
 
-        {/* Forgot */}
-        <div className="flex justify-end">
-          <Link
-            href={`/forgot-password${form.email.includes("@") ? `?email=${encodeURIComponent(form.email)}` : ""}`}
-            className="text-xs font-semibold hover:underline transition-colors"
-            style={{ color:"#18A7B8" }}>
-            Forgot password?
-          </Link>
+        {/* Password */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold text-slate-700">Password</label>
+            <Link
+              href={`/forgot-password${form.email.includes("@") ? `?email=${encodeURIComponent(form.email)}` : ""}`}
+              className="text-xs font-semibold hover:underline transition-colors"
+              style={{ color:"#18A7B8" }}>
+              Forgot Password?
+            </Link>
+          </div>
+          <div className="relative">
+            <input
+              type={showPass ? "text" : "password"}
+              placeholder="••••••••"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              {...INPUT}
+              style={{ ...INPUT.style, paddingRight: "2.75rem" }}
+              onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(122,143,255,.4)"; }}
+              onBlur={(e)  => { e.currentTarget.style.boxShadow = "none"; }}
+            />
+            <button type="button" onClick={() => setShowPass(!showPass)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors text-slate-400 hover:text-slate-600">
+              {showPass ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
+            </button>
+          </div>
         </div>
 
         {/* Submit */}
         <button type="submit" disabled={!valid || loading}
-          className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full py-2.5 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow:"0 4px 20px rgba(24,167,184,.3)" }}>
           {loading ? "Signing in…" : "Sign In"}
         </button>
 
-        {/* Trial terms */}
-        <p className="text-center text-xs font-medium" style={{ color:"rgba(255,255,255,.35)" }}>
-          ✓ No charge for 7 days · cancel anytime
+        {/* Switch */}
+        <p className="text-center text-xs text-slate-500">
+          New on our platform?{" "}
+          <Link href="/signup" className="font-bold hover:underline" style={{ color:"#18A7B8" }}>
+            Create an Account
+          </Link>
         </p>
 
         {/* OAuth */}
-        <OAuthButtons label="Or sign in with" />
-
-        {/* Switch */}
-        <p className="text-center text-sm pt-2" style={{ color:"rgba(255,255,255,.4)" }}>
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-bold hover:underline" style={{ color:"#18A7B8" }}>
-            Sign up
-          </Link>
-        </p>
+        <OAuthButtons />
       </form>
     </div>
   );
@@ -160,7 +180,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-center py-8" style={{ color:"rgba(255,255,255,.4)" }}>Loading…</div>}>
+    <Suspense fallback={<div className="text-sm text-center py-8 text-slate-400">Loading…</div>}>
       <LoginForm />
     </Suspense>
   );

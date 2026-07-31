@@ -3932,6 +3932,50 @@ BEGIN
   END LOOP;
 END $$;
 
+-- >>> FILE: 0077_zoom_accounts.sql
+-- ============================================================================
+-- Zoom OAuth connection — lets a workspace create real Zoom meetings (a stable
+-- join_url shared by host and lead) instead of a placeholder link. Deliberately
+-- a separate table from calendar_accounts: Zoom has no availability/busy-sync
+-- concept in this app, it's purely for meeting creation, so it shouldn't be
+-- swept into the calendar busy-sync loops.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS zoom_accounts (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id     UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  email            TEXT,
+  access_token     TEXT,
+  refresh_token    TEXT,
+  token_expires_at TIMESTAMPTZ,
+  scope            TEXT,
+  status           TEXT NOT NULL DEFAULT 'connected',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (workspace_id, email)
+);
+
+CREATE INDEX IF NOT EXISTS zoom_accounts_workspace_idx ON zoom_accounts(workspace_id);
+
+DROP TRIGGER IF EXISTS auto_workspace_trigger ON zoom_accounts;
+CREATE TRIGGER auto_workspace_trigger BEFORE INSERT ON zoom_accounts
+  FOR EACH ROW EXECUTE FUNCTION set_workspace_from_user();
+
+DROP TRIGGER IF EXISTS set_updated_at ON zoom_accounts;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON zoom_accounts
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE zoom_accounts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ws_select_zoom_accounts ON zoom_accounts;
+DROP POLICY IF EXISTS ws_insert_zoom_accounts ON zoom_accounts;
+DROP POLICY IF EXISTS ws_update_zoom_accounts ON zoom_accounts;
+DROP POLICY IF EXISTS ws_delete_zoom_accounts ON zoom_accounts;
+CREATE POLICY ws_select_zoom_accounts ON zoom_accounts FOR SELECT TO authenticated USING (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_insert_zoom_accounts ON zoom_accounts FOR INSERT TO authenticated WITH CHECK (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_update_zoom_accounts ON zoom_accounts FOR UPDATE TO authenticated USING (workspace_id = get_current_workspace_id());
+CREATE POLICY ws_delete_zoom_accounts ON zoom_accounts FOR DELETE TO authenticated USING (workspace_id = get_current_workspace_id());
+
 -- >>> FILE: 0078_campaign_requires_approval.sql
 -- ============================================================================
 -- Per-campaign approval toggle — lets the creator choose, at build time,
@@ -4115,3 +4159,72 @@ ALTER TABLE leads
 CREATE INDEX IF NOT EXISTS idx_leads_converted_account_id ON leads(converted_account_id);
 CREATE INDEX IF NOT EXISTS idx_leads_converted_contact_id ON leads(converted_contact_id);
 CREATE INDEX IF NOT EXISTS idx_leads_converted_opportunity_id ON leads(converted_opportunity_id);
+
+-- >>> FILE: 0085_onboarding_hard_gate.sql
+-- ============================================================================
+-- Onboarding hard-gate: per-user profile fields, grandfathering flag for
+-- workspaces that already finished onboarding under the old (looser) rules,
+-- an avatar upload bucket, and a broadened signup trigger that captures
+-- whatever name/avatar OAuth actually hands Supabase.
+-- ============================================================================
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS job_title TEXT;
+
+-- Existing workspaces that already completed onboarding under the old
+-- definition (business info only) are permanently exempt from the new
+-- profile+mailbox requirements — see plan doc for full reasoning.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS onboarding_grandfathered BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE workspaces SET onboarding_grandfathered = TRUE WHERE onboarding_completed = TRUE;
+
+-- Avatar uploads — same public-bucket, admin-client-only-writes pattern as
+-- the existing newsletter-images / lead-notes buckets (no storage.objects RLS
+-- policy needed since uploads only ever happen via the service-role key).
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Broaden the signup trigger (originally from 0013_fix_signup_trigger.sql) to
+-- also capture an avatar/picture claim and a wider name fallback — Google and
+-- LinkedIn OIDC don't reliably land the same fields under raw_user_meta_data.
+CREATE OR REPLACE FUNCTION handle_new_auth_user_with_workspace() RETURNS TRIGGER AS $$
+DECLARE
+  new_ws UUID;
+  display_name TEXT;
+  picture_url TEXT;
+BEGIN
+  -- Skip if profile already exists (admin-invited user)
+  IF EXISTS (SELECT 1 FROM public.users WHERE user_id = NEW.id) THEN
+    RETURN NEW;
+  END IF;
+
+  display_name := COALESCE(
+    NEW.raw_user_meta_data->>'full_name',
+    NEW.raw_user_meta_data->>'name',
+    split_part(NEW.email, '@', 1)
+  );
+  picture_url := COALESCE(
+    NEW.raw_user_meta_data->>'avatar_url',
+    NEW.raw_user_meta_data->>'picture'
+  );
+
+  INSERT INTO public.workspaces (name, owner_id)
+  VALUES (display_name || '''s workspace', NEW.id)
+  RETURNING id INTO new_ws;
+
+  INSERT INTO public.users (user_id, full_name, email, role_id, status, workspace_id, avatar_url)
+  VALUES (NEW.id, display_name, NEW.email, 1, 'ACTIVE', new_ws, picture_url);
+
+  -- Every new signup also gets a membership row for their first workspace
+  -- (multi-workspace support, migration 0081) — must be preserved here since
+  -- this CREATE OR REPLACE fully overwrites the function body.
+  INSERT INTO public.workspace_members (user_id, workspace_id, role_id)
+  VALUES (NEW.id, new_ws, 1);
+
+  RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE WARNING 'handle_new_auth_user_with_workspace failed for %: %', NEW.email, SQLERRM;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog;

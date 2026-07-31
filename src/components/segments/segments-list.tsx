@@ -25,7 +25,11 @@ import {
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { Modal } from "@/components/ui/modal";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import { deleteSegment, exportSegmentCsv, refreshSegment, type SegmentRow } from "@/lib/queries/segments";
 import { formatDate, cn } from "@/lib/utils";
@@ -72,6 +76,8 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
   const [assignRep, setAssignRep] = useState(SALES_REPS[0]);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 15;
 
   const filteredSegments = segments.filter((s) => {
     const matchesSearch =
@@ -82,6 +88,9 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
     const matchesStatus = statusFilter === "all" || s.status.toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesType && matchesStatus;
   });
+  const pageCount = Math.max(1, Math.ceil(filteredSegments.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedSegments = filteredSegments.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   const totalContacts = segments.reduce((sum, s) => sum + (s.contacts || 0), 0);
   const activeCount = segments.filter((s) => s.status === "Active").length;
@@ -167,24 +176,21 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Audience Segments</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Organize leads into targeted groups for personalized campaigns and workflows
-          </p>
-        </div>
-        <Link href="/segments/builder" className="self-start sm:self-auto">
-          <Button className="rounded-xl font-bold px-4 py-2.5 gap-2">
-            <Plus className="h-4 w-4" /> Create Segment
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Audience Segments"
+        description="Organize leads into targeted groups for personalized campaigns and workflows"
+        actions={
+          <Link href="/segments/builder">
+            <Button className="rounded-xl font-bold px-4 py-2.5 gap-2">
+              <Plus className="h-4 w-4" /> Create Segment
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Metrics Summary Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+        <Card className="p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Segments</span>
             <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
@@ -192,9 +198,9 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{segments.length}</p>
-        </div>
+        </Card>
 
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+        <Card className="p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Rules</span>
             <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
@@ -202,9 +208,9 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{activeCount}</p>
-        </div>
+        </Card>
 
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+        <Card className="p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Dynamic Rules</span>
             <div className="h-9 w-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400">
@@ -212,9 +218,9 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{dynamicCount}</p>
-        </div>
+        </Card>
 
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+        <Card className="p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Segmented Contacts</span>
             <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400">
@@ -222,7 +228,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{totalContacts.toLocaleString()}</p>
-        </div>
+        </Card>
       </div>
 
       {/* Dynamic Bulk Action Bar when items selected */}
@@ -249,7 +255,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
       )}
 
       {/* Main Card Container */}
-      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+      <Card className="overflow-hidden">
         {/* Toolbar: Search, Filters, View Switcher */}
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[240px]">
@@ -268,7 +274,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-[#18A7B8]/20 transition-all shadow-sm cursor-pointer"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all shadow-sm cursor-pointer"
             >
               <option value="all">All Types</option>
               <option value="dynamic">Dynamic</option>
@@ -281,7 +287,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-[#18A7B8]/20 transition-all shadow-sm cursor-pointer"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all shadow-sm cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -321,61 +327,59 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
 
         {/* Content Area: Table vs Grid Cards */}
         {viewMode === "table" ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[760px]">
-              <thead className="bg-slate-50/80 dark:bg-slate-950/60 border-b border-slate-200/80 dark:border-slate-800">
+          <>
+          <DataTable className="min-w-[760px]">
+              <DataTableHead>
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
-                  <th className="px-5 py-3.5 w-10">
+                  <DataTableTh className="w-10">
                     <input
                       type="checkbox"
                       className="rounded border-slate-300 dark:border-slate-700"
                       checked={allChecked}
                       onChange={(e) => toggleAll(e.target.checked)}
                     />
-                  </th>
-                  <th className="px-5 py-3.5 font-bold">Segment</th>
-                  <th className="px-5 py-3.5 font-bold">Contacts</th>
-                  <th className="px-5 py-3.5 font-bold">Type</th>
-                  <th className="px-5 py-3.5 font-bold">Status</th>
-                  <th className="px-5 py-3.5 font-bold">Created</th>
-                  <th className="px-5 py-3.5 text-right font-bold">Actions</th>
+                  </DataTableTh>
+                  <DataTableTh>Segment</DataTableTh>
+                  <DataTableTh>Contacts</DataTableTh>
+                  <DataTableTh>Type</DataTableTh>
+                  <DataTableTh>Status</DataTableTh>
+                  <DataTableTh>Created</DataTableTh>
+                  <DataTableTh className="text-right">Actions</DataTableTh>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-                {filteredSegments.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-16 text-center text-slate-400 dark:text-slate-500 font-medium">
-                      No matching segments found. Click <strong className="text-slate-700 dark:text-slate-300">Create Segment</strong> to build a new target group.
-                    </td>
-                  </tr>
+              </DataTableHead>
+              <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                {pagedSegments.length === 0 && (
+                  <DataTableEmpty colSpan={7}>
+                    No matching segments found. Click <strong className="text-slate-700 dark:text-slate-300">Create Segment</strong> to build a new target group.
+                  </DataTableEmpty>
                 )}
-                {filteredSegments.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="px-5 py-4">
+                {pagedSegments.map((s) => (
+                  <DataTableRow key={s.id}>
+                    <DataTableTd>
                       <input
                         type="checkbox"
                         className="rounded border-slate-300 dark:border-slate-700"
                         checked={selected.includes(s.id)}
                         onChange={(e) => toggleOne(s.id, e.target.checked)}
                       />
-                    </td>
-                    <td className="px-5 py-4">
+                    </DataTableTd>
+                    <DataTableTd>
                       <Link href={`/segments/builder?id=${s.id}`} className="block group">
-                        <p className="font-semibold text-slate-900 dark:text-white group-hover:text-[#18A7B8] transition-colors">{s.segment_name}</p>
+                        <p className="font-semibold text-slate-900 dark:text-white group-hover:text-[var(--primary)] transition-colors">{s.segment_name}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{s.description || "—"}</p>
                       </Link>
-                    </td>
-                    <td className="px-5 py-4 font-bold text-slate-900 dark:text-white tabular-nums">
+                    </DataTableTd>
+                    <DataTableTd className="font-bold text-slate-900 dark:text-white tabular-nums">
                       {s.contacts.toLocaleString()}
-                    </td>
-                    <td className="px-5 py-4">
+                    </DataTableTd>
+                    <DataTableTd>
                       <Badge variant={typeColor[s.segment_type] || "default"}>{s.segment_type}</Badge>
-                    </td>
-                    <td className="px-5 py-4">
+                    </DataTableTd>
+                    <DataTableTd>
                       <Badge variant={statusColor[s.status] || "default"}>{s.status}</Badge>
-                    </td>
-                    <td className="px-5 py-4 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(s.created_at)}</td>
-                    <td className="px-5 py-4 text-right">
+                    </DataTableTd>
+                    <DataTableTd className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(s.created_at)}</DataTableTd>
+                    <DataTableTd className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         {s.segment_type !== "Static" && (
                           <button
@@ -403,12 +407,13 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
-                    </td>
-                  </tr>
+                    </DataTableTd>
+                  </DataTableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </DataTableBody>
+            </DataTable>
+            <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filteredSegments.length} onPageChange={(p) => setPage(p - 1)} />
+          </>
         ) : (
           /* Grid View Cards */
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -420,7 +425,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             {filteredSegments.map((s) => (
               <div
                 key={s.id}
-                className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 hover:border-[#18A7B8]/50 transition-all flex flex-col justify-between space-y-4 group shadow-sm"
+                className="rounded-[var(--card-radius)] border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 hover:border-[var(--primary)]/50 transition-all flex flex-col justify-between space-y-4 group shadow-[var(--card-shadow)]"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
@@ -428,7 +433,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                     <Badge variant={statusColor[s.status] || "default"}>{s.status}</Badge>
                   </div>
                   <Link href={`/segments/builder?id=${s.id}`}>
-                    <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-[#18A7B8] transition-colors">{s.segment_name}</h3>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-[var(--primary)] transition-colors">{s.segment_name}</h3>
                   </Link>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{s.description || "No description provided."}</p>
                 </div>
@@ -441,7 +446,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                   <div className="flex items-center gap-1">
                     <Link
                       href={`/segments/builder?id=${s.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-[#18A7B8] hover:underline"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-[var(--primary)] hover:underline"
                     >
                       Edit <ArrowUpRight className="h-3.5 w-3.5" />
                     </Link>
@@ -451,7 +456,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             ))}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Assign sales rep modal */}
       <Modal

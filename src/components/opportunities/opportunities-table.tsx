@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import { formatDate } from "@/lib/utils";
 import { moveOpportunityStage, updateOpportunity, deleteOpportunity } from "@/lib/queries/opportunities";
@@ -23,7 +25,7 @@ function money(n: number): string {
   return "$" + Math.round(n).toLocaleString();
 }
 
-// Color accent per stage column header
+// Color accent per stage column header (kanban view)
 const STAGE_ACCENT: Record<OpportunityStage, string> = {
   new: "bg-slate-400",
   qualified: "bg-blue-500",
@@ -70,16 +72,18 @@ function SortTh({ label, field, defaultDir = "desc", sortField, sortDir, onSort 
 }) {
   const active = sortField === field;
   return (
-    <th className="px-3 py-3 font-semibold">
-      <button onClick={() => onSort(field, defaultDir)} className="inline-flex items-center gap-1 hover:text-slate-700">
+    <DataTableTh className="text-[11px] uppercase tracking-wider">
+      <button onClick={() => onSort(field, defaultDir)} className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200">
         {label}
-        {active ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+        {active ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 dark:text-slate-600" />}
       </button>
-    </th>
+    </DataTableTh>
   );
 }
 
-export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; stats: PipelineStats }) {
+const PAGE_SIZE = 15;
+
+export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; stats: PipelineStats }) {
   const { toast, confirm } = useFeedback();
   const [rows, setRows] = useState<OpportunityRow[]>(initial);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -96,6 +100,7 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
   const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
   const [sortField, setSortField] = useState<SortField>("created");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(0);
   function toggleSort(field: SortField, defaultDir: "asc" | "desc" = "desc") {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortField(field); setSortDir(defaultDir); }
@@ -157,6 +162,13 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
     return sortDir === "asc" ? cmp : -cmp;
   }), [filteredRows, sortField, sortDir]);
 
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedRows = useMemo(
+    () => sortedRows.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [sortedRows, safePage]
+  );
+
   const byStage = useMemo(() => {
     const map: Record<OpportunityStage, OpportunityRow[]> = {
       new: [], qualified: [], meeting_scheduled: [], proposal_sent: [], negotiation: [], won: [], lost: [],
@@ -213,27 +225,26 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
   }
 
   const tiles = [
-    { label: "Open pipeline", value: money(live.openValue), sub: `${live.openCount} open deal${live.openCount === 1 ? "" : "s"}`, icon: <DollarSign className="h-5 w-5" />, color: "bg-blue-50 text-blue-600" },
-    { label: "Won revenue", value: money(live.wonValue), sub: `${live.wonCount} won`, icon: <Trophy className="h-5 w-5" />, color: "bg-emerald-50 text-emerald-600" },
-    { label: "Win rate", value: `${live.winRate}%`, sub: `${live.wonCount} won · ${live.lostCount} lost`, icon: <TrendingUp className="h-5 w-5" />, color: "bg-indigo-50 text-indigo-600" },
-    { label: "Total deals", value: String(rows.length), sub: "in pipeline", icon: <Target className="h-5 w-5" />, color: "bg-amber-50 text-amber-600" },
+    { label: "Open pipeline", value: money(live.openValue), sub: `${live.openCount} open deal${live.openCount === 1 ? "" : "s"}`, icon: <DollarSign className="h-5 w-5" />, color: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" },
+    { label: "Won revenue", value: money(live.wonValue), sub: `${live.wonCount} won`, icon: <Trophy className="h-5 w-5" />, color: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400" },
+    { label: "Win rate", value: `${live.winRate}%`, sub: `${live.wonCount} won · ${live.lostCount} lost`, icon: <TrendingUp className="h-5 w-5" />, color: "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400" },
+    { label: "Total deals", value: String(rows.length), sub: "in pipeline", icon: <Target className="h-5 w-5" />, color: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400" },
   ];
 
   return (
-    <div>
-      {/* Custom header (breadcrumb + count badge) — kept local to this page, doesn't touch the shared PageHeader used elsewhere */}
+    <div className="max-w-[1600px] mx-auto w-full">
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Opportunities</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Opportunities</h1>
             <span className="inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">
               {rows.length}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
+          <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 mt-1">
             <span>Home</span>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-slate-600 font-medium">Opportunities</span>
+            <span className="text-slate-600 dark:text-slate-300 font-medium">Opportunities</span>
           </div>
         </div>
         {/* Opportunities can only be created by converting a lead (no standalone-create endpoint exists),
@@ -245,12 +256,12 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {tiles.map((t) => (
-          <Card key={t.label} className="p-4">
+          <Card key={t.label} className="p-4 dark:bg-slate-900 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">{t.label}</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{t.value}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{t.sub}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{t.label}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{t.value}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t.sub}</p>
               </div>
               <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${t.color}`}>{t.icon}</div>
             </div>
@@ -259,13 +270,13 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
       </div>
 
       {rows.length === 0 ? (
-        <Card className="p-12 text-center">
-          <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+        <Card className="p-12 text-center dark:bg-slate-900 dark:border-slate-800">
+          <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
             <Target className="h-6 w-6 text-slate-400" />
           </div>
-          <p className="font-semibold text-slate-900">No opportunities yet</p>
-          <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
-            Open a lead and click <span className="font-medium text-slate-700">Convert to Opportunity</span> to start building your pipeline.
+          <p className="font-semibold text-slate-900 dark:text-white">No opportunities yet</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
+            Open a lead and click <span className="font-medium text-slate-700 dark:text-slate-200">Convert to Opportunity</span> to start building your pipeline.
           </p>
         </Card>
       ) : (
@@ -276,7 +287,7 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
                 leftIcon={<Search className="h-4 w-4" />}
                 placeholder="Search deals or companies..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               />
             </div>
 
@@ -291,45 +302,45 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
                 <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
               </Button>
               {filterOpen && (
-                <div className="lp-anim-pop origin-top-left absolute left-0 top-full mt-1 z-20 w-72 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                    <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900"><FilterIcon className="h-4 w-4" /> Filter</span>
-                    <button onClick={() => setFilterOpen(false)} aria-label="Close" className="p-1 rounded-md hover:bg-slate-100 text-slate-400">
+                <div className="lp-anim-pop origin-top-left absolute left-0 top-full mt-1 z-20 w-72 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white"><FilterIcon className="h-4 w-4" /> Filter</span>
+                    <button onClick={() => setFilterOpen(false)} aria-label="Close" className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
                       <X className="h-4 w-4" />
                     </button>
                   </div>
 
                   <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
                     <div>
-                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Expected close — start</p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Expected close — start</p>
                       <input
                         type="date"
                         value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
+                        onChange={(e) => { setDateFrom(e.target.value); setPage(0); }}
                         max={dateTo || undefined}
-                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Expected close — end</p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Expected close — end</p>
                       <input
                         type="date"
                         value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
+                        onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
                         min={dateFrom || undefined}
-                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Stage columns shown</p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Stage columns shown</p>
                       <div className="flex flex-col gap-1.5">
                         {OPPORTUNITY_STAGES.map((s) => (
-                          <label key={s} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+                          <label key={s} className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
                             <input
                               type="checkbox"
                               checked={!hiddenStages.has(s)}
                               onChange={() => toggleStageVisible(s)}
-                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
                             />
                             {STAGE_LABELS[s]}
                           </label>
@@ -338,7 +349,7 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 p-3 border-t border-slate-100">
+                  <div className="flex items-center gap-2 p-3 border-t border-slate-100 dark:border-slate-800">
                     <Button variant="outline" className="flex-1" onClick={resetFilters}>Reset</Button>
                     <Button className="flex-1" onClick={() => setFilterOpen(false)}>Filter</Button>
                   </div>
@@ -368,14 +379,14 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
                   <button
                     onClick={() => setColumnsOpen((v) => !v)}
                     className={`inline-flex items-center gap-2 h-10 px-3.5 rounded-lg border text-sm font-medium transition-colors ${
-                      columnsOpen ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-indigo-50/60 border-indigo-100 text-indigo-600 hover:bg-indigo-50"
+                      columnsOpen ? "bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300" : "bg-indigo-50/60 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
                     }`}
                   >
                     <Columns3 className="h-4 w-4" /> Manage Columns
                   </button>
                   {columnsOpen && (
-                    <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-56 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden p-1">
-                      <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
+                    <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-56 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden p-1">
+                      <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Show columns</p>
                       {([
                         ["account", "Account"],
                         ["value", "Expected Value"],
@@ -383,12 +394,12 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
                         ["closeDate", "Expected Close Date"],
                         ["status", "Status"],
                       ] as const).map(([key, label]) => (
-                        <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none">
+                        <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer select-none">
                           <input
                             type="checkbox"
                             checked={visibleCols[key]}
                             onChange={() => toggleColumn(key)}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
                           />
                           {label}
                         </label>
@@ -398,18 +409,18 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
                 </div>
               )}
 
-              <div className="flex items-center rounded-lg border border-slate-200 p-0.5">
+              <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-800 p-0.5">
                 <button
                   onClick={() => setViewMode("table")}
                   aria-label="Table view"
-                  className={`p-1.5 rounded-md transition-colors ${viewMode === "table" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600"}`}
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === "table" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"}`}
                 >
                   <List className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode("kanban")}
                   aria-label="Kanban view"
-                  className={`p-1.5 rounded-md transition-colors ${viewMode === "kanban" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600"}`}
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === "kanban" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"}`}
                 >
                   <LayoutGrid className="h-4 w-4" />
                 </button>
@@ -418,68 +429,70 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
           </div>
 
           {filteredRows.length === 0 && (
-            <Card className="p-12 text-center mb-4">
-              <p className="font-semibold text-slate-900">No opportunities match your filters</p>
-              <p className="text-sm text-slate-500 mt-1">Try widening the date range or clearing the search.</p>
+            <Card className="p-12 text-center mb-4 dark:bg-slate-900 dark:border-slate-800">
+              <p className="font-semibold text-slate-900 dark:text-white">No opportunities match your filters</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Try widening the date range or clearing the search.</p>
             </Card>
           )}
 
           {filteredRows.length > 0 && viewMode === "table" && (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[880px]">
-                  <thead>
-                    <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100 bg-slate-50">
-                      <th className="px-4 py-3 font-semibold">Opportunity ID</th>
-                      <SortTh label="Opportunity Name" field="name" defaultDir="asc" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
-                      {visibleCols.account && <th className="px-3 py-3 font-semibold">Account</th>}
-                      {visibleCols.value && <SortTh label="Expected Value" field="dealValue" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />}
-                      {visibleCols.stage && <th className="px-3 py-3 font-semibold">Stage</th>}
-                      {visibleCols.closeDate && <SortTh label="Expected Close Date" field="expectedClose" defaultDir="asc" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />}
-                      {visibleCols.status && <th className="px-3 py-3 font-semibold">Status</th>}
-                      <th className="px-3 py-3 w-8" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {sortedRows.map((row) => {
-                      const closed = row.stage === "won" || row.stage === "lost";
-                      return (
-                        <tr key={row.id} onClick={() => setEditing(row)} className="cursor-pointer hover:bg-slate-50/60 transition-colors">
-                          <td className="px-4 py-3 text-slate-500 font-medium whitespace-nowrap">{displayIdMap.get(row.id)}</td>
-                          <td className="px-3 py-3 font-medium text-slate-900">{row.name}</td>
-                          {visibleCols.account && (
-                            <td className="px-3 py-3">
-                              {row.company ? (
-                                <span className="inline-flex items-center gap-2 text-slate-700">
-                                  <span className="h-6 w-6 rounded-full bg-blue-600 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
-                                    {row.company.charAt(0).toUpperCase()}
-                                  </span>
-                                  <span className="truncate max-w-[160px]">{row.company}</span>
+            <Card className="overflow-hidden dark:bg-slate-900 dark:border-slate-800">
+              <DataTable className="min-w-[880px]">
+                <DataTableHead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider">
+                    <DataTableTh className="text-[11px] uppercase tracking-wider">Opportunity ID</DataTableTh>
+                    <SortTh label="Opportunity Name" field="name" defaultDir="asc" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
+                    {visibleCols.account && <DataTableTh className="text-[11px] uppercase tracking-wider">Account</DataTableTh>}
+                    {visibleCols.value && <SortTh label="Expected Value" field="dealValue" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                    {visibleCols.stage && <DataTableTh className="text-[11px] uppercase tracking-wider">Stage</DataTableTh>}
+                    {visibleCols.closeDate && <SortTh label="Expected Close Date" field="expectedClose" defaultDir="asc" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                    {visibleCols.status && <DataTableTh className="text-[11px] uppercase tracking-wider">Status</DataTableTh>}
+                    <DataTableTh className="w-8" />
+                  </tr>
+                </DataTableHead>
+                <DataTableBody>
+                  {pagedRows.length === 0 && (
+                    <DataTableEmpty colSpan={8}>No deals on this page.</DataTableEmpty>
+                  )}
+                  {pagedRows.map((row) => {
+                    const closed = row.stage === "won" || row.stage === "lost";
+                    return (
+                      <DataTableRow key={row.id} onClick={() => setEditing(row)} className="cursor-pointer">
+                        <DataTableTd className="text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">{displayIdMap.get(row.id)}</DataTableTd>
+                        <DataTableTd className="font-medium text-slate-900 dark:text-slate-100">{row.name}</DataTableTd>
+                        {visibleCols.account && (
+                          <DataTableTd>
+                            {row.company ? (
+                              <span className="inline-flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                                <span className="h-6 w-6 rounded-full bg-blue-600 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
+                                  {row.company.charAt(0).toUpperCase()}
                                 </span>
-                              ) : <span className="text-slate-400">—</span>}
-                            </td>
-                          )}
-                          {visibleCols.value && <td className="px-3 py-3 text-slate-600">{money(Number(row.deal_value || 0))}</td>}
-                          {visibleCols.stage && <td className="px-3 py-3"><Badge variant={stageBadgeVariant(row.stage)}>{STAGE_TABLE_LABEL[row.stage]}</Badge></td>}
-                          {visibleCols.closeDate && <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{row.expected_close_date ? formatDate(row.expected_close_date) : "—"}</td>}
-                          {visibleCols.status && <td className="px-3 py-3"><OpenClosedPill closed={closed} /></td>}
-                          <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative">
-                              <button
-                                onClick={() => setEditing(row)}
-                                aria-label="Edit opportunity"
-                                className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                                <span className="truncate max-w-[160px]">{row.company}</span>
+                              </span>
+                            ) : <span className="text-slate-400 dark:text-slate-500">—</span>}
+                          </DataTableTd>
+                        )}
+                        {visibleCols.value && <DataTableTd className="text-slate-600 dark:text-slate-300">{money(Number(row.deal_value || 0))}</DataTableTd>}
+                        {visibleCols.stage && <DataTableTd><Badge variant={stageBadgeVariant(row.stage)}>{STAGE_TABLE_LABEL[row.stage]}</Badge></DataTableTd>}
+                        {visibleCols.closeDate && <DataTableTd className="text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.expected_close_date ? formatDate(row.expected_close_date) : "—"}</DataTableTd>}
+                        {visibleCols.status && <DataTableTd><OpenClosedPill closed={closed} /></DataTableTd>}
+                        <DataTableTd onClick={(e) => e.stopPropagation()}>
+                          <div className="relative">
+                            <button
+                              onClick={() => setEditing(row)}
+                              aria-label="Edit opportunity"
+                              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </DataTableTd>
+                      </DataTableRow>
+                    );
+                  })}
+                </DataTableBody>
+              </DataTable>
+              <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={sortedRows.length} onPageChange={(p) => setPage(p - 1)} />
             </Card>
           )}
 
@@ -494,15 +507,15 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
                 onDragOver={(e) => { e.preventDefault(); setOverStage(stage); }}
                 onDragLeave={() => setOverStage((s) => (s === stage ? null : s))}
                 onDrop={() => drop(stage)}
-                className={`w-72 flex-shrink-0 rounded-xl border transition-colors ${overStage === stage ? "border-blue-400 bg-blue-50/50" : "border-slate-200 bg-slate-50/60"}`}
+                className={`w-72 flex-shrink-0 rounded-xl border transition-colors ${overStage === stage ? "border-blue-400 bg-blue-50/50 dark:bg-blue-950/20" : "border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60"}`}
               >
-                <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200">
+                <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${STAGE_ACCENT[stage]}`} />
-                    <span className="text-sm font-semibold text-slate-700">{STAGE_LABELS[stage]}</span>
-                    <span className="text-xs text-slate-400">{items.length}</span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{STAGE_LABELS[stage]}</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{items.length}</span>
                   </div>
-                  <span className="text-xs font-medium text-slate-500">{money(colValue)}</span>
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{money(colValue)}</span>
                 </div>
                 <div className="p-2 space-y-2 min-h-[80px]">
                   {items.map((row) => (
@@ -511,24 +524,24 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
                       draggable
                       onDragStart={() => setDragId(row.id)}
                       onDragEnd={() => { setDragId(null); setOverStage(null); }}
-                      className={`group bg-white rounded-lg border border-slate-200 p-3 shadow-sm cursor-grab active:cursor-grabbing ${dragId === row.id ? "opacity-50" : ""}`}
+                      className={`group bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3 shadow-sm cursor-grab active:cursor-grabbing ${dragId === row.id ? "opacity-50" : ""}`}
                     >
                       <div className="flex items-start gap-2">
-                        <GripVertical className="h-4 w-4 text-slate-300 mt-0.5 flex-shrink-0" />
+                        <GripVertical className="h-4 w-4 text-slate-300 dark:text-slate-600 mt-0.5 flex-shrink-0" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-900 truncate">{row.name}</p>
+                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{row.name}</p>
                           {row.company && (
-                            <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 truncate">
                               <Building2 className="h-3 w-3 flex-shrink-0" /> {row.company}
                             </p>
                           )}
-                          <p className="text-sm font-semibold text-emerald-600 mt-1.5">{money(Number(row.deal_value || 0))}</p>
+                          <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1.5">{money(Number(row.deal_value || 0))}</p>
                         </div>
                         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => setEditing(row)} aria-label="Edit" className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50">
+                          <button onClick={() => setEditing(row)} aria-label="Edit" className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40">
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button onClick={() => remove(row)} aria-label="Delete" className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50">
+                          <button onClick={() => remove(row)} aria-label="Delete" className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-rose-950/40">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -584,43 +597,43 @@ function EditOpportunityModal({ row, onClose, onSaved }: { row: OpportunityRow; 
     }
   }
 
-  const field = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const field = "w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
     <Modal open onClose={onClose} title="Edit opportunity" size="md">
       <div className="p-5 space-y-3">
         <div>
-          <label className="text-xs font-medium text-slate-600">Deal name</label>
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Deal name</label>
           <input className={field} value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium text-slate-600">Company</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Company</label>
             <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600">Deal value ($)</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Deal value ($)</label>
             <input type="number" min="0" className={field} value={value} onChange={(e) => setValue(e.target.value)} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium text-slate-600">Stage</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Stage</label>
             <select className={field} value={stage} onChange={(e) => setStage(e.target.value as OpportunityStage)}>
               {OPPORTUNITY_STAGES.map((s) => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600">Expected close</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Expected close</label>
             <input type="date" className={field} value={closeDate} onChange={(e) => setCloseDate(e.target.value)} />
           </div>
         </div>
         <div>
-          <label className="text-xs font-medium text-slate-600">Notes</label>
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Notes</label>
           <textarea className={field} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
       </div>
-      <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
+      <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
         <Button variant="outline" onClick={onClose}>Cancel</Button>
         <Button onClick={save} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Save changes

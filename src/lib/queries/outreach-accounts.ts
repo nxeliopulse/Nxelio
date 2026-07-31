@@ -49,6 +49,20 @@ async function pruneDeadUnipileAccounts(supabase: Awaited<ReturnType<typeof crea
   }
 }
 
+/** Whether this workspace has at least one connected email mailbox — used by the
+ * onboarding hard gate. Fails open (returns true) on a query error so a DB
+ * hiccup here can never lock a workspace out of the whole app. */
+export async function hasConnectedMailbox(): Promise<boolean> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("outreach_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("channel", "email")
+    .eq("status", "connected");
+  if (error) return true;
+  return (count ?? 0) > 0;
+}
+
 export async function getOutreachAccounts(): Promise<OutreachAccountRow[]> {
   const supabase = await createClient();
   await pruneDeadUnipileAccounts(supabase);

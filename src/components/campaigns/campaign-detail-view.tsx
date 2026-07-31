@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
+import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd } from "@/components/ui/table";
 import { useFeedback } from "@/components/ui/feedback";
 import { setCampaignStatus, updateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { sendCampaign } from "@/lib/email/campaign-send";
@@ -315,47 +316,45 @@ export function CampaignDetailView({
             {leadActivity.length === 0 ? (
               <p className="p-8 text-center text-sm text-slate-500">No activity recorded yet.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
-                      <th className="px-4 py-2.5 font-semibold">Lead</th>
-                      <th className="px-4 py-2.5 font-semibold">Sent</th>
-                      <th className="px-4 py-2.5 font-semibold">Opened</th>
-                      <th className="px-4 py-2.5 font-semibold">Replied</th>
-                      <th className="px-4 py-2.5 font-semibold">Clicked</th>
-                      <th className="px-4 py-2.5 font-semibold">Bounced</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {leadActivity.map((r) => (
-                      <tr key={r.leadId} className="hover:bg-slate-50/60">
-                        <td className="px-4 py-2.5">
-                          <p className="font-medium text-slate-900">{r.leadName}</p>
-                          {r.leadEmail && <p className="text-xs text-slate-400">{r.leadEmail}</p>}
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-600">{fmtDateTime(r.sentAt)}</td>
-                        <td className="px-4 py-2.5">
-                          {r.openedAt ? (
-                            <span className={cn("inline-flex items-center gap-1.5", isToday(r.openedAt) ? "text-emerald-700 font-medium" : "text-slate-600")}>
-                              <MailOpen className="h-3.5 w-3.5" /> {fmtDateTime(r.openedAt)} {isToday(r.openedAt) && <Badge variant="success">Today</Badge>}
-                            </span>
-                          ) : <span className="text-slate-400">—</span>}
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-600">
-                          {r.repliedAt ? <span className="inline-flex items-center gap-1.5 text-teal-700"><Reply className="h-3.5 w-3.5" /> {fmtDateTime(r.repliedAt)}</span> : "—"}
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-600">
-                          {r.clickedAt ? <span className="inline-flex items-center gap-1.5 text-indigo-600"><MousePointerClick className="h-3.5 w-3.5" /> {fmtDateTime(r.clickedAt)}</span> : "—"}
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-600">
-                          {r.bouncedAt ? <span className="inline-flex items-center gap-1.5 text-red-600"><AlertTriangle className="h-3.5 w-3.5" /> {fmtDateTime(r.bouncedAt)}</span> : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable>
+                <DataTableHead>
+                  <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
+                    <DataTableTh>Lead</DataTableTh>
+                    <DataTableTh>Sent</DataTableTh>
+                    <DataTableTh>Opened</DataTableTh>
+                    <DataTableTh>Replied</DataTableTh>
+                    <DataTableTh>Clicked</DataTableTh>
+                    <DataTableTh>Bounced</DataTableTh>
+                  </tr>
+                </DataTableHead>
+                <DataTableBody className="divide-y divide-slate-100">
+                  {leadActivity.map((r) => (
+                    <DataTableRow key={r.leadId}>
+                      <DataTableTd>
+                        <p className="font-medium text-slate-900">{r.leadName}</p>
+                        {r.leadEmail && <p className="text-xs text-slate-400">{r.leadEmail}</p>}
+                      </DataTableTd>
+                      <DataTableTd className="text-slate-600">{fmtDateTime(r.sentAt)}</DataTableTd>
+                      <DataTableTd>
+                        {r.openedAt ? (
+                          <span className={cn("inline-flex items-center gap-1.5", isToday(r.openedAt) ? "text-emerald-700 font-medium" : "text-slate-600")}>
+                            <MailOpen className="h-3.5 w-3.5" /> {fmtDateTime(r.openedAt)} {isToday(r.openedAt) && <Badge variant="success">Today</Badge>}
+                          </span>
+                        ) : <span className="text-slate-400">—</span>}
+                      </DataTableTd>
+                      <DataTableTd className="text-slate-600">
+                        {r.repliedAt ? <span className="inline-flex items-center gap-1.5 text-teal-700"><Reply className="h-3.5 w-3.5" /> {fmtDateTime(r.repliedAt)}</span> : "—"}
+                      </DataTableTd>
+                      <DataTableTd className="text-slate-600">
+                        {r.clickedAt ? <span className="inline-flex items-center gap-1.5 text-indigo-600"><MousePointerClick className="h-3.5 w-3.5" /> {fmtDateTime(r.clickedAt)}</span> : "—"}
+                      </DataTableTd>
+                      <DataTableTd className="text-slate-600">
+                        {r.bouncedAt ? <span className="inline-flex items-center gap-1.5 text-red-600"><AlertTriangle className="h-3.5 w-3.5" /> {fmtDateTime(r.bouncedAt)}</span> : "—"}
+                      </DataTableTd>
+                    </DataTableRow>
+                  ))}
+                </DataTableBody>
+              </DataTable>
             )}
           </Card>
         </div>

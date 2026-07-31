@@ -6,10 +6,10 @@ import { Eye, EyeOff, AlertCircle, Loader2, KeyRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const INPUT = {
-  className: "w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 outline-none transition-all",
+  className: "w-full px-4 py-3 rounded-xl text-sm text-slate-800 placeholder-slate-400 outline-none transition-all",
   style: {
-    background: "rgba(255,255,255,.06)",
-    border: "1.5px solid rgba(255,255,255,.1)",
+    background: "#F3F4F8",
+    border: "1.5px solid transparent",
   } as React.CSSProperties,
 };
 
@@ -77,15 +77,15 @@ function ResetPasswordForm() {
         </div>
       </div>
 
-      <h1 className="text-2xl font-black text-white mb-2 text-center">Choose a new password</h1>
-      <p className="text-sm mb-8 text-center" style={{ color: "rgba(255,255,255,.45)" }}>
+      <h1 className="text-2xl font-black text-slate-900 mb-2 text-center">Choose a new password</h1>
+      <p className="text-sm mb-8 text-center text-slate-500">
         Enter a new password for your account below.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
-            style={{ background: "rgba(244,81,30,.12)", border: "1.5px solid rgba(244,81,30,.3)", color: "#ff8a65" }}>
+            style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
@@ -100,12 +100,11 @@ function ResetPasswordForm() {
             autoFocus
             {...INPUT}
             style={{ ...INPUT.style, paddingRight: "2.75rem" }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = "#18A7B8"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.15)"; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,.1)"; e.currentTarget.style.boxShadow = "none"; }}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.25)"; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = "none"; }}
           />
           <button type="button" onClick={() => setShowPass(!showPass)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-            style={{ color: "rgba(255,255,255,.35)" }}>
+            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors text-slate-400 hover:text-slate-600">
             {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
@@ -116,19 +115,19 @@ function ResetPasswordForm() {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           {...INPUT}
-          onFocus={(e) => { e.currentTarget.style.borderColor = "#18A7B8"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.15)"; }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,.1)"; e.currentTarget.style.boxShadow = "none"; }}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.25)"; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = "none"; }}
         />
 
         <button type="submit" disabled={!valid || submitting}
-          className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full py-3.5 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow: "0 4px 20px rgba(24,167,184,.3)" }}>
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {submitting ? "Updating…" : "Reset password"}
         </button>
       </form>
 
-      <p className="text-center text-sm pt-6" style={{ color: "rgba(255,255,255,.4)" }}>
+      <p className="text-center text-sm pt-6 text-slate-500">
         Link expired or not working?{" "}
         <Link href="/forgot-password" className="font-bold hover:underline" style={{ color: "#18A7B8" }}>
           Request a new one
@@ -140,7 +139,7 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-center py-8" style={{ color: "rgba(255,255,255,.4)" }}>Loading…</div>}>
+    <Suspense fallback={<div className="text-sm text-center py-8 text-slate-400">Loading…</div>}>
       <ResetPasswordForm />
     </Suspense>
   );

@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
   const isAuthPage = path.startsWith("/login") || path.startsWith("/signup") || path.startsWith("/check-email");
   const isAuthCallback = path.startsWith("/auth/");
   if (isAuthCallback) return response;
-  const isAppPage = ["/dashboard","/leads","/segments","/campaigns","/newsletters","/workflows","/inbox","/templates","/analytics","/users","/capture-form","/settings","/billing","/help"].some((p) => path.startsWith(p));
+  const isAppPage = ["/dashboard","/leads","/segments","/campaigns","/newsletters","/workflows","/inbox","/templates","/analytics","/users","/capture-form","/settings","/billing","/help","/onboarding"].some((p) => path.startsWith(p));
 
   // Not logged in + trying to access app → redirect to login
   if (!user && isAppPage) {

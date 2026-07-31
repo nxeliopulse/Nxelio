@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
-import { getOnboarding } from "@/lib/queries/onboarding";
+import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { getSubscription } from "@/lib/queries/subscriptions";
 import { SubscriptionGate } from "@/components/billing/subscription-gate";
+import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
 import { getMyWorkspaces } from "@/lib/queries/workspaces";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -30,24 +31,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
 
+  // Hard onboarding gate — runs BEFORE the subscription check, since a
+  // brand-new workspace has no subscription row yet either; checking
+  // subscription first would let someone pay before finishing onboarding.
+  const onboardingStatus = await getOnboardingStatus();
+  if (!onboardingStatus.completed) return <OnboardingGate status={onboardingStatus} />;
+
   // Card-first gate: a brand-new workspace has no subscription row at all
   // until checkout completes (see migration 0035). Block the whole dashboard
   // until that happens — nothing else here matters if there's no subscription.
   const subscription = await getSubscription();
   if (!subscription) return <SubscriptionGate />;
-
-  // Soft onboarding: new signups are sent to /onboarding from signup, and anyone
-  // who hasn't finished sees a banner (below) — no hard lockout.
-  const { completed: onboardingCompleted } = await getOnboarding();
-
-  // LP-2 — a "no mailbox connected" banner shows until at least one email
-  // mailbox is connected for the workspace.
-  const { count: mailboxCount } = await supabase
-    .from("outreach_accounts")
-    .select("id", { count: "exact", head: true })
-    .eq("channel", "email")
-    .eq("status", "connected");
-  const mailboxConnected = (mailboxCount || 0) > 0;
 
   const { data: profile } = await supabase
     .from("users")
@@ -70,8 +64,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       userEmail={userEmail}
       userRole={userRole}
       navAccess={navAccess}
-      onboardingCompleted={onboardingCompleted}
-      mailboxConnected={mailboxConnected}
       workspaces={workspaces}
     >
       {children}

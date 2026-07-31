@@ -12,6 +12,7 @@ import type { PlatformOverviewStats, HotCustomerRow, SubscriptionRow } from "@/l
 import type { LeadArchiveRow } from "@/lib/queries/lead-import-archive";
 import type { VendorSubscriptionRow } from "@/lib/queries/platform-vendor-subscriptions";
 import type { AiProviderStatus } from "@/lib/queries/ai-provider-settings";
+import { LogoMark } from "@/components/brand/logo";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -70,12 +71,8 @@ export function AdminDashboard({
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3.5">
-          <div className="h-11 w-11 rounded-2xl bg-[#18A7B8] flex items-center justify-center shadow-md shadow-[#18A7B8]/25 flex-shrink-0">
-            <svg viewBox="0 0 32 32" fill="none" className="h-6 w-6">
-              <path d="M7 24 L7 8 L19 22 L19 8" stroke="white" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M19 15 L26 8" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
-              <circle cx="26" cy="8" r="2.2" fill="white" />
-            </svg>
+          <div className="h-11 w-11 rounded-2xl overflow-hidden bg-white flex items-center justify-center shadow-md shadow-[#18A7B8]/25 flex-shrink-0">
+            <LogoMark className="h-full w-full" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
