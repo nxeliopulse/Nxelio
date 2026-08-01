@@ -11,6 +11,13 @@ import { zoomConfigured } from "@/lib/zoom/config";
 export async function GET(req: NextRequest) {
   const settings = (q: string) => NextResponse.redirect(new URL(`/settings?section=calendar&${q}`, req.url));
 
+  // Where to return after connecting — defaults to Settings (existing
+  // behavior), but callers like onboarding pass their own page so the user
+  // lands back where they started instead of an unrelated page that never
+  // reflects the fresh connection. Same open-redirect guard as auth/callback.
+  const rawNext = req.nextUrl.searchParams.get("next") || "/settings?section=calendar";
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/settings?section=calendar";
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL("/login", req.url));
@@ -28,6 +35,13 @@ export async function GET(req: NextRequest) {
   const state = crypto.randomUUID();
   const res = NextResponse.redirect(buildZoomAuthUrl(state));
   res.cookies.set("zoom_state", state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 600,
+    path: "/",
+  });
+  res.cookies.set("zoom_next", next, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

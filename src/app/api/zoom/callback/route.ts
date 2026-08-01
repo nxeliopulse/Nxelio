@@ -9,8 +9,15 @@ import { exchangeZoomCode, fetchZoomEmail } from "@/lib/zoom/client";
 import { logAudit } from "@/lib/queries/audit-log";
 
 export async function GET(req: NextRequest) {
+  // The connect route stashed where we should return to (Settings by default,
+  // or e.g. onboarding if that's where the user started) — read it before any
+  // early return so both the success and failure paths land back there
+  // instead of always bouncing to Settings regardless of where this began.
+  const nextCookie = req.cookies.get("zoom_next")?.value;
+  const next = nextCookie && nextCookie.startsWith("/") && !nextCookie.startsWith("//") ? nextCookie : "/settings?section=calendar";
+  const sep = next.includes("?") ? "&" : "?";
   const fail = (msg: string) =>
-    NextResponse.redirect(new URL(`/settings?section=calendar&calendar_error=${encodeURIComponent(msg)}`, req.url));
+    NextResponse.redirect(new URL(`${next}${sep}calendar_error=${encodeURIComponent(msg)}`, req.url));
 
   const url = req.nextUrl;
   const code = url.searchParams.get("code");
@@ -47,7 +54,8 @@ export async function GET(req: NextRequest) {
     return fail(e instanceof Error ? e.message : "Zoom connection failed");
   }
 
-  const res = NextResponse.redirect(new URL("/settings?section=calendar&connected=zoom", req.url));
+  const res = NextResponse.redirect(new URL(`${next}${sep}connected=zoom`, req.url));
   res.cookies.delete("zoom_state");
+  res.cookies.delete("zoom_next");
   return res;
 }
