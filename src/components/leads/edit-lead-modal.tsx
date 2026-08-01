@@ -1,16 +1,19 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
 import { updateLead, type LeadRow } from "@/lib/queries/leads";
-import { industries, interestAreas } from "@/lib/mock-data";
+import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
+import { getPicklistValues } from "@/lib/queries/picklists";
 
-const STATUSES = ["New", "Contacted", "Qualified", "Nurturing"];
-const COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
-const SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
+// Fallback values render immediately while the workspace's actual (admin-editable,
+// Settings > Picklists) values load in — avoids the dropdown flashing empty.
+const FALLBACK_STATUSES = ["New", "Contacted", "Qualified", "Nurturing"];
+const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
+const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
 
 export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose: () => void; lead: LeadRow }) {
   const router = useRouter();
@@ -37,6 +40,20 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [industries, setIndustries] = useState(FALLBACK_INDUSTRIES);
+  const [interestAreas, setInterestAreas] = useState(FALLBACK_INTEREST_AREAS);
+  const [statuses, setStatuses] = useState(FALLBACK_STATUSES);
+  const [companySizeBuckets, setCompanySizeBuckets] = useState(FALLBACK_COMPANY_SIZE_BUCKETS);
+  const [seniorityLevels, setSeniorityLevels] = useState(FALLBACK_SENIORITY_LEVELS);
+
+  useEffect(() => {
+    getPicklistValues("lead_industry").then(setIndustries).catch(() => {});
+    getPicklistValues("lead_interest_area").then(setInterestAreas).catch(() => {});
+    getPicklistValues("lead_status").then(setStatuses).catch(() => {});
+    getPicklistValues("lead_company_size").then(setCompanySizeBuckets).catch(() => {});
+    getPicklistValues("lead_seniority").then(setSeniorityLevels).catch(() => {});
+  }, []);
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -155,7 +172,7 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
                 {/* Include the lead's current status even if it's a legacy value (e.g. "Converted")
                     no longer offered for new selections — otherwise the dropdown would silently
                     show a different value than what's actually saved. */}
-                {(STATUSES.includes(form.status) ? STATUSES : [...STATUSES, form.status]).map((s) => (
+                {(statuses.includes(form.status) ? statuses : [...statuses, form.status]).map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </Select>
@@ -168,14 +185,14 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
               <label className={label}>Seniority</label>
               <Select className={field} value={form.seniority} onChange={(e) => set("seniority", e.target.value)}>
                 <option value="">—</option>
-                {SENIORITY_LEVELS.map((s) => <option key={s} value={s}>{s}</option>)}
+                {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
               </Select>
             </div>
             <div>
               <label className={label}>Company size</label>
               <Select className={field} value={form.company_size} onChange={(e) => set("company_size", e.target.value)}>
                 <option value="">—</option>
-                {COMPANY_SIZE_BUCKETS.map((b) => <option key={b} value={b}>{b}</option>)}
+                {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
               </Select>
             </div>
             <div>

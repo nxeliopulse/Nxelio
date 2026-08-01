@@ -52,6 +52,12 @@ BEGIN
   INSERT INTO public.users (user_id, full_name, email, role_id, status, workspace_id, avatar_url)
   VALUES (NEW.id, display_name, NEW.email, 1, 'ACTIVE', new_ws, picture_url);
 
+  -- Every new signup also gets a membership row for their first workspace
+  -- (multi-workspace support, migration 0081) — must be preserved here since
+  -- this CREATE OR REPLACE fully overwrites the function body.
+  INSERT INTO public.workspace_members (user_id, workspace_id, role_id)
+  VALUES (NEW.id, new_ws, 1);
+
   RETURN NEW;
 EXCEPTION
   WHEN OTHERS THEN

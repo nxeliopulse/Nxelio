@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { createSegment, updateSegment, getSegmentWithRules, previewSegmentCount } from "@/lib/queries/segments";
+import { getDistinctLeadValues } from "@/lib/queries/leads";
+import { getPicklistCategories } from "@/lib/queries/picklists";
+import { getUsers } from "@/lib/queries/users";
 import { SEGMENT_FIELDS, operatorsForField, fieldType, isRuleComplete } from "@/lib/segments";
 
 interface Rule {
@@ -46,6 +49,40 @@ export default function SegmentBuilderPage() {
   // Live preview count — real query against leads, debounced as rules change.
   const [count, setCount] = useState<number | null>(null);
   const [counting, setCounting] = useState(false);
+
+  // Value-dropdown option sets for fields with a fixed vocabulary (picklists,
+  // distinct real values already on leads, or the workspace's owner list) —
+  // fetched once on mount so the value input can be a real <select> instead
+  // of free text.
+  const [picklistValues, setPicklistValues] = useState<Record<string, string[]>>({});
+  const [distinctValues, setDistinctValues] = useState<Record<string, string[]>>({});
+  const [owners, setOwners] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const [categories, source, country, users] = await Promise.all([
+        getPicklistCategories(),
+        getDistinctLeadValues("source"),
+        getDistinctLeadValues("country"),
+        getUsers(),
+      ]);
+      const byKey: Record<string, string[]> = {};
+      for (const c of categories) byKey[c.key] = c.values.filter((v) => v.is_active).map((v) => v.value);
+      setPicklistValues(byKey);
+      setDistinctValues({ source, country });
+      setOwners(users.map((u) => ({ id: u.user_id, name: u.full_name })));
+    })();
+  }, []);
+
+  /** Dropdown options for a rule's value input, or null if this field stays free text. */
+  function valueOptionsFor(fieldKey: string): { value: string; label: string }[] | null {
+    const f = SEGMENT_FIELDS.find((sf) => sf.key === fieldKey);
+    if (!f?.options) return null;
+    if (f.options.kind === "picklist") return (picklistValues[f.options.key] || []).map((v) => ({ value: v, label: v }));
+    if (f.options.kind === "distinct") return (distinctValues[fieldKey] || []).map((v) => ({ value: v, label: v }));
+    if (f.options.kind === "owner") return owners.map((o) => ({ value: o.id, label: o.name }));
+    return null;
+  }
 
   // Load an existing segment when opened via ?id= (Edit) so the form shows its
   // real rules instead of the default template.
@@ -188,6 +225,7 @@ export default function SegmentBuilderPage() {
               <div className="space-y-2.5">
                 {rules.map((r, i) => {
                   const f = SEGMENT_FIELDS.find((sf) => sf.key === r.field);
+                  const options = valueOptionsFor(r.field);
                   return (
                     <div key={r.id} className="flex items-center gap-2 group">
                       <div className="w-10 text-xs font-semibold text-slate-400 text-right">{i === 0 ? "WHERE" : logic}</div>
@@ -197,13 +235,20 @@ export default function SegmentBuilderPage() {
                       <Select className="max-w-[160px]" value={r.operator} onChange={(e) => updateRule(r.id, { operator: e.target.value })}>
                         {operatorsForField(r.field).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
                       </Select>
-                      <Input
-                        type={fieldType(r.field) === "number" ? "number" : "text"}
-                        value={r.value}
-                        onChange={(e) => updateRule(r.id, { value: e.target.value })}
-                        placeholder={f?.hint || "Value..."}
-                        className="flex-1"
-                      />
+                      {options ? (
+                        <Select value={r.value} onChange={(e) => updateRule(r.id, { value: e.target.value })} className="flex-1">
+                          <option value="">Select a value...</option>
+                          {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </Select>
+                      ) : (
+                        <Input
+                          type={fieldType(r.field) === "number" ? "number" : "text"}
+                          value={r.value}
+                          onChange={(e) => updateRule(r.id, { value: e.target.value })}
+                          placeholder={f?.hint || "Value..."}
+                          className="flex-1"
+                        />
+                      )}
                       <button onClick={() => removeRule(r.id)} className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50"><X className="h-4 w-4" /></button>
                     </div>
                   );

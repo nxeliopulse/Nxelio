@@ -5,8 +5,9 @@ import { revalidatePath } from "next/cache";
 import { leadMatches, isRuleComplete, type EvalRule } from "@/lib/segments";
 import type { LeadRow } from "@/lib/queries/leads";
 
-// Only the columns a rule can match — keeps the membership scan lightweight.
-const LEAD_MATCH_FIELDS = "id, industry, interest_area, source, status, lead_score";
+// Only the columns a rule can match (see SEGMENT_FIELDS in lib/segments.ts) —
+// keeps the membership scan lightweight.
+const LEAD_MATCH_FIELDS = "id, industry, interest_area, source, status, lead_score, company_size, seniority, country, owner_id, company_name, job_title";
 
 export interface SegmentRow {
   id: string;
