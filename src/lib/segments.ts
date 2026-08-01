@@ -3,12 +3,32 @@
 
 export type FieldType = "text" | "number";
 
-/** The only lead fields a segment rule can match — each maps to a real column. */
-export const SEGMENT_FIELDS: { key: string; label: string; type: FieldType; hint?: string }[] = [
-  { key: "industry", label: "Industry", type: "text", hint: "e.g. Technology" },
-  { key: "interest_area", label: "Interest Area", type: "text", hint: "e.g. CRM" },
-  { key: "source", label: "Source", type: "text", hint: "e.g. LinkedIn" },
-  { key: "status", label: "Status", type: "text", hint: "New / Warm / Hot / Converted" },
+/**
+ * Where a rule's value dropdown gets its options from, when the field has a
+ * known/fixed vocabulary — so the value input can be a real `<select>`
+ * instead of free text. Fields with no fixed vocabulary (Company, Job Title)
+ * are left without one and stay free text.
+ * - "picklist": sourced from the admin-managed Picklist Manager (Administration → Picklists).
+ * - "distinct": sourced live from whatever values already exist on real leads for that column.
+ * - "owner": sourced from the workspace's user list.
+ */
+export type OptionsSource =
+  | { kind: "picklist"; key: import("./picklists").PicklistKey }
+  | { kind: "distinct" }
+  | { kind: "owner" };
+
+/** The lead fields a segment rule can match — each maps to a real column. */
+export const SEGMENT_FIELDS: { key: string; label: string; type: FieldType; hint?: string; options?: OptionsSource }[] = [
+  { key: "industry", label: "Industry", type: "text", options: { kind: "picklist", key: "lead_industry" } },
+  { key: "interest_area", label: "Interest Area", type: "text", options: { kind: "picklist", key: "lead_interest_area" } },
+  { key: "status", label: "Status", type: "text", options: { kind: "picklist", key: "lead_status" } },
+  { key: "company_size", label: "Company Size", type: "text", options: { kind: "picklist", key: "lead_company_size" } },
+  { key: "seniority", label: "Seniority", type: "text", options: { kind: "picklist", key: "lead_seniority" } },
+  { key: "source", label: "Source", type: "text", options: { kind: "distinct" } },
+  { key: "country", label: "Country", type: "text", options: { kind: "distinct" } },
+  { key: "owner_id", label: "Owner", type: "text", options: { kind: "owner" } },
+  { key: "company_name", label: "Company", type: "text", hint: "e.g. Acme Inc" },
+  { key: "job_title", label: "Job Title", type: "text", hint: "e.g. Head of Sales" },
   { key: "lead_score", label: "Lead Score", type: "number", hint: "0–100" },
 ];
 

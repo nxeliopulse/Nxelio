@@ -94,6 +94,24 @@ export async function getLeadStats() {
   };
 }
 
+/**
+ * Distinct, non-empty values already present on real leads for one column —
+ * powers the Segment Builder's value dropdown for fields with no managed
+ * picklist (e.g. Source, Country), so it still offers real choices instead
+ * of free text, without needing an admin to curate a list first.
+ */
+export async function getDistinctLeadValues(column: "source" | "country"): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("leads").select(column).not(column, "is", null);
+  if (error || !data) return [];
+  const values = new Set<string>();
+  for (const row of data as Record<string, string | null>[]) {
+    const v = row[column]?.trim();
+    if (v) values.add(v);
+  }
+  return [...values].sort((a, b) => a.localeCompare(b));
+}
+
 export async function createLead(payload: Partial<LeadRow>) {
   const supabase = await createClient();
   const { data, error } = await supabase.from("leads").insert(payload).select().single();
