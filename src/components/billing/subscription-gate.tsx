@@ -164,9 +164,9 @@ export function SubscriptionGate() {
         <span className={`text-sm font-medium transition-colors ${interval === "monthly" ? "text-white" : "text-white/40"}`}>Monthly</span>
         <button
           onClick={() => setInterval(i => i === "monthly" ? "annual" : "monthly")}
-          className="relative h-6 w-12 rounded-full transition-colors"
+          className="relative h-6 w-12 flex-shrink-0 rounded-full transition-colors"
           style={{ background: interval === "annual" ? "linear-gradient(135deg,#06B6D4,#8B5CF6)" : "rgba(255,255,255,.12)" }}>
-          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${interval === "annual" ? "translate-x-6" : "translate-x-0.5"}`} />
+          <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${interval === "annual" ? "translate-x-6" : "translate-x-0"}`} />
         </button>
         <span className={`text-sm font-medium transition-colors ${interval === "annual" ? "text-white" : "text-white/40"}`}>Annual</span>
         {interval === "annual" && (
