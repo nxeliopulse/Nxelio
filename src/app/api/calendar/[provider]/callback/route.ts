@@ -14,8 +14,16 @@ function isProvider(p: string): p is CalProvider {
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
+
+  // The connect route stashed where we should return to (Settings by default,
+  // or e.g. onboarding if that's where the user started) — read it before any
+  // early return so both the success and failure paths land back there
+  // instead of always bouncing to Settings regardless of where this began.
+  const nextCookie = isProvider(provider) ? req.cookies.get(`cal_next_${provider}`)?.value : undefined;
+  const next = nextCookie && nextCookie.startsWith("/") && !nextCookie.startsWith("//") ? nextCookie : "/settings?section=calendar";
+  const sep = next.includes("?") ? "&" : "?";
   const fail = (msg: string) =>
-    NextResponse.redirect(new URL(`/settings?section=calendar&calendar_error=${encodeURIComponent(msg)}`, req.url));
+    NextResponse.redirect(new URL(`${next}${sep}calendar_error=${encodeURIComponent(msg)}`, req.url));
 
   if (!isProvider(provider)) return fail("Unknown calendar provider");
 
@@ -55,7 +63,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     return fail(e instanceof Error ? e.message : "Calendar connection failed");
   }
 
-  const res = NextResponse.redirect(new URL("/settings?section=calendar&connected=calendar", req.url));
+  const res = NextResponse.redirect(new URL(`${next}${sep}connected=calendar`, req.url));
   res.cookies.delete(`cal_state_${provider}`);
+  res.cookies.delete(`cal_next_${provider}`);
   return res;
 }

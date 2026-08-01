@@ -18,6 +18,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
 
   if (!isProvider(provider)) return settings("calendar_error=" + encodeURIComponent("Unknown calendar provider"));
 
+  // Where to return after connecting — defaults to Settings (existing
+  // behavior), but callers like onboarding pass their own page so the user
+  // lands back where they started instead of an unrelated page that never
+  // reflects the fresh connection. Same open-redirect guard as auth/callback.
+  const rawNext = req.nextUrl.searchParams.get("next") || "/settings?section=calendar";
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/settings?section=calendar";
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL("/login", req.url));
@@ -35,6 +42,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   const state = crypto.randomUUID();
   const res = NextResponse.redirect(buildAuthUrl(provider, state));
   res.cookies.set(`cal_state_${provider}`, state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 600,
+    path: "/",
+  });
+  res.cookies.set(`cal_next_${provider}`, next, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

@@ -15,6 +15,8 @@ import { saveOnboarding, type OnboardingData, type OnboardingStatus } from "@/li
 import { updateProfile } from "@/lib/queries/profile";
 import { uploadAvatarImage } from "@/lib/storage/upload";
 import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outreach-accounts";
+import { getZoomAccounts } from "@/lib/queries/zoom-accounts";
+import { getCalendarAccounts } from "@/lib/queries/calendar-accounts";
 
 const GOALS = ["Generate leads", "Book more meetings", "Grow pipeline", "Close deals faster", "Automate outreach", "Track performance"];
 const SIZES = ["1–10", "11–50", "51–200", "201–500", "500+"];
@@ -59,7 +61,7 @@ function Field({ label, required, icon, children }: { label: string; required?: 
   );
 }
 
-export function OnboardingWizard({ status, calendarProviderStatus, calendarConnected, zoomConfigured, zoomConnected }: {
+export function OnboardingWizard({ status, calendarProviderStatus, calendarConnected: calendarConnectedInitial, zoomConfigured, zoomConnected: zoomConnectedInitial }: {
   status: OnboardingStatus;
   calendarProviderStatus: { google: boolean; microsoft: boolean };
   calendarConnected: boolean;
@@ -75,6 +77,8 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
   const [connecting, setConnecting] = useState(false);
   const [inboxStarted, setInboxStarted] = useState(false);
   const [mailboxConnected, setMailboxConnected] = useState(status.mailboxComplete);
+  const [zoomConnected, setZoomConnected] = useState(zoomConnectedInitial);
+  const [calendarConnected, setCalendarConnected] = useState(calendarConnectedInitial);
 
   // Profile step state
   const [phone, setPhone] = useState(status.profile?.phone ?? "");
@@ -113,10 +117,16 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
     setAvatarPreviewUrl(file ? URL.createObjectURL(file) : null);
   }
 
+  // Persist each step as the user completes it (rather than waiting for the
+  // final "Finish setup" click) — otherwise any interruption between here and
+  // the last step (a connect-integration popup redirecting, a session hiccup)
+  // wipes everything still sitting only in local React state, forcing the
+  // user to redo the whole wizard even though they'd already filled it in.
   async function next() {
     if (step === 1) {
       if (!phone.trim() || !jobTitle.trim()) { setErr("Phone and job title are required."); return; }
       setError(null);
+      let nextAvatarUrl = avatarUrl;
       if (avatarFile) {
         setUploadingAvatar(true);
         const fd = new FormData();
@@ -124,13 +134,29 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
         const res = await uploadAvatarImage(fd);
         setUploadingAvatar(false);
         if (!res.ok) { setError(res.error || "Couldn't upload your photo. You can skip it and add one later in Settings."); return; }
-        setAvatarUrl(res.url || null);
+        nextAvatarUrl = res.url || null;
+        setAvatarUrl(nextAvatarUrl);
       }
+      setSaving(true);
+      try {
+        await updateProfile({ phone: phone.trim(), job_title: jobTitle.trim(), ...(nextAvatarUrl ? { avatar_url: nextAvatarUrl } : {}) });
+      } catch (e) {
+        setSaving(false);
+        setError(e instanceof Error ? e.message : "Couldn't save your profile. Please try again.");
+        return;
+      }
+      setSaving(false);
       setStep(2);
       return;
     }
     if (step === 2 && !validateCompanyIdentity()) return;
-    if (step === 3 && !validateSalesContext()) return;
+    if (step === 3) {
+      if (!validateSalesContext()) return;
+      setSaving(true);
+      const res = await saveOnboarding(form);
+      setSaving(false);
+      if (!res.ok) { setError(res.error || "Couldn't save your company details. Please try again."); return; }
+    }
     setError(null);
     setStep((s) => Math.min(4, s + 1));
   }
@@ -160,15 +186,27 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
   // The connect popup lands in a different tab/React tree, so it can't update
   // this component's state directly — re-check on focus-regain instead (the
   // user alt-tabbing back after authorizing is the actual signal we have).
+  // Covers all three optional/mandatory integrations, not just mailbox — Zoom
+  // and Calendar used to only ever refresh on a full page reload.
   useEffect(() => {
-    if (step !== 4 || mailboxConnected) return;
+    if (step !== 4 || (mailboxConnected && zoomConnected && calendarConnected)) return;
     async function onFocus() {
-      const res = await syncOutreachAccounts();
-      if (res.ok && res.count > 0) setMailboxConnected(true);
+      if (!mailboxConnected) {
+        const res = await syncOutreachAccounts();
+        if (res.ok && res.count > 0) setMailboxConnected(true);
+      }
+      if (!zoomConnected) {
+        const zoomAccounts = await getZoomAccounts();
+        if (zoomAccounts.length > 0) setZoomConnected(true);
+      }
+      if (!calendarConnected) {
+        const calendarAccounts = await getCalendarAccounts();
+        if (calendarAccounts.length > 0) setCalendarConnected(true);
+      }
     }
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [step, mailboxConnected]);
+  }, [step, mailboxConnected, zoomConnected, calendarConnected]);
 
   async function finish() {
     if (!isEdit && !mailboxConnected) { setErr("Connect a mailbox to finish setting up your workspace."); return; }
@@ -470,12 +508,12 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
                   ) : calendarProviderStatus.google || calendarProviderStatus.microsoft ? (
                     <div className="flex flex-wrap gap-2">
                       {calendarProviderStatus.google && (
-                        <a href="/api/calendar/google/connect" target="_blank" rel="noopener noreferrer">
+                        <a href="/api/calendar/google/connect?next=/onboarding" target="_blank" rel="noopener noreferrer">
                           <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE}><ExternalLink className="h-3.5 w-3.5" /> Google Calendar</Button>
                         </a>
                       )}
                       {calendarProviderStatus.microsoft && (
-                        <a href="/api/calendar/microsoft/connect" target="_blank" rel="noopener noreferrer">
+                        <a href="/api/calendar/microsoft/connect?next=/onboarding" target="_blank" rel="noopener noreferrer">
                           <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE}><ExternalLink className="h-3.5 w-3.5" /> Outlook</Button>
                         </a>
                       )}
@@ -503,7 +541,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
                       <CheckCircle2 className="h-4 w-4" /> Connected
                     </span>
                   ) : zoomConfigured ? (
-                    <a href="/api/zoom/connect" target="_blank" rel="noopener noreferrer">
+                    <a href="/api/zoom/connect?next=/onboarding" target="_blank" rel="noopener noreferrer">
                       <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE}><ExternalLink className="h-3.5 w-3.5" /> Connect Zoom</Button>
                     </a>
                   ) : (
@@ -529,7 +567,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
           {step < 4 ? (
             <Button onClick={next} disabled={saving || uploadingAvatar} className="rounded-full"
               style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow: "0 4px 20px rgba(24,167,184,.3)" }}>
-              {uploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Save and continue <ArrowRight className="h-4 w-4" />
+              {uploadingAvatar || saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Save and continue <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
             <>
