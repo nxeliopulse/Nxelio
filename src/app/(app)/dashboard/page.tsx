@@ -15,6 +15,12 @@ export default async function DashboardPage() {
     .select("id", { count: "exact", head: true })
     .eq("status", "connected");
 
+  const { data: recentDeals } = await supabase
+    .from("opportunities")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
   const onboardingStatus = {
     essentialsDone,
     inboxConnected: (outreachCount || 0) > 0,
@@ -22,5 +28,11 @@ export default async function DashboardPage() {
     userName: onboardingData?.company_name ?? "",
   };
 
-  return <DashboardView stats={stats} onboardingStatus={onboardingStatus} />;
+  return (
+    <DashboardView
+      stats={stats}
+      onboardingStatus={onboardingStatus}
+      recentDeals={recentDeals || []}
+    />
+  );
 }

@@ -4,6 +4,7 @@ import { CheckCircle2, AlertCircle } from "lucide-react";
 
 const CHANNEL_LABEL: Record<string, string> = {
   email: "Mailbox",
+  linkedin: "LinkedIn",
   zoom: "Zoom",
   calendar: "Calendar",
 };

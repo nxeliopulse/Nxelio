@@ -63,6 +63,20 @@ export async function hasConnectedMailbox(): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
+/** Whether this workspace has at least one connected LinkedIn account —
+ * LinkedIn is an optional connect (unlike mailbox), so this fails closed on a
+ * query error rather than open. */
+export async function hasConnectedLinkedIn(): Promise<boolean> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("outreach_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("channel", "linkedin")
+    .eq("status", "connected");
+  if (error) return false;
+  return (count ?? 0) > 0;
+}
+
 export async function getOutreachAccounts(): Promise<OutreachAccountRow[]> {
   const supabase = await createClient();
   await pruneDeadUnipileAccounts(supabase);

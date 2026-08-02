@@ -53,6 +53,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${origin}/login`);
   }
 
+  // Whether the subscription actually came back trialing — the welcome
+  // banner shouldn't claim "your trial is active" if the customer was
+  // charged in full (e.g. a plan with no trial, or a Stripe Price missing
+  // trial_period_days), so this rides along on the redirect instead of the
+  // banner assuming a trial happened just because checkout succeeded.
+  let trialing = false;
+
   try {
     const sc = stripe();
     const session = await sc.checkout.sessions.retrieve(checkoutSessionId, {
@@ -67,6 +74,7 @@ export async function GET(req: NextRequest) {
 
       if (parsed) {
         const item = stripeSub.items.data[0];
+        trialing = stripeSub.status === "trialing";
         await syncSubscriptionFromStripe({
           workspaceId:          profile.workspace_id,
           planId:               parsed.planId as PlanId,
@@ -94,5 +102,5 @@ export async function GET(req: NextRequest) {
   }
 
   // Subscription is now in the DB → AppLayout will see it → dashboard renders
-  return NextResponse.redirect(`${origin}/dashboard?welcome=1`);
+  return NextResponse.redirect(`${origin}/dashboard?welcome=1&trial=${trialing ? "1" : "0"}`);
 }

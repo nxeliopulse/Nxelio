@@ -41,7 +41,10 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const initials = userName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+  const parts = userName.trim().split(/\s+/);
+  const initials = parts.length > 1
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : userName.slice(0, 2).toUpperCase() || "?";
 
   async function handleSwitchWorkspace(id: string) {
     setSwitchError(null);

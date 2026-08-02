@@ -114,6 +114,13 @@ export async function POST(req: NextRequest) {
     // managed_payments is disabled here to match the "Pick what you need"
     // choice made in the Stripe dashboard setup — Managed Payments otherwise
     // requires a tax code on every product and adds a 3.5% surcharge we don't want.
+    //
+    // Only Basic advertises a free trial (see the `trial` field on PLANS in
+    // subscription-gate.tsx) — none of the 6 Stripe Prices have
+    // trial_period_days configured on the Price itself, so without this the
+    // card is charged in full immediately regardless of plan. Set it per
+    // checkout session instead of relying on Price-level config.
+    const trialDays = planId === "basic" ? 7 : undefined;
     const session = await sc.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
@@ -121,7 +128,10 @@ export async function POST(req: NextRequest) {
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: { workspace_id: profile.workspace_id },
-      subscription_data: { metadata: { workspace_id: profile.workspace_id } },
+      subscription_data: {
+        metadata: { workspace_id: profile.workspace_id },
+        ...(trialDays ? { trial_period_days: trialDays } : {}),
+      },
       managed_payments: { enabled: false },
       ...(discounts ? { discounts } : {}),
     });
