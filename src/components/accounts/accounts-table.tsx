@@ -12,6 +12,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { EditAccountModal } from "@/components/accounts/edit-account-modal";
 import { deleteAccount, bulkDeleteAccounts, type AccountRow } from "@/lib/queries/accounts";
+import { AccountSchema } from "@/core/engine/registry";
 
 type ColKey = "index" | "account_name" | "industry" | "phone" | "website" | "account_type" | "employees" | "annual_revenue" | "rating";
 

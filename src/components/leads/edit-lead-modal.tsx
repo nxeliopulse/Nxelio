@@ -114,8 +114,8 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
       <div className="px-6 sm:px-10 py-5 border-b border-slate-100 flex-shrink-0">
         <div className="max-w-3xl mx-auto flex items-start justify-between">
           <div>
-            <h2 className="font-semibold text-xl text-slate-900">Edit lead</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Update this lead&apos;s details</p>
+            <h2 className="font-semibold text-xl text-slate-900">Edit prospect</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Update this prospect&apos;s details</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-700 rounded-md p-1">
             <X className="h-6 w-6" />

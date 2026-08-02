@@ -530,7 +530,7 @@ export function DashboardView({
                               </span>
                               <span className="ml-1.5 font-bold">{payload[0].value}%</span>
                               <span className="block text-[10px] text-slate-400 mt-0.5">
-                                Leads: {formatStat(payload[0].payload.count)}
+                                Prospects: {formatStat(payload[0].payload.count)}
                               </span>
                             </div>
                           );

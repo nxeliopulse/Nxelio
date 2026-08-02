@@ -36,7 +36,7 @@ export function OverviewTab({ stats, hotCustomers }: { stats: PlatformOverviewSt
               <Flame className="h-5 w-5 text-amber-500 fill-amber-500/20" /> Hot Customers
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Ranked by activity &mdash; leads imported + campaigns sent + AI credits consumed.
+              Ranked by activity &mdash; prospects imported + campaigns sent + AI credits consumed.
             </p>
           </div>
         </div>
@@ -45,7 +45,7 @@ export function OverviewTab({ stats, hotCustomers }: { stats: PlatformOverviewSt
             <tr className="text-left">
               <DataTableTh>Workspace</DataTableTh>
               <DataTableTh>Plan</DataTableTh>
-              <DataTableTh className="text-right">Leads</DataTableTh>
+              <DataTableTh className="text-right">Prospects</DataTableTh>
               <DataTableTh className="text-right">Campaigns Sent</DataTableTh>
               <DataTableTh className="text-right">Credits Used</DataTableTh>
             </tr>

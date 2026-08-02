@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   DollarSign, TrendingUp, Trophy, Target, GripVertical, Pencil, Trash2, Loader2, Building2, Search,
   Filter as FilterIcon, X, ChevronDown, ChevronRight, Plus, List, LayoutGrid, Columns3,
@@ -84,6 +85,7 @@ function SortTh({ label, field, defaultDir = "desc", sortField, sortDir, onSort 
 const PAGE_SIZE = 15;
 
 export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; stats: PipelineStats }) {
+  const router = useRouter();
   const { toast, confirm } = useFeedback();
   const [rows, setRows] = useState<OpportunityRow[]>(initial);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -457,7 +459,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                   {pagedRows.map((row) => {
                     const closed = row.stage === "won" || row.stage === "lost";
                     return (
-                      <DataTableRow key={row.id} onClick={() => setEditing(row)} className="cursor-pointer">
+                      <DataTableRow key={row.id} onClick={() => router.push(`/opportunities/${row.id}`)} className="cursor-pointer">
                         <DataTableTd className="text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">{displayIdMap.get(row.id)}</DataTableTd>
                         <DataTableTd className="font-medium text-slate-900 dark:text-slate-100">{row.name}</DataTableTd>
                         {visibleCols.account && (
@@ -524,6 +526,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                       draggable
                       onDragStart={() => setDragId(row.id)}
                       onDragEnd={() => { setDragId(null); setOverStage(null); }}
+                      onClick={() => router.push(`/opportunities/${row.id}`)}
                       className={`group bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3 shadow-sm cursor-grab active:cursor-grabbing ${dragId === row.id ? "opacity-50" : ""}`}
                     >
                       <div className="flex items-start gap-2">
@@ -538,10 +541,10 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                           <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1.5">{money(Number(row.deal_value || 0))}</p>
                         </div>
                         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => setEditing(row)} aria-label="Edit" className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40">
+                          <button onClick={(e) => { e.stopPropagation(); setEditing(row); }} aria-label="Edit" className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40">
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button onClick={() => remove(row)} aria-label="Delete" className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-rose-950/40">
+                          <button onClick={(e) => { e.stopPropagation(); remove(row); }} aria-label="Delete" className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-rose-950/40">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>

@@ -1,13 +1,20 @@
 "use client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowLeft, Briefcase, Building2, UserCheck, Users2, ExternalLink } from "lucide-react";
+import { Crown, Building2, UserCheck, Users2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input, Textarea } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
-import { moveOpportunityStage } from "@/lib/queries/opportunities";
-import { OPPORTUNITY_STAGES, STAGE_LABELS, type OpportunityStage, type OpportunityRow } from "@/lib/opportunities";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { moveOpportunityStage, updateOpportunity } from "@/lib/queries/opportunities";
+import { OPPORTUNITY_STAGES, STAGE_LABELS, getStageForecast, type OpportunityStage, type OpportunityRow } from "@/lib/opportunities";
+import type { AccountRow } from "@/lib/queries/accounts";
+import { formatDateTime } from "@/lib/utils";
+import {
+  RecordHeader, StatusBadge, StageProgress, DetailCard, InfoGrid, FieldRow,
+  RelatedRecordsCard, FieldRenderer, type RelatedRecordItem,
+} from "@/components/records";
+import type { FieldDefinition } from "@/core/engine/types";
 
 function stageBadgeVariant(stage: OpportunityStage): "default" | "blue" | "purple" | "warning" | "success" | "danger" {
   switch (stage) {
@@ -25,17 +32,48 @@ function money(n: number): string {
   return "$" + Math.round(n).toLocaleString();
 }
 
-export function OpportunityDetailView({ opportunity }: { opportunity: OpportunityRow }) {
+// The linear pipeline shown in the progress bar — "lost" is a terminal branch
+// off this line, not a step on it, so it's handled as its own banner instead.
+const PIPELINE_STAGES = OPPORTUNITY_STAGES.filter((s) => s !== "lost");
+
+const stageOptions = OPPORTUNITY_STAGES.map((s) => ({ label: STAGE_LABELS[s], value: s, variant: stageBadgeVariant(s) }));
+const stageFieldDef: FieldDefinition = { name: "stage_label", label: "Stage", type: "badge", options: stageOptions };
+const dateFieldDef: FieldDefinition = { name: "expected_close_date", label: "Close Date", type: "date" };
+const employeesFieldDef: FieldDefinition = { name: "employees", label: "Company Size", type: "number" };
+
+export function OpportunityDetailView({
+  opportunity,
+  account,
+  ownerName,
+  leadSource,
+  prevId,
+  nextId,
+}: {
+  opportunity: OpportunityRow;
+  account: AccountRow | null;
+  ownerName: string | null;
+  leadSource: string | null;
+  prevId: string | null;
+  nextId: string | null;
+}) {
   const router = useRouter();
   const { toast } = useFeedback();
   const [, startMove] = useTransition();
   const [stage, setStage] = useState(opportunity.stage);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState({
+    dealValue: String(opportunity.deal_value),
+    expectedCloseDate: opportunity.expected_close_date || "",
+    notes: opportunity.notes || "",
+  });
 
-  function handleStageChange(next: OpportunityStage) {
-    setStage(next);
+  function handleStageChange(next: string) {
+    const nextStage = next as OpportunityStage;
+    setStage(nextStage);
     startMove(async () => {
       try {
-        await moveOpportunityStage(opportunity.id, next);
+        await moveOpportunityStage(opportunity.id, nextStage);
         toast("Stage updated.", "success");
         router.refresh();
       } catch {
@@ -45,97 +83,126 @@ export function OpportunityDetailView({ opportunity }: { opportunity: Opportunit
     });
   }
 
+  async function handleSaveEdit() {
+    setSaving(true);
+    try {
+      await updateOpportunity(opportunity.id, {
+        dealValue: Number(draft.dealValue) || 0,
+        expectedCloseDate: draft.expectedCloseDate || null,
+        notes: draft.notes.trim() || null,
+      });
+      toast("Opportunity updated.", "success");
+      setEditing(false);
+      router.refresh();
+    } catch {
+      toast("Couldn't save changes.", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isClosed = !!opportunity.closed_at;
+  const forecast = getStageForecast(stage);
+  const weightedValue = opportunity.deal_value * (forecast.probability / 100);
+
+  const accountName = opportunity.company || account?.account_name || null;
+  const location = account
+    ? [account.billing_city, account.billing_state, account.billing_country].filter(Boolean).join(", ") || null
+    : null;
+
+  const relatedItems: RelatedRecordItem[] = [
+    { key: "account", icon: <Building2 className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />, label: accountName || "Account", href: opportunity.account_id ? `/accounts/${opportunity.account_id}` : null, emptyText: "No account linked." },
+    { key: "contact", icon: <Users2 className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />, label: opportunity.contact_name || "Contact", href: opportunity.contact_id ? `/contacts/${opportunity.contact_id}` : null, emptyText: "No contact linked." },
+    { key: "lead", icon: <UserCheck className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />, label: "Originating lead", href: opportunity.lead_id ? `/leads/${opportunity.lead_id}` : null, emptyText: "No originating lead." },
+  ];
+
   return (
     <div className="max-w-[1400px] mx-auto pb-10 text-slate-800 dark:text-slate-200">
-      <div className="flex items-center justify-between mb-3 px-1">
-        <Link href="/opportunities" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-          <ArrowLeft className="h-4 w-4" /> Opportunities
-        </Link>
-      </div>
+      <RecordHeader
+        breadcrumbHref="/opportunities"
+        breadcrumbLabel="Opportunities"
+        icon={<Crown className="h-6 w-6" />}
+        iconClassName="bg-amber-500"
+        eyebrow="Opportunity"
+        title={opportunity.name}
+        badges={
+          <>
+            <StatusBadge label={isClosed ? "Closed" : "Open"} tone={isClosed ? "neutral" : "open"} />
+            <Badge variant={stageBadgeVariant(stage)}>{STAGE_LABELS[stage]}</Badge>
+          </>
+        }
+        headline={<span className="text-lg font-bold text-slate-900 dark:text-white">{money(opportunity.deal_value)}</span>}
+        onPrev={prevId ? () => router.push(`/opportunities/${prevId}`) : undefined}
+        onNext={nextId ? () => router.push(`/opportunities/${nextId}`) : undefined}
+        onEdit={() => setEditing((e) => !e)}
+      />
 
       <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 mb-5 shadow-xs dark:bg-slate-900 dark:border-slate-800">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="h-11 w-11 rounded-lg bg-amber-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
-              <Briefcase className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-400">Opportunity</p>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 truncate tracking-tight dark:text-white">{opportunity.name}</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap ml-auto">
-            <Badge variant={stageBadgeVariant(stage)}>{STAGE_LABELS[stage]}</Badge>
-            <span className="text-lg font-bold text-slate-900 dark:text-white">{money(opportunity.deal_value)}</span>
-          </div>
-        </div>
+        <InfoGrid className="md:grid-cols-4 mb-4">
+          <FieldRow label="Account" value={accountName} />
+          <FieldRow label="Amount" value={money(opportunity.deal_value)} />
+          <FieldRow label="Close Date" value={<FieldRenderer definition={dateFieldDef} value={opportunity.expected_close_date} />} />
+          <FieldRow label="Probability" value={`${forecast.probability}%`} />
+        </InfoGrid>
+        {stage === "lost" ? (
+          <p className="text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-400">This opportunity was marked Lost.</p>
+        ) : (
+          <StageProgress
+            steps={PIPELINE_STAGES.map((s) => ({ value: s, label: STAGE_LABELS[s] }))}
+            currentValue={stage}
+            onSelect={handleStageChange}
+          />
+        )}
       </div>
 
       <div className="grid gap-5 grid-cols-1 lg:grid-cols-12">
-        <div className="space-y-4 lg:col-span-7 xl:col-span-8">
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs dark:bg-slate-900 dark:border-slate-800">
-            <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-200 font-bold text-sm text-slate-800 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-200">About</div>
-            <div className="p-4 grid grid-cols-2 gap-3.5 text-xs">
-              <div>
-                <span className="block text-slate-500 font-medium mb-0.5 dark:text-slate-400">Stage</span>
-                <select
-                  className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-950 dark:border-slate-800"
-                  value={stage}
-                  onChange={(e) => handleStageChange(e.target.value as OpportunityStage)}
-                >
-                  {OPPORTUNITY_STAGES.map((s) => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
-                </select>
-              </div>
-              <div>
-                <span className="block text-slate-500 font-medium mb-0.5 dark:text-slate-400">Expected close date</span>
-                <span className="font-semibold text-slate-900 dark:text-white">{opportunity.expected_close_date ? formatDate(opportunity.expected_close_date) : "—"}</span>
-              </div>
-              {opportunity.notes && (
-                <div className="col-span-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-                  <span className="block text-slate-500 font-medium mb-0.5 dark:text-slate-400">Notes</span>
-                  <span className="text-slate-700 whitespace-pre-wrap dark:text-slate-300">{opportunity.notes}</span>
+        <div className="space-y-4 lg:col-span-8">
+          <DetailCard title="Opportunity Information" collapsible>
+            {editing ? (
+              <div className="space-y-3">
+                <InfoGrid>
+                  <div>
+                    <label className="block text-xs text-slate-500 font-medium mb-1 dark:text-slate-400">Amount</label>
+                    <Input type="number" value={draft.dealValue} onChange={(e) => setDraft((d) => ({ ...d, dealValue: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 font-medium mb-1 dark:text-slate-400">Close Date</label>
+                    <Input type="date" value={draft.expectedCloseDate} onChange={(e) => setDraft((d) => ({ ...d, expectedCloseDate: e.target.value }))} />
+                  </div>
+                </InfoGrid>
+                <div>
+                  <label className="block text-xs text-slate-500 font-medium mb-1 dark:text-slate-400">Description</label>
+                  <Textarea value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} rows={4} />
                 </div>
-              )}
-            </div>
-          </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <Button variant="outline" size="sm" onClick={() => { setEditing(false); setDraft({ dealValue: String(opportunity.deal_value), expectedCloseDate: opportunity.expected_close_date || "", notes: opportunity.notes || "" }); }}>Cancel</Button>
+                  <Button size="sm" onClick={handleSaveEdit} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+                </div>
+              </div>
+            ) : (
+              <InfoGrid>
+                <FieldRow label="Opportunity Name" value={opportunity.name} />
+                <FieldRow label="Account" value={accountName} />
+                <FieldRow label="Primary Contact" value={opportunity.contact_name} />
+                <FieldRow label="Amount" value={money(opportunity.deal_value)} />
+                <FieldRow label="Close Date" value={<FieldRenderer definition={dateFieldDef} value={opportunity.expected_close_date} />} />
+                <FieldRow label="Stage" value={<FieldRenderer definition={stageFieldDef} value={stage} />} />
+                <FieldRow label="Probability" value={`${forecast.probability}%`} />
+                <FieldRow label="Opportunity Owner" value={ownerName} />
+                <FieldRow label="Source" value={leadSource} />
+                <FieldRow label="Forecast Category" value={forecast.forecastCategory} />
+                <FieldRow label="Expected Revenue" value={money(weightedValue)} />
+                <FieldRow label="Industry" value={account?.industry || null} />
+                <FieldRow label="Company Size" value={account?.employees ? <FieldRenderer definition={employeesFieldDef} value={account.employees} /> : null} />
+                <FieldRow label="Location" value={location} />
+                <FieldRow label="Description" value={opportunity.notes} className="md:col-span-2" />
+              </InfoGrid>
+            )}
+          </DetailCard>
         </div>
 
-        <div className="space-y-4 lg:col-span-5 xl:col-span-4">
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs dark:bg-slate-900 dark:border-slate-800">
-            <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-200 font-bold text-sm text-slate-800 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-200">Related records</div>
-            <div className="p-4 space-y-2 text-xs">
-              {opportunity.account_id ? (
-                <Link href={`/accounts/${opportunity.account_id}`} className="flex items-center justify-between gap-2 p-3 rounded-lg border border-slate-200 hover:border-blue-300 dark:border-slate-800 dark:hover:border-blue-500/50 transition-colors">
-                  <span className="font-semibold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-                    <Building2 className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" /> {opportunity.company || "Account"}
-                  </span>
-                  <ExternalLink className="h-3 w-3 text-slate-300 dark:text-slate-600 flex-shrink-0" />
-                </Link>
-              ) : (
-                <p className="text-slate-400 italic dark:text-slate-500">No account linked.</p>
-              )}
-              {opportunity.contact_id ? (
-                <Link href={`/contacts/${opportunity.contact_id}`} className="flex items-center justify-between gap-2 p-3 rounded-lg border border-slate-200 hover:border-blue-300 dark:border-slate-800 dark:hover:border-blue-500/50 transition-colors">
-                  <span className="font-semibold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-                    <Users2 className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" /> {opportunity.contact_name || "Contact"}
-                  </span>
-                  <ExternalLink className="h-3 w-3 text-slate-300 dark:text-slate-600 flex-shrink-0" />
-                </Link>
-              ) : (
-                <p className="text-slate-400 italic dark:text-slate-500">No contact linked.</p>
-              )}
-              {opportunity.lead_id ? (
-                <Link href={`/leads/${opportunity.lead_id}`} className="flex items-center justify-between gap-2 p-3 rounded-lg border border-slate-200 hover:border-blue-300 dark:border-slate-800 dark:hover:border-blue-500/50 transition-colors">
-                  <span className="font-semibold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-                    <UserCheck className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" /> Originating lead
-                  </span>
-                  <ExternalLink className="h-3 w-3 text-slate-300 dark:text-slate-600 flex-shrink-0" />
-                </Link>
-              ) : (
-                <p className="text-slate-400 italic dark:text-slate-500">No originating lead.</p>
-              )}
-            </div>
-          </div>
+        <div className="space-y-4 lg:col-span-4">
+          <RelatedRecordsCard title="Related Records" items={relatedItems} />
           <p className="text-[11px] text-slate-400 dark:text-slate-500 px-1">Last updated {formatDateTime(opportunity.updated_at)}</p>
         </div>
       </div>

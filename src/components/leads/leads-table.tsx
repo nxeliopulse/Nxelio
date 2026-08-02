@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, Flame, type LucideIcon } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -39,7 +39,7 @@ interface ColumnDef { key: ColKey; label: string; icon?: LucideIcon; defaultOn: 
 // freely reorderable via the Columns picker.
 const FIRST_COLUMNS: ColumnDef[] = [
   { key: "index", label: "Row #", defaultOn: true },
-  { key: "name", label: "Lead", icon: User, defaultOn: true },
+  { key: "name", label: "Prospect", icon: User, defaultOn: true },
 ];
 const REORDERABLE_COLUMNS: ColumnDef[] = [
   { key: "company", label: "Company", icon: Building2, defaultOn: true },
@@ -66,7 +66,7 @@ const COLS_ORDER_STORAGE_KEY = "lp_leads_column_order";
 
 interface Props {
   leads: LeadRow[];
-  /** Accepted for backwards-compat with the page; the stat strip was removed. */
+  /** Powers the stat-card grid under the page header (matches the Campaigns page's layout). */
   stats?: { total: number; hot: number; scored: number; converted: number };
   /** When set, the list is scoped to one campaign's recipients (from "View report"). */
   campaignFilter?: { id: string; name: string };
@@ -119,7 +119,7 @@ function CompanyLogo({ name }: { name?: string | null }) {
   );
 }
 
-export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
+export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -646,14 +646,14 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
     const { header, rows } = exportRows();
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    printWindow.document.write(`<html><head><title>Leads</title><style>
+    printWindow.document.write(`<html><head><title>Prospects</title><style>
       body { font-family: sans-serif; padding: 24px; color: #0f172a; }
       h1 { font-size: 18px; margin-bottom: 12px; }
       table { width: 100%; border-collapse: collapse; font-size: 12px; }
       th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
       th { background: #f5f5f5; }
     </style></head><body>
-      <h1>Leads (${rows.length})</h1>
+      <h1>Prospects (${rows.length})</h1>
       <table><thead><tr>${header.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
       <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c || "—")}</td>`).join("")}</tr>`).join("")}</tbody></table>
     </body></html>`);
@@ -910,7 +910,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Leads
+            Prospects
             <span className="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-0.5">
               {leads.length}
             </span>
@@ -918,7 +918,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-300">Home</Link>
             <span className="mx-1">›</span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium">Leads</span>
+            <span className="text-slate-700 dark:text-slate-300 font-medium">Prospects</span>
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -943,11 +943,35 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           <Button variant="outline" size="icon" onClick={() => router.refresh()} title="Refresh" className="rounded-xl h-8 w-8">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import leads" className="rounded-xl h-8 w-8">
+          <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import prospects" className="rounded-xl h-8 w-8">
             <Upload className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
+
+      {stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          {[
+            { label: "Total prospects", value: stats.total, icon: Users2, accent: "bg-amber-500" },
+            { label: "Hot prospects", value: stats.hot, icon: Flame, accent: "bg-rose-500" },
+            { label: "AI scored", value: stats.scored, icon: Sparkles, accent: "bg-blue-500" },
+            { label: "Converted", value: stats.converted, icon: CheckCircle2, accent: "bg-emerald-500" },
+          ].map((s) => {
+            const Icon = s.icon;
+            return (
+              <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
+                <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{s.label}</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value.toLocaleString()}</p>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
@@ -977,7 +1001,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
             {/* Count Chip */}
             <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0 whitespace-nowrap">
               <Users2 className="h-3.5 w-3.5 text-slate-400" />
-              <span>{filtered.length} Lead{filtered.length === 1 ? "" : "s"}</span>
+              <span>{filtered.length} Prospect{filtered.length === 1 ? "" : "s"}</span>
             </div>
 
             {/* Date Range Button */}
@@ -1004,7 +1028,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                 "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
                 hasActiveFilters && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
               )}
-              title="Filter leads"
+              title="Filter prospects"
             >
               <Filter className="h-3.5 w-3.5" />
               <span>Filter</span>
@@ -1081,7 +1105,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap"
             >
               <Plus className="h-3.5 w-3.5" />
-              <span>Add Lead</span>
+              <span>Add Prospect</span>
             </Button>
           </div>
         </div>
@@ -1214,7 +1238,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                 {paged.length === 0 && (
                   <tr>
                     <td colSpan={visibleCols.length + aiColumns.length + 2} className="px-4 py-16 text-center text-slate-500">
-                      No leads yet. Click <strong>Add Leads</strong> to import from LinkedIn, social, or a CSV.
+                      No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.
                     </td>
                   </tr>
                 )}
@@ -1308,7 +1332,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
               </div>
             ))}
             {paged.length === 0 && (
-              <p className="col-span-full text-center text-slate-500 dark:text-slate-400 py-16">No leads yet. Click <strong>Add Lead</strong> to import from LinkedIn, social, or a CSV.</p>
+              <p className="col-span-full text-center text-slate-500 dark:text-slate-400 py-16">No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</p>
             )}
           </div>
         )}
@@ -1618,7 +1642,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
                 <option value="all">All ({quickFilterCounts.all})</option>
                 <option value="new">New ({quickFilterCounts.new})</option>
                 <option value="qualified">Qualified ({quickFilterCounts.qualified})</option>
-                <option value="hot">Hot Leads ({quickFilterCounts.hot})</option>
+                <option value="hot">Hot Prospects ({quickFilterCounts.hot})</option>
                 <option value="followup">Needs Follow-up ({quickFilterCounts.followup})</option>
               </Select>
             </div>

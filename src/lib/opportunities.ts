@@ -30,6 +30,7 @@ export interface OpportunityRow {
   lead_id: string | null;
   account_id: string | null;
   contact_id: string | null;
+  owner_id: string | null;
   name: string;
   company: string | null;
   contact_name: string | null;
@@ -41,6 +42,29 @@ export interface OpportunityRow {
   closed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Deterministic win-probability/forecast-category lookup, keyed on stage.
+// Written as a fixed table today; call sites pass just `stage` so this can
+// later read from pipeline metadata (per-stage probability config) instead
+// of a hardcoded switch, without changing anything that calls it.
+export interface StageForecast {
+  probability: number;
+  forecastCategory: string;
+}
+
+const STAGE_FORECAST: Record<OpportunityStage, StageForecast> = {
+  new: { probability: 10, forecastCategory: "Pipeline" },
+  qualified: { probability: 25, forecastCategory: "Pipeline" },
+  meeting_scheduled: { probability: 50, forecastCategory: "Best Case" },
+  proposal_sent: { probability: 65, forecastCategory: "Best Case" },
+  negotiation: { probability: 80, forecastCategory: "Commit" },
+  won: { probability: 100, forecastCategory: "Closed" },
+  lost: { probability: 0, forecastCategory: "Closed" },
+};
+
+export function getStageForecast(stage: OpportunityStage): StageForecast {
+  return STAGE_FORECAST[stage];
 }
 
 export interface PipelineStats {

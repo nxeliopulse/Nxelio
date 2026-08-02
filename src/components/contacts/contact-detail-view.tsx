@@ -1,9 +1,10 @@
 "use client";
+
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, UserCheck, Pencil, Trash2, MoreHorizontal, ChevronDown, ChevronUp,
+  UserCheck, Pencil, Trash2, MoreHorizontal, ChevronDown, ChevronUp,
   Mail, Phone, Building2, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,8 @@ import { useFeedback } from "@/components/ui/feedback";
 import { EditContactModal } from "@/components/contacts/edit-contact-modal";
 import { deleteContact, type ContactWithAccount } from "@/lib/queries/contacts";
 import { formatDateTime } from "@/lib/utils";
+import { RecordHeader } from "@/components/records/record-header";
+import { ContactSchema } from "@/core/engine/registry";
 
 export function ContactDetailView({ contact }: { contact: ContactWithAccount }) {
   const router = useRouter();
@@ -42,49 +45,36 @@ export function ContactDetailView({ contact }: { contact: ContactWithAccount }) 
 
   return (
     <div className="max-w-[1650px] mx-auto pb-10 text-slate-800 dark:text-slate-200">
-      <div className="flex items-center justify-between mb-3 px-1">
-        <Link href="/contacts" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-          <ArrowLeft className="h-4 w-4" /> Contacts
-        </Link>
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 mb-5 shadow-xs dark:bg-slate-900 dark:border-slate-800">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="h-11 w-11 rounded-lg bg-[#6b21a8] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
-              <UserCheck className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-400">Contact</p>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 truncate tracking-tight dark:text-white">{displayName || "—"}</h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap ml-auto">
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="rounded-lg text-xs font-semibold">
-              <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" /> Edit
+      {/* Reusable Record Header */}
+      <RecordHeader
+        breadcrumbHref="/contacts"
+        breadcrumbLabel="Contacts"
+        icon={<UserCheck className="h-6 w-6" />}
+        iconClassName="bg-[#6b21a8]"
+        eyebrow={ContactSchema.singularLabel}
+        title={displayName || "—"}
+        onEdit={() => setEditOpen(true)}
+        moreMenu={
+          <div className="relative">
+            <Button variant="outline" size="icon" onClick={() => setMenuOpen((v) => !v)} className="rounded-lg h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
-            <div className="relative">
-              <Button variant="outline" size="icon" onClick={() => setMenuOpen((v) => !v)} className="rounded-lg h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-              {menuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg text-xs dark:bg-slate-900 dark:border-slate-800">
-                    <button onClick={() => { setMenuOpen(false); setEditOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
-                      <Pencil className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" /> Edit Record
-                    </button>
-                    <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
-                      <Trash2 className="h-3.5 w-3.5" /> Delete Record
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg text-xs dark:bg-slate-900 dark:border-slate-800">
+                  <button onClick={() => { setMenuOpen(false); setEditOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                    <Pencil className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" /> Edit Record
+                  </button>
+                  <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
+                    <Trash2 className="h-3.5 w-3.5" /> Delete Record
+                  </button>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid gap-5 grid-cols-1 lg:grid-cols-12">
         <div className="space-y-4 lg:col-span-7 xl:col-span-8">
