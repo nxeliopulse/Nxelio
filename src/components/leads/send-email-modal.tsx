@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Send, Sparkles, Loader2, AlertCircle, CheckCircle2, Info } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Input, Textarea } from "@/components/ui/input";
@@ -23,6 +23,19 @@ export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: P
   const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // The modal stays mounted between opens (just toggled via `open`), so without
+  // this the previous send's subject/body/success message would still be
+  // showing the next time it's reopened for the same or a different lead.
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the form each time the modal reopens, not a mount-only init
+      setSubject("");
+      setBody("");
+      setError(null);
+      setSuccess(null);
+    }
+  }, [open]);
 
   async function handleDraft() {
     setDrafting(true);

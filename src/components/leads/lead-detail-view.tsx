@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, X, Mail, Phone, Globe, Calendar, Star, Send, Building2,
-  Target, Users, BarChart3, FileDown, MailOpen, Lock, Settings, ThumbsUp,
+  Target, Users, BarChart3, FileDown, MailOpen, Lock, ThumbsUp,
   Mouse, Briefcase, Pencil, CalendarDays, ChevronDown, ChevronUp, Paperclip, Trash2,
   RefreshCw, Sparkles, Filter, CheckCircle2, UserCheck, Plus, ExternalLink, History as HistoryIcon, Megaphone,
   type LucideIcon,
@@ -554,27 +554,6 @@ export function LeadDetailView({
               </span>
             </div>
 
-            {/* Contacts Section */}
-            <div className="flex justify-between items-center mb-2">
-              <h6 className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-wide">Contacts</h6>
-              <button
-                onClick={() => toast("Creating contact details forms...", "info")}
-                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
-              >
-                <Plus className="h-3 w-3" /> Add New
-              </button>
-            </div>
-            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
-              <div className="flex items-center">
-                <div className="h-6 w-6 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px] font-bold mr-2">
-                  JS
-                </div>
-                <div className="text-xs">
-                  <p className="text-slate-800 dark:text-slate-200 font-semibold">Jessica Sen</p>
-                </div>
-              </div>
-            </div>
-
             {/* Last Modified Auditing */}
             <div className="space-y-2 text-xs pt-1">
               <div className="flex justify-between items-center">
@@ -696,10 +675,6 @@ export function LeadDetailView({
                           <BarChart3 className="h-3 w-3 rotate-90" /> Sort: {sortOrder === "newest" ? "Newest" : "Oldest"}
                         </Button>
                       </div>
-                      
-                      <button className="p-1 rounded-full text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800">
-                        <Settings className="h-4 w-4 text-rose-500" />
-                      </button>
                     </div>
                   </div>
 
@@ -869,7 +844,11 @@ export function LeadDetailView({
                       <p className="text-xs text-slate-400 italic text-center py-6">No meetings scheduled for this contact.</p>
                     ) : (
                       meetings.map((m) => (
-                        <div key={m.id} className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                        <button
+                          key={m.id}
+                          onClick={() => router.push(`/meetings?open=${m.id}`)}
+                          className="w-full text-left p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors"
+                        >
                           <div className="flex items-center justify-between">
                             <div className="min-w-0">
                               <h6 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{m.title}</h6>
@@ -882,7 +861,7 @@ export function LeadDetailView({
                               {m.status}
                             </Badge>
                           </div>
-                        </div>
+                        </button>
                       ))
                     )}
                   </div>
@@ -895,7 +874,14 @@ export function LeadDetailView({
                   <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
                     <h5 className="font-bold text-slate-800 dark:text-slate-200 text-xs">Files & Attachments</h5>
                     <button
-                      onClick={() => bodyRef.current?.focus()}
+                      onClick={() => {
+                        // Files here are just notes with an attachment (see the filter
+                        // below) — there's no separate upload endpoint, so "Add file"
+                        // jumps to the Notes tab's real attach-file picker instead of
+                        // doing nothing.
+                        setActiveTab("notes");
+                        setTimeout(() => fileRef.current?.click(), 0);
+                      }}
                       className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
                     >
                       <Plus className="h-3 w-3" /> Add file
