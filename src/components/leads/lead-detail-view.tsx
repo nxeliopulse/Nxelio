@@ -6,7 +6,8 @@ import {
   ArrowLeft, X, Mail, Phone, Globe, Calendar, Star, Send, Building2,
   Target, Users, BarChart3, FileDown, MailOpen, Lock, Settings, ThumbsUp,
   Mouse, Briefcase, Pencil, CalendarDays, ChevronDown, ChevronUp, Paperclip, Trash2,
-  RefreshCw, Sparkles, Filter, CheckCircle2, UserCheck, Plus, ExternalLink, History as HistoryIcon, Megaphone
+  RefreshCw, Sparkles, Filter, CheckCircle2, UserCheck, Plus, ExternalLink, History as HistoryIcon, Megaphone,
+  type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ export interface Activity {
   created_at: string;
 }
 
-const activityMeta: Record<string, { label: string; color: string; icon: React.ComponentType<any> }> = {
+const activityMeta: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   PAGE_VISITED: { label: "Visited a page", color: "bg-blue-500", icon: BarChart3 },
   EMAIL_SENT: { label: "Sent email", color: "bg-blue-600", icon: Send },
   EMAIL_OPENED: { label: "Opened email", color: "bg-emerald-500", icon: MailOpen },
@@ -94,6 +95,7 @@ export function LeadDetailView({
   const [email, setEmail] = useState(lead.email);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resyncs local state when the parent passes a new lead after a router refresh, without remounting this component
     setLead(initialLead);
     setConverted(initialLead.status === "Converted");
     setEmail(initialLead.email);
@@ -649,7 +651,7 @@ export function LeadDetailView({
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id as any)}
+                      onClick={() => setActiveTab(tab.id as "activities" | "notes" | "calls" | "files" | "email")}
                       className={cn(
                         "flex items-center gap-1.5 py-3 px-1 border-b-2 text-xs font-semibold whitespace-nowrap transition-colors focus:outline-none",
                         isActive
@@ -1021,23 +1023,23 @@ export function LeadDetailView({
 }
 
 // Helpers for Lucide icons mapping with tab IDs
-function ClockDaysIcon(props: any) {
+function ClockDaysIcon(props: React.ComponentProps<typeof CalendarDays>) {
   return <CalendarDays {...props} />;
 }
 
-function FileTextIcon(props: any) {
+function FileTextIcon(props: React.ComponentProps<typeof FileDown>) {
   return <FileDown {...props} />;
 }
 
-function PhoneIcon(props: any) {
+function PhoneIcon(props: React.ComponentProps<typeof Phone>) {
   return <Phone {...props} />;
 }
 
-function FileIcon(props: any) {
+function FileIcon(props: React.ComponentProps<typeof FileDown>) {
   return <FileDown {...props} />;
 }
 
-function MailIcon(props: any) {
+function MailIcon(props: React.ComponentProps<typeof Mail>) {
   return <Mail {...props} />;
 }
 

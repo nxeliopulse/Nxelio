@@ -88,9 +88,11 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
   useEffect(() => {
     try {
       const rawCols = localStorage.getItem(COLS_STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from localStorage on mount
       if (rawCols) setCols({ ...DEFAULT_COLS, ...JSON.parse(rawCols) });
 
       const rawStarred = localStorage.getItem("lp_starred_contacts");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- same one-time init
       if (rawStarred) setStarred(JSON.parse(rawStarred));
     } catch { /* ignore malformed storage */ }
   }, []);
@@ -309,7 +311,7 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                   <button
                     key={opt.key}
                     onClick={() => {
-                      setSort(opt.key as any);
+                      setSort(opt.key as "none" | "name_az" | "name_za" | "newest");
                       setSortDropdownOpen(false);
                       toast(`Sorted contacts by ${opt.label}`, "success");
                     }}
@@ -394,7 +396,7 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                   <button
                     key={opt.key}
                     onClick={() => {
-                      setStatusFilter(opt.key as any);
+                      setStatusFilter(opt.key as "all" | "active" | "inactive");
                       setFilterDropdownOpen(false);
                       toast(`Filtering by status: ${opt.label}`, "info");
                     }}

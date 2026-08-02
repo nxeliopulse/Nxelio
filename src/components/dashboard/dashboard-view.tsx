@@ -32,6 +32,7 @@ function WelcomeBanner() {
 
   useEffect(() => {
     if (params.get("welcome") === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time reveal driven by a URL param on mount
       setVisible(true);
       setWasTrial(params.get("trial") === "1");
       router.replace("/dashboard", { scroll: false });
@@ -371,7 +372,7 @@ export function DashboardView({
                   {["weekly", "monthly", "yearly"].map((t) => (
                     <li key={t} className="nav-item">
                       <button
-                        onClick={() => setTimeframe(t as any)}
+                        onClick={() => setTimeframe(t as "weekly" | "monthly" | "yearly")}
                         className={cn(
                           "nav-link py-1 px-2.5 rounded transition-all capitalize",
                           timeframe === t
@@ -442,12 +443,12 @@ export function DashboardView({
                           return (
                             <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-md text-xs relative z-50">
                               <p className="font-bold text-slate-500 dark:text-slate-400 mb-1">{label}</p>
-                              {payload.map((p: any, i) => (
+                              {payload.map((p, i) => (
                                 <div key={i} className="flex items-center gap-1.5 py-0.5">
                                   <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: p.color }} />
                                   <span className="text-slate-500 dark:text-slate-400">{p.name}:</span>
                                   <span className="font-bold ml-auto" style={{ color: p.color === "#EA580C" ? "#EA580C" : "inherit" }}>
-                                    {money(p.value)}
+                                    {money(Number(p.value ?? 0))}
                                   </span>
                                 </div>
                               ))}
