@@ -151,7 +151,7 @@ export function CampaignDetailView({
     start(async () => { await setCampaignStatus(campaign.id, next); });
   }
   async function handleSendNow() {
-    if (!(await confirm({ title: "Send this campaign?", message: `Send the opener email to everyone in “${audienceLabel}” (${audience.toLocaleString()} leads).`, confirmLabel: "Send now" }))) return;
+    if (!(await confirm({ title: "Send this campaign?", message: `Send the opener email to everyone in “${audienceLabel}” (${audience.toLocaleString()} prospects).`, confirmLabel: "Send now" }))) return;
     setSending(true);
     try {
       const res = await sendCampaign(campaign.id);
@@ -238,7 +238,7 @@ export function CampaignDetailView({
         <div>
           <div className="mb-3">
             <h2 className="font-semibold text-slate-900">{audienceLabel}</h2>
-            <p className="text-xs text-slate-500">{audienceLeads.length.toLocaleString()} of {audience.toLocaleString()} leads shown below</p>
+            <p className="text-xs text-slate-500">{audienceLeads.length.toLocaleString()} of {audience.toLocaleString()} prospects shown below</p>
           </div>
           <LeadsTable leads={audienceLeads} />
         </div>
@@ -310,7 +310,7 @@ export function CampaignDetailView({
           {/* Per-lead activity — who was sent to, who opened (and when), who replied/bounced */}
           <Card className="overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-900 flex items-center gap-2"><CalendarClock className="h-4 w-4 text-slate-400" /> Lead activity</p>
+              <p className="text-sm font-medium text-slate-900 flex items-center gap-2"><CalendarClock className="h-4 w-4 text-slate-400" /> Prospect activity</p>
               <p className="text-xs text-slate-400">{leadActivity.filter((r) => isToday(r.openedAt)).length} opened today</p>
             </div>
             {leadActivity.length === 0 ? (
@@ -319,7 +319,7 @@ export function CampaignDetailView({
               <DataTable>
                 <DataTableHead>
                   <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
-                    <DataTableTh>Lead</DataTableTh>
+                    <DataTableTh>Prospect</DataTableTh>
                     <DataTableTh>Sent</DataTableTh>
                     <DataTableTh>Opened</DataTableTh>
                     <DataTableTh>Replied</DataTableTh>

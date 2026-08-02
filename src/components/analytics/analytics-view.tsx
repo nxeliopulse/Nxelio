@@ -279,7 +279,7 @@ interface PMeta { title:string; span:PanelSpan; icon:React.ReactNode; }
 const PM: Record<PanelId,PMeta> = {
   "ov-combo":    {title:"Overall Sales & Engagement", span:"full",  icon:<TrendingUp size={13}/>},
   "ov-donut":    {title:"Revenue Split",              span:"half",  icon:<BarChart2 size={13}/>},
-  "ov-leads":    {title:"Recent Lead Streams",        span:"half",  icon:<Users size={13}/>},
+  "ov-leads":    {title:"Recent Prospect Streams",        span:"half",  icon:<Users size={13}/>},
   "ov-opps":     {title:"Top Open Opportunities",     span:"full",  icon:<Trophy size={13}/>},
   "ov-insights": {title:"AI Predictive Insights",     span:"half",  icon:<Zap size={13}/>},
   "ov-activity": {title:"Activity Logs Feed",         span:"half",  icon:<Activity size={13}/>},
@@ -306,8 +306,8 @@ const PM: Record<PanelId,PMeta> = {
   "ac-bars":     {title:"Volume distribution by Type", span:"full",  icon:<BarChart2 size={13}/>},
 
   "aa-health":   {title:"Account Relationship Health",span:"half",  icon:<Activity size={13}/>},
-  "aa-sources":  {title:"Lead Source Channel Audit",   span:"half",  icon:<Globe size={13}/>},
-  "aa-score":    {title:"Lead Score Value Spread",    span:"full",  icon:<Target size={13}/>},
+  "aa-sources":  {title:"Prospect Source Channel Audit",   span:"half",  icon:<Globe size={13}/>},
+  "aa-score":    {title:"Prospect Score Value Spread",    span:"full",  icon:<Target size={13}/>},
   "aa-mix":      {title:"Interactivity Mix Allocation",span:"full",  icon:<MailOpen size={13}/>},
 };
 
@@ -588,7 +588,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
   function exportCSV(){
     const rows=[
       ["Emails Sent",s.emailsSent],["Open Rate %",s.openRate],["Reply Rate %",s.replyRate],
-      ["Total Leads",s.totalLeads],["Hot Leads",s.hotLeads],["Pipeline",s.pipelineTotal],
+      ["Total Prospects",s.totalLeads],["Hot Prospects",s.hotLeads],["Pipeline",s.pipelineTotal],
       ["Won Revenue",s.wonRevenue],["Win Rate %",s.winRate],["Quota %",s.quotaAttainment],
     ];
     const c=[["Metric","Value"],...rows].map(r=>r.map(csv).join(",")).join("\n");
@@ -854,7 +854,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
 
       case "ov-leads": return(
         <div>
-          {s.leadSources.length===0&&<p className="text-xs text-center py-6 text-slate-400">No leads active</p>}
+          {s.leadSources.length===0&&<p className="text-xs text-center py-6 text-slate-400">No prospects active</p>}
           <div className="space-y-3">
             {s.leadSources.slice(0,5).map((l,i)=>(
               <div key={i} className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-1 rounded-lg" onClick={() => setFacet({ type: "source", value: l.source })}>
@@ -863,7 +863,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold truncate text-slate-700">{l.source}</p>
-                  <p className="text-[11px] text-slate-400 font-medium">{l.leads} leads · {l.converted} converted</p>
+                  <p className="text-[11px] text-slate-400 font-medium">{l.leads} prospects · {l.converted} converted</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-black text-slate-800">{fmtK(l.value)}</p>
@@ -873,7 +873,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             ))}
           </div>
           <div className="mt-4 pt-3 border-t border-[#DDDBDA] flex justify-between items-center text-xs">
-            <span className="font-bold text-slate-700">{fmt(s.totalLeads)} total leads</span>
+            <span className="font-bold text-slate-700">{fmt(s.totalLeads)} total prospects</span>
             <span className="font-bold text-[#0176D3] hover:underline cursor-pointer" onClick={() => setTab("accounts")}>Audit Sources →</span>
           </div>
         </div>
@@ -1283,7 +1283,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             <XAxis dataKey="bucket" tick={{fontSize:11,fill:TICK_C,fontWeight:600}} axisLine={false} tickLine={false}/>
             <YAxis tick={{fontSize:11,fill:TICK_C,fontWeight:600}} axisLine={false} tickLine={false}/>
             <Tooltip content={<Tip/>}/>
-            <Bar dataKey="count" name="Leads" radius={[4,4,0,0]}>
+            <Bar dataKey="count" name="Prospects" radius={[4,4,0,0]}>
               {s.leadScoreDist.map((_,i)=><Cell key={i} fill={[MUTED,PAL[5],PAL[0],PAL[1],PAL[2]][i]??PAL[0]}/>)}
             </Bar>
           </BarChart>
@@ -1337,7 +1337,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
       case "overview": return[
         {label:"Emails Sent Volume", value:fmt(s.emailsSent),      sub:"all campaigns",    icon:<Mail size={18}/>,       colorIdx:0},
         {label:"Sales Open Ratio",  value:`${s.openRate}%`,        sub:"avg open rate",    icon:<MailOpen size={18}/>,   colorIdx:1, trend:s.openRate>20?4:-2},
-        {label:"Active Hot Leads",  value:fmt(s.hotLeads),         sub:`of ${fmt(s.totalLeads)} leads`,icon:<Flame size={18}/>,colorIdx:2},
+        {label:"Active Hot Prospects",  value:fmt(s.hotLeads),         sub:`of ${fmt(s.totalLeads)} prospects`,icon:<Flame size={18}/>,colorIdx:2},
         {label:"Closed Won Revenue",value:fmtK(s.wonRevenue),      sub:"won this period",  icon:<Trophy size={18}/>,     colorIdx:3},
       ];
       case "pipeline": return[
@@ -1360,15 +1360,15 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
       ];
       case "activity": return[
         {label:"Total Logged Activities",value:fmt(s.activityBreakdown.reduce((a,x)=>a+x.count,0)),sub:"all tasks and calls",icon:<Activity size={18}/>,colorIdx:0},
-        {label:"Total CRM Lead Base",  value:fmt(s.totalLeads),         sub:"leads in database",icon:<Users size={18}/>,       colorIdx:1},
-        {label:"High-Intent Hot Leads",value:fmt(s.hotLeads),           sub:"lead score > 75",  icon:<Flame size={18}/>,       colorIdx:2},
+        {label:"Total CRM Prospect Base",  value:fmt(s.totalLeads),         sub:"prospects in database",icon:<Users size={18}/>,       colorIdx:1},
+        {label:"High-Intent Hot Prospects",value:fmt(s.hotLeads),           sub:"prospect score > 75",  icon:<Flame size={18}/>,       colorIdx:2},
         {label:"Engagement Clicks",    value:`${s.clickRate}%`,         sub:"link interaction rate",icon:<Globe size={18}/>,   colorIdx:3},
       ];
       case "accounts": return[
         {label:"Total Client Accounts",value:fmt(s.totalLeads),         sub:"monitored accounts",icon:<Users size={18}/>,      colorIdx:0},
         {label:"At Risk Accounts",     value:fmt(s.hotLeads),           sub:"flagged relationship score",icon:<Flame size={18}/>,colorIdx:1},
-        {label:"Lead Conversion Count",value:fmt(s.convertedLeads),     sub:"leads converted to accounts",icon:<CheckCircle2 size={18}/>,colorIdx:4},
-        {label:"Lead-To-Account Ratio",value:`${convRate}%`,            sub:"overall success percentage",icon:<Target size={18}/>,colorIdx:2},
+        {label:"Prospect Conversion Count",value:fmt(s.convertedLeads),     sub:"prospects converted to accounts",icon:<CheckCircle2 size={18}/>,colorIdx:4},
+        {label:"Prospect-To-Account Ratio",value:`${convRate}%`,            sub:"overall success percentage",icon:<Target size={18}/>,colorIdx:2},
       ];
     }
   }
@@ -1843,7 +1843,7 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
               {label:"Emails Sent Volume", value:fmt(s.emailsSent),            color:PAL[0]},
               {label:"Open Ratio",         value:`${s.openRate}%`,             color:PAL[1]},
               {label:"Response Ratio",     value:`${s.replyRate}%`,            color:PAL[2]},
-              {label:"High-Score Leads",   value:fmt(s.hotLeads),              color:"#ED6C02"},
+              {label:"High-Score Prospects",   value:fmt(s.hotLeads),              color:"#ED6C02"},
               {label:"Open Pipeline Value",value:fmtK(s.pipelineTotal),        color:PAL[0]},
               {label:"Closed Won Revenue", value:fmtK(s.wonRevenue),           color:PAL[1]},
               {label:"Opportunities Win Rate",value:`${s.winRate.toFixed(1)}%`,color:PAL[4]},

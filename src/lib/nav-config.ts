@@ -27,7 +27,7 @@ const SUPER: Role[] = ["Super Admin"];
  */
 export const navMainItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ALL },
-  { label: "Leads", href: "/leads", icon: Users2, roles: SALES },
+  { label: "Prospects", href: "/leads", icon: Users2, roles: SALES },
   { label: "Accounts", href: "/accounts", icon: Building2, roles: SALES },
   { label: "Contacts", href: "/contacts", icon: Contact, roles: SALES },
   { label: "Campaigns", href: "/campaigns", icon: Send, roles: SALES },

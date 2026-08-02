@@ -1,15 +1,17 @@
 "use client";
 import { useState } from "react";
-import { Users2, ListChecks } from "lucide-react";
+import { Users2, ListChecks, Sliders } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { UsersView } from "@/components/users/users-view";
 import { PicklistsManager } from "@/components/administration/picklists-manager";
+import { CustomFieldsBuilder } from "@/components/administration/custom-fields-builder";
 import type { UserWithRole } from "@/lib/queries/users";
 import type { PicklistCategoryRow } from "@/lib/picklists";
 
 const TABS = [
   { id: "users", label: "User Management", icon: <Users2 className="h-4 w-4" /> },
   { id: "picklists", label: "Picklists", icon: <ListChecks className="h-4 w-4" /> },
+  { id: "custom-fields", label: "Custom Fields", icon: <Sliders className="h-4 w-4" /> },
 ] as const;
 
 interface Props {
@@ -25,7 +27,7 @@ export function AdministrationView({ users, roles, isAdmin, currentUserId, pickl
 
   return (
     <div className="max-w-[1600px] mx-auto">
-      <PageHeader title="Administration" description="Manage your team and platform-wide configuration." />
+      <PageHeader title="Administration" description="Manage your team, object schemas, custom fields, and platform picklists." />
 
       <div className="flex items-center gap-1 border-b border-slate-200 mb-6">
         {TABS.map((t) => (
@@ -43,6 +45,7 @@ export function AdministrationView({ users, roles, isAdmin, currentUserId, pickl
 
       {active === "users" && <UsersView users={users} roles={roles} isAdmin={isAdmin} currentUserId={currentUserId} />}
       {active === "picklists" && <PicklistsManager categories={picklistCategories} />}
+      {active === "custom-fields" && <CustomFieldsBuilder />}
     </div>
   );
 }

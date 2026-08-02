@@ -150,7 +150,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search leads, campaigns..."
+            placeholder="Search prospects, campaigns..."
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             onFocus={() => { if (searchQuery.trim().length >= 2) setSearchOpen(true); }}
@@ -172,11 +172,11 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
                 <p className="px-4 py-6 text-sm text-red-600 text-center">{searchError}</p>
               )}
               {!searchLoading && !searchError && !hasSearchResults && (
-                <p className="px-4 py-6 text-sm text-slate-500 text-center">No leads or campaigns match &quot;{searchQuery.trim()}&quot;.</p>
+                <p className="px-4 py-6 text-sm text-slate-500 text-center">No prospects or campaigns match &quot;{searchQuery.trim()}&quot;.</p>
               )}
               {searchResults.leads.length > 0 && (
                 <div className="p-1">
-                  <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Leads</p>
+                  <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Prospects</p>
                   {searchResults.leads.map((l) => (
                     <button
                       key={l.id}
@@ -212,7 +212,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
                   onClick={() => goToSearch(`/leads?q=${encodeURIComponent(searchQuery.trim())}`)}
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--primary)] hover:bg-slate-50 border-t border-slate-100"
                 >
-                  <Search className="h-3.5 w-3.5" /> See all leads matching &quot;{searchQuery.trim()}&quot;
+                  <Search className="h-3.5 w-3.5" /> See all prospects matching &quot;{searchQuery.trim()}&quot;
                 </button>
               )}
             </div>

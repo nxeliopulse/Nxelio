@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, Settings2,
   Phone, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  TrendingUp, Trash, RefreshCw
+  TrendingUp, Trash, RefreshCw, User, Link2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -269,6 +269,28 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
             <RefreshCw className="h-4 w-4 text-slate-500" />
           </Button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        {[
+          { label: "Total contacts", value: scoped.length, icon: Users2, accent: "bg-amber-500" },
+          { label: "Linked to account", value: scoped.filter((c) => c.account_id).length, icon: Link2, accent: "bg-blue-500" },
+          { label: "Unassigned", value: scoped.filter((c) => !c.account_id).length, icon: User, accent: "bg-rose-500" },
+          { label: "With email", value: scoped.filter((c) => c.email).length, icon: Mail, accent: "bg-emerald-500" },
+        ].map((s) => {
+          const Icon = s.icon;
+          return (
+            <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
+              <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{s.label}</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value.toLocaleString()}</p>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Redesigned Sub-header / Actions Controls bar */}

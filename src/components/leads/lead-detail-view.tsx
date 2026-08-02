@@ -283,7 +283,7 @@ export function LeadDetailView({
       <div className="d-flex align-items-center justify-content-between gap-2 mb-4 flex-wrap flex justify-between items-center">
         <div>
           <h4 className="mb-1 text-xl font-bold flex items-center gap-2">
-            Leads
+            Prospects
             <span className="bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-xs px-2 py-0.5 rounded font-semibold border border-blue-100 dark:border-blue-900/30">
               125
             </span>
@@ -295,7 +295,7 @@ export function LeadDetailView({
               </li>
               <span>/</span>
               <li className="breadcrumb-item active text-slate-700 dark:text-slate-200 font-medium" aria-current="page">
-                Leads
+                Prospects
               </li>
             </ol>
           </nav>
@@ -364,7 +364,7 @@ export function LeadDetailView({
                 size="sm"
                 className="px-3 py-1.5 shadow-sm text-xs font-semibold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-md gap-1"
               >
-                <ArrowLeft className="h-3.5 w-3.5" /> Back to Leads
+                <ArrowLeft className="h-3.5 w-3.5" /> Back to Prospects
               </Button>
             </Link>
           )}

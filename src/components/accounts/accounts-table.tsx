@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Trash2, ChevronDown, Building2, ArrowUpDown, Settings2, Hash, Phone, Globe, Briefcase, Users2 } from "lucide-react";
+import { Search, Plus, Trash2, ChevronDown, Building2, ArrowUpDown, Settings2, Hash, Phone, Globe, Briefcase, Users2, Flame, Target } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { EditAccountModal } from "@/components/accounts/edit-account-modal";
 import { deleteAccount, bulkDeleteAccounts, type AccountRow } from "@/lib/queries/accounts";
+import { AccountSchema } from "@/core/engine/registry";
 
 type ColKey = "index" | "account_name" | "industry" | "phone" | "website" | "account_type" | "employees" | "annual_revenue" | "rating";
 
@@ -182,19 +183,26 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-blue-500 p-4 sm:p-5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Accounts</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{accounts.length}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-emerald-500 p-4 sm:p-5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Customers</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{accounts.filter((a) => a.account_type === "Customer").length}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-amber-500 p-4 sm:p-5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Prospects</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{accounts.filter((a) => a.account_type === "Prospect").length}</p>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        {[
+          { label: "Total accounts", value: accounts.length, icon: Building2, accent: "bg-amber-500" },
+          { label: "Customers", value: accounts.filter((a) => a.account_type === "Customer").length, icon: Briefcase, accent: "bg-blue-500" },
+          { label: "Prospects", value: accounts.filter((a) => a.account_type === "Prospect").length, icon: Target, accent: "bg-emerald-500" },
+          { label: "Hot accounts", value: accounts.filter((a) => a.rating === "Hot").length, icon: Flame, accent: "bg-rose-500" },
+        ].map((s) => {
+          const Icon = s.icon;
+          return (
+            <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
+              <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{s.label}</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value.toLocaleString()}</p>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       <Card className="overflow-hidden">

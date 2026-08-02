@@ -31,6 +31,22 @@ export async function getOpportunitiesForLead(leadId: string): Promise<Opportuni
   return (data as OpportunityRow[]) || [];
 }
 
+/** Sibling ids (by created_at order) for the detail page's Prev/Next nav. */
+export async function getAdjacentOpportunityIds(id: string): Promise<{ prevId: string | null; nextId: string | null }> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("opportunities")
+    .select("id")
+    .order("created_at", { ascending: false });
+  const ids = ((data as { id: string }[]) || []).map((r) => r.id);
+  const index = ids.indexOf(id);
+  if (index === -1) return { prevId: null, nextId: null };
+  return {
+    prevId: index > 0 ? ids[index - 1] : null,
+    nextId: index < ids.length - 1 ? ids[index + 1] : null,
+  };
+}
+
 export async function getPipelineStats(): Promise<PipelineStats> {
   const supabase = await createClient();
   const { data } = await supabase.from("opportunities").select("deal_value, stage");

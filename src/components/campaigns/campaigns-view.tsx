@@ -446,7 +446,7 @@ export function CampaignsView({
             <option value="updatedAt:desc">Sort: Newest first</option>
             <option value="updatedAt:asc">Sort: Oldest first</option>
             <option value="name:asc">Sort: Name A-Z</option>
-            <option value="leads:desc">Sort: Most leads</option>
+            <option value="leads:desc">Sort: Most prospects</option>
             <option value="sent:desc">Sort: Most sent</option>
             <option value="replyRate:desc">Sort: Best reply rate</option>
           </Select>
@@ -585,7 +585,7 @@ export function CampaignsView({
                     <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
                     {([
                       ["status", "Status"],
-                      ["leads", "Leads"],
+                      ["leads", "Prospects"],
                       ["sent", "Sent"],
                       ["replyRate", "Reply rate"],
                       ["bounceRate", "Bounce rate"],
@@ -720,7 +720,7 @@ export function CampaignsView({
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
-                    <div><p className="text-slate-400">Leads</p><p className="font-medium text-slate-900">{r.leads === null ? "—" : r.leads.toLocaleString()}</p></div>
+                    <div><p className="text-slate-400">Prospects</p><p className="font-medium text-slate-900">{r.leads === null ? "—" : r.leads.toLocaleString()}</p></div>
                     <div><p className="text-slate-400">Sent</p><p className="font-medium text-slate-900">{r.sent ? r.sent.toLocaleString() : "—"}</p></div>
                     <div><p className="text-slate-400">Reply rate</p><p className="font-medium text-slate-900">{r.sent ? `${r.replyRate}%` : "—"}</p></div>
                     <div><p className="text-slate-400">Bounce rate</p><p className="font-medium text-slate-900">{r.bounceRate === null ? "—" : r.sent ? `${r.bounceRate}%` : "—"}</p></div>
@@ -829,7 +829,7 @@ export function CampaignsView({
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-4">
                             {visibleCols.leads && (
-                              <div className="text-xs"><p className="font-semibold text-slate-900">{r.leads === null ? "—" : r.leads.toLocaleString()}</p><p className="text-slate-400">Leads</p></div>
+                              <div className="text-xs"><p className="font-semibold text-slate-900">{r.leads === null ? "—" : r.leads.toLocaleString()}</p><p className="text-slate-400">Prospects</p></div>
                             )}
                             {visibleCols.sent && (
                               <div className="text-xs"><p className="font-semibold text-slate-900">{r.sent ? r.sent.toLocaleString() : "—"}</p><p className="text-slate-400">Sent</p></div>

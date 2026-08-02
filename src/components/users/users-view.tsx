@@ -34,7 +34,7 @@ const roleVariant: Record<string, "purple" | "pink" | "blue" | "default"> = {
 
 const roleAccessSummary: Record<string, string[]> = {
   "Super Admin": ["All workspace screens", "Administration", "Capture Form", "Billing & Integrations"],
-  "Sales Admin": ["Dashboard", "Leads", "Campaigns", "Inbox", "Workflows", "Analytics", "Templates"],
+  "Sales Admin": ["Dashboard", "Prospects", "Campaigns", "Inbox", "Workflows", "Analytics", "Templates"],
   "Marketing Admin": ["Dashboard", "Segments", "Newsletters", "Workflows", "Analytics", "Templates"],
 };
 

@@ -18,6 +18,7 @@ import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options
 import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
 import { getPicklistValues } from "@/lib/queries/picklists";
+import { cn } from "@/lib/utils";
 
 export type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
 
@@ -56,7 +57,7 @@ type ManualLead = { id: string; name: string; title: string; url: string };
 // Leads, this source genuinely has this data because the person typing it in knows it).
 type ManualEntry = {
   id: string; name: string; email: string; company: string; title: string;
-  phone: string; companySize: string; seniority: string; twitter: string;
+  phone: string; companySize: string; seniority: string; twitter: string; linkedin: string;
   streetAddress: string; city: string; state: string; country: string; postalCode: string;
 };
 
@@ -156,14 +157,14 @@ const manualInvalidCount = (rows: ManualLead[]) => rows.filter((m) => !m.url.tri
 
 const newEntry = (): ManualEntry => ({
   id: `e${++_mid}`, name: "", email: "", company: "", title: "",
-  phone: "", companySize: "", seniority: "", twitter: "",
+  phone: "", companySize: "", seniority: "", twitter: "", linkedin: "",
   streetAddress: "", city: "", state: "", country: "", postalCode: "",
 });
 // A manual entry imports if it has a name (or company) AND an email.
 const entryValid = (e: ManualEntry) => !!((e.name.trim() || e.company.trim()) && e.email.trim());
 const entryStarted = (e: ManualEntry) =>
   !!(e.name.trim() || e.email.trim() || e.company.trim() || e.title.trim() || e.phone.trim() ||
-     e.companySize.trim() || e.seniority.trim() || e.twitter.trim() ||
+     e.companySize.trim() || e.seniority.trim() || e.twitter.trim() || e.linkedin.trim() ||
      e.streetAddress.trim() || e.city.trim() || e.state.trim() || e.country.trim() || e.postalCode.trim());
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
@@ -455,6 +456,7 @@ export function AddLeadsWizard({
         seniority: e.seniority.trim() || null,
         company_size: e.companySize.trim() || null,
         twitter_handle: e.twitter.trim() || null,
+        linkedin: e.linkedin.trim() || null,
         street_address: e.streetAddress.trim() || null,
         city: e.city.trim() || null,
         state: e.state.trim() || null,
@@ -509,7 +511,7 @@ export function AddLeadsWizard({
       <div className="px-6 sm:px-10 py-5 border-b border-slate-100 flex-shrink-0">
         <div className="max-w-6xl mx-auto flex items-start justify-between">
           <div>
-            <h2 className="font-semibold text-xl text-slate-900">Create a list of leads below</h2>
+            <h2 className="font-semibold text-xl text-slate-900">Create a list of prospects below</h2>
             <p className="text-sm text-slate-500 mt-0.5">Step {step} of 4 · {step === 1 ? "Choose a source" : step === 2 ? SOURCE_LABEL[source!] : step === 3 ? "Review" : "Summary"}</p>
           </div>
           <button
@@ -827,11 +829,16 @@ function Step2Input(props: {
 }
 
 /** Labeled block field — label above the input, matching standard CRM form conventions. */
-function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+// Salesforce-style row used by the manual-entry form — matches the
+// account/contact creation forms (right-aligned label, red required bar).
+function EntryRow({ label, required, children, className }: { label: string; required?: boolean; children: React.ReactNode; className?: string }) {
   return (
-    <div className={className}>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-      {children}
+    <div className={cn("grid grid-cols-[120px_1fr] items-center gap-3", className)}>
+      <label className="text-xs font-medium text-slate-600 text-right whitespace-nowrap truncate" title={label}>{label}</label>
+      <div className="relative flex items-center w-full">
+        {required && <span className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-l-md z-10" />}
+        {children}
+      </div>
     </div>
   );
 }
@@ -961,47 +968,46 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
-              <div className="p-4 space-y-4">
+              <div className="p-5 space-y-6">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Contact</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <Field label="Name *"><Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Jane Doe" /></Field>
-                    <Field label="Email *"><Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="jane@company.com" className={bad ? "border-amber-300 focus:ring-amber-200" : ""} /></Field>
-                    <Field label="Phone"><Input value={e.phone} onChange={(ev) => update(e.id, "phone", ev.target.value)} placeholder="+1 555 000 0000" /></Field>
-                    <Field label="Twitter / X handle"><Input value={e.twitter} onChange={(ev) => update(e.id, "twitter", ev.target.value)} placeholder="@janedoe" /></Field>
+                  <h4 className="text-xs font-bold text-slate-800 mb-3 pb-1.5 border-b border-slate-100">Contact Information</h4>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
+                    <EntryRow label="Name" required><Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Jane Doe" /></EntryRow>
+                    <EntryRow label="Email" required><Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="jane@company.com" className={bad ? "border-amber-300 focus:ring-amber-200" : ""} /></EntryRow>
+                    <EntryRow label="Phone"><Input value={e.phone} onChange={(ev) => update(e.id, "phone", ev.target.value)} placeholder="+1 555 000 0000" /></EntryRow>
+                    <EntryRow label="LinkedIn"><Input value={e.linkedin} onChange={(ev) => update(e.id, "linkedin", ev.target.value)} placeholder="linkedin.com/in/janedoe" leftIcon={<Link2 className="h-3.5 w-3.5" />} /></EntryRow>
+                    <EntryRow label="Twitter / X"><Input value={e.twitter} onChange={(ev) => update(e.id, "twitter", ev.target.value)} placeholder="@janedoe" /></EntryRow>
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Company</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <Field label="Company"><Input value={e.company} onChange={(ev) => update(e.id, "company", ev.target.value)} placeholder="Acme Inc." /></Field>
-                    <Field label="Job title"><Input value={e.title} onChange={(ev) => update(e.id, "title", ev.target.value)} placeholder="Head of Sales" /></Field>
-                    <Field label="Company size">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 mb-3 pb-1.5 border-b border-slate-100">Company Information</h4>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
+                    <EntryRow label="Company"><Input value={e.company} onChange={(ev) => update(e.id, "company", ev.target.value)} placeholder="Acme Inc." /></EntryRow>
+                    <EntryRow label="Job title"><Input value={e.title} onChange={(ev) => update(e.id, "title", ev.target.value)} placeholder="Head of Sales" /></EntryRow>
+                    <EntryRow label="Company size">
                       <Select value={e.companySize} onChange={(ev) => update(e.id, "companySize", ev.target.value)}>
                         <option value="">Select…</option>
                         {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
                       </Select>
-                    </Field>
-                    <Field label="Seniority">
+                    </EntryRow>
+                    <EntryRow label="Seniority">
                       <Select value={e.seniority} onChange={(ev) => update(e.id, "seniority", ev.target.value)}>
                         <option value="">Select…</option>
                         {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
                       </Select>
-                    </Field>
+                    </EntryRow>
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Address</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                    <Field label="Street address" className="lg:col-span-2"><Input value={e.streetAddress} onChange={(ev) => update(e.id, "streetAddress", ev.target.value)} placeholder="123 Main St" /></Field>
-                    <Field label="City"><Input value={e.city} onChange={(ev) => update(e.id, "city", ev.target.value)} placeholder="City" /></Field>
-                    <Field label="State"><Input value={e.state} onChange={(ev) => update(e.id, "state", ev.target.value)} placeholder="State" /></Field>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Country"><Input value={e.country} onChange={(ev) => update(e.id, "country", ev.target.value)} placeholder="Country" /></Field>
-                      <Field label="Postal code"><Input value={e.postalCode} onChange={(ev) => update(e.id, "postalCode", ev.target.value)} placeholder="Postal" /></Field>
-                    </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 mb-3 pb-1.5 border-b border-slate-100">Address</h4>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
+                    <EntryRow label="Street"><Input value={e.streetAddress} onChange={(ev) => update(e.id, "streetAddress", ev.target.value)} placeholder="123 Main St" /></EntryRow>
+                    <EntryRow label="City"><Input value={e.city} onChange={(ev) => update(e.id, "city", ev.target.value)} placeholder="City" /></EntryRow>
+                    <EntryRow label="State"><Input value={e.state} onChange={(ev) => update(e.id, "state", ev.target.value)} placeholder="State" /></EntryRow>
+                    <EntryRow label="Country"><Input value={e.country} onChange={(ev) => update(e.id, "country", ev.target.value)} placeholder="Country" /></EntryRow>
+                    <EntryRow label="Postal code"><Input value={e.postalCode} onChange={(ev) => update(e.id, "postalCode", ev.target.value)} placeholder="Postal" /></EntryRow>
                   </div>
                 </div>
               </div>

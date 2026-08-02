@@ -39,12 +39,12 @@ import { getCurrentUserProfile } from "@/lib/queries/users";
 type TabId = "leads" | "sequence" | "sender" | "settings";
 // Ordered to match the intended flow: add leads first, then everything else unlocks.
 const PAGE_TABS: { id: TabId; label: string }[] = [
-  { id: "leads", label: "Leads" },
+  { id: "leads", label: "Prospects" },
   { id: "sequence", label: "Sequence" },
   { id: "sender", label: "Sender accounts" },
   { id: "settings", label: "Settings" },
 ];
-const LEADS_GATE_MESSAGE = "Add at least one list of leads first.";
+const LEADS_GATE_MESSAGE = "Add at least one list of prospects first.";
 
 interface LeadList { id: string; label: string; source: string; count: number; segmentId: string | null }
 interface SegmentLite { id: string; segment_name: string; contacts: number }
@@ -193,7 +193,7 @@ export default function CampaignBuilderPage() {
     const wasEmpty = lists.length === 0;
     if (segmentId === null) {
       if (lists.some((l) => l.segmentId === null)) return;
-      setLists([...lists, { id: `all-${Date.now()}`, label: "All leads", source: "Workspace", count: 0, segmentId: null }]);
+      setLists([...lists, { id: `all-${Date.now()}`, label: "All prospects", source: "Workspace", count: 0, segmentId: null }]);
     } else {
       const seg = segments.find((s) => s.id === segmentId);
       if (!seg || lists.some((l) => l.segmentId === segmentId)) return;
@@ -308,7 +308,7 @@ export default function CampaignBuilderPage() {
   // there's nothing to send to either way; audienceLoading guards against
   // flashing this while the fetch is still in flight.
   const audienceEmpty = lists.length > 0 && !audienceLoading && audienceLeads.length === 0;
-  const AUDIENCE_EMPTY_MSG = "This audience doesn't have any leads yet — add leads to this list or segment before choosing a channel.";
+  const AUDIENCE_EMPTY_MSG = "This audience doesn't have any prospects yet — add prospects to this list or segment before choosing a channel.";
 
   // A channel is only as usable as its worst lead: if any lead in the chosen
   // audience is missing an email/LinkedIn profile, that whole channel is
@@ -519,7 +519,7 @@ export default function CampaignBuilderPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Lists of leads</h2>
+              <h2 className="text-xl font-bold text-slate-900">Lists of prospects</h2>
               <p className="text-sm text-slate-500">Choose who this campaign reaches.</p>
             </div>
             <div className="relative">
@@ -527,7 +527,7 @@ export default function CampaignBuilderPage() {
               {addOpen && (
                 <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-64 bg-white rounded-xl border border-slate-200 shadow-lg p-1">
                   <button onClick={() => addList(null)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
-                    <Users2 className="h-4 w-4 text-slate-400" /> All leads
+                    <Users2 className="h-4 w-4 text-slate-400" /> All prospects
                   </button>
                   {segments.length > 0 && <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Segments</p>}
                   {segments.map((s) => (
@@ -537,7 +537,7 @@ export default function CampaignBuilderPage() {
                     </button>
                   ))}
                   <button onClick={() => { setAddOpen(false); setShowImport(true); }} className="w-full flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-100 rounded-lg text-sm font-medium text-blue-600 hover:bg-slate-50">
-                    <Plus className="h-4 w-4" /> Import new leads…
+                    <Plus className="h-4 w-4" /> Import new prospects…
                   </button>
                 </div>
               )}
@@ -547,8 +547,8 @@ export default function CampaignBuilderPage() {
           {lists.length === 0 ? (
             <Card className="p-12 text-center">
               <div className="h-12 w-12 mx-auto rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3"><Users2 className="h-6 w-6" /></div>
-              <p className="font-medium text-slate-900">Add leads to this campaign</p>
-              <p className="text-sm text-slate-500 mt-1">Pick a segment, all leads, or import a new list.</p>
+              <p className="font-medium text-slate-900">Add prospects to this campaign</p>
+              <p className="text-sm text-slate-500 mt-1">Pick a segment, all prospects, or import a new list.</p>
             </Card>
           ) : (
             <div className="space-y-3">
@@ -560,7 +560,7 @@ export default function CampaignBuilderPage() {
                     </div>
                     <div>
                       <p className="font-medium text-slate-900">{l.label}</p>
-                      <p className="text-xs text-slate-500">Added from {l.source}{l.segmentId ? ` · ${l.count} leads` : ""} · click to view leads</p>
+                      <p className="text-xs text-slate-500">Added from {l.source}{l.segmentId ? ` · ${l.count} prospects` : ""} · click to view prospects</p>
                     </div>
                   </div>
                   <button onClick={(e) => { e.stopPropagation(); setLists(lists.filter((x) => x.id !== l.id)); }} aria-label="Remove list" className="p-2 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50">
@@ -697,12 +697,12 @@ export default function CampaignBuilderPage() {
                   ))}
                   <div className="relative">
                     <button onClick={() => setAddOpen((v) => !v)} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">
-                      <Plus className="h-3 w-3" /> Lead list
+                      <Plus className="h-3 w-3" /> Prospect list
                     </button>
                     {addOpen && (
                       <div className="lp-anim-pop origin-top-left absolute left-0 top-full mt-1 z-20 w-56 bg-white rounded-xl border border-slate-200 shadow-lg p-1">
                         <button onClick={() => addList(null)} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
-                          <Users2 className="h-4 w-4 text-slate-400" /> All leads
+                          <Users2 className="h-4 w-4 text-slate-400" /> All prospects
                         </button>
                         {segments.length > 0 && <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Segments</p>}
                         {segments.map((s) => (
@@ -712,7 +712,7 @@ export default function CampaignBuilderPage() {
                           </button>
                         ))}
                         <button onClick={() => { setAddOpen(false); setShowImport(true); }} className="w-full flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-100 rounded-lg text-sm font-medium text-blue-600 hover:bg-slate-50">
-                          <Plus className="h-4 w-4" /> Import new leads…
+                          <Plus className="h-4 w-4" /> Import new prospects…
                         </button>
                       </div>
                     )}
@@ -1039,7 +1039,7 @@ export default function CampaignBuilderPage() {
               </label>
             </div>
             <div className="text-sm text-slate-500 flex items-center gap-2 bg-slate-50 rounded-lg p-3">
-              <Filter className="h-4 w-4 flex-shrink-0" /> Leads who reply are automatically put on hold — no further steps are sent.
+              <Filter className="h-4 w-4 flex-shrink-0" /> Prospects who reply are automatically put on hold — no further steps are sent.
             </div>
           </Card>
         </div>
@@ -1065,12 +1065,12 @@ export default function CampaignBuilderPage() {
         <div className="p-5 max-h-[75vh] overflow-y-auto bg-slate-50/60">
           {loadingLeads ? (
             <div className="flex items-center justify-center py-16 text-slate-400">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading leads…
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading prospects…
             </div>
           ) : viewingLeads && viewingLeads.length > 0 ? (
             <LeadsTable leads={viewingLeads} />
           ) : (
-            <div className="py-16 text-center text-sm text-slate-500">No leads in this list yet.</div>
+            <div className="py-16 text-center text-sm text-slate-500">No prospects in this list yet.</div>
           )}
         </div>
       </Modal>

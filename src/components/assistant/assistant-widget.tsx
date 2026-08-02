@@ -51,13 +51,13 @@ function getSpeechRecognitionCtor(): SpeechRecognitionCtor | undefined {
 // Static fallback — replaced at runtime by dynamic suggestions from AssistantContext
 const STATIC_SUGGESTIONS = [
   { Icon: BarChart2, text: "What's my workspace overview?" },
-  { Icon: Users, text: "Show me my hot leads" },
+  { Icon: Users, text: "Show me my hot prospects" },
   { Icon: Mail, text: "Create a new email campaign" },
   { Icon: Settings, text: "List my team members and roles" },
 ];
 
 const MENTION_ITEMS = [
-  { label: "Leads", Icon: Users, value: "leads" },
+  { label: "Prospects", Icon: Users, value: "leads" },
   { label: "Campaigns", Icon: Mail, value: "campaigns" },
   { label: "Segments", Icon: Layers, value: "segments" },
   { label: "Templates", Icon: FileText, value: "templates" },
@@ -69,7 +69,7 @@ const MENTION_ITEMS = [
 
 const APP_NAV = [
   { label: "Dashboard", Icon: LayoutDashboard, href: "/dashboard" },
-  { label: "Leads", Icon: Users, href: "/leads" },
+  { label: "Prospects", Icon: Users, href: "/leads" },
   { label: "Campaigns", Icon: Mail, href: "/campaigns" },
   { label: "Segments", Icon: Layers, href: "/segments" },
   { label: "Newsletters", Icon: Newspaper, href: "/newsletters" },
@@ -603,7 +603,7 @@ export function AssistantWidget({
                     <h2 className={cn("font-bold mb-1.5", expanded ? "text-4xl" : "text-2xl")} style={{ color: T.textPrimary }}>Hi {userName}!</h2>
                     <p className={cn("font-medium mb-1", expanded ? "text-xl" : "text-base")} style={{ color: PRIMARY }}>How can I help you?</p>
                     <p className={cn("mb-8", expanded ? "text-sm max-w-sm" : "text-xs max-w-[240px]")} style={{ color: T.textSecondary }}>
-                      Ask me anything about your Nxelio Nurture workspace — leads, campaigns, analytics, and more.
+                      Ask me anything about your Nxelio Nurture workspace — prospects, campaigns, analytics, and more.
                     </p>
                     <div className="w-full space-y-2">
                       {activeSuggestions.map((s) => (
