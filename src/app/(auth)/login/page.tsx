@@ -66,9 +66,7 @@ function LoginForm() {
 
     // The platform admin account lands in the standalone admin panel, not the customer app.
     if (form.email.trim().toLowerCase() === "admin@nxelio.com") {
-      setLoading(false);
-      router.push("/admin");
-      router.refresh();
+      window.location.href = "/admin";
       return;
     }
 
@@ -79,13 +77,18 @@ function LoginForm() {
     // the button stuck on "Signing in…" forever with no feedback — the user
     // is already authenticated at this point, so falling back to /dashboard
     // on error is safe (its own layout will re-check onboarding/subscription).
+    //
+    // A hard navigation (not router.push + router.refresh) on purpose: the
+    // session cookie was just set by signInWithPassword, and firing push()
+    // immediately followed by refresh() raced the in-flight RSC fetch for
+    // the destination route — the URL would silently change while the page
+    // never actually rendered, only "fixing itself" on a manual reload. A
+    // full page load has no such race and always sees the fresh session.
     try {
       const status = await getOnboardingStatus();
-      router.push(status.completed ? "/dashboard" : "/onboarding");
-      router.refresh();
+      window.location.href = status.completed ? "/dashboard" : "/onboarding";
     } catch (err) {
       setError(err instanceof Error ? `Signed in, but couldn't finish loading your account: ${err.message}` : "Signed in, but something went wrong loading your account.");
-    } finally {
       setLoading(false);
     }
   }
