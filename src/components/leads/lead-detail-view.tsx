@@ -153,13 +153,14 @@ export function LeadDetailView({
 
   // Toggle favorite
   const handleToggleFavorite = async () => {
+    const nextFavorite = !lead.is_favorite;
+    setLead((l) => ({ ...l, is_favorite: nextFavorite }));
     try {
-      const nextFavorite = !lead.is_favorite;
       await updateLead(lead.id, { is_favorite: nextFavorite });
-      setLead((l) => ({ ...l, is_favorite: nextFavorite }));
       toast(nextFavorite ? "Added to favorites." : "Removed from favorites.", "success");
       router.refresh();
     } catch (e) {
+      setLead((l) => ({ ...l, is_favorite: !nextFavorite }));
       toast("Couldn't update favorite status.", "error");
     }
   };
@@ -491,6 +492,14 @@ export function LeadDetailView({
                 <p className="text-slate-500 dark:text-slate-400 font-medium">Source</p>
                 <p className="text-slate-800 dark:text-slate-200 font-semibold">{lead.source || "Google"}</p>
               </div>
+              {lead.message && (
+                <div className="pt-2 text-xs border-t border-slate-100 dark:border-slate-800/80">
+                  <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">About</p>
+                  <p className="text-slate-800 dark:text-slate-200 leading-relaxed bg-slate-50 dark:bg-slate-950 p-2 rounded-lg whitespace-pre-wrap font-medium">
+                    {lead.message}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Owner Section */}

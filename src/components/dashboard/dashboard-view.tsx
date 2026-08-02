@@ -3,17 +3,19 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays, CheckCircle2, ChevronDown, Download, RefreshCw, X,
-  ArrowRight, Landmark, Briefcase, Activity, Sparkles, Plus, Star, Building2, Globe, Eye
+  ArrowRight, Landmark, Briefcase, Activity, Sparkles,
 } from "lucide-react";
 import {
   Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis
 } from "recharts";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import type { DashboardStats } from "@/lib/queries/analytics";
 import type { OpportunityRow } from "@/lib/opportunities";
+import type { MeetingRow } from "@/lib/queries/meetings";
+import type { AiCreditsUsage } from "@/lib/queries/credits";
 
 function money(n: number): string {
   return "$" + Math.round(n).toLocaleString("en-US");
@@ -70,22 +72,39 @@ interface OnboardingStatus {
 
 export function DashboardView({
   stats,
+  userName = "User",
   onboardingStatus,
   recentDeals = [],
+  collaborators = [],
+  meetings = [],
+  credits = { used: 0, total: 1500, planId: "free" },
+  teamPerformance = [],
 }: {
   stats: DashboardStats;
+  userName?: string;
   onboardingStatus?: OnboardingStatus;
   recentDeals?: OpportunityRow[];
+  collaborators?: { name: string }[];
+  meetings?: MeetingRow[];
+  credits?: AiCreditsUsage;
+  teamPerformance?: { name: string; dealsCount: number; wonValue: number }[];
 }) {
   const router = useRouter();
   const { toast } = useFeedback();
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+  const greeting = getGreeting();
 
   const [timeframe, setTimeframe] = useState<"weekly" | "monthly" | "yearly">("weekly");
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [activeDateRange, setActiveDateRange] = useState("Last 30 Days");
 
-  // Date picker dropdown options from crms.dreamstechnologies.com
   const dateRangeOptions = [
     "Today",
     "Yesterday",
@@ -93,146 +112,48 @@ export function DashboardView({
     "Last 30 Days",
     "This Month",
     "Last Month",
-    "Custom Range"
   ];
 
-  // Simulated collaborators array
-  const collaborators = [
-    { name: "Jessica Sen", initial: "JS", bg: "bg-rose-500 text-white" },
-    { name: "Sharon Roy", initial: "SR", bg: "bg-teal-500 text-white" },
-    { name: "Jerald Sen", initial: "JS", bg: "bg-indigo-500 text-white" },
-    { name: "Ann McClure", initial: "AM", bg: "bg-orange-500 text-white" }
-  ];
+  const AVATAR_COLORS = ["bg-rose-500", "bg-teal-500", "bg-indigo-500", "bg-orange-500", "bg-purple-500"];
 
-  // Recharts mixed bar/area data mapping
-  const chartDataWeekly = [
-    { day: "Mon", Revenue: 35000, Sales: 18000 },
-    { day: "Tue", Revenue: 20000, Sales: 25000 },
-    { day: "Wed", Revenue: 50000, Sales: 23000 },
-    { day: "Thu", Revenue: 50000, Sales: 26000 },
-    { day: "Fri", Revenue: 58000, Sales: 28000 },
-    { day: "Sat", Revenue: 40000, Sales: 38000 }
-  ];
+  // Real revenue/pipeline series computed server-side for weekly/monthly/yearly — no mock arrays.
+  const activeChartData = stats.revenueSeries[timeframe];
+  const activeChartTotal = activeChartData.reduce((s, d) => s + d.Revenue + d.Pipeline, 0);
 
-  const chartDataMonthly = stats.leadGrowth.length > 0
-    ? stats.leadGrowth.map((item) => ({
-        day: item.date,
-        Revenue: item.leads * 6000,
-        Sales: item.leads * 3000 + item.hot * 1500
-      }))
-    : [
-        { day: "Jan", Revenue: 30000, Sales: 20000 },
-        { day: "Feb", Revenue: 45000, Sales: 28000 },
-        { day: "Mar", Revenue: 50000, Sales: 22000 },
-        { day: "Apr", Revenue: 35000, Sales: 25000 },
-        { day: "May", Revenue: 60000, Sales: 38000 }
-      ];
+  // Real lead-source breakdown (top 4 + Other), computed server-side.
+  const sourceColors: Record<string, string> = {
+    "LinkedIn": "#0077B5", "Cold Email": "#EA580C", "Email": "#EA580C",
+    "Website Form": "#18A7B8", "Website": "#18A7B8", "Referral": "#8B5CF6",
+    "Campaigns": "#EC4899", "Campaign": "#EC4899", "Other": "#64748b",
+  };
+  const donutData = stats.trafficSources.map((s) => ({
+    name: s.name, value: s.value, count: s.count, color: sourceColors[s.name] || "#94a3b8",
+  }));
+  const topSource = donutData[0];
 
-  const chartDataYearly = [
-    { day: "2024", Revenue: 450000, Sales: 280000 },
-    { day: "2025", Revenue: 580000, Sales: 350000 },
-    { day: "2026", Revenue: 620000, Sales: 420000 }
-  ];
+  const [nowMs] = useState(() => Date.now());
+  const upcomingMeetings = meetings
+    .filter((m) => m.status === "scheduled" && new Date(m.start_at).getTime() >= nowMs)
+    .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
 
-  const activeChartData = timeframe === "weekly"
-    ? chartDataWeekly
-    : timeframe === "monthly"
-      ? chartDataMonthly
-      : chartDataYearly;
+  // Real Top Deals — highest-value opportunities from the real recentDeals prop, no mock fallback.
+  const topDealsData = [...recentDeals].sort((a, b) => b.deal_value - a.deal_value).slice(0, 5);
 
-  // Traffic Sources static donut data from the crms.dreamstechnologies.com mockup
-  const donutData = [
-    { name: "Organic Search", value: 58, count: 6598, color: "#10B981" },
-    { name: "Direct Traffic", value: 22, count: 2458, color: "#3B82F6" },
-    { name: "Referral Traffic", value: 13, count: 1456, color: "#F59E0B" },
-    { name: "Social Media", value: 7, count: 845, color: "#A855F7" }
-  ];
+  const STAGE_LABEL: Record<string, string> = {
+    new: "New", qualified: "Qualified", meeting_scheduled: "Meeting Scheduled",
+    proposal_sent: "Proposal Sent", negotiation: "Negotiation", won: "Won", lost: "Lost",
+  };
 
-  // Sparkline data for Total Contacts card
-  const sparklineData = [
-    { value: 12 },
-    { value: 18 },
-    { value: 15 },
-    { value: 22 },
-    { value: 28 },
-    { value: 20 },
-    { value: 25 }
-  ];
-
-  // Pipeline Statistics Card mock data
-  const pipelineStats = [
-    { label: "Lead", value: "$20,010", count: "80 Deals", color: "bg-rose-500" },
-    { label: "Proposal", value: "$17,210", count: "23 Deals", color: "bg-amber-500" },
-    { label: "Sales", value: "$9,210", count: "12 Deals", color: "bg-purple-500" },
-    { label: "Won", value: "$8,210", count: "21 Deals", color: "bg-emerald-500" }
-  ];
-
-  const pipelineChartData = [
-    { name: "Lead", value: 20010, fill: "#EF4444" },
-    { name: "Proposal", value: 17210, fill: "#F59E0B" },
-    { name: "Sales", value: 9210, fill: "#8B5CF6" },
-    { name: "Won", value: 8210, fill: "#10B981" }
-  ];
-
-  const profitChartData = [
-    { name: "Jan", value: 20 },
-    { name: "Feb", value: 40 },
-    { name: "Mar", value: 30 },
-    { name: "Apr", value: 65 },
-    { name: "May", value: 45 },
-    { name: "Jun", value: 35 },
-    { name: "Jul", value: 50 },
-    { name: "Aug", value: 60 },
-    { name: "Sep", value: 85 },
-    { name: "Oct", value: 55 }
-  ];
-
-  // Default fallbacks for Top Deals
-  const defaultTopDeals = [
-    { name: "NovaWave LLC", country: "Germany", value: 1994938, initial: "NW", bg: "bg-blue-100 text-blue-600" },
-    { name: "Silver Hawk", country: "Australia", value: 1544540, initial: "SH", bg: "bg-emerald-100 text-emerald-600" },
-    { name: "Summit LLC", country: "Italy", value: 1036390, initial: "SU", bg: "bg-purple-100 text-purple-600" },
-    { name: "Bluesky Industries", country: "Canada", value: 1015280, initial: "BI", bg: "bg-orange-100 text-orange-600" },
-    { name: "HealthTech Innovations", country: "UK", value: 1014112, initial: "HT", bg: "bg-rose-100 text-rose-600" }
-  ];
-
-  // Render Top Deals based on Supabase opportunities data, falling back to mock deals
-  const topDealsData = recentDeals.length > 0
-    ? [...recentDeals]
-        .sort((a, b) => b.deal_value - a.deal_value)
-        .slice(0, 5)
-        .map((d) => ({
-          name: d.name,
-          country: d.company || "Global",
-          value: d.deal_value,
-          initial: d.name.slice(0, 2).toUpperCase(),
-          bg: "bg-indigo-100 text-indigo-600"
-        }))
-    : defaultTopDeals;
-
-  // Default fallbacks for Recent Deals
-  const defaultRecentDeals = [
-    { name: "Annual Software", stage: "Appointment", value: 1994938, tag: "Rated", tagColor: "text-amber-500 bg-amber-50 dark:bg-amber-950/20 border-amber-200", owner: "Robert Johnson", avatar: "RJ", avatarBg: "bg-rose-100 text-rose-600", probability: "90%", status: "Won", statusColor: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400" },
-    { name: "CRM Onboarding", stage: "Appointment", value: 1544540, tag: "Collab", tagColor: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200", owner: "Isabella Cooper", avatar: "IC", avatarBg: "bg-teal-100 text-teal-600", probability: "90%", status: "Lost", statusColor: "bg-rose-100 text-rose-800 dark:bg-rose-950/20 dark:text-rose-400" },
-    { name: "Enterprise Plan", stage: "Contact Made", value: 1036390, tag: "Promotion", tagColor: "text-purple-500 bg-purple-50 dark:bg-purple-950/20 border-purple-200", owner: "John Smith", avatar: "JS", avatarBg: "bg-indigo-100 text-indigo-600", probability: "80%", status: "Won", statusColor: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400" }
-  ];
-
-  // Render Recent Deals based on Supabase opportunities data, falling back to mock deals
-  const recentDealsTableData = recentDeals.length > 0
-    ? recentDeals.slice(0, 5).map((d) => ({
-        name: d.name,
-        stage: d.stage === "meeting_scheduled" ? "Meeting Scheduled" : d.stage === "proposal_sent" ? "Proposal Sent" : d.stage.toUpperCase(),
-        value: d.deal_value,
-        tag: d.stage === "won" ? "Collab" : "Lead",
-        tagColor: d.stage === "won" ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200" : "text-blue-500 bg-blue-50 dark:bg-blue-950/20 border-blue-200",
-        owner: d.contact_name || "Steve Vaughan",
-        avatar: (d.contact_name || "SV").slice(0, 2).toUpperCase(),
-        avatarBg: "bg-sky-100 text-sky-600",
-        probability: d.stage === "won" ? "100%" : d.stage === "lost" ? "0%" : "70%",
-        status: d.stage === "won" ? "Won" : d.stage === "lost" ? "Lost" : "Active",
-        statusColor: d.stage === "won" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400" : d.stage === "lost" ? "bg-rose-100 text-rose-800 dark:bg-rose-950/20 dark:text-rose-400" : "bg-blue-100 text-blue-800 dark:bg-blue-950/20 dark:text-blue-400"
-      }))
-    : defaultRecentDeals;
+  // Real Recent Deals table rows — no mock fallback rows.
+  const recentDealsTableData = recentDeals.slice(0, 5).map((d) => ({
+    id: d.id,
+    name: d.name,
+    stage: STAGE_LABEL[d.stage] || d.stage,
+    value: d.deal_value,
+    contact: d.contact_name || "—",
+    status: d.stage === "won" ? "Won" : d.stage === "lost" ? "Lost" : "Active",
+    statusColor: d.stage === "won" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400" : d.stage === "lost" ? "bg-rose-100 text-rose-800 dark:bg-rose-950/20 dark:text-rose-400" : "bg-blue-100 text-blue-800 dark:bg-blue-950/20 dark:text-blue-400",
+  }));
 
   return (
     <div className="space-y-5 max-w-[1600px] mx-auto pb-10 px-4 sm:px-6 text-slate-800 dark:text-slate-200">
@@ -256,11 +177,11 @@ export function DashboardView({
                 key={i}
                 title={user.name}
                 className={cn(
-                  "h-7 w-7 rounded-full border-2 border-white dark:border-[#0c0d21] flex items-center justify-center text-[10px] font-bold shadow-xs",
-                  user.bg
+                  "h-7 w-7 rounded-full border-2 border-white dark:border-[#0c0d21] flex items-center justify-center text-[10px] font-bold text-white shadow-xs",
+                  AVATAR_COLORS[i % AVATAR_COLORS.length]
                 )}
               >
-                {user.initial}
+                {user.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
               </div>
             ))}
             <button
@@ -354,6 +275,21 @@ export function DashboardView({
         </div>
       </div>
 
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent border border-blue-100/30 dark:border-slate-800 rounded-2xl p-5 mb-4 shadow-3xs flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            👋 {greeting}, <span className="text-blue-600 dark:text-blue-400 font-extrabold">{userName}</span>!
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-semibold leading-relaxed">
+            Here is what is happening with your leads and pipeline today.
+          </p>
+        </div>
+        <div className="hidden sm:flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+          <Sparkles className="h-5 w-5 animate-pulse" />
+        </div>
+      </div>
+
       {/* Row 1: Charts (Revenue Analytics & Traffic Sources) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
@@ -391,19 +327,19 @@ export function DashboardView({
               <div className="d-flex align-items-center justify-between flex-wrap gap-2 flex justify-between items-center mb-4">
                 <div className="d-flex align-items-center flex-wrap gap-2 flex items-center gap-1.5">
                   <h4 className="mb-0 text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-                    {timeframe === "weekly" ? "495K" : timeframe === "monthly" ? "1.2M" : "4.8M"}
+                    {money(activeChartTotal)}
                   </h4>
-                  <p className="mb-0 text-xs font-medium text-slate-400">Revenue with Sales (USD)</p>
+                  <p className="mb-0 text-xs font-medium text-slate-400">Revenue Won + Open Pipeline ({timeframe})</p>
                 </div>
-                
+
                 <div className="d-flex align-items-center flex-wrap gap-2 flex items-center gap-2 text-xs font-semibold">
                   <div className="d-flex align-items-center border dark:border-slate-800 rounded px-2 py-1 flex items-center gap-1.5 bg-white dark:bg-slate-900">
                     <span className="h-2 w-2 rounded-full bg-rose-500" />
-                    <span className="text-slate-600 dark:text-slate-400">Revenue</span>
+                    <span className="text-slate-600 dark:text-slate-400">Revenue Won</span>
                   </div>
                   <div className="d-flex align-items-center border dark:border-slate-800 rounded px-2 py-1 flex items-center gap-1.5 bg-white dark:bg-slate-900">
                     <span className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" />
-                    <span className="text-slate-600 dark:text-slate-400">Sales</span>
+                    <span className="text-slate-600 dark:text-slate-400">Open Pipeline</span>
                   </div>
                 </div>
               </div>
@@ -413,7 +349,7 @@ export function DashboardView({
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={activeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
                     <defs>
-                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="colorPipeline" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#475569" stopOpacity={0.1}/>
                         <stop offset="95%" stopColor="#475569" stopOpacity={0}/>
                       </linearGradient>
@@ -458,20 +394,20 @@ export function DashboardView({
                         return null;
                       }}
                     />
-                    {/* Area representing Sales (background) */}
+                    {/* Area representing Open Pipeline (background) */}
                     <Area
                       type="monotone"
-                      dataKey="Sales"
-                      name="Sales"
+                      dataKey="Pipeline"
+                      name="Open Pipeline"
                       stroke="#64748b"
                       strokeWidth={1.5}
                       fillOpacity={1}
-                      fill="url(#colorSales)"
+                      fill="url(#colorPipeline)"
                     />
-                    {/* Bar representing Revenue (foreground) */}
+                    {/* Bar representing Revenue Won (foreground) */}
                     <Bar
                       dataKey="Revenue"
-                      name="Revenue"
+                      name="Revenue Won"
                       fill="#EA580C"
                       radius={[4, 4, 0, 0]}
                       barSize={40}
@@ -500,70 +436,80 @@ export function DashboardView({
                 </button>
               </div>
 
-              {/* Donut Chart using Recharts Pie */}
-              <div className="h-[180px] w-full relative mt-3 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={donutData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={75}
-                      paddingAngle={3}
-                      dataKey="value"
-                      stroke="none"
-                      startAngle={90}
-                      endAngle={-270}
-                    >
-                      {donutData.map((entry, idx) => (
-                        <Cell key={`cell-${idx}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 shadow-md text-xs">
-                              <span className="font-bold" style={{ color: payload[0].payload.color }}>
-                                {payload[0].name}
-                              </span>
-                              <span className="ml-1.5 font-bold">{payload[0].value}%</span>
-                              <span className="block text-[10px] text-slate-400 mt-0.5">
-                                Leads: {formatStat(payload[0].payload.count)}
-                              </span>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                
-                {/* Text centered inside the donut hole */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-xl font-black text-slate-900 dark:text-white">58%</span>
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Organic</span>
+              {donutData.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center py-10">
+                  <p className="text-xs text-slate-400 text-center">No leads yet — sources will show up here once you have some.</p>
                 </div>
-              </div>
+              ) : (
+                <>
+                  {/* Donut Chart using Recharts Pie */}
+                  <div className="h-[180px] w-full relative mt-3 flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={donutData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={75}
+                          paddingAngle={3}
+                          dataKey="value"
+                          stroke="none"
+                          startAngle={90}
+                          endAngle={-270}
+                        >
+                          {donutData.map((entry, idx) => (
+                            <Cell key={`cell-${idx}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 shadow-md text-xs">
+                                  <span className="font-bold" style={{ color: payload[0].payload.color }}>
+                                    {payload[0].name}
+                                  </span>
+                                  <span className="ml-1.5 font-bold">{payload[0].value}%</span>
+                                  <span className="block text-[10px] text-slate-400 mt-0.5">
+                                    Leads: {formatStat(payload[0].payload.count)}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    {/* Text centered inside the donut hole — real top source, not hardcoded */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-xl font-black text-slate-900 dark:text-white">{topSource?.value ?? 0}%</span>
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{topSource?.name ?? "—"}</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Legend breakdown list matching target mockup */}
-            <div className="mb-1 border-t border-slate-100 dark:border-slate-800/80">
-              {donutData.map((d, i) => (
-                <div
-                  key={i}
-                  className="px-4 py-2 d-flex align-items-center justify-content-between border-bottom flex justify-between items-center text-xs font-semibold border-b border-slate-100 dark:border-slate-800/50 last:border-b-0 last:pb-3"
-                >
-                  <p className="text-slate-700 dark:text-slate-300 d-flex align-items-center mb-0 flex items-center">
-                    <span className="h-2 w-2 rounded-full mr-2 inline-block" style={{ backgroundColor: d.color }} />
-                    {d.name}
-                  </p>
-                  <p className="text-slate-900 dark:text-white font-bold mb-0">{formatStat(d.count)}</p>
-                </div>
-              ))}
-            </div>
+            {/* Legend breakdown list */}
+            {donutData.length > 0 && (
+              <div className="mb-1 border-t border-slate-100 dark:border-slate-800/80">
+                {donutData.map((d, i) => (
+                  <div
+                    key={i}
+                    className="px-4 py-2 d-flex align-items-center justify-content-between border-bottom flex justify-between items-center text-xs font-semibold border-b border-slate-100 dark:border-slate-800/50 last:border-b-0 last:pb-3"
+                  >
+                    <p className="text-slate-700 dark:text-slate-300 d-flex align-items-center mb-0 flex items-center">
+                      <span className="h-2 w-2 rounded-full mr-2 inline-block" style={{ backgroundColor: d.color }} />
+                      {d.name}
+                    </p>
+                    <p className="text-slate-900 dark:text-white font-bold mb-0">{formatStat(d.count)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
 
@@ -578,15 +524,17 @@ export function DashboardView({
             <div>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Revenue</p>
               <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2.5">
-                {stats.pipeline.wonValue > 0 ? money(stats.pipeline.wonValue) : "$15,44,540"}
+                {money(stats.pipeline.wonValue)}
               </h4>
             </div>
-            
+
             <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="inline-flex items-center py-0.5 px-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-full">
-                +2.5%
-              </span>
-              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">From Last Week</p>
+              {stats.revenueTrendPct !== null && (
+                <span className={cn("inline-flex items-center py-0.5 px-2 text-[10px] font-bold rounded-full", stats.revenueTrendPct >= 0 ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400" : "bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400")}>
+                  {stats.revenueTrendPct >= 0 ? "+" : ""}{stats.revenueTrendPct}%
+                </span>
+              )}
+              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">{stats.revenueTrendPct !== null ? "vs Last Month" : "No prior month to compare"}</p>
             </div>
 
             <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-gradient-to-tr from-rose-500 to-orange-500 text-white flex items-center justify-center shadow-sm">
@@ -601,15 +549,12 @@ export function DashboardView({
             <div>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Active Deals</p>
               <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2.5">
-                {stats.pipeline.openCount > 0 ? formatStat(stats.pipeline.openCount) : "147"}
+                {formatStat(stats.pipeline.openCount)}
               </h4>
             </div>
-            
+
             <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="inline-flex items-center py-0.5 px-2 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-[10px] font-bold rounded-full">
-                -21.15%
-              </span>
-              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">From Last Week</p>
+              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">{money(stats.pipeline.openValue)} open value</p>
             </div>
 
             <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-sm">
@@ -624,15 +569,17 @@ export function DashboardView({
             <div>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Conversion Rate</p>
               <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2.5">
-                {stats.conversionRate > 0 ? `${stats.conversionRate}%` : "32.8%"}
+                {stats.conversionRate}%
               </h4>
             </div>
-            
+
             <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="inline-flex items-center py-0.5 px-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-full">
-                +15.5%
-              </span>
-              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">From Last Week</p>
+              {stats.conversionTrendPct !== null && (
+                <span className={cn("inline-flex items-center py-0.5 px-2 text-[10px] font-bold rounded-full", stats.conversionTrendPct >= 0 ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400" : "bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400")}>
+                  {stats.conversionTrendPct >= 0 ? "+" : ""}{stats.conversionTrendPct}%
+                </span>
+              )}
+              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">{stats.conversionTrendPct !== null ? "vs Last Month" : "No prior month to compare"}</p>
             </div>
 
             <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-gradient-to-tr from-pink-500 to-rose-500 text-white flex items-center justify-center shadow-sm">
@@ -649,19 +596,21 @@ export function DashboardView({
               <div>
                 <div className="flex items-center gap-1.5">
                   <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                    {stats.totalLeads > 0 ? formatStat(stats.totalLeads) : "4,569"}
+                    {formatStat(stats.totalLeads)}
                   </h4>
-                  <span className="inline-flex items-center py-0.5 px-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold rounded-full">
-                    +2.5%
-                  </span>
+                  {stats.leadsDelta !== undefined && (
+                    <span className={cn("inline-flex items-center py-0.5 px-2 text-[9px] font-bold rounded-full", stats.leadsDelta >= 0 ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400" : "bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400")}>
+                      {stats.leadsDelta >= 0 ? "+" : ""}{stats.leadsDelta}%
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">Total Contacts</p>
               </div>
-              
-              {/* Sparkline mini-bar chart on the right side of the card */}
+
+              {/* Real sparkline — new leads per day, last 7 days */}
               <div className="h-[35px] w-[65px] flex-shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sparklineData}>
+                  <BarChart data={stats.contactsSparkline.map((v) => ({ value: v }))}>
                     <Bar dataKey="value" fill="#EA580C" radius={[1.5, 1.5, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -669,21 +618,7 @@ export function DashboardView({
             </div>
 
             <div className="flex items-center gap-2 text-xs flex-wrap mt-auto">
-              <div className="avatar-list-stacked avatar-group-sm flex -space-x-1 items-center">
-                <span className="h-5 w-5 rounded-full border border-white dark:border-[#0c0d21] bg-slate-100 flex items-center justify-center text-[8px] overflow-hidden">
-                  <img src="assets/img/profiles/avatar-03.jpg" alt="user" className="h-full w-full object-cover" />
-                </span>
-                <span className="h-5 w-5 rounded-full border border-white dark:border-[#0c0d21] bg-slate-100 flex items-center justify-center text-[8px] overflow-hidden">
-                  <img src="assets/img/profiles/avatar-05.jpg" alt="user" className="h-full w-full object-cover" />
-                </span>
-                <span className="h-5 w-5 rounded-full border border-white dark:border-[#0c0d21] bg-slate-100 flex items-center justify-center text-[8px] overflow-hidden">
-                  <img src="assets/img/profiles/avatar-01.jpg" alt="user" className="h-full w-full object-cover" />
-                </span>
-                <a className="h-5 w-5 rounded-full border border-white dark:border-[#0c0d21] bg-slate-200 text-slate-700 text-[8px] font-bold flex items-center justify-center cursor-pointer" href="javascript:void(0);">
-                  +4
-                </a>
-              </div>
-              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">From Last Week</p>
+              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">{stats.leadsDelta !== undefined ? "vs Last Month" : "New leads, last 7 days"}</p>
             </div>
 
           </div>
@@ -708,20 +643,24 @@ export function DashboardView({
             </div>
 
             <div className="space-y-4 flex-1">
-              {topDealsData.map((deal, idx) => (
-                <div key={idx} className="flex items-center justify-between text-xs font-semibold">
-                  <div className="flex items-center gap-2.5">
-                    <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0", deal.bg)}>
-                      {deal.initial}
+              {topDealsData.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-8">No deals yet — convert a lead to start your pipeline.</p>
+              ) : (
+                topDealsData.map((deal, idx) => (
+                  <div key={deal.id} className="flex items-center justify-between text-xs font-semibold">
+                    <div className="flex items-center gap-2.5">
+                      <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0", AVATAR_COLORS[idx % AVATAR_COLORS.length])}>
+                        {deal.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-slate-800 dark:text-slate-200 font-bold truncate leading-none mb-1">{deal.name}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{deal.company || "—"}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-slate-800 dark:text-slate-200 font-bold truncate leading-none mb-1">{deal.name}</p>
-                      <p className="text-[10px] text-slate-400 font-medium">{deal.country}</p>
-                    </div>
+                    <p className="text-slate-900 dark:text-white font-bold">{money(deal.deal_value)}</p>
                   </div>
-                  <p className="text-slate-900 dark:text-white font-bold">{money(deal.value)}</p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <button
@@ -748,45 +687,39 @@ export function DashboardView({
             </div>
 
             <div className="grid grid-cols-4 gap-1.5 mb-3.5 text-center">
-              {pipelineStats.map((item, i) => (
+              {stats.pipelineBuckets.map((b, i) => (
                 <div key={i} className="min-w-0">
-                  <p className="text-[10px] text-slate-400 font-medium mb-1 truncate">{item.label}</p>
-                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate mb-0.5">{item.value}</p>
-                  <p className="text-[9px] text-slate-500 truncate font-semibold">{item.count}</p>
+                  <p className="text-[10px] text-slate-400 font-medium mb-1 truncate">{b.label}</p>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate mb-0.5">{money(b.value)}</p>
+                  <p className="text-[9px] text-slate-500 truncate font-semibold">{b.count} Deals</p>
                 </div>
               ))}
             </div>
 
             <div className="h-[75px] w-full mt-1 pr-2">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pipelineChartData}>
-                  <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-                    {pipelineChartData.map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
+                <BarChart data={stats.pipelineBuckets.map((b) => ({ name: b.label, value: b.value }))}>
+                  <Bar dataKey="value" radius={[3, 3, 0, 0]} fill="#EA580C" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
 
-          {/* Bottom Half: Profit Earned */}
+          {/* Bottom Half: Win Rate — real, replaces a fabricated "Profit Earned" figure */}
           <Card className="bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl overflow-hidden p-4 sm:p-5 flex flex-col justify-between h-[150px]">
             <div className="flex items-center justify-between mb-2">
               <h5 className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                Profit Earned <span className="text-slate-900 dark:text-white text-sm font-black ml-1">$85K</span>
+                Win Rate <span className="text-slate-900 dark:text-white text-sm font-black ml-1">{stats.pipeline.winRate}%</span>
               </h5>
               <div className="text-slate-400 dark:text-slate-500 text-[10px] font-semibold">
-                2025
+                {stats.pipeline.wonCount} Won
               </div>
             </div>
-
-            <div className="h-[60px] w-full mt-1.5 pr-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={profitChartData}>
-                  <Bar dataKey="value" fill="#EA580C" radius={[1.5, 1.5, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="flex-1 flex flex-col justify-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <div className="w-full bg-slate-100 dark:bg-slate-900 rounded-full h-2.5 border border-slate-200 dark:border-slate-800">
+                <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${stats.pipeline.winRate}%` }} />
+              </div>
+              <p>{formatStat(stats.snapshot.emailsSent)} emails sent · {formatStat(stats.snapshot.repliesReceived)} replies</p>
             </div>
           </Card>
         </div>
@@ -807,58 +740,60 @@ export function DashboardView({
               </button>
             </div>
 
-            {/* Horizontal progress stacked bar */}
-            <div className="flex h-3.5 w-full bg-slate-100 dark:bg-slate-800 rounded-md overflow-hidden gap-0.5 mb-4">
-              <div className="bg-teal-500" style={{ width: "38%" }} title="Successful" />
-              <div className="bg-sky-500" style={{ width: "24%" }} title="Pending" />
-              <div className="bg-amber-500" style={{ width: "23%" }} title="Referral" />
-              <div className="bg-purple-500" style={{ width: "15%" }} title="Social" />
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap mb-4 text-xs font-semibold">
-              <h4 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">2656</h4>
-              <span className="inline-flex items-center py-0.5 px-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-full">
-                +12.5%
-              </span>
-              <p className="text-slate-400 dark:text-slate-500 mb-0 font-medium">compared to last week</p>
-            </div>
-
-            {/* Breakdown detail list */}
-            <div className="space-y-3 flex-1 mb-4">
-              {[
-                { name: "Successful Deals", count: "1000 Deals", color: "bg-teal-500" },
-                { name: "Pending Deals", count: "1056 Deals", color: "bg-sky-500" },
-                { name: "Rejected Deals", count: "500 Deals", color: "bg-purple-500" },
-                { name: "Upcoming Deals", count: "100 Deals", color: "bg-rose-500" }
-              ].map((item, i) => (
-                <div key={i} className="flex justify-between items-center text-xs font-semibold pb-1.5 border-b border-slate-100 dark:border-slate-800/40 last:border-0 last:pb-0">
-                  <div className="flex items-center">
-                    <span className={cn("h-2 w-2 rounded-full mr-2 inline-block", item.color)} />
-                    <span className="text-slate-600 dark:text-slate-400">{item.name}</span>
+            {(() => {
+              const { successfulCount, successfulValue, pendingCount, pendingValue, rejectedCount, rejectedValue } = stats.dealsOverview;
+              const total = successfulCount + pendingCount + rejectedCount;
+              const pct = (n: number) => (total > 0 ? Math.round((n / total) * 1000) / 10 : 0);
+              return (
+                <>
+                  {/* Horizontal progress stacked bar — real, all-time deal outcomes */}
+                  <div className="flex h-3.5 w-full bg-slate-100 dark:bg-slate-800 rounded-md overflow-hidden gap-0.5 mb-4">
+                    <div className="bg-teal-500" style={{ width: `${pct(successfulCount)}%` }} title="Successful" />
+                    <div className="bg-sky-500" style={{ width: `${pct(pendingCount)}%` }} title="Pending" />
+                    <div className="bg-rose-500" style={{ width: `${pct(rejectedCount)}%` }} title="Rejected" />
                   </div>
-                  <span className="text-slate-900 dark:text-white font-bold">{item.count}</span>
-                </div>
-              ))}
-            </div>
 
-            {/* Deals won horizontal card */}
-            <div className="p-3 border border-slate-150 dark:border-slate-800/80 rounded-lg bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between text-xs font-semibold">
-              <div>
-                <p className="text-slate-400 dark:text-slate-500 font-medium mb-1">Deals Won</p>
-                <h4 className="text-sm font-black text-slate-900 dark:text-white mb-0">689</h4>
-              </div>
-              <div className="avatar-group-sm flex -space-x-1.5 items-center">
-                <span className="h-6 w-6 rounded-full border border-white dark:border-[#0c0d21] bg-slate-100 flex items-center justify-center overflow-hidden">
-                  <img src="assets/img/profiles/avatar-03.jpg" alt="c1" className="h-full w-full object-cover" />
-                </span>
-                <span className="h-6 w-6 rounded-full border border-white dark:border-[#0c0d21] bg-slate-100 flex items-center justify-center overflow-hidden">
-                  <img src="assets/img/profiles/avatar-05.jpg" alt="c2" className="h-full w-full object-cover" />
-                </span>
-                <span className="h-6 w-6 rounded-full border border-white dark:border-[#0c0d21] bg-slate-100 flex items-center justify-center overflow-hidden">
-                  <img src="assets/img/profiles/avatar-01.jpg" alt="c3" className="h-full w-full object-cover" />
-                </span>
-              </div>
-            </div>
+                  <div className="flex items-center gap-2 flex-wrap mb-4 text-xs font-semibold">
+                    <h4 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">{formatStat(total)}</h4>
+                    <p className="text-slate-400 dark:text-slate-500 mb-0 font-medium">total opportunities, all time</p>
+                  </div>
+
+                  {/* Breakdown detail list — real counts + values */}
+                  <div className="space-y-3 flex-1 mb-4">
+                    {[
+                      { name: "Successful Deals", count: successfulCount, value: successfulValue, color: "bg-teal-500" },
+                      { name: "Pending Deals", count: pendingCount, value: pendingValue, color: "bg-sky-500" },
+                      { name: "Rejected Deals", count: rejectedCount, value: rejectedValue, color: "bg-rose-500" },
+                    ].map((item, i) => (
+                      <div key={i} className="flex justify-between items-center text-xs font-semibold pb-1.5 border-b border-slate-100 dark:border-slate-800/40 last:border-0 last:pb-0">
+                        <div className="flex items-center">
+                          <span className={cn("h-2 w-2 rounded-full mr-2 inline-block", item.color)} />
+                          <span className="text-slate-600 dark:text-slate-400">{item.name}</span>
+                        </div>
+                        <span className="text-slate-900 dark:text-white font-bold">{item.count} · {money(item.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Team performance — real, replaces a fabricated avatar/count card */}
+                  <div className="p-3 border border-slate-150 dark:border-slate-800/80 rounded-lg bg-slate-50/50 dark:bg-slate-900/30 text-xs font-semibold">
+                    <p className="text-slate-400 dark:text-slate-500 font-medium mb-2">Top Performers (all-time won)</p>
+                    {teamPerformance.length === 0 ? (
+                      <p className="text-slate-400 text-[11px]">No deals assigned to an owner yet.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {teamPerformance.slice(0, 3).map((rep, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <span className="text-slate-700 dark:text-slate-300">{rep.name}</span>
+                            <span className="text-slate-900 dark:text-white font-bold">{money(rep.wonValue)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </Card>
 
@@ -880,48 +815,90 @@ export function DashboardView({
         </div>
 
         {/* Responsive deals table */}
-        <div className="overflow-x-auto w-full">
-          <table className="w-full min-w-[700px] border border-slate-100 dark:border-slate-800">
-            <thead>
-              <tr className="bg-slate-50/50 dark:bg-slate-900/30 text-left border-b border-slate-100 dark:border-slate-800">
-                {["Deal Name", "Stage", "Deal Value", "Tags", "Owner", "Probability", "Status"].map((h) => (
-                  <th key={h} className="py-2.5 px-3 text-xs font-bold text-slate-600 dark:text-slate-400">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {recentDealsTableData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-colors">
-                  <td className="py-2.5 px-3 truncate max-w-[150px]">{row.name}</td>
-                  <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{row.stage}</td>
-                  <td className="py-2.5 px-3 text-slate-900 dark:text-white font-bold">{money(row.value)}</td>
-                  <td className="py-2.5 px-3">
-                    <span className={cn("px-2 py-0.5 rounded text-[10px] font-medium border", row.tagColor)}>
-                      {row.tag}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className={cn("h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-bold", row.avatarBg)}>
-                        {row.avatar}
-                      </div>
-                      <span>{row.owner}</span>
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{row.probability}</td>
-                  <td className="py-2.5 px-3">
-                    <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold", row.statusColor)}>
-                      {row.status}
-                    </span>
-                  </td>
+        {recentDealsTableData.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-8">No deals yet — convert a lead to start your pipeline.</p>
+        ) : (
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[600px] border border-slate-100 dark:border-slate-800">
+              <thead>
+                <tr className="bg-slate-50/50 dark:bg-slate-900/30 text-left border-b border-slate-100 dark:border-slate-800">
+                  {["Deal Name", "Stage", "Deal Value", "Contact", "Status"].map((h) => (
+                    <th key={h} className="py-2.5 px-3 text-xs font-bold text-slate-600 dark:text-slate-400">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {recentDealsTableData.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-colors">
+                    <td className="py-2.5 px-3 truncate max-w-[150px]">{row.name}</td>
+                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{row.stage}</td>
+                    <td className="py-2.5 px-3 text-slate-900 dark:text-white font-bold">{money(row.value)}</td>
+                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{row.contact}</td>
+                    <td className="py-2.5 px-3">
+                      <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold", row.statusColor)}>
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
+
+      {/* Upcoming Meetings & AI Credits — real data now available from page.tsx */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <Card className="bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl overflow-hidden p-4 sm:p-5">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/85 mb-3.5">
+            <h5 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span className="h-4 w-1 bg-rose-500 rounded-full inline-block" />
+              Upcoming Meetings
+            </h5>
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 dark:bg-slate-900/50 px-2 py-0.5 rounded-md border border-slate-100 dark:border-slate-800">
+              {upcomingMeetings.length} Scheduled
+            </span>
+          </div>
+          {upcomingMeetings.length === 0 ? (
+            <p className="text-xs text-slate-400 text-center py-6">Nothing scheduled — book a meeting to see it here.</p>
+          ) : (
+            <div className="space-y-3">
+              {upcomingMeetings.slice(0, 4).map((m) => (
+                <div key={m.id} className="flex items-center justify-between text-xs font-semibold pb-2 border-b border-slate-100 dark:border-slate-800/40 last:border-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="text-slate-800 dark:text-slate-200 font-bold truncate">{m.title}</p>
+                    <p className="text-[10px] text-slate-400">{new Date(m.start_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                  </div>
+                  {m.join_url && (
+                    <a href={m.join_url} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 rounded text-[10px] font-bold flex-shrink-0">
+                      Join
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card className="bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl overflow-hidden p-4 sm:p-5">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/85 mb-3.5">
+            <h5 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span className="h-4 w-1 bg-rose-500 rounded-full inline-block" />
+              AI Credits
+            </h5>
+            <span className="text-[10px] font-bold text-slate-400 uppercase">{credits.planId} plan</span>
+          </div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <h4 className="text-xl font-black text-slate-900 dark:text-white">{formatStat(credits.total - credits.used)}</h4>
+            <p className="text-xs text-slate-400 font-medium">of {formatStat(credits.total)} remaining</p>
+          </div>
+          <div className="w-full bg-slate-100 dark:bg-slate-900 rounded-full h-2.5 border border-slate-200 dark:border-slate-800">
+            <div className="bg-rose-500 h-2 rounded-full" style={{ width: `${credits.total > 0 ? Math.min(100, Math.round((credits.used / credits.total) * 100)) : 0}%` }} />
+          </div>
+        </Card>
+      </div>
 
     </div>
   );

@@ -256,6 +256,22 @@ export function AddLeadsWizard({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open, initialSource]);
 
+  useEffect(() => {
+    if (open) {
+      const mainEl = document.querySelector("main");
+      if (mainEl) {
+        const originalOverflow = mainEl.style.overflow;
+        const originalOverflowY = mainEl.style.overflowY;
+        mainEl.style.overflow = "hidden";
+        mainEl.style.overflowY = "hidden";
+        return () => {
+          mainEl.style.overflow = originalOverflow;
+          mainEl.style.overflowY = originalOverflowY;
+        };
+      }
+    }
+  }, [open]);
+
   if (!open) return null;
 
   function handleConnectLinkedIn() {

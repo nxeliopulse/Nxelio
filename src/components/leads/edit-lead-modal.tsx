@@ -37,6 +37,7 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
     state: lead.state || "",
     country: lead.country || "",
     postal_code: lead.postal_code || "",
+    message: lead.message || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +55,22 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
     getPicklistValues("lead_company_size").then(setCompanySizeBuckets).catch(() => {});
     getPicklistValues("lead_seniority").then(setSeniorityLevels).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      const mainEl = document.querySelector("main");
+      if (mainEl) {
+        const originalOverflow = mainEl.style.overflow;
+        const originalOverflowY = mainEl.style.overflowY;
+        mainEl.style.overflow = "hidden";
+        mainEl.style.overflowY = "hidden";
+        return () => {
+          mainEl.style.overflow = originalOverflow;
+          mainEl.style.overflowY = originalOverflowY;
+        };
+      }
+    }
+  }, [open]);
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -92,6 +109,7 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
         state: form.state.trim() || null,
         country: form.country.trim() || null,
         postal_code: form.postal_code.trim() || null,
+        message: form.message.trim() || null,
       });
       toast("Lead updated.", "success");
       onClose();
@@ -218,6 +236,15 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
             <div>
               <label className={label}>Postal code</label>
               <input className={field} value={form.postal_code} onChange={(e) => set("postal_code", e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <label className={label}>About (Message / Request)</label>
+              <textarea
+                className={`${field} min-h-[80px] resize-y`}
+                value={form.message}
+                onChange={(e) => set("message", e.target.value)}
+                placeholder="What is the lead interested in?"
+              />
             </div>
           </div>
         </div>

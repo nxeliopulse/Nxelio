@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition, useRef, useEffect } from "react";
+import { useState, useTransition, useRef, useEffect, useOptimistic } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, type LucideIcon } from "lucide-react";
@@ -123,6 +123,11 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [optimisticLeads, setOptimisticLeads] = useOptimistic(
+    leads,
+    (state, update: { id: string; is_favorite: boolean }) =>
+      state.map((l) => (l.id === update.id ? { ...l, is_favorite: update.is_favorite } : l))
+  );
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState(initialSearch ?? "");
   const [industryFilter, setIndustryFilter] = useState("");
@@ -181,7 +186,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
 
   async function handleBulkFindCompany() {
     const targetList = selected.length > 0
-      ? leads.filter((l) => selected.includes(l.id) && !l.company_name)
+      ? optimisticLeads.filter((l) => selected.includes(l.id) && !l.company_name)
       : filtered.filter((l) => !l.company_name);
 
     if (!targetList.length) {
@@ -384,7 +389,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   function runAiColumnOnAll(columnId: string) {
     setAiColMenu(null);
     setRunningColumnId(columnId);
-    setRunProgress({ columnId, done: 0, total: leads.length });
+    setRunProgress({ columnId, done: 0, total: optimisticLeads.length });
 
     const poll = setInterval(async () => {
       const p = await getAiColumnProgress(columnId);
@@ -421,7 +426,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
 
   const activeColumnFilterKeys = (Object.keys(columnFilters) as ColKey[]).filter((k) => columnFilters[k]);
 
-  const baseFiltered = leads.filter((l) => {
+  const baseFiltered = optimisticLeads.filter((l) => {
     const name = l.full_name || l.company_name || "";
     const q = search.toLowerCase();
     const matchSearch =
@@ -593,7 +598,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   const toggleAll = () =>
     setSelected(selected.length === filtered.length ? [] : filtered.map((l) => l.id));
 
-  const selectedLeads = leads.filter((l) => selected.includes(l.id));
+  const selectedLeads = optimisticLeads.filter((l) => selected.includes(l.id));
   const selectedWithEmail = selectedLeads.filter((l) => l.email).length;
   const selectedMissingEmail = selectedLeads.length - selectedWithEmail;
 
@@ -719,9 +724,15 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
   }
 
   function toggleFavorite(lead: LeadRow) {
+    const nextFavorite = !lead.is_favorite;
     start(async () => {
-      await updateLead(lead.id, { is_favorite: !lead.is_favorite });
-      router.refresh();
+      setOptimisticLeads({ id: lead.id, is_favorite: nextFavorite });
+      try {
+        await updateLead(lead.id, { is_favorite: nextFavorite });
+        router.refresh();
+      } catch (err) {
+        toast("Failed to update favorite status", "error");
+      }
     });
   }
 
@@ -912,7 +923,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Leads
             <span className="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-0.5">
-              {leads.length}
+              {optimisticLeads.length}
             </span>
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -952,7 +963,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
           <p className="text-sm text-blue-900">
-            Showing <span className="font-semibold">{leads.length}</span> lead{leads.length === 1 ? "" : "s"} in campaign <span className="font-semibold">{campaignFilter.name}</span>
+            Showing <span className="font-semibold">{optimisticLeads.length}</span> lead{optimisticLeads.length === 1 ? "" : "s"} in campaign <span className="font-semibold">{campaignFilter.name}</span>
             <span className="text-blue-700/70"> · click a lead to see its email stages</span>
           </p>
           <Link href="/leads" className="text-sm font-medium text-blue-700 hover:text-blue-900">Clear filter ✕</Link>
@@ -1426,7 +1437,7 @@ export function LeadsTable({ leads, campaignFilter, initialSearch, aiColumns = [
           <div className="fixed inset-0 z-40" onClick={() => setRowMenu(null)} />
           <div className="fixed z-50 w-36 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-1" style={{ top: rowMenu.top, left: rowMenu.left }}>
             <button
-              onClick={() => { const id = rowMenu.id; const lead = paged.find((x) => x.id === id) || leads.find((x) => x.id === id); setRowMenu(null); if (lead) setEditingLead(lead); }}
+              onClick={() => { const id = rowMenu.id; const lead = paged.find((x) => x.id === id) || optimisticLeads.find((x) => x.id === id); setRowMenu(null); if (lead) setEditingLead(lead); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <Pencil className="h-3.5 w-3.5" /> Edit

@@ -14,9 +14,41 @@ export interface DashboardStats {
   snapshot: { emailsSent: number; repliesReceived: number; hotLeads: number; aiScored: number };
   pipeline: { openValue: number; openCount: number; wonValue: number; wonCount: number; winRate: number };
   campaignTypes: { campaigns: number; newsletters: number; segments: number; workflows: number };
+  /** Won deal value ("Revenue") vs. new opportunity value created ("Pipeline") per period — real, grouped by day/month/year. */
+  revenueSeries: {
+    weekly: { day: string; Revenue: number; Pipeline: number }[];
+    monthly: { day: string; Revenue: number; Pipeline: number }[];
+    yearly: { day: string; Revenue: number; Pipeline: number }[];
+  };
+  /** Real lead.source breakdown — top 4 + an "Other" bucket for the rest. */
+  trafficSources: { name: string; value: number; count: number }[];
+  /** Stage-grouped open pipeline (Lead/Proposal/Sales), plus Won closed this calendar month. */
+  pipelineBuckets: { label: string; value: number; count: number }[];
+  /** All-time, mutually-exclusive deal outcome buckets. */
+  dealsOverview: { successfulCount: number; successfulValue: number; pendingCount: number; pendingValue: number; rejectedCount: number; rejectedValue: number };
+  /** New-lead counts for the last 7 days, oldest first — real sparkline data. */
+  contactsSparkline: number[];
+  /** Month-over-month % change; null when there's no prior-month data to compare against. */
+  revenueTrendPct: number | null;
+  conversionTrendPct: number | null;
+  /** All-time deal count + won revenue per owner_id — names are resolved by the caller
+   *  (page.tsx already fetches the real user list; join here would duplicate that lookup). */
+  teamPerformance: { ownerId: string; dealsCount: number; wonValue: number }[];
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Never surface the underlying data-provider's name in the product — matches
+ *  the same rule applied to a single lead's source in lead-detail.ts. */
+function brandSource(source: string | null): string {
+  if (!source) return "Unknown";
+  return source.replace(/bright\s*data/gi, "BILEADS Kit");
+}
+
+function pctChange(current: number, previous: number): number | null {
+  if (!previous) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   const supabase = await createClient();
@@ -26,7 +58,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     { count: replyCount }, { data: opps },
     { count: campaignCount }, { count: newsletterCount }, { count: segmentCount }, { count: workflowCount },
   ] = await Promise.all([
-    supabase.from("leads").select("id, full_name, company_name, lead_score, status, created_at"),
+    supabase.from("leads").select("id, full_name, company_name, lead_score, status, source, created_at"),
     supabase.from("campaigns").select("campaign_name, sent_count, open_rate, reply_rate").order("sent_count", { ascending: false }).limit(5),
     supabase.from("lead_activities")
       .select("id, activity_type, created_at, leads(full_name, company_name)")
@@ -34,18 +66,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .limit(8),
     supabase.from("campaigns").select("sent_count"),
     supabase.from("inbox_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound"),
-    supabase.from("opportunities").select("deal_value, stage"),
+    supabase.from("opportunities").select("deal_value, stage, created_at, closed_at, owner_id"),
     supabase.from("campaigns").select("id", { count: "exact", head: true }),
     supabase.from("newsletters").select("id", { count: "exact", head: true }),
     supabase.from("segments").select("id", { count: "exact", head: true }),
     supabase.from("workflows").select("id", { count: "exact", head: true }),
   ]);
 
-  const oppRows = (opps as { deal_value: number; stage: string }[]) || [];
+  const oppRows = (opps as { deal_value: number; stage: string; created_at: string; closed_at: string | null; owner_id: string | null }[]) || [];
   const openOpps = oppRows.filter((o) => o.stage !== "won" && o.stage !== "lost");
   const wonOpps = oppRows.filter((o) => o.stage === "won");
-  const lostCount = oppRows.filter((o) => o.stage === "lost").length;
-  const closedCount = wonOpps.length + lostCount;
+  const lostOpps = oppRows.filter((o) => o.stage === "lost");
+  const closedCount = wonOpps.length + lostOpps.length;
   const pipeline = {
     openValue: openOpps.reduce((s, o) => s + Number(o.deal_value || 0), 0),
     openCount: openOpps.length,
@@ -65,7 +97,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     : 0;
 
   const now = new Date();
-  const months: { date: string; leads: number; hot: number }[] = [];
+  const months: { date: string; leads: number; hot: number; converted: number; wonValue: number; pipelineValue: number }[] = [];
   for (let i = 4; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const start = d.getTime();
@@ -74,10 +106,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       const t = new Date(l.created_at).getTime();
       return t >= start && t < end;
     });
+    const monthWon = wonOpps.filter((o) => o.closed_at && new Date(o.closed_at).getTime() >= start && new Date(o.closed_at).getTime() < end);
+    const monthCreatedOpps = oppRows.filter((o) => {
+      const t = new Date(o.created_at).getTime();
+      return t >= start && t < end;
+    });
     months.push({
       date: MONTHS[d.getMonth()],
       leads: monthLeads.length,
       hot: monthLeads.filter((l) => l.status === "Hot").length,
+      converted: monthLeads.filter((l) => l.status === "Converted").length,
+      wonValue: monthWon.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+      pipelineValue: monthCreatedOpps.reduce((s, o) => s + Number(o.deal_value || 0), 0),
     });
   }
 
@@ -86,6 +126,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const leadsDelta = lastMonthLeads > 0
     ? Math.round(((thisMonthLeads - lastMonthLeads) / lastMonthLeads) * 1000) / 10
     : undefined;
+
+  const revenueTrendPct = pctChange(months[months.length - 1]?.wonValue ?? 0, months[months.length - 2]?.wonValue ?? 0);
+  const thisMonthConvRate = thisMonthLeads ? (months[months.length - 1].converted / thisMonthLeads) * 100 : 0;
+  const lastMonthConvRate = lastMonthLeads ? (months[months.length - 2].converted / lastMonthLeads) * 100 : 0;
+  const conversionTrendPct = pctChange(thisMonthConvRate, lastMonthConvRate);
 
   const emailsSent = (allCampaigns || []).reduce((s, c) => s + (c.sent_count || 0), 0);
   const aiScored = (leads || []).filter((l) => (l.lead_score || 0) > 0).length;
@@ -116,6 +161,102 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       score: l.lead_score || 0,
     }));
 
+  // ── Revenue Analytics chart (weekly/monthly/yearly), real for all three ──
+  const dayMs = 24 * 60 * 60 * 1000;
+  const weekly: { day: string; Revenue: number; Pipeline: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).getTime();
+    const dayEnd = dayStart + dayMs;
+    const wonThatDay = wonOpps.filter((o) => o.closed_at && new Date(o.closed_at).getTime() >= dayStart && new Date(o.closed_at).getTime() < dayEnd);
+    const createdThatDay = oppRows.filter((o) => new Date(o.created_at).getTime() >= dayStart && new Date(o.created_at).getTime() < dayEnd);
+    weekly.push({
+      day: new Date(dayStart).toLocaleDateString("en-US", { weekday: "short" }),
+      Revenue: wonThatDay.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+      Pipeline: createdThatDay.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+    });
+  }
+  const monthly = months.map((m) => ({ day: m.date, Revenue: m.wonValue, Pipeline: m.pipelineValue }));
+  const years = new Set<number>();
+  for (const o of oppRows) years.add(new Date(o.created_at).getFullYear());
+  years.add(now.getFullYear());
+  const yearly = [...years].sort().slice(-3).map((y) => {
+    const yStart = new Date(y, 0, 1).getTime();
+    const yEnd = new Date(y + 1, 0, 1).getTime();
+    const wonThatYear = wonOpps.filter((o) => o.closed_at && new Date(o.closed_at).getTime() >= yStart && new Date(o.closed_at).getTime() < yEnd);
+    const createdThatYear = oppRows.filter((o) => new Date(o.created_at).getTime() >= yStart && new Date(o.created_at).getTime() < yEnd);
+    return {
+      day: String(y),
+      Revenue: wonThatYear.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+      Pipeline: createdThatYear.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+    };
+  });
+
+  // ── Traffic Sources — real lead.source breakdown, top 4 + Other ──
+  const sourceCounts = new Map<string, number>();
+  for (const l of (leads || []) as { source: string | null }[]) {
+    const label = brandSource(l.source);
+    sourceCounts.set(label, (sourceCounts.get(label) || 0) + 1);
+  }
+  const sortedSources = [...sourceCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const topSources = sortedSources.slice(0, 4);
+  const otherCount = sortedSources.slice(4).reduce((s, [, c]) => s + c, 0);
+  if (otherCount > 0) topSources.push(["Other", otherCount]);
+  const sourceTotal = totalLeads || 1;
+  const trafficSources = topSources.map(([name, count]) => ({
+    name,
+    count,
+    value: Math.round((count / sourceTotal) * 1000) / 10,
+  }));
+
+  // ── Pipeline Statistics — real stage-grouped buckets, Won scoped to this calendar month ──
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const bucketDefs: { label: string; stages: string[] }[] = [
+    { label: "Lead", stages: ["new", "qualified"] },
+    { label: "Proposal", stages: ["meeting_scheduled", "proposal_sent"] },
+    { label: "Sales", stages: ["negotiation"] },
+  ];
+  const pipelineBuckets = bucketDefs.map((b) => {
+    const rows = openOpps.filter((o) => b.stages.includes(o.stage));
+    return { label: b.label, value: rows.reduce((s, o) => s + Number(o.deal_value || 0), 0), count: rows.length };
+  });
+  const wonThisMonth = wonOpps.filter((o) => o.closed_at && new Date(o.closed_at).getTime() >= monthStart);
+  pipelineBuckets.push({ label: "Won", value: wonThisMonth.reduce((s, o) => s + Number(o.deal_value || 0), 0), count: wonThisMonth.length });
+
+  // ── Deals Overview — real, all-time, 3 mutually-exclusive buckets ──
+  const dealsOverview = {
+    successfulCount: wonOpps.length,
+    successfulValue: pipeline.wonValue,
+    pendingCount: openOpps.length,
+    pendingValue: pipeline.openValue,
+    rejectedCount: lostOpps.length,
+    rejectedValue: lostOpps.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+  };
+
+  // ── Total Contacts sparkline — real new-lead counts, last 7 days ──
+  const contactsSparkline: number[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).getTime();
+    const dayEnd = dayStart + dayMs;
+    contactsSparkline.push((leads || []).filter((l) => {
+      const t = new Date(l.created_at).getTime();
+      return t >= dayStart && t < dayEnd;
+    }).length);
+  }
+
+  // ── Team Performance — real per-owner deal counts + won revenue, top 4 by revenue ──
+  const byOwner = new Map<string, { dealsCount: number; wonValue: number }>();
+  for (const o of oppRows) {
+    if (!o.owner_id) continue;
+    const entry = byOwner.get(o.owner_id) || { dealsCount: 0, wonValue: 0 };
+    entry.dealsCount += 1;
+    if (o.stage === "won") entry.wonValue += Number(o.deal_value || 0);
+    byOwner.set(o.owner_id, entry);
+  }
+  const teamPerformance = [...byOwner.entries()]
+    .map(([ownerId, v]) => ({ ownerId, ...v }))
+    .sort((a, b) => b.wonValue - a.wonValue)
+    .slice(0, 4);
+
   return {
     totalLeads, hotLeads, avgOpenRate, conversionRate,
     leadGrowth: months, campaignPerf, recentActivities, hotLeadAlerts,
@@ -124,6 +265,14 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       campaigns: campaignCount || 0, newsletters: newsletterCount || 0,
       segments: segmentCount || 0, workflows: workflowCount || 0,
     },
+    revenueSeries: { weekly, monthly, yearly },
+    trafficSources,
+    pipelineBuckets,
+    dealsOverview,
+    contactsSparkline,
+    revenueTrendPct,
+    conversionTrendPct,
+    teamPerformance,
   };
 }
 
