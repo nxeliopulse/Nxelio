@@ -269,6 +269,29 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
 
   return (
     <div>
+      {/* Account identity strip — shown on every step (not just step 1's profile
+          fields) so someone signed into more than one Nxelio account can tell
+          which one they're setting up without having to guess. */}
+      {status.profile && (
+        <div className="flex items-center justify-end gap-2 mb-3">
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white pl-1.5 pr-3.5 py-1.5">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a static asset
+              <img src={avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
+                {initials}
+              </div>
+            )}
+            <div className="leading-tight">
+              <p className="text-xs font-semibold text-slate-800">{status.profile.full_name || "—"}</p>
+              <p className="text-[11px] text-slate-400">{status.profile.email}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start gap-3 mb-4">
         {step > 1 && (

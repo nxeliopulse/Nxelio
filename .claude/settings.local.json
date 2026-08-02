@@ -23,7 +23,22 @@
       "Skill(claude-api:*)",
       "Bash(xargs grep -l \"export.*interface\\\\|export.*type\")",
       "Bash(node -e \"const cb = require\\('chargebee-typescript'\\); console.log\\(typeof cb\\); console.log\\(Object.keys\\(cb\\)\\)\")",
-      "Bash(node -e \"const { ChargeBee } = require\\('chargebee-typescript'\\); const cb = new ChargeBee\\(\\); console.log\\(typeof cb\\); console.log\\(typeof cb.configure\\);\")"
+      "Bash(node -e \"const { ChargeBee } = require\\('chargebee-typescript'\\); const cb = new ChargeBee\\(\\); console.log\\(typeof cb\\); console.log\\(typeof cb.configure\\);\")",
+      "PowerShell(npx eslint \"src/components/dashboard/dashboard-view.tsx\" \"src/components/layout/sidebar.tsx\" \"src/components/layout/topbar.tsx\" \"src/components/layout/mobile-sidebar.tsx\" \"src/components/layout/app-shell.tsx\" \"src/components/ui/card.tsx\" \"src/components/ui/badge.tsx\" \"src/app/\\(app\\)/dashboard/loading.tsx\" 2>&1 | Select-Object -First 60)",
+      "PowerShell(npx eslint src 2>&1 | Select-Object -Last 40)",
+      "PowerShell($env:NEXT_TELEMETRY_DISABLED=1; npx next build 2>&1 | Select-Object -Last 45)",
+      "Artifact",
+      "mcp__figma__whoami",
+      "mcp__figma__create_new_file",
+      "mcp__figma__use_figma",
+      "Bash(grep -n \"^function \\\\|^export function \\\\|^const \\\\|^  const \\\\[\\\\|^  function \\\\|^  async function \\\\|^  // ──\\\\|^  {/\\\\* ──\\\\|^      {/\\\\* \" src/components/leads/leads-table.tsx)",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30)",
+      "PowerShell(npx eslint \"src/components/leads/leads-table.tsx\" \"src/components/ui/input.tsx\" \"src/app/\\(app\\)/leads/loading.tsx\" 2>&1 | Select-Object -First 40)",
+      "PowerShell(npx eslint src 2>&1 | Select-Object -Last 12)",
+      "PowerShell($env:NEXT_TELEMETRY_DISABLED=1; npx next build 2>&1 | Select-String -Pattern \"Compiled|Failed|error|Error|✓|warn\" | Select-Object -First 20)",
+      "PowerShell(Tee-Object *)",
+      "Bash(git stash *)",
+      "Bash(git clean *)"
     ]
   }
 }

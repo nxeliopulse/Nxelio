@@ -23,7 +23,7 @@ export interface AppearanceSettings {
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   theme: "system",
   fontSize: "default",
-  fontStyle: "golos",
+  fontStyle: "outfit",
   pointerCursors: true,
   underlineLinks: false,
   lightPreset: "light",

@@ -286,7 +286,7 @@ html[data-sidebar-badge="dot"] .sidebar-badge {
 html, body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Golos Text', var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: 'Outfit', var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
