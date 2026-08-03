@@ -1,14 +1,12 @@
 "use client";
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Search, Mail, Phone, Calendar, User, ChevronDown, RefreshCw,
+  Search, Mail, Calendar, User, ChevronDown, RefreshCw,
   Download, Filter, Columns, MoreVertical, Plus, Trash2, Edit, CheckSquare, Square,
-  X, Check, Bold, Italic, Underline, Link2, List, ListOrdered, Type, Bell, Clock, HelpCircle
+  X, Bold, Italic, Underline, Link2, List, ListOrdered, Type, Bell
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
@@ -43,171 +41,6 @@ interface ActivityItem {
   company?: string;
 }
 
-const INITIAL_MOCK_EMAILS: ActivityItem[] = [
-  {
-    id: "email-mock-1",
-    title: "Analysing latest time estimation for new project",
-    activity_type: "Email",
-    due_date: "11 Oct 2026",
-    time: "17:00",
-    created_at: "03 Oct 2026, 03:53 pm",
-    owner: "Theresa Nelson",
-    lead_email: "theresa@example.com",
-    description: "Analysing project timeline requirements.",
-    reminder: 15,
-    reminder_unit: "Minutes",
-    guests: ["Darlee Robertson"],
-    deal: "Collins",
-    contact: "Select",
-    company: "NovaWave LLC"
-  },
-  {
-    id: "email-mock-2",
-    title: "Regarding latest updates in project",
-    activity_type: "Email",
-    due_date: "30 Nov 2026",
-    time: "21:20",
-    created_at: "25 Nov 2026, 06:30 pm",
-    owner: "Guilory Berggren",
-    lead_email: "guilory@example.com",
-    description: "Follow up about latest release sprint updates.",
-    reminder: 30,
-    reminder_unit: "Minutes",
-    guests: ["Darlee Robertson"],
-    deal: "SaaS Platform",
-    contact: "Select",
-    company: "NovaWave LLC"
-  },
-  {
-    id: "email-mock-3",
-    title: "Attach final proposal for upcoming project",
-    activity_type: "Email",
-    due_date: "19 Dec 2026",
-    time: "14:20",
-    created_at: "10 Dec 2026, 06:30 pm",
-    owner: "Jami Carlile",
-    lead_email: "jami@example.com",
-    description: "Send contract proposal document for final confirmation.",
-    reminder: 1,
-    reminder_unit: "Hours",
-    guests: ["Darlee Robertson"],
-    deal: "Enterprise Package",
-    contact: "Select",
-    company: "NovaWave LLC"
-  }
-];
-
-const INITIAL_MOCK_CALLS: ActivityItem[] = [
-  {
-    id: "call-mock-1",
-    title: "Introductory Discovery Call with Client",
-    activity_type: "Call",
-    due_date: "12 Oct 2026",
-    time: "10:00",
-    created_at: "04 Oct 2026, 09:00 am",
-    owner: "Theresa Nelson",
-    lead_email: "client1@example.com",
-    description: "Introductory sync meeting.",
-    reminder: 15,
-    reminder_unit: "Minutes",
-    guests: ["Darlee Robertson"],
-    deal: "Collins",
-    contact: "Select",
-    company: "NovaWave LLC"
-  },
-  {
-    id: "call-mock-2",
-    title: "Project Review and Alignment Meeting",
-    activity_type: "Call",
-    due_date: "14 Nov 2026",
-    time: "15:00",
-    created_at: "10 Nov 2026, 11:30 am",
-    owner: "Guilory Berggren",
-    lead_email: "client2@example.com",
-    description: "Aligning on core CRM requirements.",
-    reminder: 30,
-    reminder_unit: "Minutes",
-    guests: ["Darlee Robertson"],
-    deal: "SaaS Platform",
-    contact: "Select",
-    company: "NovaWave LLC"
-  }
-];
-
-const INITIAL_MOCK_MEETINGS: ActivityItem[] = [
-  {
-    id: "meet-mock-1",
-    title: "We scheduled a meeting for next week",
-    activity_type: "Meeting",
-    due_date: "23 Jan 2026",
-    time: "23:15",
-    created_at: "15 Sep 2025, 11:15 pm",
-    owner: "Aeron",
-    lead_email: "aeron@example.com",
-    description: "Spoke with the client about CRM pricing and onboarding process. Client requested a follow-up call next week.",
-    reminder: 15,
-    reminder_unit: "Minutes",
-    guests: ["Darlee Robertson"],
-    deal: "Collins",
-    contact: "Select",
-    company: "NovaWave LLC"
-  },
-  {
-    id: "meet-mock-2",
-    title: "SaaS Platform Demo & Q&A",
-    activity_type: "Meeting",
-    due_date: "22 Oct 2026",
-    time: "16:00",
-    created_at: "18 Oct 2026, 02:00 pm",
-    owner: "Theresa Nelson",
-    lead_email: "demo-request@example.com",
-    description: "Interactive dashboard demonstration.",
-    reminder: 5,
-    reminder_unit: "Minutes",
-    guests: ["Darlee Robertson"],
-    deal: "SaaS Platform",
-    contact: "Select",
-    company: "NovaWave LLC"
-  }
-];
-
-const INITIAL_MOCK_USERS: ActivityItem[] = [
-  {
-    id: "user-mock-1",
-    title: "Lead score threshold triggered for enterprise lead",
-    activity_type: "User",
-    due_date: "01 Oct 2026",
-    time: "10:00",
-    created_at: "01 Oct 2026, 10:00 am",
-    owner: "Sarah Jenkins",
-    lead_email: "sarah@example.com",
-    description: "System logged automatic lead enrichment update.",
-    reminder: 0,
-    reminder_unit: "Minutes",
-    guests: [],
-    deal: "Select",
-    contact: "Select",
-    company: "NovaWave LLC"
-  },
-  {
-    id: "user-mock-2",
-    title: "New admin settings configured for workspace",
-    activity_type: "User",
-    due_date: "02 Oct 2026",
-    time: "14:15",
-    created_at: "02 Oct 2026, 02:15 pm",
-    owner: "David Ross",
-    lead_email: "david@example.com",
-    description: "Admin configured role permission overrides.",
-    reminder: 0,
-    reminder_unit: "Minutes",
-    guests: [],
-    deal: "Select",
-    contact: "Select",
-    company: "NovaWave LLC"
-  }
-];
-
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", 
   "bg-violet-500", "bg-cyan-500", "bg-pink-500", "bg-indigo-500"
@@ -227,6 +60,62 @@ function initials(name: string): string {
   return name.substring(0, 2).toUpperCase();
 }
 
+// Real, DB-backed activity — no fake guests/deal/contact/company attached.
+function formatDbActivity(a: DbActivityRow): ActivityItem {
+  const leadName = a.lead?.full_name || a.lead?.company_name || "Unknown Lead";
+  const leadEmail = a.lead?.email || "";
+
+  const d = new Date(a.created_at);
+  const formattedDate = d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+  const formattedTime = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  const isEmail = a.activity_type.startsWith("EMAIL_");
+
+  return {
+    id: a.id,
+    title: a.metadata?.subject || a.metadata?.campaign_name || `${a.activity_type.replace(/_/g, " ")} for lead`,
+    activity_type: isEmail ? "Email" : "User",
+    due_date: formattedDate,
+    time: d.toTimeString().slice(0, 5),
+    created_at: `${formattedDate}, ${formattedTime}`,
+    owner: leadName,
+    lead_id: a.lead?.id,
+    lead_name: leadName,
+    lead_email: leadEmail,
+    description: a.metadata?.body || "Outreach activities record.",
+  };
+}
+
+// Real, DB-backed meeting — no fake guests/deal/contact/company attached.
+function formatDbMeeting(m: MeetingRow): ActivityItem {
+  const leadName = m.lead?.full_name || m.lead?.company_name || "Unknown Contact";
+  const leadEmail = m.lead?.email || "";
+
+  const d = new Date(m.start_at);
+  const formattedStart = d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+  const formattedCreated = new Date(m.created_at || m.start_at).toLocaleString([], {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return {
+    id: m.id,
+    title: m.title || "Scheduled Event",
+    activity_type: "Meeting",
+    due_date: formattedStart,
+    time: d.toTimeString().slice(0, 5),
+    created_at: formattedCreated,
+    owner: leadName,
+    lead_id: m.lead?.id,
+    lead_name: leadName,
+    lead_email: leadEmail,
+    description: m.description || "Meetings & Calls activity log.",
+  };
+}
+
 export function ActivitiesDashboardView({
   dbActivities,
   dbMeetings,
@@ -244,96 +133,13 @@ export function ActivitiesDashboardView({
   // Tab State: 'emails' | 'meetings' | 'users'
   const [activeTab, setActiveTab] = useState<"emails" | "meetings" | "users">(defaultTab);
 
-  // Formatted Db Activities
-  const formattedDbActivities = useMemo(() => {
-    return dbActivities.map((a) => {
-      const leadName = a.lead?.full_name || a.lead?.company_name || "Unknown Lead";
-      const leadEmail = a.lead?.email || "";
-      
-      const d = new Date(a.created_at);
-      const formattedDate = d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
-      const formattedTime = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-      const isEmail = a.activity_type.startsWith("EMAIL_");
-
-      return {
-        id: a.id,
-        title: a.metadata?.subject || a.metadata?.campaign_name || `${a.activity_type.replace(/_/g, " ")} for lead`,
-        activity_type: isEmail ? "Email" : "User",
-        due_date: formattedDate,
-        time: d.toTimeString().slice(0, 5),
-        created_at: `${formattedDate}, ${formattedTime}`,
-        owner: leadName,
-        lead_id: a.lead?.id,
-        lead_name: leadName,
-        lead_email: leadEmail,
-        description: a.metadata?.body || "Outreach activities record.",
-        reminder: 15,
-        reminder_unit: "Minutes",
-        guests: ["Darlee Robertson"],
-        deal: "Collins",
-        contact: "Select",
-        company: "NovaWave LLC"
-      };
-    });
-  }, [dbActivities]);
-
-  // Formatted Db Meetings
-  const formattedDbMeetings = useMemo(() => {
-    return dbMeetings.map((m) => {
-      const leadName = m.lead?.full_name || m.lead?.company_name || "Unknown Contact";
-      const leadEmail = m.lead?.email || "";
-      
-      const d = new Date(m.start_at);
-      const formattedStart = d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
-      const formattedTime = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      const formattedCreated = new Date(m.created_at || m.start_at).toLocaleString([], {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      const isMeeting = m.provider === "zoom" || m.join_url;
-
-      return {
-        id: m.id,
-        title: m.title || "Scheduled Event",
-        activity_type: "Meeting",
-        due_date: formattedStart,
-        time: d.toTimeString().slice(0, 5),
-        created_at: formattedCreated,
-        owner: leadName,
-        lead_id: m.lead?.id,
-        lead_name: leadName,
-        lead_email: leadEmail,
-        description: m.description || "Meetings & Calls activity log.",
-        reminder: 15,
-        reminder_unit: "Minutes",
-        guests: ["Darlee Robertson"],
-        deal: "Collins",
-        contact: "Select",
-        company: "NovaWave LLC"
-      };
-    });
-  }, [dbMeetings]);
-
-  // Merge state list
-  const [activities, setActivities] = useState<ActivityItem[]>(() => {
-    const dbEmails = formattedDbActivities.filter(a => a.activity_type === "Email");
-    const dbUsers = formattedDbActivities.filter(a => a.activity_type === "User");
-    const dbMeets = formattedDbMeetings.filter(m => m.activity_type === "Meeting");
-
-    return [
-      ...dbEmails,
-      ...INITIAL_MOCK_EMAILS,
-      ...dbMeets,
-      ...INITIAL_MOCK_MEETINGS,
-      ...dbUsers,
-      ...INITIAL_MOCK_USERS
-    ];
-  });
+  // Real activities/meetings only — seeded once from props. formatDbActivity/formatDbMeeting
+  // are plain functions (not hooks), so this lazy initializer depends only on props, which
+  // keeps the React Compiler able to verify the later useMemo below.
+  const [activities, setActivities] = useState<ActivityItem[]>(() => [
+    ...dbActivities.map(formatDbActivity),
+    ...dbMeetings.map(formatDbMeeting),
+  ]);
 
   // UI State
   const [searchQuery, setSearchQuery] = useState("");
@@ -380,9 +186,9 @@ export function ActivitiesDashboardView({
   const [formOwner, setFormOwner] = useState("");
   const [formGuests, setFormGuests] = useState<string[]>([]);
   const [formDescription, setFormDescription] = useState("");
-  const [formDeal, setFormDeal] = useState("Collins");
-  const [formContact, setFormContact] = useState("Select");
-  const [formCompany, setFormCompany] = useState("NovaWave LLC");
+  const [formDeal, setFormDeal] = useState("");
+  const [formContact, setFormContact] = useState("");
+  const [formCompany, setFormCompany] = useState("");
 
   // New Guest input helper
   const [newGuestInput, setNewGuestInput] = useState("");
@@ -407,17 +213,17 @@ export function ActivitiesDashboardView({
       const d = new Date(activity.due_date);
       setFormDate(d.toISOString().slice(0, 10));
     } catch {
-      // Fallback if not standard date format
-      setFormDate("2026-01-23");
+      // Fallback if not a standard date format
+      setFormDate(new Date().toISOString().slice(0, 10));
     }
-    
+
     setFormTime(activity.time || "10:00");
     setFormReminder(activity.reminder ?? 15);
     setFormReminderUnit(activity.reminder_unit || "Minutes");
-    setFormGuests(activity.guests || ["Darlee Robertson"]);
-    setFormDeal(activity.deal || "Collins");
-    setFormContact(activity.contact || "Select");
-    setFormCompany(activity.company || "NovaWave LLC");
+    setFormGuests(activity.guests || []);
+    setFormDeal(activity.deal || "");
+    setFormContact(activity.contact || "");
+    setFormCompany(activity.company || "");
   };
 
   const handleSaveDrawer = (e: React.FormEvent) => {
@@ -432,26 +238,27 @@ export function ActivitiesDashboardView({
     const dObj = new Date(formDate);
     const dateFormatted = dObj.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 
-    setActivities(prev => prev.map(a => {
-      if (a.id === editingActivity.id) {
-        return {
-          ...a,
-          title: formTitle,
-          activity_type: formType,
-          due_date: dateFormatted,
-          time: formTime,
-          owner: formOwner,
-          description: formDescription,
-          reminder: formReminder,
-          reminder_unit: formReminderUnit,
-          guests: formGuests,
-          deal: formDeal,
-          contact: formContact,
-          company: formCompany
-        };
-      }
-      return a;
-    }));
+    const updated: ActivityItem = {
+      ...editingActivity,
+      title: formTitle,
+      activity_type: formType,
+      due_date: dateFormatted,
+      time: formTime,
+      owner: formOwner,
+      description: formDescription,
+      reminder: formReminder,
+      reminder_unit: formReminderUnit,
+      guests: formGuests,
+      deal: formDeal,
+      contact: formContact,
+      company: formCompany
+    };
+
+    setActivities(prev => {
+      const exists = prev.some(a => a.id === editingActivity.id);
+      if (exists) return prev.map(a => (a.id === editingActivity.id ? updated : a));
+      return [updated, ...prev];
+    });
 
     setEditingActivity(null);
     toast("Activity details saved successfully!", "success");
@@ -530,6 +337,10 @@ export function ActivitiesDashboardView({
     return Array.from(ownersSet);
   }, [activities]);
 
+  // React Compiler can't prove equivalence for this filter+sort combination; the manual useMemo
+  // below is correct and functions properly, it just doesn't get auto-memoized on top (verified:
+  // multiple equivalent rewrites of the callback body all hit the same compiler limitation).
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const filteredAndSorted = useMemo(() => {
     const result = activities.filter(a => {
       // Tab filter
@@ -541,19 +352,20 @@ export function ActivitiesDashboardView({
       if (selectedOwnerFilter !== "all" && a.owner !== selectedOwnerFilter) return false;
 
       // Search filter
+      const q = searchQuery.toLowerCase();
       return (
-        a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (a.lead_email && a.lead_email.toLowerCase().includes(searchQuery.toLowerCase()))
+        a.title.toLowerCase().includes(q) ||
+        a.owner.toLowerCase().includes(q) ||
+        Boolean(a.lead_email && a.lead_email.toLowerCase().includes(q))
       );
     });
 
     // Sort — spread into a fresh array rather than mutating `result` in place
-    const compare =
-      sortBy === "title" ? (a: (typeof result)[number], b: (typeof result)[number]) => a.title.localeCompare(b.title)
-      : sortBy === "oldest" ? (a: (typeof result)[number], b: (typeof result)[number]) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      : (a: (typeof result)[number], b: (typeof result)[number]) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    return [...result].sort(compare);
+    return [...result].sort((a, b) => {
+      if (sortBy === "title") return a.title.localeCompare(b.title);
+      if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
   }, [activities, activeTab, selectedOwnerFilter, searchQuery, sortBy]);
 
   const paginatedActivities = useMemo(() => {
@@ -614,21 +426,21 @@ export function ActivitiesDashboardView({
           {/* Add New Activity Red Button */}
           <button
             onClick={() => {
-              // Create mock activity
-              const mockNewAct: ActivityItem = {
+              const today = new Date();
+              const draft: ActivityItem = {
                 id: `new-${Date.now()}`,
-                title: "New activity title log",
+                title: "",
                 activity_type: activeTab === "emails" ? "Email" : activeTab === "meetings" ? "Meeting" : "User",
-                due_date: "23 Jan 2026",
+                due_date: today.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }),
                 time: "10:00",
-                created_at: new Date().toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+                created_at: today.toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
                 owner: currentUserName,
                 description: "",
                 reminder: 15,
                 reminder_unit: "Minutes",
-                guests: ["Darlee Robertson"]
+                guests: []
               };
-              openEditDrawer(mockNewAct);
+              openEditDrawer(draft);
             }}
             className="flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white transition-colors shadow-sm"
           >
@@ -1110,12 +922,10 @@ export function ActivitiesDashboardView({
                         onChange={e => setFormOwner(e.target.value)}
                         className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-semibold bg-white text-xs focus:outline-none"
                       >
-                        <option value="Sarah Jenkins">Sarah Jenkins</option>
-                        <option value="David Ross">David Ross</option>
-                        <option value="Theresa Nelson">Theresa Nelson</option>
-                        <option value="Guilory Berggren">Guilory Berggren</option>
-                        <option value="Jami Carlile">Jami Carlile</option>
                         <option value={currentUserName}>{currentUserName}</option>
+                        {uniqueOwners.filter(o => o !== currentUserName).map(owner => (
+                          <option key={owner} value={owner}>{owner}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -1194,21 +1004,16 @@ export function ActivitiesDashboardView({
                         <span className="font-bold text-slate-500">Deals</span>
                       </div>
                       <div className="w-2/3 flex items-center gap-2">
-                        <select
+                        <Input
                           value={formDeal}
                           onChange={e => setFormDeal(e.target.value)}
-                          className="flex-1 rounded-xl border border-slate-200 px-3 py-2 bg-white font-medium"
-                        >
-                          <option value="Collins">Collins</option>
-                          <option value="SaaS Platform">SaaS Platform</option>
-                          <option value="Enterprise Package">Enterprise Package</option>
-                          <option value="Select">Select</option>
-                        </select>
-                        <button type="button" onClick={() => toast("Add Deals modal.", "info")} className="text-[10px] font-black text-red-600 hover:underline shrink-0">+ Add New</button>
+                          placeholder="No deal linked — not wired up yet"
+                          className="flex-1 rounded-xl border-slate-200 h-9 text-xs font-medium"
+                        />
                       </div>
                     </div>
 
-                    {/* Contacts select */}
+                    {/* Contacts select — real names pulled from this workspace's activities */}
                     <div className="flex items-center justify-between gap-4">
                       <div className="w-1/3">
                         <span className="font-bold text-slate-500">Contacts</span>
@@ -1219,11 +1024,11 @@ export function ActivitiesDashboardView({
                           onChange={e => setFormContact(e.target.value)}
                           className="flex-1 rounded-xl border border-slate-200 px-3 py-2 bg-white font-medium"
                         >
-                          <option value="Select">Select</option>
-                          <option value="Darlee Robertson">Darlee Robertson</option>
-                          <option value="Guilory Berggren">Guilory Berggren</option>
+                          <option value="">— No contact —</option>
+                          {uniqueOwners.map(owner => (
+                            <option key={owner} value={owner}>{owner}</option>
+                          ))}
                         </select>
-                        <button type="button" onClick={() => toast("Add Contacts modal.", "info")} className="text-[10px] font-black text-red-600 hover:underline shrink-0">+ Add New</button>
                       </div>
                     </div>
                   </div>
