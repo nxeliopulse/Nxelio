@@ -25,7 +25,7 @@ function StepHeader({ n, title, description, right }: { n: number; title: string
         <span className="h-5 w-5 rounded-full bg-[#18A7B8] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">{n}</span>
         <div>
           <p className="font-semibold text-sm text-slate-900 dark:text-white leading-tight">{title}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-500">{description}</p>
         </div>
       </div>
       {right}
@@ -49,7 +49,7 @@ function ChoiceCard({ selected, onClick, icon, title, subtitle, subtitleColor = 
       <span className={cn("h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center", selected ? "border-[#18A7B8]" : "border-slate-300")}>
         {selected && <span className="h-2 w-2 rounded-full bg-[#18A7B8]" />}
       </span>
-      <span className={cn("h-7 w-7 rounded-md flex items-center justify-center flex-shrink-0", selected ? "bg-[#18A7B8]/15 text-[#18A7B8]" : "bg-slate-100 dark:bg-slate-800 text-slate-500")}>
+      <span className={cn("h-7 w-7 rounded-md flex items-center justify-center flex-shrink-0", selected ? "bg-[#18A7B8]/15 text-[#18A7B8]" : "bg-slate-100 dark:bg-[var(--muted)] text-slate-500")}>
         {icon}
       </span>
       <span className="min-w-0">
@@ -144,8 +144,8 @@ export function ConvertLeadModal({
     }
   }
 
-  const field = "w-full rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-800 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500";
-  const label = "text-[11px] font-medium text-slate-600 dark:text-slate-400 block mb-0.5";
+  const field = "w-full rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const label = "text-[11px] font-medium text-slate-600 dark:text-slate-500 block mb-0.5";
   const effectiveContactName = contactMode === "existing" && matchedContact ? `${matchedContact.first_name} ${matchedContact.last_name}` : `${contactFirstName} ${contactLastName}`.trim();
   const effectiveContactEmail = contactMode === "existing" && matchedContact ? matchedContact.email : contactEmail;
   const effectiveContactPhone = contactMode === "existing" && matchedContact ? matchedContact.phone : contactPhone;
@@ -158,17 +158,17 @@ export function ConvertLeadModal({
       <div className="px-5 py-2.5 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <button onClick={onClose} aria-label="Back" className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md p-1">
+            <button onClick={onClose} aria-label="Back" className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-700 rounded-md p-1">
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div>
               <h2 className="font-semibold text-base text-slate-900 dark:text-white leading-tight">
                 Convert Prospect: <span className="text-[#18A7B8]">{lead.full_name || lead.company_name || "Prospect"}</span>
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Create or link an Account, Contact, and optional Opportunity</p>
+              <p className="text-xs text-slate-500 dark:text-slate-500">Create or link an Account, Contact, and optional Opportunity</p>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md p-1">
+          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-700 rounded-md p-1">
             <X className="h-4.5 w-4.5" />
           </button>
         </div>
@@ -315,7 +315,7 @@ export function ConvertLeadModal({
                 <p className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                   <UserIcon className="h-3 w-3" /> Prospect
                 </p>
-                <p className="text-xs text-slate-800 dark:text-slate-200 pl-4 font-medium">{lead.full_name || lead.company_name || "—"}</p>
+                <p className="text-xs text-slate-800 dark:text-slate-700 pl-4 font-medium">{lead.full_name || lead.company_name || "—"}</p>
               </div>
 
               <div className="border-t border-teal-100 dark:border-teal-900/30" />
@@ -324,7 +324,7 @@ export function ConvertLeadModal({
                 <p className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                   <Building2 className="h-3 w-3" /> Account
                 </p>
-                <p className="flex items-center gap-2 text-xs text-slate-800 dark:text-slate-200 pl-4 font-medium">
+                <p className="flex items-center gap-2 text-xs text-slate-800 dark:text-slate-700 pl-4 font-medium">
                   <span className="truncate">{effectiveAccountName || "—"}</span>
                   <span className={cn("text-[9px] font-semibold px-1.5 py-0.2 rounded-full flex-shrink-0", accountMode === "existing" ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700")}>
                     {accountMode === "existing" ? "Existing" : "New"}
@@ -338,7 +338,7 @@ export function ConvertLeadModal({
                 <p className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                   <UserIcon className="h-3 w-3" /> Contact
                 </p>
-                <p className="text-xs text-slate-800 dark:text-slate-200 pl-4 font-medium">{effectiveContactName || "—"}</p>
+                <p className="text-xs text-slate-800 dark:text-slate-700 pl-4 font-medium">{effectiveContactName || "—"}</p>
                 {effectiveContactEmail && (
                   <p className="flex items-center gap-1 text-[11px] text-slate-500 pl-4"><Mail className="h-3 w-3" /> {effectiveContactEmail}</p>
                 )}
@@ -354,7 +354,7 @@ export function ConvertLeadModal({
                     <p className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                       <Briefcase className="h-3 w-3" /> Opportunity
                     </p>
-                    <p className="text-xs text-slate-800 dark:text-slate-200 pl-4 font-medium">{oppName || "—"}</p>
+                    <p className="text-xs text-slate-800 dark:text-slate-700 pl-4 font-medium">{oppName || "—"}</p>
                     <p className="text-[11px] text-slate-500 pl-4">Stage: {STAGE_LABELS[oppStage]}</p>
                     <p className="text-[11px] text-slate-500 pl-4">Amount: ${oppAmount || "0"}</p>
                     {oppCloseDate && (

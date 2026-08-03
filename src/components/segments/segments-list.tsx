@@ -192,7 +192,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Segments</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Total Segments</span>
             <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
               <Layers className="h-5 w-5" />
             </div>
@@ -202,7 +202,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
 
         <Card className="p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Rules</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Active Rules</span>
             <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="h-5 w-5" />
             </div>
@@ -212,7 +212,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
 
         <Card className="p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Dynamic Rules</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Dynamic Rules</span>
             <div className="h-9 w-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400">
               <Zap className="h-5 w-5" />
             </div>
@@ -222,7 +222,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
 
         <Card className="p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Segmented Contacts</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Segmented Contacts</span>
             <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400">
               <Users className="h-5 w-5" />
             </div>
@@ -245,7 +245,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
               <button
                 key={a.label}
                 onClick={a.onClick}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 shadow-sm transition-all"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-700 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-[var(--muted)] shadow-sm transition-all"
               >
                 {a.icon} {a.label}
               </button>
@@ -274,7 +274,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all shadow-sm cursor-pointer"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-600 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all shadow-sm cursor-pointer"
             >
               <option value="all">All Types</option>
               <option value="dynamic">Dynamic</option>
@@ -287,7 +287,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all shadow-sm cursor-pointer"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-600 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all shadow-sm cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -330,7 +330,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
           <>
           <DataTable className="min-w-[760px]">
               <DataTableHead>
-                <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
+                <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-500 font-bold">
                   <DataTableTh className="w-10">
                     <input
                       type="checkbox"
@@ -350,7 +350,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
               <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                 {pagedSegments.length === 0 && (
                   <DataTableEmpty colSpan={7}>
-                    No matching segments found. Click <strong className="text-slate-700 dark:text-slate-300">Create Segment</strong> to build a new target group.
+                    No matching segments found. Click <strong className="text-slate-700 dark:text-slate-600">Create Segment</strong> to build a new target group.
                   </DataTableEmpty>
                 )}
                 {pagedSegments.map((s) => (
@@ -366,7 +366,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                     <DataTableTd>
                       <Link href={`/segments/builder?id=${s.id}`} className="block group">
                         <p className="font-semibold text-slate-900 dark:text-white group-hover:text-[var(--primary)] transition-colors">{s.segment_name}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{s.description || "—"}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">{s.description || "—"}</p>
                       </Link>
                     </DataTableTd>
                     <DataTableTd className="font-bold text-slate-900 dark:text-white tabular-nums">
@@ -378,7 +378,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                     <DataTableTd>
                       <Badge variant={statusColor[s.status] || "default"}>{s.status}</Badge>
                     </DataTableTd>
-                    <DataTableTd className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(s.created_at)}</DataTableTd>
+                    <DataTableTd className="text-slate-500 dark:text-slate-500 text-xs whitespace-nowrap">{formatDate(s.created_at)}</DataTableTd>
                     <DataTableTd className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         {s.segment_type !== "Static" && (
@@ -386,7 +386,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                             onClick={() => handleRefresh(s.id, s.segment_name)}
                             disabled={pending}
                             title="Refresh contacts"
-                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[var(--muted)] text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                           >
                             <RefreshCw className="h-4 w-4" />
                           </button>
@@ -394,7 +394,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                         <Link
                           href={`/segments/builder?id=${s.id}`}
                           title="Edit Segment"
-                          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[var(--muted)] text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                         >
                           <Pencil className="h-4 w-4" />
                         </Link>
@@ -435,7 +435,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                   <Link href={`/segments/builder?id=${s.id}`}>
                     <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-[var(--primary)] transition-colors">{s.segment_name}</h3>
                   </Link>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{s.description || "No description provided."}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 line-clamp-2">{s.description || "No description provided."}</p>
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
@@ -468,7 +468,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
       >
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Sales rep</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-600 mb-1.5">Sales rep</label>
             <Select value={assignRep} onChange={(e) => setAssignRep(e.target.value)}>
               {SALES_REPS.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -492,7 +492,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
       >
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Tag</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-600 mb-1.5">Tag</label>
             <Input
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
@@ -506,7 +506,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                 <button
                   key={t}
                   onClick={() => setTagInput(t)}
-                  className="px-2.5 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                  className="px-2.5 py-1 rounded-full text-xs bg-slate-100 dark:bg-[var(--muted)] hover:bg-slate-200 dark:hover:bg-[var(--border)] text-slate-700 dark:text-slate-600"
                 >
                   {t}
                 </button>

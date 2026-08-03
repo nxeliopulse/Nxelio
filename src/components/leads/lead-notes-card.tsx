@@ -43,7 +43,7 @@ export function LeadNotesCard({ leadId, notes }: { leadId: string; notes: LeadNo
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full px-4 py-3 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-left font-bold text-sm text-slate-800 dark:text-slate-200"
+        className="w-full px-4 py-3 bg-slate-50/80 dark:bg-[var(--muted)] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-left font-bold text-sm text-slate-800 dark:text-slate-700"
       >
         <span className="inline-flex items-center gap-2">
           {open ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronUp className="h-4 w-4 text-slate-500" />}
@@ -81,7 +81,7 @@ export function LeadNotesCard({ leadId, notes }: { leadId: string; notes: LeadNo
                 />
                 <label
                   htmlFor={`note-file-${leadId}`}
-                  className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer font-medium flex-shrink-0"
+                  className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-600 cursor-pointer font-medium flex-shrink-0"
                 >
                   <Paperclip className="h-3.5 w-3.5" /> Attach file
                 </label>
@@ -108,7 +108,7 @@ export function LeadNotesCard({ leadId, notes }: { leadId: string; notes: LeadNo
                 <li key={n.id} className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 group">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{n.body}</p>
+                      <p className="text-slate-700 dark:text-slate-600 whitespace-pre-wrap break-words">{n.body}</p>
                       {n.file_url && (
                         <a href={n.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1.5 text-blue-600 hover:underline font-medium">
                           <Paperclip className="h-3 w-3" /> {n.file_name || "Attachment"}

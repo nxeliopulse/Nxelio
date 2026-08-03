@@ -24,7 +24,7 @@ export function OverviewTab({ stats, hotCustomers }: { stats: PlatformOverviewSt
               <c.icon className="h-5 w-5" />
             </div>
             <p className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">{c.value}</p>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">{c.label}</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 mt-1">{c.label}</p>
           </Card>
         ))}
       </div>
@@ -35,7 +35,7 @@ export function OverviewTab({ stats, hotCustomers }: { stats: PlatformOverviewSt
             <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
               <Flame className="h-5 w-5 text-amber-500 fill-amber-500/20" /> Hot Customers
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
               Ranked by activity &mdash; prospects imported + campaigns sent + AI credits consumed.
             </p>
           </div>
@@ -57,10 +57,10 @@ export function OverviewTab({ stats, hotCustomers }: { stats: PlatformOverviewSt
             {hotCustomers.map((c) => (
               <DataTableRow key={c.workspace_id}>
                 <DataTableTd className="font-semibold text-slate-900 dark:text-white">{c.workspace_name}</DataTableTd>
-                <DataTableTd className="text-slate-600 dark:text-slate-400 font-medium">{c.plan_name}</DataTableTd>
-                <DataTableTd className="text-slate-900 dark:text-slate-200 text-right tabular-nums font-bold">{c.leadCount}</DataTableTd>
-                <DataTableTd className="text-slate-900 dark:text-slate-200 text-right tabular-nums font-bold">{c.campaignsSent}</DataTableTd>
-                <DataTableTd className="text-slate-900 dark:text-slate-200 text-right tabular-nums font-bold">{c.creditsConsumed}</DataTableTd>
+                <DataTableTd className="text-slate-600 dark:text-slate-500 font-medium">{c.plan_name}</DataTableTd>
+                <DataTableTd className="text-slate-900 dark:text-slate-700 text-right tabular-nums font-bold">{c.leadCount}</DataTableTd>
+                <DataTableTd className="text-slate-900 dark:text-slate-700 text-right tabular-nums font-bold">{c.campaignsSent}</DataTableTd>
+                <DataTableTd className="text-slate-900 dark:text-slate-700 text-right tabular-nums font-bold">{c.creditsConsumed}</DataTableTd>
               </DataTableRow>
             ))}
           </DataTableBody>

@@ -77,7 +77,7 @@ export function FieldRenderer({
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange?.(e.target.value)}
             disabled={definition.readOnly}
             className={cn(
-              "flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100",
+              "flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-800",
               className
             )}
           >
@@ -91,7 +91,7 @@ export function FieldRenderer({
         );
       case "checkbox":
         return (
-          <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-600">
             <input
               type="checkbox"
               checked={Boolean(value)}
@@ -122,14 +122,14 @@ export function FieldRenderer({
   switch (definition.type) {
     case "currency":
       return (
-        <span className={cn("text-sm font-medium text-slate-900 dark:text-slate-100", className)}>
+        <span className={cn("text-sm font-medium text-slate-900 dark:text-slate-800", className)}>
           {formatCurrency(value)}
         </span>
       );
 
     case "number":
       return (
-        <span className={cn("text-sm font-medium text-slate-900 dark:text-slate-100", className)}>
+        <span className={cn("text-sm font-medium text-slate-900 dark:text-slate-800", className)}>
           {typeof value === "number" ? value.toLocaleString() : value}
         </span>
       );
@@ -172,7 +172,7 @@ export function FieldRenderer({
 
     case "date":
       return (
-        <span className={cn("inline-flex items-center gap-1 text-sm text-slate-700 dark:text-slate-300", className)}>
+        <span className={cn("inline-flex items-center gap-1 text-sm text-slate-700 dark:text-slate-600", className)}>
           <Calendar className="h-3.5 w-3.5 text-slate-400" />
           {formatDate(value)}
         </span>
@@ -180,7 +180,7 @@ export function FieldRenderer({
 
     case "datetime":
       return (
-        <span className={cn("text-sm text-slate-700 dark:text-slate-300", className)}>
+        <span className={cn("text-sm text-slate-700 dark:text-slate-600", className)}>
           {formatDateTime(value)}
         </span>
       );
@@ -206,7 +206,7 @@ export function FieldRenderer({
 
     default:
       return (
-        <span className={cn("text-sm text-slate-900 dark:text-slate-100", className)}>
+        <span className={cn("text-sm text-slate-900 dark:text-slate-800", className)}>
           {String(value)}
         </span>
       );

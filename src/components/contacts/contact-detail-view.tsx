@@ -44,7 +44,7 @@ export function ContactDetailView({ contact }: { contact: ContactWithAccount }) 
   const mailing = [contact.mailing_street, contact.mailing_city, contact.mailing_state, contact.mailing_zip, contact.mailing_country].filter(Boolean).join(", ");
 
   return (
-    <div className="max-w-[1650px] mx-auto pb-10 text-slate-800 dark:text-slate-200">
+    <div className="max-w-[1650px] mx-auto pb-10 text-slate-800 dark:text-slate-700">
       {/* Reusable Record Header */}
       <RecordHeader
         breadcrumbHref="/contacts"
@@ -63,7 +63,7 @@ export function ContactDetailView({ contact }: { contact: ContactWithAccount }) 
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg text-xs dark:bg-slate-900 dark:border-slate-800">
-                  <button onClick={() => { setMenuOpen(false); setEditOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                  <button onClick={() => { setMenuOpen(false); setEditOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-600 dark:hover:bg-[var(--muted)]">
                     <Pencil className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" /> Edit Record
                   </button>
                   <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
@@ -79,12 +79,12 @@ export function ContactDetailView({ contact }: { contact: ContactWithAccount }) 
       <div className="grid gap-5 grid-cols-1 lg:grid-cols-12">
         <div className="space-y-4 lg:col-span-7 xl:col-span-8">
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs dark:bg-slate-900 dark:border-slate-800">
-            <button onClick={() => setAboutOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-200">
+            <button onClick={() => setAboutOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-700">
               <span className="inline-flex items-center gap-2">
-                {aboutOpen ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
+                {aboutOpen ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-500" /> : <ChevronUp className="h-4 w-4 text-slate-500 dark:text-slate-500" />}
                 About
               </span>
-              <Pencil className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 cursor-pointer dark:text-slate-500 dark:hover:text-slate-400" onClick={(e) => { e.stopPropagation(); setEditOpen(true); }} />
+              <Pencil className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 cursor-pointer dark:text-slate-500 dark:hover:text-slate-500" onClick={(e) => { e.stopPropagation(); setEditOpen(true); }} />
             </button>
             {aboutOpen && (
               <div className="p-4 grid grid-cols-2 gap-3.5 text-xs">
@@ -104,8 +104,8 @@ export function ContactDetailView({ contact }: { contact: ContactWithAccount }) 
                 <Field label="Secondary email" value={contact.secondary_email} />
                 {contact.description && (
                   <div className="col-span-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-                    <span className="block text-slate-500 font-medium mb-0.5 dark:text-slate-400">Description</span>
-                    <span className="text-slate-700 whitespace-pre-wrap dark:text-slate-300">{contact.description}</span>
+                    <span className="block text-slate-500 font-medium mb-0.5 dark:text-slate-500">Description</span>
+                    <span className="text-slate-700 whitespace-pre-wrap dark:text-slate-600">{contact.description}</span>
                   </div>
                 )}
               </div>
@@ -113,15 +113,15 @@ export function ContactDetailView({ contact }: { contact: ContactWithAccount }) 
           </div>
 
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs dark:bg-slate-900 dark:border-slate-800">
-            <button onClick={() => setAddressOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-200">
+            <button onClick={() => setAddressOpen((v) => !v)} className="w-full px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-left font-bold text-sm text-slate-800 dark:bg-slate-950/40 dark:border-slate-800 dark:text-slate-700">
               <span className="inline-flex items-center gap-2">
-                {addressOpen ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
+                {addressOpen ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-500" /> : <ChevronUp className="h-4 w-4 text-slate-500 dark:text-slate-500" />}
                 Mailing address
               </span>
             </button>
             {addressOpen && (
               <div className="p-4 text-xs">
-                <span className="font-semibold text-slate-800 dark:text-slate-200">{mailing || "—"}</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-700">{mailing || "—"}</span>
               </div>
             )}
           </div>
@@ -140,7 +140,7 @@ export function ContactDetailView({ contact }: { contact: ContactWithAccount }) 
 function Field({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <div className="border-t border-slate-100 dark:border-slate-800 pt-3 first:border-t-0 first:pt-0">
-      <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium mb-0.5">{icon}{label}</span>
+      <span className="flex items-center gap-1 text-slate-500 dark:text-slate-500 font-medium mb-0.5">{icon}{label}</span>
       <span className="font-semibold text-slate-900 dark:text-white">{value ?? "—"}</span>
     </div>
   );

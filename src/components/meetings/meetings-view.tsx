@@ -213,7 +213,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
       {presetLeadIds.length === 1 && (
         <Link
           href={`/leads/${presetLeadIds[0]}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-700"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back to Prospect Details
         </Link>
@@ -223,7 +223,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Meetings & Calendar</h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-500 mt-0.5">
             Schedule, track, and sync meetings with Google & Outlook Calendar
           </p>
         </div>
@@ -233,7 +233,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
               <RefreshCw className="h-3.5 w-3.5" /> Connect Calendar
             </Link>
           ) : (
-            <div className="hidden md:flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <div className="hidden md:flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-500">
               <span className="h-2 w-2 rounded-full bg-emerald-500" /> Connected ({accounts.length})
             </div>
           )}
@@ -270,7 +270,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
               <div className="space-y-1 text-xs font-medium">
                 <button
                   onClick={() => setShowMyMeetings(!showMyMeetings)}
-                  className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                  className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-[var(--muted)] transition-colors text-left"
                 >
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-md bg-blue-600 dark:bg-blue-500 flex-shrink-0" />
@@ -285,7 +285,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                     <button
                       key={a.id}
                       onClick={() => setShowExternalCalendars(!showExternalCalendars)}
-                      className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
+                      className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-[var(--muted)] transition-colors text-left"
                     >
                       <div className="flex items-center gap-2">
                         <span className={`h-2.5 w-2.5 rounded-md ${style.dot} flex-shrink-0`} />
@@ -314,7 +314,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">
                     {selectedDay.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-500">
                     {selectedDayAgenda.length} event{selectedDayAgenda.length === 1 ? "" : "s"} scheduled
                   </p>
                 </div>
@@ -332,8 +332,8 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                 <div className="p-3 text-center text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl space-y-1 flex-1 flex flex-col items-center justify-center">
                   <p>No events on this day.</p>
                   {upcoming[0] && (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                      Next: <span className="font-bold text-slate-700 dark:text-slate-300">{upcoming[0].title}</span> ({dayLabel(upcoming[0].start_at)})
+                    <p className="text-[11px] text-slate-500 dark:text-slate-500 font-medium">
+                      Next: <span className="font-bold text-slate-700 dark:text-slate-600">{upcoming[0].title}</span> ({dayLabel(upcoming[0].start_at)})
                     </p>
                   )}
                 </div>
@@ -402,19 +402,19 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() - 1); setCalendarMonth(d); }}
-                      className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => { const d = new Date(); d.setDate(1); setCalendarMonth(d); setSelectedDay(new Date()); }}
-                      className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
                     >
                       Today
                     </button>
                     <button
                       onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() + 1); setCalendarMonth(d); }}
-                      className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
@@ -529,13 +529,13 @@ function MiniCalendar({
         <div className="flex items-center gap-1">
           <button
             onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() - 1); onMonthChange(d); }}
-            className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() + 1); onMonthChange(d); }}
-            className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
@@ -562,7 +562,7 @@ function MiniCalendar({
                   : isToday
                   ? "bg-blue-50 dark:bg-blue-950/80 text-blue-600 font-bold border border-blue-200 dark:border-blue-800"
                   : inMonth
-                  ? "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  ? "text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
                   : "text-slate-300 dark:text-slate-700"
               )}
             >
@@ -592,7 +592,7 @@ function MeetingRowItem({ m, onOpen, past, compact }: { m: MeetingRow; onOpen: (
           <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{m.title}</p>
           {m.status !== "scheduled" && <Badge variant={STATUS_VARIANT[m.status] || "default"}>{m.status}</Badge>}
         </div>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
+        <p className="text-[11px] text-slate-500 dark:text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
           <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {fmtRange(m.start_at, m.end_at)}</span>
           {leadLabel(m.lead) && <> · <span className="truncate">{leadLabel(m.lead)}</span></>}
         </p>
@@ -613,7 +613,7 @@ function ExternalEventRow({ e, compact }: { e: SyncedCalendarEvent; compact?: bo
     <div className={cn(
       "w-full text-left flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 border-l-4 bg-white dark:bg-slate-900 transition-all shadow-sm",
       compact ? "p-2.5" : "p-3.5",
-      e.htmlLink ? "hover:bg-slate-50/50 dark:hover:bg-slate-800/40 cursor-pointer" : ""
+      e.htmlLink ? "hover:bg-slate-50/50 dark:hover:bg-[var(--muted)] cursor-pointer" : ""
     )}>
       <div className={cn("rounded-lg flex items-center justify-center flex-shrink-0", style.chip, compact ? "h-8 w-8" : "h-10 w-10")}>
         <CalendarDays className={compact ? "h-4 w-4" : "h-5 w-5"} />
@@ -623,7 +623,7 @@ function ExternalEventRow({ e, compact }: { e: SyncedCalendarEvent; compact?: bo
           <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm">{e.title}</p>
           <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${style.chip}`}>{style.label}</span>
         </div>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 font-medium">
+        <p className="text-[11px] text-slate-500 dark:text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
           <Clock className="h-3 w-3" /> {e.allDay ? "All day" : fmtRange(e.start, e.end)}
         </p>
       </div>
@@ -705,7 +705,7 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
                   : isToday
                   ? "bg-blue-50/60 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800"
                   : inMonth
-                  ? "hover:bg-slate-50 dark:hover:bg-slate-800/40 bg-white dark:bg-slate-900"
+                  ? "hover:bg-slate-50 dark:hover:bg-[var(--muted)] bg-white dark:bg-slate-900"
                   : "bg-slate-50/30 dark:bg-slate-950/40 text-slate-400 dark:text-slate-700"
               )}
             >
@@ -716,7 +716,7 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
                   : isSelected
                   ? "bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold"
                   : inMonth
-                  ? "text-slate-700 dark:text-slate-300"
+                  ? "text-slate-700 dark:text-slate-600"
                   : "text-slate-400 dark:text-slate-600"
               )}>
                 {d.getDate()}
@@ -762,11 +762,11 @@ function DetailPanel({ m, pending, onClose, onEdit, onCancel, onDelete }: {
               <h2 className="text-lg font-bold text-slate-900 dark:text-white truncate">{m.title}</h2>
               {m.status !== "scheduled" && <Badge variant={STATUS_VARIANT[m.status] || "default"}>{m.status}</Badge>}
             </div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 mt-1 flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5" /> {new Date(m.start_at).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
@@ -780,7 +780,7 @@ function DetailPanel({ m, pending, onClose, onEdit, onCancel, onDelete }: {
           <Row icon={<Users className="h-4 w-4" />} label={`Attendees (${attendees.length})`}>
             {attendees.length === 0 ? <span className="text-slate-400">None added</span> : (
               <ul className="space-y-1">
-                {attendees.map((a, i) => <li key={i} className="text-slate-700 dark:text-slate-300 font-medium">{a.name || a.email}{a.name && a.email ? ` · ${a.email}` : ""}</li>)}
+                {attendees.map((a, i) => <li key={i} className="text-slate-700 dark:text-slate-600 font-medium">{a.name || a.email}{a.name && a.email ? ` · ${a.email}` : ""}</li>)}
               </ul>
             )}
           </Row>
@@ -812,7 +812,7 @@ function Row({ icon, label, children }: { icon: React.ReactNode; label: string; 
       <span className="text-slate-400 dark:text-slate-500 mt-0.5 flex-shrink-0">{icon}</span>
       <div className="min-w-0">
         <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
-        <div className="text-slate-700 dark:text-slate-300 mt-0.5 font-medium">{children}</div>
+        <div className="text-slate-700 dark:text-slate-600 mt-0.5 font-medium">{children}</div>
       </div>
     </div>
   );
@@ -980,7 +980,7 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               {isEdit ? "Edit / reschedule meeting" : step === "review" ? "Review & schedule" : "Schedule a meeting"}
             </h2>
-            <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
+            <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"><X className="h-4 w-4" /></button>
           </div>
 
           {error && (
@@ -999,7 +999,7 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
                 {attendees.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {attendees.map((a, i) => (
-                      <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-[var(--muted)] px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-600">
                         {a.name || a.email}{!a.email && <span className="text-amber-600" title="No email — won't get an invite">⚠</span>}
                         <button onClick={() => removeAttendee(i)} className="text-slate-400 hover:text-rose-600"><X className="h-3 w-3" /></button>
                       </span>
@@ -1027,7 +1027,7 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
 
               <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-950/40">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 inline-flex items-center gap-1.5 uppercase tracking-wider"><CalendarCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Availability</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-600 inline-flex items-center gap-1.5 uppercase tracking-wider"><CalendarCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Availability</span>
                   <Button type="button" variant="outline" size="sm" onClick={checkAvailability} disabled={avail.loading} className="rounded-xl text-xs font-bold">
                     {avail.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />} Check calendar
                   </Button>
@@ -1049,7 +1049,7 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
                             <div className="flex flex-wrap gap-1.5">
                               {freeSlots.slice(0, 10).map((s) => (
                                 <button key={s.startLocal} onClick={() => { set("startLocal", s.startLocal); set("endLocal", s.endLocal); }}
-                                  className="rounded-lg border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:border-blue-500">
+                                  className="rounded-lg border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:border-blue-500">
                                   {s.label}
                                 </button>
                               ))}
@@ -1094,7 +1094,7 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
               {form.description && <ReviewRow label="Notes">{form.description}</ReviewRow>}
 
               {!isEdit && (
-                <label className="flex items-center gap-2 pt-2 text-slate-700 dark:text-slate-300 font-medium">
+                <label className="flex items-center gap-2 pt-2 text-slate-700 dark:text-slate-600 font-medium">
                   <input type="checkbox" checked={sendInvites} onChange={(e) => setSendInvites(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                   Email an invite to {invitableCount} attendee{invitableCount === 1 ? "" : "s"}
                 </label>
@@ -1128,7 +1128,7 @@ function ReviewRow({ label, children }: { label: string; children: React.ReactNo
   return (
     <div className="flex gap-3">
       <span className="w-24 flex-shrink-0 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 pt-0.5">{label}</span>
-      <div className="flex-1 text-slate-700 dark:text-slate-300 font-medium">{children}</div>
+      <div className="flex-1 text-slate-700 dark:text-slate-600 font-medium">{children}</div>
     </div>
   );
 }
@@ -1136,7 +1136,7 @@ function ReviewRow({ label, children }: { label: string; children: React.ReactNo
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">{label} {required && <span className="text-rose-500">*</span>}</label>
+      <label className="block text-xs font-bold text-slate-700 dark:text-slate-600 uppercase tracking-wider mb-1.5">{label} {required && <span className="text-rose-500">*</span>}</label>
       {children}
     </div>
   );
@@ -1199,9 +1199,9 @@ function RegionClockWidget() {
   }, [time, selectedZone]);
 
   return (
-    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 p-2.5 space-y-2">
+    <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-[var(--muted)] p-2.5 space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 inline-flex items-center gap-1.5">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500 inline-flex items-center gap-1.5">
           <Globe className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> Region Time
         </span>
         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
@@ -1213,7 +1213,7 @@ function RegionClockWidget() {
         <span className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight font-mono">
           {timeString}
         </span>
-        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-500">
           {dateString}
         </span>
       </div>
@@ -1222,7 +1222,7 @@ function RegionClockWidget() {
         <select
           value={selectedZone || ""}
           onChange={(e) => setSelectedZone(e.target.value || undefined)}
-          className="w-full text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-700 dark:text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           {REGIONS.map((r) => (
             <option key={r.label} value={r.zone || ""}>

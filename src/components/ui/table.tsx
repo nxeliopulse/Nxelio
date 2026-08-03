@@ -24,20 +24,20 @@ export function DataTableBody({ className, ...props }: React.HTMLAttributes<HTML
 }
 
 export function DataTableRow({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors", className)} {...props} />;
+  return <tr className={cn("hover:bg-slate-50/60 dark:hover:bg-[var(--muted)] transition-colors", className)} {...props} />;
 }
 
 export function DataTableTh({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={cn("text-left text-xs font-semibold text-slate-600 dark:text-slate-400 px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap", className)}
+      className={cn("text-left text-xs font-semibold text-slate-600 dark:text-slate-500 px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap", className)}
       {...props}
     />
   );
 }
 
 export function DataTableTd({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("px-3.5 py-3 border-b border-slate-100 dark:border-slate-800 text-slate-800 dark:text-slate-200", className)} {...props} />;
+  return <td className={cn("px-3.5 py-3 border-b border-slate-100 dark:border-slate-800 text-slate-800 dark:text-slate-700", className)} {...props} />;
 }
 
 export function DataTableEmpty({ colSpan, children }: { colSpan: number; children: React.ReactNode }) {

@@ -107,7 +107,7 @@ export function RecordLayout({
                         "whitespace-nowrap py-3 px-1 border-b-2 text-sm font-semibold transition-colors flex items-center gap-2",
                         isActive
                           ? "border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400"
-                          : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200"
+                          : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-500 dark:hover:text-slate-700"
                       )}
                     >
                       {tab.label}
@@ -117,7 +117,7 @@ export function RecordLayout({
                             "px-2 py-0.5 text-xs font-semibold rounded-full",
                             isActive
                               ? "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
-                              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                              : "bg-slate-100 text-slate-600 dark:bg-[var(--muted)] dark:text-slate-500"
                           )}
                         >
                           {tab.badge}

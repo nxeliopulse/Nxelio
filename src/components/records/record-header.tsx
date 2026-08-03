@@ -42,7 +42,7 @@ export function RecordHeader({
   return (
     <div className="mb-5">
       <div className="flex items-center justify-between mb-3 px-1">
-        <Link href={breadcrumbHref} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+        <Link href={breadcrumbHref} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-700">
           <ArrowLeft className="h-4 w-4" /> {breadcrumbLabel}
         </Link>
         {(onPrev || onNext) && (
@@ -51,7 +51,7 @@ export function RecordHeader({
               onClick={onPrev}
               disabled={!onPrev || prevDisabled}
               aria-label="Previous record"
-              className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:hover:bg-slate-800"
+              className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:hover:bg-[var(--muted)]"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -59,7 +59,7 @@ export function RecordHeader({
               onClick={onNext}
               disabled={!onNext || nextDisabled}
               aria-label="Next record"
-              className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:hover:bg-slate-800"
+              className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:hover:bg-[var(--muted)]"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -74,7 +74,7 @@ export function RecordHeader({
               {icon}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-400">{eyebrow}</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-500">{eyebrow}</p>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 truncate tracking-tight dark:text-white">{title}</h1>
             </div>
           </div>
@@ -82,7 +82,7 @@ export function RecordHeader({
             {badges}
             {headline}
             {onEdit && (
-              <button onClick={onEdit} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800">
+              <button onClick={onEdit} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-700 dark:hover:bg-[var(--muted)]">
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </button>
             )}

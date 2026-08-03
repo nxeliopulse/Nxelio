@@ -206,7 +206,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                           <p className="font-bold text-slate-900 dark:text-white group-hover:text-[var(--primary)] transition-colors text-sm">
                             {n.title}
                           </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                          <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5 line-clamp-1">
                             {n.subject || "(No subject line)"}
                           </p>
                         </Link>
@@ -214,7 +214,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                       <DataTableTd>
                         <Badge variant={statusVariant[n.status] || "default"}>{n.status}</Badge>
                       </DataTableTd>
-                      <DataTableTd className="text-slate-900 dark:text-slate-200 font-bold">
+                      <DataTableTd className="text-slate-900 dark:text-slate-700 font-bold">
                         {n.recipient_count.toLocaleString()}
                       </DataTableTd>
                       <DataTableTd>
@@ -223,7 +223,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                             <div className="w-16 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                               <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(100, openRate)}%` }} />
                             </div>
-                            <span className="text-slate-900 dark:text-slate-200 font-bold text-xs">{openRate}%</span>
+                            <span className="text-slate-900 dark:text-slate-700 font-bold text-xs">{openRate}%</span>
                           </div>
                         ) : (
                           <span className="text-slate-400 dark:text-slate-600">—</span>
@@ -236,7 +236,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                           <span className="text-slate-400 dark:text-slate-600">—</span>
                         )}
                       </DataTableTd>
-                      <DataTableTd className="text-slate-500 dark:text-slate-400 text-xs">
+                      <DataTableTd className="text-slate-500 dark:text-slate-500 text-xs">
                         {n.sent_at ? formatDate(n.sent_at) : "—"}
                       </DataTableTd>
                       <DataTableTd className="text-right relative">
@@ -260,7 +260,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                             >
                               <Link
                                 href={`/newsletters/builder?id=${n.id}`}
-                                className="flex items-center gap-2 px-3.5 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80"
+                                className="flex items-center gap-2 px-3.5 py-2 text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-[var(--muted)]"
                                 onClick={() => setMenuOpen(null)}
                               >
                                 <Eye className="h-3.5 w-3.5 text-[var(--primary)]" /> Edit / View
@@ -268,7 +268,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                               <button
                                 onClick={() => handleDuplicate(n.id)}
                                 disabled={pending}
-                                className="w-full flex items-center gap-2 px-3.5 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-left"
+                                className="w-full flex items-center gap-2 px-3.5 py-2 text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-[var(--muted)] text-left"
                               >
                                 <Copy className="h-3.5 w-3.5 text-indigo-500" /> Duplicate
                               </button>

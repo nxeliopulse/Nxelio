@@ -64,7 +64,7 @@ export function FormRenderer({
 
   const renderFieldItem = (field: FieldDefinition) => (
     <div key={field.name} className="flex flex-col gap-1.5 min-w-0">
-      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+      <label className="text-xs font-semibold text-slate-700 dark:text-slate-600">
         {field.label}
         {field.required && <span className="text-rose-500 ml-0.5">*</span>}
       </label>
@@ -85,7 +85,7 @@ export function FormRenderer({
       {sections ? (
         sections.map((sec) => (
           <div key={sec.id} className="space-y-3">
-            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-800 border-b border-slate-100 dark:border-slate-800 pb-1.5">
               {sec.title}
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

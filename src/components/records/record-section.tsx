@@ -34,12 +34,12 @@ export function RecordSection({
   return (
     <Card className={cn("border border-slate-200 dark:border-slate-800 shadow-xs mb-4", className)}>
       {section.title && (
-        <CardHeader className="py-3.5 px-4 sm:px-5 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/40">
-          <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+        <CardHeader className="py-3.5 px-4 sm:px-5 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-[var(--muted)]">
+          <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-700">
             {section.title}
           </CardTitle>
           {section.description && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
               {section.description}
             </p>
           )}
@@ -51,7 +51,7 @@ export function RecordSection({
             const fieldValue = record[field.name];
             return (
               <div key={field.name} className="flex flex-col gap-1 min-w-0">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-400">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-500">
                   {field.label}
                   {field.required && <span className="text-rose-500 ml-0.5">*</span>}
                 </span>

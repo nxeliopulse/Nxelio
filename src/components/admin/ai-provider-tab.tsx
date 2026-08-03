@@ -43,7 +43,7 @@ export function AiProviderTab({ status }: { status: AiProviderStatus }) {
           <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2.5">
             <Sparkles className="h-5 w-5 text-amber-500 fill-amber-500/20" /> AI Provider
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
             Debug switch &mdash; pick which AI provider powers every AI feature (AI Assistant, lead scoring, email generation, support/landing chat) across the whole platform. Takes effect immediately, no redeploy.
           </p>
         </div>
@@ -72,10 +72,10 @@ export function AiProviderTab({ status }: { status: AiProviderStatus }) {
                   ) : switching === p ? (
                     <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
                   ) : (
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Switch</span>
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white">Switch</span>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-3">{info.envHint}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-500 font-mono mt-3">{info.envHint}</p>
                 <p className={`text-xs mt-1 font-semibold ${cfg?.configured ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
                   {cfg?.configured ? "✓ API key configured" : "⚠ No API key set — add it to env vars"}
                 </p>
@@ -92,7 +92,7 @@ export function AiProviderTab({ status }: { status: AiProviderStatus }) {
 
       <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
         <h4 className="font-bold text-slate-900 dark:text-white text-base">Send a test message</h4>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 mb-4">
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5 mb-4">
           Sends a minimal ping to whichever provider is active right now, to confirm the key/model work.
         </p>
         <button

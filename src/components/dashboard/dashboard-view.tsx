@@ -156,7 +156,7 @@ export function DashboardView({
   }));
 
   return (
-    <div className="space-y-5 max-w-[1600px] mx-auto pb-10 px-4 sm:px-6 text-slate-800 dark:text-slate-200">
+    <div className="space-y-5 max-w-[1600px] mx-auto pb-10 px-4 sm:px-6 text-slate-800 dark:text-slate-700">
       
       {/* Welcome Banner */}
       <Suspense fallback={null}>
@@ -196,11 +196,11 @@ export function DashboardView({
           <div className="relative">
             <button
               onClick={() => setDateRangeOpen(!dateRangeOpen)}
-              className="daterangepick form-control w-auto d-flex align-items-center me-2 flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-2xs mr-2 hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="daterangepick form-control w-auto d-flex align-items-center me-2 flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-700 dark:text-slate-600 shadow-2xs mr-2 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
-              <CalendarDays className="h-4 w-4 text-slate-500 flex-shrink-0" />
+              <CalendarDays className="h-4 w-4 text-slate-500 dark:text-slate-500 flex-shrink-0" />
               <span>{activeDateRange}</span>
-              <ChevronDown className="h-3 w-3 text-slate-400 ml-1 flex-shrink-0" />
+              <ChevronDown className="h-3 w-3 text-slate-400 dark:text-slate-500 ml-1 flex-shrink-0" />
             </button>
             {dateRangeOpen && (
               <div className="absolute right-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
@@ -214,7 +214,7 @@ export function DashboardView({
                     }}
                     className={cn(
                       "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      activeDateRange === opt ? "text-rose-500 bg-rose-50/50 dark:bg-rose-950/20" : "text-slate-700 dark:text-slate-300"
+                      activeDateRange === opt ? "text-rose-500 bg-rose-50/50 dark:bg-rose-950/20" : "text-slate-700 dark:text-slate-600"
                     )}
                   >
                     {opt}
@@ -242,7 +242,7 @@ export function DashboardView({
                     toast("Downloading PDF analytics...", "info");
                     setExportDropdownOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-300"
+                  className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
                 >
                   <Download className="h-3.5 w-3.5 text-red-500" /> Download PDF
                 </button>
@@ -251,7 +251,7 @@ export function DashboardView({
                     toast("Downloading Excel metrics...", "info");
                     setExportDropdownOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-300"
+                  className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
                 >
                   <Download className="h-3.5 w-3.5 text-emerald-500" /> Download Excel
                 </button>
@@ -281,7 +281,7 @@ export function DashboardView({
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
             👋 {greeting}, <span className="text-blue-600 dark:text-blue-400 font-extrabold">{userName}</span>!
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-semibold leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 font-semibold leading-relaxed">
             Here is what is happening with your leads and pipeline today.
           </p>
         </div>
@@ -304,7 +304,7 @@ export function DashboardView({
                 </h5>
                 
                 {/* Timeframe pill tabs */}
-                <ul className="nav nav-tabs nav-solid-danger border dark:border-slate-800 rounded-lg gap-1.5 p-1 flex items-center text-xs font-semibold bg-slate-50/50 dark:bg-slate-900/50">
+                <ul className="nav nav-tabs nav-solid-danger border dark:border-slate-800 rounded-lg gap-1.5 p-1 flex items-center text-xs font-semibold bg-slate-50/50 dark:bg-[var(--muted)]">
                   {["weekly", "monthly", "yearly"].map((t) => (
                     <li key={t} className="nav-item">
                       <button
@@ -313,7 +313,7 @@ export function DashboardView({
                           "nav-link py-1 px-2.5 rounded transition-all capitalize",
                           timeframe === t
                             ? "bg-rose-500 text-white shadow-2xs"
-                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                            : "text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-700"
                         )}
                       >
                         {t}
@@ -335,11 +335,11 @@ export function DashboardView({
                 <div className="d-flex align-items-center flex-wrap gap-2 flex items-center gap-2 text-xs font-semibold">
                   <div className="d-flex align-items-center border dark:border-slate-800 rounded px-2 py-1 flex items-center gap-1.5 bg-white dark:bg-slate-900">
                     <span className="h-2 w-2 rounded-full bg-rose-500" />
-                    <span className="text-slate-600 dark:text-slate-400">Revenue Won</span>
+                    <span className="text-slate-600 dark:text-slate-500">Revenue Won</span>
                   </div>
                   <div className="d-flex align-items-center border dark:border-slate-800 rounded px-2 py-1 flex items-center gap-1.5 bg-white dark:bg-slate-900">
                     <span className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" />
-                    <span className="text-slate-600 dark:text-slate-400">Open Pipeline</span>
+                    <span className="text-slate-600 dark:text-slate-500">Open Pipeline</span>
                   </div>
                 </div>
               </div>
@@ -378,11 +378,11 @@ export function DashboardView({
                         if (active && payload && payload.length) {
                           return (
                             <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-md text-xs relative z-50">
-                              <p className="font-bold text-slate-500 dark:text-slate-400 mb-1">{label}</p>
+                              <p className="font-bold text-slate-500 dark:text-slate-500 mb-1">{label}</p>
                               {payload.map((p, i) => (
                                 <div key={i} className="flex items-center gap-1.5 py-0.5">
                                   <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: p.color }} />
-                                  <span className="text-slate-500 dark:text-slate-400">{p.name}:</span>
+                                  <span className="text-slate-500 dark:text-slate-500">{p.name}:</span>
                                   <span className="font-bold ml-auto" style={{ color: p.color === "#EA580C" ? "#EA580C" : "inherit" }}>
                                     {money(Number(p.value ?? 0))}
                                   </span>
@@ -501,7 +501,7 @@ export function DashboardView({
                     key={i}
                     className="px-4 py-2 d-flex align-items-center justify-content-between border-bottom flex justify-between items-center text-xs font-semibold border-b border-slate-100 dark:border-slate-800/50 last:border-b-0 last:pb-3"
                   >
-                    <p className="text-slate-700 dark:text-slate-300 d-flex align-items-center mb-0 flex items-center">
+                    <p className="text-slate-700 dark:text-slate-600 d-flex align-items-center mb-0 flex items-center">
                       <span className="h-2 w-2 rounded-full mr-2 inline-block" style={{ backgroundColor: d.color }} />
                       {d.name}
                     </p>
@@ -522,7 +522,7 @@ export function DashboardView({
         <Card className="bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl overflow-hidden w-full relative">
           <div className="p-4 sm:p-5 flex flex-col justify-between h-full min-h-[125px]">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Revenue</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 mb-1">Revenue</p>
               <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2.5">
                 {money(stats.pipeline.wonValue)}
               </h4>
@@ -534,7 +534,7 @@ export function DashboardView({
                   {stats.revenueTrendPct >= 0 ? "+" : ""}{stats.revenueTrendPct}%
                 </span>
               )}
-              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">{stats.revenueTrendPct !== null ? "vs Last Month" : "No prior month to compare"}</p>
+              <p className="text-slate-500 dark:text-slate-500 mb-0 font-medium">{stats.revenueTrendPct !== null ? "vs Last Month" : "No prior month to compare"}</p>
             </div>
 
             <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-gradient-to-tr from-rose-500 to-orange-500 text-white flex items-center justify-center shadow-sm">
@@ -547,14 +547,14 @@ export function DashboardView({
         <Card className="bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl overflow-hidden w-full relative">
           <div className="p-4 sm:p-5 flex flex-col justify-between h-full min-h-[125px]">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Active Deals</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 mb-1">Active Deals</p>
               <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2.5">
                 {formatStat(stats.pipeline.openCount)}
               </h4>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap text-xs">
-              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">{money(stats.pipeline.openValue)} open value</p>
+              <p className="text-slate-500 dark:text-slate-500 mb-0 font-medium">{money(stats.pipeline.openValue)} open value</p>
             </div>
 
             <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-sm">
@@ -567,7 +567,7 @@ export function DashboardView({
         <Card className="bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl overflow-hidden w-full relative">
           <div className="p-4 sm:p-5 flex flex-col justify-between h-full min-h-[125px]">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Conversion Rate</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 mb-1">Conversion Rate</p>
               <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2.5">
                 {stats.conversionRate}%
               </h4>
@@ -579,7 +579,7 @@ export function DashboardView({
                   {stats.conversionTrendPct >= 0 ? "+" : ""}{stats.conversionTrendPct}%
                 </span>
               )}
-              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">{stats.conversionTrendPct !== null ? "vs Last Month" : "No prior month to compare"}</p>
+              <p className="text-slate-500 dark:text-slate-500 mb-0 font-medium">{stats.conversionTrendPct !== null ? "vs Last Month" : "No prior month to compare"}</p>
             </div>
 
             <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-gradient-to-tr from-pink-500 to-rose-500 text-white flex items-center justify-center shadow-sm">
@@ -604,7 +604,7 @@ export function DashboardView({
                     </span>
                   )}
                 </div>
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">Total Contacts</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 mt-1">Total Contacts</p>
               </div>
 
               {/* Real sparkline — new leads per day, last 7 days */}
@@ -618,7 +618,7 @@ export function DashboardView({
             </div>
 
             <div className="flex items-center gap-2 text-xs flex-wrap mt-auto">
-              <p className="text-slate-500 dark:text-slate-400 mb-0 font-medium">{stats.leadsDelta !== undefined ? "vs Last Month" : "New leads, last 7 days"}</p>
+              <p className="text-slate-500 dark:text-slate-500 mb-0 font-medium">{stats.leadsDelta !== undefined ? "vs Last Month" : "New leads, last 7 days"}</p>
             </div>
 
           </div>
@@ -653,7 +653,7 @@ export function DashboardView({
                         {deal.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-slate-800 dark:text-slate-200 font-bold truncate leading-none mb-1">{deal.name}</p>
+                        <p className="text-slate-800 dark:text-slate-700 font-bold truncate leading-none mb-1">{deal.name}</p>
                         <p className="text-[10px] text-slate-400 font-medium">{deal.company || "—"}</p>
                       </div>
                     </div>
@@ -665,7 +665,7 @@ export function DashboardView({
 
             <button
               onClick={() => router.push("/opportunities")}
-              className="w-full mt-4 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors text-center block"
+              className="w-full mt-4 py-2 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors text-center block"
             >
               View All &gt;
             </button>
@@ -708,14 +708,14 @@ export function DashboardView({
           {/* Bottom Half: Win Rate — real, replaces a fabricated "Profit Earned" figure */}
           <Card className="bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl overflow-hidden p-4 sm:p-5 flex flex-col justify-between h-[150px]">
             <div className="flex items-center justify-between mb-2">
-              <h5 className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+              <h5 className="text-xs font-bold text-slate-500 dark:text-slate-500 flex items-center gap-1">
                 Win Rate <span className="text-slate-900 dark:text-white text-sm font-black ml-1">{stats.pipeline.winRate}%</span>
               </h5>
               <div className="text-slate-400 dark:text-slate-500 text-[10px] font-semibold">
                 {stats.pipeline.wonCount} Won
               </div>
             </div>
-            <div className="flex-1 flex flex-col justify-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+            <div className="flex-1 flex flex-col justify-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-500">
               <div className="w-full bg-slate-100 dark:bg-slate-900 rounded-full h-2.5 border border-slate-200 dark:border-slate-800">
                 <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${stats.pipeline.winRate}%` }} />
               </div>
@@ -768,7 +768,7 @@ export function DashboardView({
                       <div key={i} className="flex justify-between items-center text-xs font-semibold pb-1.5 border-b border-slate-100 dark:border-slate-800/40 last:border-0 last:pb-0">
                         <div className="flex items-center">
                           <span className={cn("h-2 w-2 rounded-full mr-2 inline-block", item.color)} />
-                          <span className="text-slate-600 dark:text-slate-400">{item.name}</span>
+                          <span className="text-slate-600 dark:text-slate-500">{item.name}</span>
                         </div>
                         <span className="text-slate-900 dark:text-white font-bold">{item.count} · {money(item.value)}</span>
                       </div>
@@ -776,7 +776,7 @@ export function DashboardView({
                   </div>
 
                   {/* Team performance — real, replaces a fabricated avatar/count card */}
-                  <div className="p-3 border border-slate-150 dark:border-slate-800/80 rounded-lg bg-slate-50/50 dark:bg-slate-900/30 text-xs font-semibold">
+                  <div className="p-3 border border-slate-150 dark:border-slate-800/80 rounded-lg bg-slate-50/50 dark:bg-[var(--muted)] text-xs font-semibold">
                     <p className="text-slate-400 dark:text-slate-500 font-medium mb-2">Top Performers (all-time won)</p>
                     {teamPerformance.length === 0 ? (
                       <p className="text-slate-400 text-[11px]">No deals assigned to an owner yet.</p>
@@ -784,7 +784,7 @@ export function DashboardView({
                       <div className="space-y-1.5">
                         {teamPerformance.slice(0, 3).map((rep, i) => (
                           <div key={i} className="flex items-center justify-between">
-                            <span className="text-slate-700 dark:text-slate-300">{rep.name}</span>
+                            <span className="text-slate-700 dark:text-slate-600">{rep.name}</span>
                             <span className="text-slate-900 dark:text-white font-bold">{money(rep.wonValue)}</span>
                           </div>
                         ))}
@@ -808,7 +808,7 @@ export function DashboardView({
           </h5>
           <button
             onClick={() => router.push("/opportunities")}
-            className="px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors rounded"
+            className="px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-600 bg-slate-100 dark:bg-[var(--muted)] hover:bg-slate-200 dark:hover:bg-[var(--border)] transition-colors rounded"
           >
             View All &gt;
           </button>
@@ -821,9 +821,9 @@ export function DashboardView({
           <div className="overflow-x-auto w-full">
             <table className="w-full min-w-[600px] border border-slate-100 dark:border-slate-800">
               <thead>
-                <tr className="bg-slate-50/50 dark:bg-slate-900/30 text-left border-b border-slate-100 dark:border-slate-800">
+                <tr className="bg-slate-50/50 dark:bg-[var(--muted)] text-left border-b border-slate-100 dark:border-slate-800">
                   {["Deal Name", "Stage", "Deal Value", "Contact", "Status"].map((h) => (
-                    <th key={h} className="py-2.5 px-3 text-xs font-bold text-slate-600 dark:text-slate-400">
+                    <th key={h} className="py-2.5 px-3 text-xs font-bold text-slate-600 dark:text-slate-500">
                       {h}
                     </th>
                   ))}
@@ -831,11 +831,11 @@ export function DashboardView({
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {recentDealsTableData.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-colors">
+                  <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 text-xs font-semibold text-slate-800 dark:text-slate-700 transition-colors">
                     <td className="py-2.5 px-3 truncate max-w-[150px]">{row.name}</td>
-                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{row.stage}</td>
+                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-500">{row.stage}</td>
                     <td className="py-2.5 px-3 text-slate-900 dark:text-white font-bold">{money(row.value)}</td>
-                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{row.contact}</td>
+                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-500">{row.contact}</td>
                     <td className="py-2.5 px-3">
                       <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold", row.statusColor)}>
                         {row.status}
@@ -857,7 +857,7 @@ export function DashboardView({
               <span className="h-4 w-1 bg-rose-500 rounded-full inline-block" />
               Upcoming Meetings
             </h5>
-            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 dark:bg-slate-900/50 px-2 py-0.5 rounded-md border border-slate-100 dark:border-slate-800">
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 dark:bg-[var(--muted)] px-2 py-0.5 rounded-md border border-slate-100 dark:border-slate-800">
               {upcomingMeetings.length} Scheduled
             </span>
           </div>
@@ -868,7 +868,7 @@ export function DashboardView({
               {upcomingMeetings.slice(0, 4).map((m) => (
                 <div key={m.id} className="flex items-center justify-between text-xs font-semibold pb-2 border-b border-slate-100 dark:border-slate-800/40 last:border-0 last:pb-0">
                   <div className="min-w-0">
-                    <p className="text-slate-800 dark:text-slate-200 font-bold truncate">{m.title}</p>
+                    <p className="text-slate-800 dark:text-slate-700 font-bold truncate">{m.title}</p>
                     <p className="text-[10px] text-slate-400">{new Date(m.start_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
                   </div>
                   {m.join_url && (
