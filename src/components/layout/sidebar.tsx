@@ -216,7 +216,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
         <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide py-3 space-y-5", collapsed ? "px-2" : "px-3")}>
           <div>
             {!collapsed && <p className="px-3 mb-2 text-[10px] font-extrabold uppercase tracking-wider text-white/85">Main Menu</p>}
-            <ul className="space-y-1">{main.map((item) => renderItem(item, false))}</ul>
+            <ul data-tour-id="dashboard-sidebar-nav" className="space-y-1">{main.map((item) => renderItem(item, false))}</ul>
           </div>
 
           {admin.length > 0 && (

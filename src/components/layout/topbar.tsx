@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown, LogOut, User as UserIcon, Settings, Menu, Sparkles,
-  Phone, ShoppingBag, HelpCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2,
+  Phone, ShoppingBag, HelpCircle, PlayCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2,
   Building2, Check, Plus, Sun, Moon
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -262,6 +262,15 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
           className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
           <ShoppingBag className="h-4 w-4" />
+        </button>
+
+        {/* Replay product tour */}
+        <button
+          onClick={() => router.push("/dashboard?tour=dashboard")}
+          title="Replay product tour"
+          className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+        >
+          <PlayCircle className="h-4 w-4" />
         </button>
 
         {/* Help icon */}
