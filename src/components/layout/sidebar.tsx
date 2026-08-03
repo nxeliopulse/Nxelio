@@ -37,13 +37,25 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
     ? new Date(credits.trialEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : null;
 
-  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
-    Activities: true,
-  });
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   const toggleExpanded = (label: string) => {
     setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
   };
+
+  // Auto-expand menu group when pathname matches one of its sub-items
+  useEffect(() => {
+    navMainItems.forEach((item) => {
+      if (item.items) {
+        const hasActiveSubItem = item.items.some(
+          (sub) => pathname === sub.href || pathname.startsWith(sub.href + "/")
+        );
+        if (hasActiveSubItem) {
+          setExpandedItems((prev) => ({ ...prev, [item.label]: true }));
+        }
+      }
+    });
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
