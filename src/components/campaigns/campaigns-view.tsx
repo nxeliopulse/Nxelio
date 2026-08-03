@@ -16,6 +16,8 @@ import { submitForReview, approveCampaign, sendBackToDraft, archiveCampaign } fr
 import { APPROVAL_STATUSES, approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { campaignTemplates } from "@/lib/campaign-templates";
 import { formatDate } from "@/lib/utils";
+import { usePageTour } from "@/components/tour/use-page-tour";
+import { CAMPAIGNS_TOUR_STEPS } from "@/components/tour/tour-registry";
 
 interface UnifiedRow {
   id: string;
@@ -121,6 +123,7 @@ export function CampaignsView({
 }) {
   const { toast, prompt } = useFeedback();
   const router = useRouter();
+  usePageTour("campaigns", CAMPAIGNS_TOUR_STEPS);
   const [pending, start] = useTransition();
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
@@ -369,14 +372,10 @@ export function CampaignsView({
 
   return (
     <div className="max-w-[1600px] mx-auto">
-      {/* Custom header (breadcrumb + count badge) — kept local to this page, doesn't touch the shared PageHeader used elsewhere */}
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Campaigns</h1>
-            <span className="inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">
-              {rows.length}
-            </span>
+            <h1 data-tour-id="campaigns-title" className="text-2xl font-bold text-slate-900 tracking-tight">Campaigns</h1>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
             <span>Home</span>
@@ -389,7 +388,7 @@ export function CampaignsView({
             <Link2 className="h-4 w-4" /> Connections
           </Button>
           <Link href="/campaigns/builder">
-            <Button><Plus className="h-4 w-4" /> New Campaign</Button>
+            <Button data-tour-id="campaigns-new"><Plus className="h-4 w-4" /> New Campaign</Button>
           </Link>
         </div>
       </div>
@@ -413,7 +412,7 @@ export function CampaignsView({
 
       <Card className="overflow-visible">
         {/* Toolbar */}
-        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
+        <div data-tour-id="campaigns-filter" className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[200px] max-w-sm">
             <Input
               leftIcon={<Search className="h-4 w-4" />}
@@ -673,7 +672,7 @@ export function CampaignsView({
             <Link href="/campaigns/builder"><Button><Plus className="h-4 w-4" /> Create campaign</Button></Link>
           </div>
         ) : viewMode === "grid" ? (
-          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div data-tour-id="campaigns-list" className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.length === 0 && (
               <p className="col-span-full px-1 py-12 text-center text-slate-500 text-sm">No campaigns match your filters.</p>
             )}
@@ -742,7 +741,7 @@ export function CampaignsView({
             })}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div data-tour-id="campaigns-list" className="overflow-x-auto">
             <table className="w-full text-sm min-w-[880px]">
               <thead>
                 <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100 bg-slate-50">

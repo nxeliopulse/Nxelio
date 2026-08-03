@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown, LogOut, User as UserIcon, Settings, Menu, Sparkles,
-  Phone, ShoppingBag, HelpCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2,
-  Building2, Check, Plus
+  Phone, ShoppingBag, HelpCircle, PlayCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2,
+  Building2, Check, Plus, Sun, Moon
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { globalSearch, type GlobalSearchResult } from "@/lib/queries/global-search";
@@ -13,6 +13,7 @@ import { switchWorkspace, createWorkspace, type MyWorkspaceRow } from "@/lib/que
 import { NotificationsBell } from "./notifications-bell";
 import { useSidebar } from "./sidebar-context";
 import { Modal } from "@/components/ui/modal";
+import { getStoredAppearance, applyTheme } from "@/lib/theme";
 
 interface TopbarProps {
   userName?: string;
@@ -27,6 +28,20 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [open, setOpen] = useState(false);
+  const [theme, setTheme] = useState<string>("light");
+
+  // Read theme on mount
+  useEffect(() => {
+    const appearance = getStoredAppearance();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs client-only localStorage value after mount to avoid SSR hydration mismatch
+    setTheme(appearance.theme);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    applyTheme(nextTheme);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -249,6 +264,15 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
           <ShoppingBag className="h-4 w-4" />
         </button>
 
+        {/* Replay product tour */}
+        <button
+          onClick={() => router.push("/dashboard?tour=dashboard")}
+          title="Replay product tour"
+          className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+        >
+          <PlayCircle className="h-4 w-4" />
+        </button>
+
         {/* Help icon */}
         <Link
           href="/help"
@@ -266,6 +290,19 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         >
           <Settings className="h-4 w-4" />
         </Link>
+
+        {/* Dark/Light mode theme toggle */}
+        <button
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors animate-fade-in"
+        >
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4 text-amber-300 fill-amber-300" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
+        </button>
 
         {/* Notifications bell */}
         <NotificationsBell className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white" />

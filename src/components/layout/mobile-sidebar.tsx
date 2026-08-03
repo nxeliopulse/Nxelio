@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { X, Sparkles, HelpCircle } from "lucide-react";
-import { getAiCreditsUsage } from "@/lib/queries/credits";
+import { X, Sparkles, HelpCircle, ChevronDown, AlertTriangle } from "lucide-react";
+import { getAiCreditsUsage, type AiCreditsUsage } from "@/lib/queries/credits";
 import { onCreditsChanged } from "@/lib/credits-refresh";
 import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,37 @@ import { navMainItems, sidebarAdminItems, filterNavByRoleAndOverrides } from "@/
 
 export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolean; onClose: () => void; role?: string; navAccess?: Record<string, boolean> | null }) {
   const pathname = usePathname();
-  const [credits, setCredits] = useState<{ used: number; total: number } | null>(null);
+  const [credits, setCredits] = useState<AiCreditsUsage | null>(null);
+  const [nowMs] = useState(() => Date.now());
+  // Real trial-expired check: a trial end date in the past, on a workspace that never converted to paid.
+  const trialExpired = Boolean(
+    credits?.trialEndsAt &&
+    credits.status !== "active" &&
+    new Date(credits.trialEndsAt).getTime() < nowMs
+  );
+  const trialExpiredDate = trialExpired && credits?.trialEndsAt
+    ? new Date(credits.trialEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+
+  const toggleExpanded = (label: string) => {
+    setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  // Auto-expand menu group when pathname matches one of its sub-items
+  useEffect(() => {
+    navMainItems.forEach((item) => {
+      if (item.items) {
+        const hasActiveSubItem = item.items.some(
+          (sub) => pathname === sub.href || pathname.startsWith(sub.href + "/")
+        );
+        if (hasActiveSubItem) {
+          setExpandedItems((prev) => ({ ...prev, [item.label]: true }));
+        }
+      }
+    });
+  }, [pathname]);
 
   // Close the drawer on navigation; onClose is stable enough not to need in deps.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,6 +97,54 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
               {main.map((item) => {
                 const Icon = item.icon;
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
+
+                if (item.items) {
+                  const isExpanded = expandedItems[item.label] ?? false;
+                  const hasActiveSubItem = item.items.some(
+                    (sub) => pathname === sub.href || pathname.startsWith(sub.href + "/")
+                  );
+
+                  return (
+                    <li key={item.label} className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(item.label)}
+                        className={cn(
+                          "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
+                          hasActiveSubItem ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className={cn("h-4.5 w-4.5 flex-shrink-0", hasActiveSubItem ? "text-blue-600" : "text-slate-400")} strokeWidth={2} />
+                          <span className="flex-1 text-left">{item.label}</span>
+                        </div>
+                        <ChevronDown className={cn("h-4 w-4 transition-transform duration-200 text-slate-400", isExpanded && "rotate-180")} />
+                      </button>
+                      {isExpanded && (
+                        <ul className="pl-9 space-y-1">
+                          {item.items.map((sub) => {
+                            const subActive = pathname === sub.href || pathname.startsWith(sub.href + "/");
+                            return (
+                              <li key={sub.href}>
+                                <Link
+                                  href={sub.href}
+                                  onClick={onClose}
+                                  className={cn(
+                                    "flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                                    subActive ? "text-blue-600 font-semibold" : "text-slate-500 hover:text-slate-800"
+                                  )}
+                                >
+                                  <span>{sub.label}</span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                }
+
                 return (
                   <li key={item.href}>
                     <Link
@@ -133,6 +211,28 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
             <HelpCircle className="h-4.5 w-4.5 text-slate-400" />
             Help & Support
           </Link>
+
+          {/* Trial expired notice — only rendered when the real trial end date has passed */}
+          {trialExpired && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="font-bold text-slate-900 text-sm">Free trial</p>
+                  <p className="text-xs font-semibold text-rose-600 mt-0.5">Expired {trialExpiredDate}</p>
+                </div>
+                <div className="h-8 w-8 rounded-full ring-2 ring-rose-400 text-rose-500 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="h-4 w-4" />
+                </div>
+              </div>
+              <Link
+                href="/billing"
+                onClick={onClose}
+                className="flex items-center justify-center w-full py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
+              >
+                Upgrade
+              </Link>
+            </div>
+          )}
         </div>
       </aside>
     </>

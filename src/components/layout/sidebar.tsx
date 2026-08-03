@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getAiCreditsUsage, type AiCreditsUsage } from "@/lib/queries/credits";
 import { onCreditsChanged } from "@/lib/credits-refresh";
-import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen, ChevronDown, AlertTriangle } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 import { navMainItems, navAdminItems, sidebarAdminItems, filterNavByRoleAndOverrides, isNavItemAllowed } from "@/lib/nav-config";
@@ -24,8 +24,38 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
   const pathname = usePathname();
   const { collapsed, toggleCollapsed } = useSidebar();
   const [credits, setCredits] = useState<AiCreditsUsage | null>(null);
+  const [nowMs] = useState(() => Date.now());
   // Once already on the top plan there's nothing to upgrade to.
   const canUpgrade = !credits || NEXT_PLAN[credits.planId] !== null;
+  // Real trial-expired check: a trial end date in the past, on a workspace that never converted to paid.
+  const trialExpired = Boolean(
+    credits?.trialEndsAt &&
+    credits.status !== "active" &&
+    new Date(credits.trialEndsAt).getTime() < nowMs
+  );
+  const trialExpiredDate = trialExpired && credits?.trialEndsAt
+    ? new Date(credits.trialEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+
+  const toggleExpanded = (label: string) => {
+    setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  // Auto-expand menu group when pathname matches one of its sub-items
+  useEffect(() => {
+    navMainItems.forEach((item) => {
+      if (item.items) {
+        const hasActiveSubItem = item.items.some(
+          (sub) => pathname === sub.href || pathname.startsWith(sub.href + "/")
+        );
+        if (hasActiveSubItem) {
+          setExpandedItems((prev) => ({ ...prev, [item.label]: true }));
+        }
+      }
+    });
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +83,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
 
     if (collapsed) {
       return (
-        <li key={item.href} className="flex justify-center">
+        <li key={item.label} className="flex justify-center">
           <Link
             href={item.href}
             title={item.label}
@@ -66,6 +96,67 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
           >
             <Icon className="h-[21px] w-[21px]" strokeWidth={2} />
           </Link>
+        </li>
+      );
+    }
+
+    if (item.items) {
+      const isExpanded = expandedItems[item.label] ?? false;
+      const hasActiveSubItem = item.items.some(
+        (sub) => pathname === sub.href || pathname.startsWith(sub.href + "/")
+      );
+
+      return (
+        <li key={item.label} className="space-y-1">
+          <button
+            type="button"
+            onClick={() => toggleExpanded(item.label)}
+            className={cn(
+              "w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-sm font-semibold transition-colors group",
+              hasActiveSubItem
+                ? "bg-white/20 text-white shadow-xs"
+                : "text-white/85 hover:bg-white/15 hover:text-white"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <Icon
+                className={cn(
+                  "h-5 w-5 flex-shrink-0",
+                  hasActiveSubItem ? "text-white" : "text-white/75 group-hover:text-white"
+                )}
+                strokeWidth={2}
+              />
+              <span className="flex-1 whitespace-nowrap text-left">{item.label}</span>
+            </div>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 transition-transform duration-200 text-white/60 group-hover:text-white",
+                isExpanded && "rotate-180"
+              )}
+            />
+          </button>
+          {isExpanded && (
+            <ul className="pl-9 space-y-1">
+              {item.items.map((sub) => {
+                const subActive = pathname === sub.href || pathname.startsWith(sub.href + "/");
+                return (
+                  <li key={sub.href}>
+                    <Link
+                      href={sub.href}
+                      className={cn(
+                        "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors",
+                        subActive
+                          ? "bg-white/25 text-white ring-1 ring-white/35 shadow-xs"
+                          : "text-white/75 hover:bg-white/10 hover:text-white"
+                      )}
+                    >
+                      <span className="flex-1 whitespace-nowrap text-left">{sub.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </li>
       );
     }
@@ -106,17 +197,17 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             suppressHydrationWarning
             className={cn("flex items-center gap-2.5 group w-full", collapsed && "justify-center")}
           >
-            <span className="relative h-9 w-9 rounded-xl bg-white flex items-center justify-center font-bold flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-              <LogoMark className="h-6 w-6 transition-opacity duration-200 group-hover:opacity-0" />
+            <span className="relative h-9 w-9 rounded-xl bg-white flex items-center justify-center font-bold flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
+              <LogoMark className="h-full w-full transition-opacity duration-200 group-hover:opacity-0" />
               <PanelLeftClose className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", collapsed && "hidden")} />
               <PanelLeftOpen className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", !collapsed && "hidden")} />
             </span>
             {!collapsed && (
               <span className="flex flex-col leading-tight whitespace-nowrap text-left">
-                <span className="font-bold text-white text-sm tracking-tight">
+                <span className="font-bold text-white text-[15px] tracking-tight">
                   Nxelio Nurture
                 </span>
-                <span className="text-[10px] text-white/80 font-bold uppercase tracking-wider mt-0.5">AI NURTURE</span>
+                <span className="text-[11px] text-white/80 font-bold uppercase tracking-wider mt-0.5">AI NURTURE</span>
               </span>
             )}
           </button>
@@ -125,7 +216,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
         <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide py-3 space-y-5", collapsed ? "px-2" : "px-3")}>
           <div>
             {!collapsed && <p className="px-3 mb-2 text-[10px] font-extrabold uppercase tracking-wider text-white/85">Main Menu</p>}
-            <ul className="space-y-1">{main.map((item) => renderItem(item, false))}</ul>
+            <ul data-tour-id="dashboard-sidebar-nav" className="space-y-1">{main.map((item) => renderItem(item, false))}</ul>
           </div>
 
           {admin.length > 0 && (
@@ -192,6 +283,37 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
               <span className="whitespace-nowrap">Help &amp; Support</span>
             </Link>
           )}
+
+          {/* Trial expired notice — only rendered when the real trial end date has passed */}
+          {trialExpired && (collapsed ? (
+            <div className="flex justify-center">
+              <Link
+                href="/billing"
+                title={`Free trial expired ${trialExpiredDate}`}
+                className="flex items-center justify-center h-10 w-10 rounded-xl bg-rose-950/60 text-rose-400 ring-1 ring-rose-900/60 hover:bg-rose-950 transition-colors"
+              >
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-rose-950/50 ring-1 ring-rose-900/50 p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="font-bold text-white text-sm">Free trial</p>
+                  <p className="text-xs font-semibold text-rose-400 mt-0.5">Expired {trialExpiredDate}</p>
+                </div>
+                <div className="h-8 w-8 rounded-full ring-2 ring-rose-500 text-rose-500 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="h-4 w-4" />
+                </div>
+              </div>
+              <Link
+                href="/billing"
+                className="flex items-center justify-center w-full py-2 rounded-xl bg-black/40 ring-1 ring-white/25 text-white text-xs font-bold hover:bg-black/60 transition-colors"
+              >
+                Upgrade
+              </Link>
+            </div>
+          ))}
         </div>
       </div>
     </aside>

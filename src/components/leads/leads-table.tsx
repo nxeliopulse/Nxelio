@@ -18,6 +18,8 @@ import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { deleteLead, bulkDeleteLeads, updateLead, type LeadRow } from "@/lib/queries/leads";
 import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
 import { createStaticSegment } from "@/lib/queries/segments";
+import { usePageTour } from "@/components/tour/use-page-tour";
+import { LEADS_TOUR_STEPS } from "@/components/tour/tour-registry";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
 // Customizable columns. Users toggle these via the gear menu in the header; the
@@ -122,6 +124,7 @@ function CompanyLogo({ name }: { name?: string | null }) {
 export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
+  usePageTour("leads", LEADS_TOUR_STEPS);
   const [pending, start] = useTransition();
   const [optimisticLeads, setOptimisticLeads] = useOptimistic(
     leads,
@@ -944,11 +947,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       {/* Page header — title + total count badge, breadcrumb, Export/Refresh/Import actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h1 data-tour-id="leads-title" className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Prospects
-            <span className="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-0.5">
-              {optimisticLeads.length}
-            </span>
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
             <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-600">Home</Link>
@@ -985,7 +985,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       </div>
 
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div data-tour-id="leads-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {[
             { label: "Total prospects", value: stats.total, icon: Users2, accent: "bg-amber-500" },
             { label: "Hot prospects", value: stats.hot, icon: Flame, accent: "bg-rose-500" },
@@ -1068,6 +1068,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
             {/* Filter Button */}
             <Button
+              data-tour-id="leads-filter"
               variant="outline"
               size="sm"
               onClick={openFiltersPopover}
@@ -1147,6 +1148,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
             {/* Add Lead — opens the source-picker screen directly (Manual, CSV, LinkedIn, Buy Leads, etc.) */}
             <Button
+              data-tour-id="leads-add-prospect"
               size="sm"
               onClick={() => setShowWizard(true)}
               className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap"

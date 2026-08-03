@@ -16,6 +16,10 @@ import type { DashboardStats } from "@/lib/queries/analytics";
 import type { OpportunityRow } from "@/lib/opportunities";
 import type { MeetingRow } from "@/lib/queries/meetings";
 import type { AiCreditsUsage } from "@/lib/queries/credits";
+import type { ChecklistItem } from "@/lib/getting-started";
+import { GettingStartedChecklist } from "@/components/dashboard/getting-started-checklist";
+import { usePageTour } from "@/components/tour/use-page-tour";
+import { DASHBOARD_TOUR_STEPS } from "@/components/tour/tour-registry";
 
 function money(n: number): string {
   return "$" + Math.round(n).toLocaleString("en-US");
@@ -77,8 +81,9 @@ export function DashboardView({
   recentDeals = [],
   collaborators = [],
   meetings = [],
-  credits = { used: 0, total: 1500, planId: "free" },
+  credits = { used: 0, total: 1500, planId: "free", status: "trialing", trialEndsAt: null },
   teamPerformance = [],
+  gettingStartedItems = [],
 }: {
   stats: DashboardStats;
   userName?: string;
@@ -88,9 +93,11 @@ export function DashboardView({
   meetings?: MeetingRow[];
   credits?: AiCreditsUsage;
   teamPerformance?: { name: string; dealsCount: number; wonValue: number }[];
+  gettingStartedItems?: ChecklistItem[];
 }) {
   const router = useRouter();
   const { toast } = useFeedback();
+  usePageTour("dashboard", DASHBOARD_TOUR_STEPS);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -276,7 +283,10 @@ export function DashboardView({
       </div>
 
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent border border-blue-100/30 dark:border-slate-800 rounded-2xl p-5 mb-4 shadow-3xs flex items-center justify-between gap-4">
+      <div
+        data-tour-id="dashboard-welcome"
+        className="bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent border border-blue-100/30 dark:border-slate-800 rounded-2xl p-5 mb-4 shadow-3xs flex items-center justify-between gap-4"
+      >
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
             👋 {greeting}, <span className="text-blue-600 dark:text-blue-400 font-extrabold">{userName}</span>!
@@ -290,12 +300,19 @@ export function DashboardView({
         </div>
       </div>
 
+      {/* Getting Started checklist — only shown until every item is done */}
+      {gettingStartedItems.length > 0 && gettingStartedItems.some((i) => !i.done) && (
+        <div className="mb-4">
+          <GettingStartedChecklist items={gettingStartedItems} />
+        </div>
+      )}
+
       {/* Row 1: Charts (Revenue Analytics & Traffic Sources) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
         {/* Left Widget: Revenue Analytics Chart */}
         <div className="lg:col-span-8 flex">
-          <Card className="flex-fill bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl overflow-hidden w-full">
+          <Card data-tour-id="dashboard-revenue-chart" className="flex-fill bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl overflow-hidden w-full">
             <div className="p-4 sm:p-5 pb-0">
               <div className="flex align-items-center justify-between flex-wrap gap-2 mb-3 items-center justify-between">
                 <h5 className="mb-0 text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -346,7 +363,7 @@ export function DashboardView({
 
               {/* Mixed Recharts Area & Bar Chart */}
               <div className="h-[250px] w-full mt-2 pr-2">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={activeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
                     <defs>
                       <linearGradient id="colorPipeline" x1="0" y1="0" x2="0" y2="1">
@@ -444,7 +461,7 @@ export function DashboardView({
                 <>
                   {/* Donut Chart using Recharts Pie */}
                   <div className="h-[180px] w-full relative mt-3 flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
                         <Pie
                           data={donutData}
@@ -609,7 +626,7 @@ export function DashboardView({
 
               {/* Real sparkline — new leads per day, last 7 days */}
               <div className="h-[35px] w-[65px] flex-shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width={65} height={35}>
                   <BarChart data={stats.contactsSparkline.map((v) => ({ value: v }))}>
                     <Bar dataKey="value" fill="#EA580C" radius={[1.5, 1.5, 0, 0]} />
                   </BarChart>
@@ -697,7 +714,7 @@ export function DashboardView({
             </div>
 
             <div className="h-[75px] w-full mt-1 pr-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={75}>
                 <BarChart data={stats.pipelineBuckets.map((b) => ({ name: b.label, value: b.value }))}>
                   <Bar dataKey="value" radius={[3, 3, 0, 0]} fill="#EA580C" />
                 </BarChart>
