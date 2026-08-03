@@ -14,19 +14,16 @@
   --muted: #e1e7ef;
   --muted-foreground: #64748b;
   --border: #d7dde7;
-  /* App-wide default accent — "vermilion", matching the CRMS reference
-     redesign (crms.dreamstechnologies.com). Settings > Appearance can
-     override this via data-accent-color below; the landing page keeps its
-     own hardcoded teal (see .landing-page overrides) regardless of this. */
-  --primary: #E41F07;
+  /* App-wide default accent — "teal". Settings > Appearance can override this via data-accent-color below. */
+  --primary: #18A7B8;
   --primary-foreground: #ffffff;
-  --color-blue-50: #FCE9E6;
-  --color-blue-100: #F8CDC5;
-  --color-blue-500: #EF4B30;
-  --color-blue-600: #E41F07;
-  --color-blue-700: #C11A06;
-  --color-teal-600: #E41F07;
-  --color-emerald-600: #E41F07;
+  --color-blue-50: #e0f7fa;
+  --color-blue-100: #b2ebf2;
+  --color-blue-500: #18A7B8;
+  --color-blue-600: #18A7B8;
+  --color-blue-700: #14929f;
+  --color-teal-600: #18A7B8;
+  --color-emerald-600: #18A7B8;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;

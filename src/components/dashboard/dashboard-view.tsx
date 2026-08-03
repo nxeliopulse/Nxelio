@@ -16,8 +16,6 @@ import type { DashboardStats } from "@/lib/queries/analytics";
 import type { OpportunityRow } from "@/lib/opportunities";
 import type { MeetingRow } from "@/lib/queries/meetings";
 import type { AiCreditsUsage } from "@/lib/queries/credits";
-import type { ChecklistItem } from "@/lib/getting-started";
-import { GettingStartedChecklist } from "@/components/dashboard/getting-started-checklist";
 import { usePageTour } from "@/components/tour/use-page-tour";
 import { DASHBOARD_TOUR_STEPS } from "@/components/tour/tour-registry";
 
@@ -83,7 +81,6 @@ export function DashboardView({
   meetings = [],
   credits = { used: 0, total: 1500, planId: "free", status: "trialing", trialEndsAt: null },
   teamPerformance = [],
-  gettingStartedItems = [],
 }: {
   stats: DashboardStats;
   userName?: string;
@@ -93,7 +90,6 @@ export function DashboardView({
   meetings?: MeetingRow[];
   credits?: AiCreditsUsage;
   teamPerformance?: { name: string; dealsCount: number; wonValue: number }[];
-  gettingStartedItems?: ChecklistItem[];
 }) {
   const router = useRouter();
   const { toast } = useFeedback();
@@ -299,13 +295,6 @@ export function DashboardView({
           <Sparkles className="h-5 w-5 animate-pulse" />
         </div>
       </div>
-
-      {/* Getting Started checklist — only shown until every item is done */}
-      {gettingStartedItems.length > 0 && gettingStartedItems.some((i) => !i.done) && (
-        <div className="mb-4">
-          <GettingStartedChecklist items={gettingStartedItems} />
-        </div>
-      )}
 
       {/* Row 1: Charts (Revenue Analytics & Traffic Sources) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">

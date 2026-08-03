@@ -28,7 +28,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   underlineLinks: false,
   lightPreset: "light",
   darkPreset: "dark",
-  accentColor: "vermilion",
+  accentColor: "teal",
   sidebarBadgeStyle: "default",
   sidebarDensity: "default",
 };

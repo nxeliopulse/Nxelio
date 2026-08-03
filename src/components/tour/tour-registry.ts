@@ -15,11 +15,6 @@ export const DASHBOARD_TOUR_STEPS: TourStep[] = [
     description: "This is your home base. Here's a quick tour of what's next.",
   },
   {
-    id: "dashboard-getting-started",
-    title: "Getting Started checklist",
-    description: "Follow this checklist to get real leads flowing through your pipeline.",
-  },
-  {
     id: "dashboard-revenue-chart",
     title: "Revenue analytics",
     description: "Track revenue and pipeline here once you start closing deals.",
