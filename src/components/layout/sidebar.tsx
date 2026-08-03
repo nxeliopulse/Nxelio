@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getAiCreditsUsage, type AiCreditsUsage } from "@/lib/queries/credits";
 import { onCreditsChanged } from "@/lib/credits-refresh";
-import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen, ChevronDown } from "lucide-react";
+import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen, ChevronDown, AlertTriangle } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 import { navMainItems, navAdminItems, sidebarAdminItems, filterNavByRoleAndOverrides, isNavItemAllowed } from "@/lib/nav-config";
@@ -24,8 +24,18 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
   const pathname = usePathname();
   const { collapsed, toggleCollapsed } = useSidebar();
   const [credits, setCredits] = useState<AiCreditsUsage | null>(null);
+  const [nowMs] = useState(() => Date.now());
   // Once already on the top plan there's nothing to upgrade to.
   const canUpgrade = !credits || NEXT_PLAN[credits.planId] !== null;
+  // Real trial-expired check: a trial end date in the past, on a workspace that never converted to paid.
+  const trialExpired = Boolean(
+    credits?.trialEndsAt &&
+    credits.status !== "active" &&
+    new Date(credits.trialEndsAt).getTime() < nowMs
+  );
+  const trialExpiredDate = trialExpired && credits?.trialEndsAt
+    ? new Date(credits.trialEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
 
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
     Activities: true,
@@ -261,6 +271,37 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
               <span className="whitespace-nowrap">Help &amp; Support</span>
             </Link>
           )}
+
+          {/* Trial expired notice — only rendered when the real trial end date has passed */}
+          {trialExpired && (collapsed ? (
+            <div className="flex justify-center">
+              <Link
+                href="/billing"
+                title={`Free trial expired ${trialExpiredDate}`}
+                className="flex items-center justify-center h-10 w-10 rounded-xl bg-rose-950/60 text-rose-400 ring-1 ring-rose-900/60 hover:bg-rose-950 transition-colors"
+              >
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-rose-950/50 ring-1 ring-rose-900/50 p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="font-bold text-white text-sm">Free trial</p>
+                  <p className="text-xs font-semibold text-rose-400 mt-0.5">Expired {trialExpiredDate}</p>
+                </div>
+                <div className="h-8 w-8 rounded-full ring-2 ring-rose-500 text-rose-500 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="h-4 w-4" />
+                </div>
+              </div>
+              <Link
+                href="/billing"
+                className="flex items-center justify-center w-full py-2 rounded-xl bg-black/40 ring-1 ring-white/25 text-white text-xs font-bold hover:bg-black/60 transition-colors"
+              >
+                Upgrade
+              </Link>
+            </div>
+          ))}
         </div>
       </div>
     </aside>

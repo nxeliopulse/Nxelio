@@ -56,6 +56,7 @@ export const navMainItems: NavItem[] = [
 
 export const navAdminItems: NavItem[] = [
   { label: "Administration", href: "/users", icon: UserCog, roles: SUPER },
+  { label: "Subscription", href: "/billing", icon: CreditCard, roles: SUPER },
   { label: "Capture Form", href: "/capture-form", icon: Link2, roles: SUPER },
   { label: "Settings", href: "/settings", icon: Settings, roles: ALL },
 ];
@@ -63,8 +64,12 @@ export const navAdminItems: NavItem[] = [
 /** Admin nav entries actually rendered in the sidebar. "Settings" stays in
  *  navAdminItems (permission checks — e.g. the per-user nav-access toggle
  *  list — still key off it) but is reached from the topbar profile menu
- *  instead of the sidebar, so it's excluded from the rendered list. */
-export const sidebarAdminItems: NavItem[] = navAdminItems.filter((i) => i.href !== "/settings");
+ *  instead of the sidebar, so it's excluded from the rendered list.
+ *  "Subscription" (/billing) is excluded the same way — it's already reachable
+ *  via the topbar Upgrade button and the sidebar's AI Credits widget, so it
+ *  stays in navAdminItems purely so isNavItemAllowed() and the per-user
+ *  nav-access toggle list (User Management) can resolve it correctly. */
+export const sidebarAdminItems: NavItem[] = navAdminItems.filter((i) => i.href !== "/settings" && i.href !== "/billing");
 
 export function filterNavByRole(items: NavItem[], role: Role | null | undefined): NavItem[] {
   if (!role) return items;

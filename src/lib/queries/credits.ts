@@ -1,11 +1,14 @@
 "use server";
 
 import { getSubscription } from "@/lib/queries/subscriptions";
+import type { SubscriptionStatus } from "@/lib/queries/subscription-types";
 
 export interface AiCreditsUsage {
   used: number;
   total: number;
   planId: string;
+  status: SubscriptionStatus;
+  trialEndsAt: string | null;
 }
 
 /**
@@ -15,6 +18,12 @@ export interface AiCreditsUsage {
  */
 export async function getAiCreditsUsage(): Promise<AiCreditsUsage> {
   const sub = await getSubscription();
-  if (!sub) return { used: 0, total: 0, planId: "basic" };
-  return { used: sub.credits_total - sub.credits_remaining, total: sub.credits_total, planId: sub.plan_id };
+  if (!sub) return { used: 0, total: 0, planId: "basic", status: "trialing", trialEndsAt: null };
+  return {
+    used: sub.credits_total - sub.credits_remaining,
+    total: sub.credits_total,
+    planId: sub.plan_id,
+    status: sub.status,
+    trialEndsAt: sub.trial_ends_at,
+  };
 }

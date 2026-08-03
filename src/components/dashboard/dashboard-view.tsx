@@ -77,7 +77,7 @@ export function DashboardView({
   recentDeals = [],
   collaborators = [],
   meetings = [],
-  credits = { used: 0, total: 1500, planId: "free" },
+  credits = { used: 0, total: 1500, planId: "free", status: "trialing", trialEndsAt: null },
   teamPerformance = [],
 }: {
   stats: DashboardStats;
