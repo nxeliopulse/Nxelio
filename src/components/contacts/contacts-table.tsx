@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, Settings2,
   Phone, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  TrendingUp, Trash, RefreshCw, User, Link2
+  TrendingUp, Pencil, RefreshCw, User, Link2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -83,7 +83,8 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
 
   // Star state persisted locally
   const [starred, setStarred] = useState<string[]>([]);
-  const [actionOpenId, setActionOpenId] = useState<string | null>(null);
+  const [rowMenu, setRowMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const [editingContact, setEditingContact] = useState<ContactRow | null>(null);
 
   useEffect(() => {
     try {
@@ -538,8 +539,6 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400"
                     : "bg-rose-100 text-rose-800 dark:bg-rose-950/30 dark:text-rose-400";
 
-                  const isActionOpen = actionOpenId === c.id;
-
                   return (
                     <DataTableRow
                       key={c.id}
@@ -669,38 +668,17 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                       )}
 
                       {/* Action Menu Column */}
-                      <td className="px-3 py-2.5 text-center relative" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => setActionOpenId(isActionOpen ? null : c.id)}
-                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
+                          onClick={(e) => {
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setRowMenu({ id: c.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) });
+                          }}
+                          title="Row actions"
+                          className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
                         >
-                          <MoreVertical className="h-4 w-4" />
+                          <MoreVertical className="h-4 w-4 text-slate-400" />
                         </button>
-                        {isActionOpen && (
-                          <>
-                            <div className="fixed inset-0 z-35" onClick={() => setActionOpenId(null)} />
-                            <div className="absolute right-3 mt-1 w-32 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-40 text-left text-xs">
-                              <button
-                                onClick={() => {
-                                  openContact(c.id);
-                                  setActionOpenId(null);
-                                }}
-                                className="w-full px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300"
-                              >
-                                View Details
-                              </button>
-                              <button
-                                onClick={() => {
-                                  handleDelete(c.id);
-                                  setActionOpenId(null);
-                                }}
-                                className="w-full px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-red-500 font-semibold flex items-center gap-1"
-                              >
-                                <Trash className="h-3 w-3" /> Delete
-                              </button>
-                            </div>
-                          </>
-                        )}
                       </td>
 
                     </DataTableRow>
@@ -826,6 +804,39 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
 
       {/* Modal overlays */}
       <EditContactModal open={showModal} onClose={() => setShowModal(false)} defaultAccountId={accountFilterId || undefined} />
+      {editingContact && (
+        <EditContactModal open={true} onClose={() => setEditingContact(null)} contact={editingContact} />
+      )}
+
+      {/* Row actions menu — kebab button in the rightmost column, Edit + Delete */}
+      {rowMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setRowMenu(null)} />
+          <div className="fixed z-50 w-36 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-1" style={{ top: rowMenu.top, left: rowMenu.left }}>
+            <button
+              onClick={() => {
+                const contact = contacts.find((x) => x.id === rowMenu.id);
+                setRowMenu(null);
+                if (contact) setEditingContact(contact);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </button>
+            <button
+              onClick={() => {
+                const id = rowMenu.id;
+                setRowMenu(null);
+                handleDelete(id);
+              }}
+              disabled={pending}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-rose-950/50 rounded-lg disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Columns customizer floating panel */}
       {showCols && colsPos && (
