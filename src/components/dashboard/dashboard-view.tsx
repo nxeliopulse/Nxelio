@@ -346,7 +346,7 @@ export function DashboardView({
 
               {/* Mixed Recharts Area & Bar Chart */}
               <div className="h-[250px] w-full mt-2 pr-2">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={activeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
                     <defs>
                       <linearGradient id="colorPipeline" x1="0" y1="0" x2="0" y2="1">
@@ -444,7 +444,7 @@ export function DashboardView({
                 <>
                   {/* Donut Chart using Recharts Pie */}
                   <div className="h-[180px] w-full relative mt-3 flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
                         <Pie
                           data={donutData}
@@ -609,7 +609,7 @@ export function DashboardView({
 
               {/* Real sparkline — new leads per day, last 7 days */}
               <div className="h-[35px] w-[65px] flex-shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width={65} height={35}>
                   <BarChart data={stats.contactsSparkline.map((v) => ({ value: v }))}>
                     <Bar dataKey="value" fill="#EA580C" radius={[1.5, 1.5, 0, 0]} />
                   </BarChart>
@@ -697,7 +697,7 @@ export function DashboardView({
             </div>
 
             <div className="h-[75px] w-full mt-1 pr-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={75}>
                 <BarChart data={stats.pipelineBuckets.map((b) => ({ name: b.label, value: b.value }))}>
                   <Bar dataKey="value" radius={[3, 3, 0, 0]} fill="#EA580C" />
                 </BarChart>
