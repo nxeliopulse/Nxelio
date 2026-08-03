@@ -42,9 +42,9 @@ export const navMainItems: NavItem[] = [
   { label: "Opportunities", href: "/opportunities", icon: Briefcase, roles: SALES },
   {
     label: "Activities",
-    href: "/meetings",
+    href: "/activities",
     icon: CalendarDays,
-    roles: SALES,
+    roles: ALL,
     items: [
       { label: "Meetings", href: "/meetings" },
       { label: "Emails", href: "/activities/emails" },

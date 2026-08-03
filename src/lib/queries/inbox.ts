@@ -65,6 +65,42 @@ export async function getInboxConversations(campaignId?: string): Promise<InboxC
   return [...byLead.values()].map((c) => ({ ...c, is_read: !anyUnread.has((c.lead_id as string) || c.id) }));
 }
 
+/** Every message this workspace has sent, newest first — the real "Sent" folder
+ *  for the Activities > Emails screen (mirrors getInboxConversations' shape,
+ *  but ungrouped and scoped to direction=outbound). */
+export async function getSentMessages(): Promise<InboxConversation[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("inbox_messages")
+    .select(`
+      *,
+      leads(full_name, company_name, email),
+      campaigns(campaign_name)
+    `)
+    .eq("direction", "outbound")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error || !data) return [];
+  return data.map((m) => {
+    const leads = (m as { leads?: { full_name?: string; company_name?: string; email?: string } }).leads;
+    const campaigns = (m as { campaigns?: { campaign_name?: string } }).campaigns;
+    return {
+      id: m.id,
+      lead_id: m.lead_id,
+      campaign_id: m.campaign_id,
+      direction: m.direction,
+      subject: m.subject,
+      body: m.body,
+      is_read: m.is_read,
+      created_at: m.created_at,
+      lead_name: leads?.full_name || leads?.company_name || "Unknown",
+      lead_company: leads?.company_name || null,
+      lead_email: leads?.email || null,
+      campaign_name: campaigns?.campaign_name || null,
+    };
+  });
+}
+
 /** Pass campaignId when viewing this thread from a specific campaign's own
  *  Inbox tab, so it only shows that campaign's messages — otherwise a lead
  *  enrolled in several campaigns shows every one of them mixed together. */
@@ -177,4 +213,39 @@ export async function sendReply(
   });
   revalidatePath("/campaigns", "layout");
   return { ok: true, simulated };
+}
+
+/**
+ * Sends a real email from the Activities > Emails composer to any address.
+ * When the recipient matches an existing lead, this reuses sendReply() so it
+ * gets the exact same real send path (email or LinkedIn fallback) and gets
+ * logged as a real conversation message. When the recipient isn't a known
+ * lead yet, it still sends for real via the email provider, it just isn't
+ * tied to any lead record (no fake entry gets created either way).
+ */
+export async function sendComposedEmail(
+  to: string,
+  subject: string,
+  body: string
+): Promise<{ ok: boolean; error?: string; simulated?: boolean }> {
+  const recipient = to.trim();
+  if (!recipient) return { ok: false, error: "Recipient email is required" };
+  if (!subject.trim()) return { ok: false, error: "Subject is required" };
+
+  const supabase = await createClient();
+  const { data: matchedLead } = await supabase.from("leads").select("id").eq("email", recipient).maybeSingle();
+  if (matchedLead) {
+    return sendReply(matchedLead.id, subject, body);
+  }
+
+  const { sendEmail } = await import("@/lib/email/resend");
+  const { getOnboarding } = await import("@/lib/queries/onboarding");
+  const { isBlocked } = await import("@/lib/queries/blocklist");
+  if (await isBlocked(recipient)) return { ok: false, error: "This recipient is on your blocklist" };
+
+  const { data: onboarding } = await getOnboarding();
+  const fromName = onboarding?.company_name?.trim() || "Nxelio Nurture";
+  const result = await sendEmail({ to: recipient, subject, text: body, fromName });
+  if (!result.ok) return { ok: false, error: result.error };
+  return { ok: true, simulated: result.simulated };
 }

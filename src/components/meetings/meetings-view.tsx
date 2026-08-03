@@ -80,9 +80,39 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
   const [detail, setDetail] = useState<MeetingRow | null>(null);
   const [editing, setEditing] = useState<MeetingRow | "new" | null>(null);
   
-  // Zoho Calendar sidebar visibility filters
-  const [showMyMeetings, setShowMyMeetings] = useState(true);
-  const [showExternalCalendars, setShowExternalCalendars] = useState(true);
+  // Accountix Calendar Category Filters
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(
+    new Set(["Meetings", "Tasks", "Calls", "Events", "Holidays"])
+  );
+
+  const toggleCategory = (cat: string) => {
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  const getEventCategory = (item: { kind: "meeting" | "external"; title: string }) => {
+    if (item.kind === "meeting") return "Meetings";
+    const t = item.title.toLowerCase();
+    if (t.includes("call") || t.includes("phone")) return "Calls";
+    if (t.includes("retreat") || t.includes("happy") || t.includes("task") || t.includes("todo")) return "Tasks";
+    if (t.includes("holiday") || t.includes("valentine") || t.includes("christmas") || t.includes("report")) return "Holidays";
+    return "Events";
+  };
+
+  const getEventStyle = (cat: string) => {
+    switch (cat) {
+      case "Meetings": return "bg-blue-600 text-white";
+      case "Tasks": return "bg-emerald-600 text-white";
+      case "Calls": return "bg-cyan-600 text-white";
+      case "Events": return "bg-purple-600 text-white";
+      case "Holidays": return "bg-rose-600 text-white";
+      default: return "bg-slate-600 text-white";
+    }
+  };
 
   const [presetLeadIds, setPresetLeadIds] = useState<string[]>([]);
   useEffect(() => {
@@ -133,13 +163,12 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
 
   const externalByDay = useMemo(() => {
     const map = new Map<string, SyncedCalendarEvent[]>();
-    if (!showExternalCalendars) return map;
     for (const e of external.events) {
       const k = dateKey(new Date(e.start));
       (map.get(k) ?? map.set(k, []).get(k)!).push(e);
     }
     return map;
-  }, [external.events, showExternalCalendars]);
+  }, [external.events]);
 
   const [now] = useState(() => Date.now());
   const { upcoming, past } = useMemo(() => {
@@ -155,6 +184,31 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
     return { upcoming: up, past: pa };
   }, [meetings, now]);
 
+  const upcomingEventsList = useMemo(() => {
+    const list: { title: string; start: string; timeLabel: string; kind: "meeting" | "external" }[] = [];
+    upcoming.forEach((m) => {
+      list.push({
+        title: m.title,
+        start: m.start_at,
+        timeLabel: dayLabel(m.start_at) + " " + fmtTime(m.start_at),
+        kind: "meeting",
+      });
+    });
+    external.events.forEach((e) => {
+      const isFuture = new Date(e.start).getTime() >= now;
+      if (isFuture) {
+        list.push({
+          title: e.title,
+          start: e.start,
+          timeLabel: dayLabel(e.start) + " " + (e.allDay ? "All day" : fmtTime(e.start)),
+          kind: "external",
+        });
+      }
+    });
+    list.sort((a, b) => a.start.localeCompare(b.start));
+    return list.filter((item) => activeCategories.has(getEventCategory(item))).slice(0, 5);
+  }, [upcoming, external.events, now, activeCategories]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, MeetingRow[]>();
     for (const m of upcoming) {
@@ -166,14 +220,13 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
 
   const meetingsByDay = useMemo(() => {
     const map = new Map<string, MeetingRow[]>();
-    if (!showMyMeetings) return map;
     for (const m of meetings) {
       const k = dateKey(new Date(m.start_at));
       (map.get(k) ?? map.set(k, []).get(k)!).push(m);
     }
     for (const list of map.values()) list.sort((a, b) => a.start_at.localeCompare(b.start_at));
     return map;
-  }, [meetings, showMyMeetings]);
+  }, [meetings]);
 
   const selectedDayKey = dateKey(selectedDay);
   const selectedDayAgenda = useMemo(() => {
@@ -206,10 +259,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-4">
-      {/* Shown only when arrived from a single prospect's page (Schedule button
-          passes ?leads=<id>) — the only way back to it was the browser's Back
-          button, which is easy to lose once you've clicked around the calendar. */}
+    <div className="max-w-[1600px] mx-auto space-y-6">
       {presetLeadIds.length === 1 && (
         <Link
           href={`/leads/${presetLeadIds[0]}`}
@@ -219,211 +269,160 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
         </Link>
       )}
 
-      {/* Top Header & Primary Schedule Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Meetings & Calendar</h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-500 mt-0.5">
-            Schedule, track, and sync meetings with Google & Outlook Calendar
-          </p>
-        </div>
-        <div className="flex items-center gap-3 self-start sm:self-auto">
-          {accounts.length === 0 ? (
-            <Link href="/settings?section=calendar" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
-              <RefreshCw className="h-3.5 w-3.5" /> Connect Calendar
-            </Link>
-          ) : (
-            <div className="hidden md:flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-500">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Connected ({accounts.length})
-            </div>
-          )}
-          <Button
-            onClick={() => setEditing("new")}
-            className="rounded-xl font-bold px-4 py-2 text-xs sm:text-sm gap-2"
-          >
-            <Plus className="h-4 w-4" /> Schedule Meeting
-          </Button>
-        </div>
-      </div>
-
-      {/* Zero-Scroll Zoho Grid Layout: Left Control Panel + Right Calendar Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+      {/* Zero-Scroll Two-Column Layout */}
+      <div className="flex flex-col lg:flex-row gap-6 items-stretch">
         
-        {/* Left Control Sidebar (Unified Single Card - Stretches 100% to match Big Calendar height) */}
-        <div className="lg:col-span-4 flex flex-col">
-          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex-1 flex flex-col justify-between space-y-4">
-            {/* Section 1: Mini Month Picker */}
-            <div className="flex-shrink-0">
-              <MiniCalendar
-                month={calendarMonth}
-                onMonthChange={setCalendarMonth}
-                selectedDay={selectedDay}
-                onSelectDay={setSelectedDay}
-              />
+        {/* Left Column Sidebar */}
+        <div className="w-full lg:w-80 shrink-0 space-y-6">
+          {/* Card 1: Mini Calendar */}
+          <div className="rounded-2xl border border-slate-200 bg-white dark:bg-slate-900 p-5 shadow-sm">
+            <MiniCalendar
+              month={calendarMonth}
+              onMonthChange={setCalendarMonth}
+              selectedDay={selectedDay}
+              onSelectDay={setSelectedDay}
+            />
+          </div>
+
+          {/* Card 2: My Calendars (Checkboxes) */}
+          <div className="rounded-2xl border border-slate-200 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white">My Calendars</h3>
+            <div className="space-y-3 text-xs font-semibold">
+              {[
+                { name: "Meetings", color: "bg-blue-600", border: "border-blue-600 text-blue-600" },
+                { name: "Tasks", color: "bg-emerald-600", border: "border-emerald-600 text-emerald-600" },
+                { name: "Calls", color: "bg-cyan-600", border: "border-cyan-600 text-cyan-600" },
+                { name: "Events", color: "bg-purple-600", border: "border-purple-600 text-purple-600" },
+                { name: "Holidays", color: "bg-rose-600", border: "border-rose-600 text-rose-600" },
+              ].map((cat) => {
+                const active = activeCategories.has(cat.name);
+                return (
+                  <button
+                    key={cat.name}
+                    onClick={() => toggleCategory(cat.name)}
+                    className="w-full flex items-center gap-3 text-left hover:opacity-85 transition-opacity"
+                  >
+                    <div className={cn(
+                      "h-4 w-4 rounded flex items-center justify-center border transition-all",
+                      active ? `${cat.color} border-transparent text-white` : "border-slate-300 text-transparent"
+                    )}>
+                      <Check className="h-3 w-3 stroke-[3]" />
+                    </div>
+                    <span className="text-slate-700 dark:text-slate-300 font-bold">{cat.name}</span>
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            <div className="border-t border-slate-100 dark:border-slate-800" />
-
-            {/* Section 2: My Calendars Checkboxes */}
-            <div className="flex-shrink-0 space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">My Calendars</h3>
-              <div className="space-y-1 text-xs font-medium">
-                <button
-                  onClick={() => setShowMyMeetings(!showMyMeetings)}
-                  className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-[var(--muted)] transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-md bg-blue-600 dark:bg-blue-500 flex-shrink-0" />
-                    <span className="text-slate-900 dark:text-white font-semibold">LeadPro Meetings</span>
-                  </div>
-                  {showMyMeetings ? <CheckSquare className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> : <Square className="h-3.5 w-3.5 text-slate-300 dark:text-slate-700" />}
-                </button>
-
-                {accounts.map((a) => {
-                  const style = PROVIDER_STYLE[a.provider] || PROVIDER_STYLE.google;
-                  return (
-                    <button
-                      key={a.id}
-                      onClick={() => setShowExternalCalendars(!showExternalCalendars)}
-                      className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-[var(--muted)] transition-colors text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2.5 w-2.5 rounded-md ${style.dot} flex-shrink-0`} />
-                        <span className="text-slate-900 dark:text-white truncate max-w-[140px]">{style.label}</span>
-                      </div>
-                      {showExternalCalendars ? <CheckSquare className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> : <Square className="h-3.5 w-3.5 text-slate-300 dark:text-slate-700" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100 dark:border-slate-800" />
-
-            {/* Region / Time Zone Live Clock Widget */}
-            <div className="flex-shrink-0">
-              <RegionClockWidget />
-            </div>
-
-            <div className="border-t border-slate-100 dark:border-slate-800" />
-
-            {/* Section 3: Selected Day Schedule / Events List (Expands to fill remaining vertical space!) */}
-            <div className="flex-1 flex flex-col justify-between space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    {selectedDay.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-500">
-                    {selectedDayAgenda.length} event{selectedDayAgenda.length === 1 ? "" : "s"} scheduled
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setEditing("new")}
-                  className="rounded-xl gap-1 font-bold text-xs h-7 px-2.5"
-                >
-                  <Plus className="h-3 w-3" /> Add Event
-                </Button>
-              </div>
-
-              {selectedDayAgenda.length === 0 ? (
-                <div className="p-3 text-center text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl space-y-1 flex-1 flex flex-col items-center justify-center">
-                  <p>No events on this day.</p>
-                  {upcoming[0] && (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-500 font-medium">
-                      Next: <span className="font-bold text-slate-700 dark:text-slate-600">{upcoming[0].title}</span> ({dayLabel(upcoming[0].start_at)})
-                    </p>
-                  )}
-                </div>
+          {/* Card 3: Upcoming Events */}
+          <div className="rounded-2xl border border-slate-200 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4 flex flex-col min-h-[280px]">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white">Upcoming Events</h3>
+            <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+              {upcomingEventsList.length === 0 ? (
+                <p className="text-xs text-slate-400 py-8 text-center">No upcoming events.</p>
               ) : (
-                <div className="space-y-2 flex-1 min-h-[140px]">
-                  {selectedDayAgenda.map((item) =>
-                    item.kind === "meeting" ? (
-                      <MeetingRowItem key={item.key} m={item.meeting} onOpen={() => setDetail(item.meeting)} past={new Date(item.meeting.end_at).getTime() < now} compact />
-                    ) : (
-                      <ExternalEventRow key={item.key} e={item.event} compact />
-                    )
-                  )}
-                </div>
+                upcomingEventsList.map((evt, idx) => {
+                  const cat = getEventCategory(evt);
+                  const colorClass = getEventStyle(cat).split(" ")[0]; // e.g. bg-blue-600
+                  return (
+                    <div key={idx} className="flex items-start gap-3 text-xs">
+                      <span className={cn("h-2.5 w-2.5 rounded-full mt-1 shrink-0", colorClass)} />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{evt.title}</p>
+                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">{evt.timeLabel}</p>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
         </div>
 
-        {/* Right Main Calendar View Container (Zero Scroll Full Screen Grid) */}
-        <div className="lg:col-span-8 flex flex-col">
-          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm flex-1 flex flex-col">
-            {/* View Mode Bar */}
-            <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 p-1 bg-slate-50 dark:bg-slate-950/60">
+        {/* Right Main Column */}
+        <div className="flex-1 flex flex-col space-y-6">
+          {/* Header Controls Area */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Calendar</h1>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-500 mt-0.5">
+                {calendarMonth.toLocaleDateString([], { month: "long", year: "numeric" })}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Navigation group */}
+              <div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-800 p-0.5 bg-white dark:bg-slate-900">
+                <button
+                  onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() - 1); setCalendarMonth(d); }}
+                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => { const d = new Date(); d.setDate(1); setCalendarMonth(d); setSelectedDay(new Date()); }}
+                  className="px-3 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border-x border-slate-200 dark:border-slate-800"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() + 1); setCalendarMonth(d); }}
+                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* View toggle group */}
+              <div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-800 p-0.5 bg-white dark:bg-slate-900">
                 <button
                   onClick={() => setViewMode("month")}
                   className={cn(
-                    "px-3 py-1 rounded-lg text-xs font-bold transition-all",
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all",
                     viewMode === "month"
-                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
                       : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
                   )}
                 >
-                  Month View
+                  Month
                 </button>
                 <button
                   onClick={() => setViewMode("upcoming")}
                   className={cn(
-                    "px-3 py-1 rounded-lg text-xs font-bold transition-all",
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border-x border-slate-200 dark:border-slate-800",
                     viewMode === "upcoming"
-                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
                       : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
                   )}
                 >
-                  Upcoming ({upcoming.length})
+                  Upcoming
                 </button>
                 <button
                   onClick={() => setViewMode("past")}
                   className={cn(
-                    "px-3 py-1 rounded-lg text-xs font-bold transition-all",
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all",
                     viewMode === "past"
-                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
                       : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
                   )}
                 >
-                  Past ({past.length})
+                  Past
                 </button>
               </div>
 
-              {/* Navigation Arrows for Month */}
-              {viewMode === "month" && (
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">
-                    {calendarMonth.toLocaleDateString([], { month: "long", year: "numeric" })}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() - 1); setCalendarMonth(d); }}
-                      className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => { const d = new Date(); d.setDate(1); setCalendarMonth(d); setSelectedDay(new Date()); }}
-                      className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
-                    >
-                      Today
-                    </button>
-                    <button
-                      onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() + 1); setCalendarMonth(d); }}
-                      className="p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Add event button */}
+              <Button
+                onClick={() => setEditing("new")}
+                className="rounded-xl font-bold px-4 py-2 text-xs sm:text-sm gap-2"
+              >
+                <Plus className="h-4 w-4" /> Add Event
+              </Button>
             </div>
+          </div>
 
-            {/* Calendar Grid Mode */}
+          {/* Calendar Area */}
+          <div className="rounded-2xl border border-slate-200 bg-white dark:bg-slate-900 overflow-hidden shadow-sm flex-1 flex flex-col min-h-[600px]">
             {viewMode === "month" && (
               <CalendarGrid
                 month={calendarMonth}
@@ -432,19 +431,21 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                 externalByDay={externalByDay}
                 selectedDay={selectedDay}
                 onSelectDay={setSelectedDay}
+                activeCategories={activeCategories}
+                getEventCategory={getEventCategory}
+                getEventStyle={getEventStyle}
               />
             )}
 
-            {/* List Modes */}
             {viewMode === "upcoming" && (
-              <div className="p-4 space-y-4">
+              <div className="p-5 space-y-5 overflow-y-auto">
                 {upcoming.length === 0 ? (
                   <div className="py-16 text-center text-slate-400 dark:text-slate-500 font-medium text-xs">No upcoming meetings scheduled.</div>
                 ) : (
                   grouped.map(([day, items]) => (
-                    <div key={day} className="space-y-2">
+                    <div key={day} className="space-y-2.5">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{day}</h3>
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         {items.map((m) => <MeetingRowItem key={m.id} m={m} onOpen={() => setDetail(m)} />)}
                       </div>
                     </div>
@@ -454,7 +455,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
             )}
 
             {viewMode === "past" && (
-              <div className="p-4 space-y-2">
+              <div className="p-5 space-y-2.5 overflow-y-auto">
                 {past.length === 0 ? (
                   <div className="py-16 text-center text-slate-400 dark:text-slate-500 font-medium text-xs">No past meetings recorded.</div>
                 ) : (
@@ -521,31 +522,32 @@ function MiniCalendar({
   }, [month]);
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-4">
+      {/* Header with Month Title and arrows on edges */}
       <div className="flex items-center justify-between px-1">
-        <span className="font-bold text-xs text-slate-900 dark:text-white">
-          {month.toLocaleDateString([], { month: "short", year: "numeric" })}
+        <button
+          onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() - 1); onMonthChange(d); }}
+          className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="font-bold text-sm text-slate-800">
+          {month.toLocaleDateString([], { month: "long", year: "numeric" })}
         </span>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() - 1); onMonthChange(d); }}
-            className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() + 1); onMonthChange(d); }}
-            className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
-          >
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <button
+          onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() + 1); onMonthChange(d); }}
+          className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400">
-        <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400">
+        <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
       </div>
 
+      {/* Grid of days */}
       <div className="grid grid-cols-7 gap-1 text-xs">
         {days.map((d) => {
           const inMonth = d.getMonth() === month.getMonth();
@@ -556,17 +558,20 @@ function MiniCalendar({
               key={d.toISOString()}
               onClick={() => onSelectDay(d)}
               className={cn(
-                "h-6 w-6 rounded-lg flex items-center justify-center font-medium mx-auto transition-all text-[11px]",
+                "h-7 w-7 rounded-full flex items-center justify-center font-semibold mx-auto transition-all text-xs relative",
                 isSelected
-                  ? "bg-blue-600 text-white font-bold shadow-sm"
+                  ? "bg-indigo-600 text-white font-bold shadow-sm"
                   : isToday
-                  ? "bg-blue-50 dark:bg-blue-950/80 text-blue-600 font-bold border border-blue-200 dark:border-blue-800"
+                  ? "bg-indigo-50 text-indigo-600 font-bold border border-indigo-200"
                   : inMonth
-                  ? "text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-[var(--muted)]"
-                  : "text-slate-300 dark:text-slate-700"
+                  ? "text-slate-600 hover:bg-slate-100"
+                  : "text-slate-300"
               )}
             >
               {d.getDate()}
+              {inMonth && !isSelected && (
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-slate-300" />
+              )}
             </button>
           );
         })}
@@ -643,16 +648,28 @@ function ExternalEventRow({ e, compact }: { e: SyncedCalendarEvent; compact?: bo
   );
 }
 
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAY_LABELS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-/** Zero-Scroll Zoho Calendar Month Grid */
-function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, selectedDay, onSelectDay }: {
+function CalendarGrid({
+  month,
+  onMonthChange,
+  meetingsByDay,
+  externalByDay,
+  selectedDay,
+  onSelectDay,
+  activeCategories,
+  getEventCategory,
+  getEventStyle,
+}: {
   month: Date;
   onMonthChange: (d: Date) => void;
   meetingsByDay: Map<string, MeetingRow[]>;
   externalByDay: Map<string, SyncedCalendarEvent[]>;
   selectedDay: Date;
   onSelectDay: (d: Date) => void;
+  activeCategories: Set<string>;
+  getEventCategory: (item: { kind: "meeting" | "external"; title: string }) => string;
+  getEventStyle: (cat: string) => string;
 }) {
   const today = new Date();
   const cells = useMemo(() => {
@@ -671,25 +688,31 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
   const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
   return (
-    <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
-      <div className="grid grid-cols-7 gap-1 flex-1">
+    <div className="flex-1 flex flex-col bg-slate-100 dark:bg-slate-800 gap-px p-4 sm:p-5">
+      {/* Weekday headers row */}
+      <div className="grid grid-cols-7 bg-white dark:bg-slate-900">
         {WEEKDAY_LABELS.map((w) => (
-          <div key={w} className="text-center text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 py-1.5 border-b border-slate-100 dark:border-slate-800">
+          <div key={w} className="text-center text-xs font-bold tracking-wider text-slate-400 py-3 border-b border-slate-100 dark:border-slate-800">
             {w}
           </div>
         ))}
+      </div>
+      
+      {/* 6-row Day grid */}
+      <div className="grid grid-cols-7 gap-px bg-slate-200 dark:bg-slate-800 flex-1">
         {cells.map((d) => {
           const inMonth = d.getMonth() === month.getMonth();
           const dayMeetings = meetingsByDay.get(dateKey(d)) ?? [];
           const dayExternal = externalByDay.get(dateKey(d)) ?? [];
-          const totalCount = dayMeetings.length + dayExternal.length;
           const isToday = sameDay(d, today);
           const isSelected = sameDay(d, selectedDay);
 
           const chips = [
-            ...dayMeetings.map((m) => ({ kind: "meeting" as const, start: m.start_at, title: m.title })),
-            ...dayExternal.map((e) => ({ kind: "external" as const, start: e.start, title: e.title, provider: e.provider })),
-          ].sort((a, b) => a.start.localeCompare(b.start));
+            ...dayMeetings.map((m) => ({ kind: "meeting" as const, start: m.start_at, title: m.title, allDay: false })),
+            ...dayExternal.map((e) => ({ kind: "external" as const, start: e.start, title: e.title, provider: e.provider, allDay: e.allDay })),
+          ]
+            .filter((c) => activeCategories.has(getEventCategory(c)))
+            .sort((a, b) => a.start.localeCompare(b.start));
 
           const visibleChips = chips.slice(0, 3);
           const overflow = chips.length - visibleChips.length;
@@ -699,45 +722,41 @@ function CalendarGrid({ month, onMonthChange, meetingsByDay, externalByDay, sele
               key={d.toISOString()}
               onClick={() => onSelectDay(d)}
               className={cn(
-                "min-h-[96px] sm:min-h-[110px] rounded-xl flex flex-col items-stretch gap-1 text-xs transition-all p-2 text-left border border-slate-100/60 dark:border-slate-800/60",
-                isSelected
-                  ? "bg-blue-50/80 dark:bg-blue-950/60 border-blue-600 dark:border-blue-500 shadow-xs"
-                  : isToday
-                  ? "bg-blue-50/60 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800"
-                  : inMonth
-                  ? "hover:bg-slate-50 dark:hover:bg-[var(--muted)] bg-white dark:bg-slate-900"
-                  : "bg-slate-50/30 dark:bg-slate-950/40 text-slate-400 dark:text-slate-700"
+                "min-h-[110px] bg-white dark:bg-slate-900 flex flex-col items-stretch gap-1.5 p-2 text-left relative transition-all",
+                isSelected ? "ring-2 ring-indigo-600 ring-inset z-10" : "hover:bg-slate-50/50"
               )}
             >
               <span className={cn(
-                "self-start h-5 w-5 flex items-center justify-center rounded-full text-[11px] font-bold transition-all",
+                "h-5 w-5 flex items-center justify-center rounded-full text-xs font-semibold",
                 isToday
-                  ? "bg-blue-600 text-white shadow-xs"
+                  ? "bg-indigo-600 text-white shadow-xs font-bold"
                   : isSelected
-                  ? "bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold"
+                  ? "text-indigo-600 font-bold"
                   : inMonth
-                  ? "text-slate-700 dark:text-slate-600"
-                  : "text-slate-400 dark:text-slate-600"
+                  ? "text-slate-700 dark:text-slate-300"
+                  : "text-slate-300 dark:text-slate-700"
               )}>
                 {d.getDate()}
               </span>
 
-              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                {visibleChips.map((c, i) => (
-                  <span
-                    key={i}
-                    className={cn(
-                      "truncate rounded-md px-1.5 py-0.5 text-[9px] font-semibold leading-tight border-l-2 transition-colors",
-                      c.kind === "meeting"
-                        ? "bg-blue-50 dark:bg-blue-950/80 border-l-blue-600 text-blue-900 dark:text-blue-200"
-                        : `${(PROVIDER_STYLE[c.provider] || PROVIDER_STYLE.google).chip} border-l-2`
-                    )}
-                  >
-                    {fmtTime(c.start)} {c.title}
-                  </span>
-                ))}
+              <div className="flex flex-col gap-1 min-w-0 flex-1 overflow-hidden">
+                {visibleChips.map((c, i) => {
+                  const cat = getEventCategory(c);
+                  const styleClass = getEventStyle(cat);
+                  return (
+                    <span
+                      key={i}
+                      className={cn(
+                        "truncate rounded px-1.5 py-1 text-[9px] font-bold leading-none block w-full",
+                        styleClass
+                      )}
+                    >
+                      {c.allDay ? "" : fmtTime(c.start)} {c.title}
+                    </span>
+                  );
+                })}
                 {overflow > 0 && (
-                  <span className="text-[9px] font-bold px-1 text-slate-400 dark:text-slate-500">+{overflow} more</span>
+                  <span className="text-[9px] font-bold px-1 text-slate-400 dark:border-slate-500">+{overflow} more</span>
                 )}
               </div>
             </button>
@@ -975,8 +994,8 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto pointer-events-none">
-        <Card className="w-full max-w-lg p-6 mt-12 pointer-events-auto rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="w-full max-w-2xl p-5 mt-4 pointer-events-auto rounded-2xl shadow-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               {isEdit ? "Edit / reschedule meeting" : step === "review" ? "Review & schedule" : "Schedule a meeting"}
             </h2>
@@ -984,20 +1003,20 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/50 p-3 text-sm text-red-700 dark:text-red-300 mb-4">
+            <div className="flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/50 p-3 text-sm text-red-700 dark:text-red-300 mb-3">
               <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{error}</span>
             </div>
           )}
 
           {step === "details" ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <Field label="Title" required>
                 <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Discovery call" className="rounded-xl" />
               </Field>
 
               <Field label={`Attendees${invitableCount ? ` (${invitableCount} will be invited)` : ""}`}>
                 {attendees.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
+                  <div className="flex flex-wrap gap-1.5 mb-1.5">
                     {attendees.map((a, i) => (
                       <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-[var(--muted)] px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-600">
                         {a.name || a.email}{!a.email && <span className="text-amber-600" title="No email — won't get an invite">⚠</span>}
@@ -1006,50 +1025,50 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
                     ))}
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <Select value="" onChange={(e) => { if (e.target.value) addLeadAttendee(e.target.value); }} className="flex-1 rounded-xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Select value="" onChange={(e) => { if (e.target.value) addLeadAttendee(e.target.value); }} className="rounded-xl">
                     <option value="">+ Add a lead…</option>
                     {leads.filter((l) => !attendees.some((a) => a.leadId === l.id)).map((l) => (
                       <option key={l.id} value={l.id}>{leadLabel(l)}{l.email ? "" : " (no email)"}</option>
                     ))}
                   </Select>
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <Input className="flex-1 rounded-xl" placeholder="or add an email…" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addManualEmail(); } }} />
-                  <Button type="button" variant="outline" onClick={addManualEmail} className="flex-shrink-0 rounded-xl"><UserPlus className="h-4 w-4" /> Add</Button>
+                  <div className="flex gap-2">
+                    <Input className="flex-1 rounded-xl" placeholder="or add an email…" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addManualEmail(); } }} />
+                    <Button type="button" variant="outline" onClick={addManualEmail} className="flex-shrink-0 rounded-xl"><UserPlus className="h-4 w-4" /> Add</Button>
+                  </div>
                 </div>
               </Field>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Start" required><Input type="datetime-local" value={form.startLocal} onChange={(e) => set("startLocal", e.target.value)} className="rounded-xl" /></Field>
                 <Field label="End" required><Input type="datetime-local" value={form.endLocal} onChange={(e) => set("endLocal", e.target.value)} className="rounded-xl" /></Field>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-950/40">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-2.5 bg-slate-50/50 dark:bg-slate-950/40">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-600 inline-flex items-center gap-1.5 uppercase tracking-wider"><CalendarCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Availability</span>
-                  <Button type="button" variant="outline" size="sm" onClick={checkAvailability} disabled={avail.loading} className="rounded-xl text-xs font-bold">
+                  <Button type="button" variant="outline" size="sm" onClick={checkAvailability} disabled={avail.loading} className="rounded-xl text-xs font-bold h-7 px-2.5">
                     {avail.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />} Check calendar
                   </Button>
                 </div>
                 {!avail.checked && conflict && (
-                  <p className="mt-2 text-xs text-rose-600 dark:text-rose-400 inline-flex items-center gap-1 font-medium"><AlertCircle className="h-3.5 w-3.5" /> Overlaps another meeting you have scheduled.</p>
+                  <p className="mt-1 text-xs text-rose-600 dark:text-rose-400 inline-flex items-center gap-1 font-medium"><AlertCircle className="h-3.5 w-3.5" /> Overlaps another meeting you have scheduled.</p>
                 )}
                 {avail.checked && (
-                  <div className="mt-2 text-xs font-medium">
+                  <div className="mt-1 text-xs font-medium">
                     {avail.error ? (
                       <p className="text-slate-400">Calendar not connected — connect it in Settings → Calendar.</p>
                     ) : (
                       <>
-                        {conflict && <p className="text-rose-600 dark:text-rose-400 mb-1.5 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Overlaps a busy event on your calendar.</p>}
-                        {!conflict && form.startLocal && <p className="text-blue-600 dark:text-blue-400 mb-1.5 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> You&apos;re free at the selected time.</p>}
+                        {conflict && <p className="text-rose-600 dark:text-rose-400 mb-1 inline-flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Overlaps a busy event on your calendar.</p>}
+                        {!conflict && form.startLocal && <p className="text-blue-600 dark:text-blue-400 mb-1 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> You&apos;re free at the selected time.</p>}
                         {freeSlots.length > 0 && (
                           <>
                             <p className="text-slate-500 mb-1">Free slots that day:</p>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-wrap gap-1">
                               {freeSlots.slice(0, 10).map((s) => (
                                 <button key={s.startLocal} onClick={() => { set("startLocal", s.startLocal); set("endLocal", s.endLocal); }}
-                                  className="rounded-lg border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:border-blue-500">
+                                  className="rounded-lg border border-slate-200 dark:border-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:text-slate-600 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:border-blue-500">
                                   {s.label}
                                 </button>
                               ))}
@@ -1062,23 +1081,24 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Field label="Conferencing">
                   <Select value={form.provider} onChange={(e) => set("provider", e.target.value)} className="rounded-xl">
                     {PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                   </Select>
                 </Field>
                 <Field label="Location"><Input value={form.location} onChange={(e) => set("location", e.target.value)} placeholder="Room or address" className="rounded-xl" /></Field>
+                <Field label="Join link">
+                  <div className="flex gap-1.5">
+                    <Input className="flex-1 rounded-xl" value={form.join_url} onChange={(e) => set("join_url", e.target.value)} placeholder="https://…" />
+                    <Button type="button" variant="outline" onClick={handleGenerate} disabled={form.provider === "manual" || generating} className="flex-shrink-0 rounded-xl font-bold px-2.5 h-9">
+                      {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </Field>
               </div>
-              <Field label="Join link">
-                <div className="flex gap-2">
-                  <Input className="flex-1 rounded-xl" value={form.join_url} onChange={(e) => set("join_url", e.target.value)} placeholder="https://…" />
-                  <Button type="button" variant="outline" onClick={handleGenerate} disabled={form.provider === "manual" || generating} className="flex-shrink-0 rounded-xl font-bold">
-                    {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />} Generate
-                  </Button>
-                </div>
-              </Field>
-              <Field label="Notes"><Textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Agenda or context" className="rounded-xl" /></Field>
+
+              <Field label="Notes"><Textarea rows={1} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Agenda or context" className="rounded-xl" /></Field>
             </div>
           ) : (
             <div className="space-y-3 text-sm">

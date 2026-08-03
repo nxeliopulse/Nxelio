@@ -179,13 +179,6 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
       <PageHeader
         title="Audience Segments"
         description="Organize leads into targeted groups for personalized campaigns and workflows"
-        actions={
-          <Link href="/segments/builder">
-            <Button className="rounded-xl font-bold px-4 py-2.5 gap-2">
-              <Plus className="h-4 w-4" /> Create Segment
-            </Button>
-          </Link>
-        }
       />
 
       {/* Metrics Summary Strip */}
@@ -256,25 +249,31 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
 
       {/* Main Card Container */}
       <Card className="overflow-hidden">
-        {/* Toolbar: Search, Filters, View Switcher */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[240px]">
+        {/* Toolbar: Search, Filters, View Switcher, Create Button */}
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900">
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
             {/* Search Input */}
-            <div className="w-full sm:w-72">
+            <div className="w-full sm:w-52">
               <Input
                 leftIcon={<Search className="h-4 w-4 text-slate-400" />}
-                placeholder="Search segments..."
+                placeholder="Search..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-10 text-sm rounded-xl"
+                className="h-9 text-xs rounded-xl"
               />
+            </div>
+
+            {/* Badged Count Button */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300">
+              <Layers className="h-3.5 w-3.5 text-slate-500" />
+              <span>{filteredSegments.length} Segments</span>
             </div>
 
             {/* Type Filter */}
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-600 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all shadow-sm cursor-pointer"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-400 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9"
             >
               <option value="all">All Types</option>
               <option value="dynamic">Dynamic</option>
@@ -287,41 +286,68 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-600 outline-none focus:ring-2 focus:ring-[var(--primary)]/20 transition-all shadow-sm cursor-pointer"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-400 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
               <option value="paused">Paused</option>
               <option value="draft">Draft</option>
             </select>
+
+            {/* Action Buttons to match Prospects */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncCrm}
+              className="rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Sync CRM
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAiRecommend}
+              className="rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              AI Actions
+            </Button>
           </div>
 
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 p-1 bg-slate-50 dark:bg-slate-950/60">
-            <button
-              onClick={() => setViewMode("table")}
-              className={cn(
-                "p-1.5 rounded-lg text-xs font-semibold transition-all",
-                viewMode === "table"
-                  ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
-              )}
-              title="Table View"
-            >
-              <List className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("grid")}
-              className={cn(
-                "p-1.5 rounded-lg text-xs font-semibold transition-all",
-                viewMode === "grid"
-                  ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
-              )}
-              title="Grid View"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
+          <div className="flex items-center gap-3">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-0.5 rounded-xl border border-slate-200 dark:border-slate-800 p-0.5 bg-slate-50 dark:bg-slate-950/60">
+              <button
+                onClick={() => setViewMode("table")}
+                className={cn(
+                  "p-1.5 rounded-lg text-xs font-semibold transition-all",
+                  viewMode === "table"
+                    ? "bg-[var(--primary)] text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                )}
+                title="Table View"
+              >
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("grid")}
+                className={cn(
+                  "p-1.5 rounded-lg text-xs font-semibold transition-all",
+                  viewMode === "grid"
+                    ? "bg-[var(--primary)] text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                )}
+                title="Grid View"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Create Segment Button inside toolbar */}
+            <Link href="/segments/builder">
+              <Button className="rounded-xl font-bold px-4 py-2 text-xs sm:text-sm gap-2">
+                <Plus className="h-4 w-4" /> Create Segment
+              </Button>
+            </Link>
           </div>
         </div>
 

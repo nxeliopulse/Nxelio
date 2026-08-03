@@ -385,6 +385,7 @@ export function DashboardView({
                       tickLine={false}
                       axisLine={false}
                       dy={5}
+                      padding={{ left: 20, right: 10 }}
                     />
                     <YAxis
                       stroke="#64748b"

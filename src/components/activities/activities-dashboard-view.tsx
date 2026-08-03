@@ -2,13 +2,15 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Search, Mail, Calendar, User, ChevronDown, RefreshCw,
-  Download, Filter, Columns, MoreVertical, Plus, Trash2, Edit, CheckSquare, Square,
-  X, Bold, Italic, Underline, Link2, List, ListOrdered, Type, Bell
+  Search, ChevronRight, Download, RefreshCw, Layout, Plus,
+  MoreVertical, Edit, Trash2, Phone, Mail, Calendar, User,
+  ChevronDown, Filter, Columns, X, CheckSquare, Square,
+  Bold, Italic, Underline, Link2, List, ListOrdered, Type, UserPlus
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import type { MeetingRow } from "@/lib/queries/meetings";
@@ -24,8 +26,9 @@ export interface DbActivityRow {
 interface ActivityItem {
   id: string;
   title: string;
-  activity_type: string; // 'Email' | 'Call' | 'Meeting' | 'User'
+  activity_type: "Meeting" | "Calls" | "Email" | "Task" | "User";
   due_date: string;
+  time: string;
   created_at: string;
   owner: string;
   lead_id?: string;
@@ -34,7 +37,6 @@ interface ActivityItem {
   description?: string;
   reminder?: number;
   reminder_unit?: string;
-  time?: string;
   guests?: string[];
   deal?: string;
   contact?: string;
@@ -42,11 +44,11 @@ interface ActivityItem {
 }
 
 const AVATAR_COLORS = [
-  "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", 
-  "bg-violet-500", "bg-cyan-500", "bg-pink-500", "bg-indigo-500"
+  "bg-blue-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600",
+  "bg-violet-650", "bg-cyan-600", "bg-pink-600", "bg-indigo-600"
 ];
 
-function avatarColor(name: string): string {
+function getAvatarColor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -54,18 +56,17 @@ function avatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-function initials(name: string): string {
+function getInitials(name: string): string {
   const parts = name.split(" ");
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return name.substring(0, 2).toUpperCase();
 }
 
-// Real, DB-backed activity — no fake guests/deal/contact/company attached.
 function formatDbActivity(a: DbActivityRow): ActivityItem {
   const leadName = a.lead?.full_name || a.lead?.company_name || "Unknown Lead";
   const leadEmail = a.lead?.email || "";
-
   const d = new Date(a.created_at);
+
   const formattedDate = d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
   const formattedTime = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -74,7 +75,7 @@ function formatDbActivity(a: DbActivityRow): ActivityItem {
   return {
     id: a.id,
     title: a.metadata?.subject || a.metadata?.campaign_name || `${a.activity_type.replace(/_/g, " ")} for lead`,
-    activity_type: isEmail ? "Email" : "User",
+    activity_type: isEmail ? "Email" : "Task",
     due_date: formattedDate,
     time: d.toTimeString().slice(0, 5),
     created_at: `${formattedDate}, ${formattedTime}`,
@@ -82,16 +83,15 @@ function formatDbActivity(a: DbActivityRow): ActivityItem {
     lead_id: a.lead?.id,
     lead_name: leadName,
     lead_email: leadEmail,
-    description: a.metadata?.body || "Outreach activities record.",
+    description: a.metadata?.body || "Outreach activity logged.",
   };
 }
 
-// Real, DB-backed meeting — no fake guests/deal/contact/company attached.
 function formatDbMeeting(m: MeetingRow): ActivityItem {
   const leadName = m.lead?.full_name || m.lead?.company_name || "Unknown Contact";
   const leadEmail = m.lead?.email || "";
-
   const d = new Date(m.start_at);
+
   const formattedStart = d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
   const formattedCreated = new Date(m.created_at || m.start_at).toLocaleString([], {
     day: "numeric",
@@ -103,7 +103,7 @@ function formatDbMeeting(m: MeetingRow): ActivityItem {
 
   return {
     id: m.id,
-    title: m.title || "Scheduled Event",
+    title: m.title || "Scheduled Meeting",
     activity_type: "Meeting",
     due_date: formattedStart,
     time: d.toTimeString().slice(0, 5),
@@ -120,43 +120,38 @@ export function ActivitiesDashboardView({
   dbActivities,
   dbMeetings,
   currentUserName,
-  defaultTab = "emails"
 }: {
   dbActivities: DbActivityRow[];
   dbMeetings: MeetingRow[];
   currentUserName: string;
-  defaultTab?: "emails" | "meetings" | "users";
+  defaultTab?: string;
 }) {
-  const router = useRouter();
   const { confirm, toast } = useFeedback();
+  const router = useRouter();
 
-  // Tab State: 'emails' | 'meetings' | 'users'
-  const [activeTab, setActiveTab] = useState<"emails" | "meetings" | "users">(defaultTab);
-
-  // Real activities/meetings only — seeded once from props. formatDbActivity/formatDbMeeting
-  // are plain functions (not hooks), so this lazy initializer depends only on props, which
-  // keeps the React Compiler able to verify the later useMemo below.
+  // Real activities/meetings only — seeded once from props via a lazy
+  // initializer (no mock rows).
   const [activities, setActivities] = useState<ActivityItem[]>(() => [
     ...dbActivities.map(formatDbActivity),
     ...dbMeetings.map(formatDbMeeting),
   ]);
 
-  // UI State
-  const [searchQuery, setSearchQuery] = useState("");
+  // Stable per-session id source — avoids calling the impure Date.now()
+  // directly inside render/handlers (React Compiler purity rule).
+  const [sessionId] = useState(() => Date.now());
+
+  // UI state
+  const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "title">("newest");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "title">("newest");
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]); // empty = all
+
   // Dropdown states
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [isSortOpen, setIsSortOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isColumnsOpen, setIsColumnsOpen] = useState(false);
-
-  // Filter criteria: Owner
-  const [selectedOwnerFilter, setSelectedOwnerFilter] = useState<string>("all");
+  const [selectedOwnerFilter, setSelectedOwnerFilter] = useState("all");
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     title: true,
@@ -166,17 +161,12 @@ export function ActivitiesDashboardView({
     createdAt: true,
   });
 
-  const toggleColumn = (col: string) => {
-    setVisibleColumns(prev => ({ ...prev, [col]: !prev[col] }));
-  };
-
-  // Edit Drawer state
+  // Add/Edit Drawer State
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<ActivityItem | null>(null);
-
-  // Edit panel active tab
   const [drawerTab, setDrawerTab] = useState<"activity" | "comments">("activity");
 
-  // Form states (Dynamic drawer inputs matching mockups)
+  // Form Fields State
   const [formTitle, setFormTitle] = useState("");
   const [formType, setFormType] = useState<"Email" | "Meeting">("Email");
   const [formDate, setFormDate] = useState("");
@@ -189,31 +179,50 @@ export function ActivitiesDashboardView({
   const [formDeal, setFormDeal] = useState("");
   const [formContact, setFormContact] = useState("");
   const [formCompany, setFormCompany] = useState("");
-
-  // New Guest input helper
   const [newGuestInput, setNewGuestInput] = useState("");
 
+  const toggleTypeFilter = (type: string) => {
+    setSelectedTypes(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
+
+  const handleRefresh = () => {
+    toast("Refreshing activities...", "info");
+    router.refresh();
+  };
+
+  const handleExportCsv = () => {
+    setIsExportOpen(false);
+    const headers = "ID,Title,Type,DueDate,Owner,CreatedAt\n";
+    const rows = filteredAndSorted.map(
+      (a) => `"${a.id}","${a.title}","${a.activity_type}","${a.due_date}","${a.owner}","${a.created_at}"`
+    ).join("\n");
+    const blob = new Blob([headers + rows], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `activities_export_${sessionId}.csv`;
+    link.click();
+    toast("Activities exported successfully.", "success");
+  };
+
+  // Open Edit Drawer
   const openEditDrawer = (activity: ActivityItem) => {
     setActiveMenuId(null);
     setEditingActivity(activity);
+    setIsDrawerOpen(true);
     setDrawerTab("activity");
 
-    // Populate drawer values
     setFormTitle(activity.title);
     setFormOwner(activity.owner);
     setFormDescription(activity.description || "");
-    
-    // Map activity_type to tab choices
-    const t = activity.activity_type;
-    if (t === "Meeting") setFormType("Meeting");
-    else setFormType("Email");
+    setFormType(activity.activity_type === "Meeting" ? "Meeting" : "Email");
 
-    // Map Dates
     try {
       const d = new Date(activity.due_date);
       setFormDate(d.toISOString().slice(0, 10));
     } catch {
-      // Fallback if not a standard date format
       setFormDate(new Date().toISOString().slice(0, 10));
     }
 
@@ -226,51 +235,71 @@ export function ActivitiesDashboardView({
     setFormCompany(activity.company || "");
   };
 
+  // Save Drawer Form
   const handleSaveDrawer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingActivity) return;
     if (!formTitle.trim()) {
       toast("Please enter a title.", "error");
       return;
     }
 
-    // Format output dates nicely
-    const dObj = new Date(formDate);
-    const dateFormatted = dObj.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+    const formattedDate = new Date(formDate).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 
-    const updated: ActivityItem = {
-      ...editingActivity,
-      title: formTitle,
-      activity_type: formType,
-      due_date: dateFormatted,
-      time: formTime,
-      owner: formOwner,
-      description: formDescription,
-      reminder: formReminder,
-      reminder_unit: formReminderUnit,
-      guests: formGuests,
-      deal: formDeal,
-      contact: formContact,
-      company: formCompany
-    };
+    if (editingActivity) {
+      // Update
+      const updated: ActivityItem = {
+        ...editingActivity,
+        title: formTitle,
+        activity_type: formType,
+        due_date: formattedDate,
+        time: formTime,
+        owner: formOwner,
+        description: formDescription,
+        reminder: formReminder,
+        reminder_unit: formReminderUnit,
+        guests: formGuests,
+        deal: formDeal,
+        contact: formContact,
+        company: formCompany,
+      };
 
-    setActivities(prev => {
-      const exists = prev.some(a => a.id === editingActivity.id);
-      if (exists) return prev.map(a => (a.id === editingActivity.id ? updated : a));
-      return [updated, ...prev];
-    });
+      setActivities(prev => prev.map(a => (a.id === editingActivity.id ? updated : a)));
+      toast("Activity details saved successfully!", "success");
+    } else {
+      // Create
+      const created: ActivityItem = {
+        id: `act-${Date.now()}`,
+        title: formTitle,
+        activity_type: formType,
+        due_date: formattedDate,
+        time: formTime,
+        created_at: new Date().toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+        owner: formOwner || currentUserName,
+        description: formDescription,
+        reminder: formReminder,
+        reminder_unit: formReminderUnit,
+        guests: formGuests,
+        deal: formDeal,
+        contact: formContact,
+        company: formCompany,
+      };
 
+      setActivities(prev => [created, ...prev]);
+      toast("New Activity created successfully!", "success");
+    }
+
+    setIsDrawerOpen(false);
     setEditingActivity(null);
-    toast("Activity details saved successfully!", "success");
   };
 
+  // Delete activity
   const handleDeleteActivity = async (id: string) => {
     setActiveMenuId(null);
     const ok = await confirm({
       title: "Delete Activity?",
       message: "Are you sure you want to delete this activity record?",
       confirmLabel: "Delete",
-      danger: true
+      danger: true,
     });
     if (!ok) return;
 
@@ -297,769 +326,705 @@ export function ActivitiesDashboardView({
     }
   };
 
-  const handleSelectOne = (id: string) => {
+  const toggleSelectOne = (id: string) => {
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
 
-  const handleExportCSV = () => {
-    setIsExportOpen(false);
-    if (filteredAndSorted.length === 0) {
-      toast("No activities to export.", "error");
-      return;
-    }
-
-    const headers = ["Title", "Activity Type", "Due Date", "Owner", "Created At"];
-    const rows = filteredAndSorted.map(a => [
-      `"${a.title.replace(/"/g, '""')}"`,
-      a.activity_type,
-      a.due_date,
-      a.owner,
-      a.created_at
-    ]);
-
-    const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `activities_${activeTab}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast("CSV exported successfully.", "success");
-  };
-
-  const uniqueOwners = useMemo(() => {
-    const ownersSet = new Set<string>();
-    activities.forEach(a => ownersSet.add(a.owner));
-    return Array.from(ownersSet);
-  }, [activities]);
-
-  // React Compiler can't prove equivalence for this filter+sort combination; the manual useMemo
-  // below is correct and functions properly, it just doesn't get auto-memoized on top (verified:
-  // multiple equivalent rewrites of the callback body all hit the same compiler limitation).
+  // Filter & Sort logic. React Compiler can't prove equivalence for this filter+sort
+  // combination; the manual useMemo below is correct and works fine, it just doesn't get
+  // auto-memoized on top (same known limitation hit and documented earlier in this file's
+  // history for an equivalent filter+sort hook).
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const filteredAndSorted = useMemo(() => {
-    const result = activities.filter(a => {
-      // Tab filter
-      if (activeTab === "emails" && a.activity_type !== "Email") return false;
-      if (activeTab === "meetings" && a.activity_type !== "Meeting") return false;
-      if (activeTab === "users" && a.activity_type !== "User") return false;
+    const filtered = activities.filter((a) => {
+      const matchesSearch =
+        !search ||
+        a.title.toLowerCase().includes(search.toLowerCase()) ||
+        a.owner.toLowerCase().includes(search.toLowerCase());
 
-      // Owner filter
-      if (selectedOwnerFilter !== "all" && a.owner !== selectedOwnerFilter) return false;
+      const matchesType =
+        selectedTypes.length === 0 || selectedTypes.includes(a.activity_type);
 
-      // Search filter
-      const q = searchQuery.toLowerCase();
-      return (
-        a.title.toLowerCase().includes(q) ||
-        a.owner.toLowerCase().includes(q) ||
-        Boolean(a.lead_email && a.lead_email.toLowerCase().includes(q))
-      );
+      const matchesOwner =
+        selectedOwnerFilter === "all" ||
+        (selectedOwnerFilter === "me" && a.owner === currentUserName) ||
+        (selectedOwnerFilter === "others" && a.owner !== currentUserName);
+
+      return matchesSearch && matchesType && matchesOwner;
     });
 
-    // Sort — spread into a fresh array rather than mutating `result` in place
-    return [...result].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       if (sortBy === "title") return a.title.localeCompare(b.title);
-      if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      const timeA = new Date(a.created_at).getTime();
+      const timeB = new Date(b.created_at).getTime();
+      return sortBy === "newest" ? timeB - timeA : timeA - timeB;
     });
-  }, [activities, activeTab, selectedOwnerFilter, searchQuery, sortBy]);
+  }, [activities, search, selectedTypes, selectedOwnerFilter, sortBy, currentUserName]);
 
-  const paginatedActivities = useMemo(() => {
-    const startIdx = (currentPage - 1) * entriesPerPage;
-    return filteredAndSorted.slice(startIdx, startIdx + entriesPerPage);
-  }, [filteredAndSorted, currentPage, entriesPerPage]);
+  // Real owner names — always includes the current user so the "Owner" select
+  // has a valid option even in a brand-new workspace with no activity history yet.
+  const ownersList = useMemo(() => {
+    return Array.from(new Set([currentUserName, ...activities.map(a => a.owner)]));
+  }, [activities, currentUserName]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / entriesPerPage));
+  // Real lead/contact names from actual activities and meetings — no fake people.
+  const contactsList = useMemo(() => {
+    const names = activities.map(a => a.lead_name).filter((n): n is string => Boolean(n));
+    return Array.from(new Set(names));
+  }, [activities]);
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-4">
-      {/* Top Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="max-w-[1600px] mx-auto space-y-6">
+      
+      {/* HEADER SECTION */}
+      <div className="flex items-end justify-between flex-wrap gap-4">
         <div>
-          <div className="flex items-center gap-2 text-slate-500 mb-1 text-xs font-semibold">
-            <span>Home</span>
-            <ChevronDown className="-rotate-90 h-3 w-3 text-slate-400" />
-            <span className="text-slate-800 dark:text-slate-200">Activities</span>
-          </div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Activities
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+              Activities 
+              <Badge className="bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold py-0.5 px-2">
+                {activities.length}
+              </Badge>
             </h1>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
+            <span>Home</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-slate-650 font-medium">Activities</span>
           </div>
         </div>
 
-        {/* Right side buttons */}
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        {/* Header Actions */}
+        <div className="flex items-center gap-2">
           {/* Export Dropdown */}
           <div className="relative">
-            <button
-              onClick={() => setIsExportOpen(!isExportOpen)}
-              className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-xs"
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsExportOpen(prev => !prev)}
+              className="rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800"
             >
               <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
-            </button>
+            </Button>
             {isExportOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setIsExportOpen(false)} />
-                <div className="absolute right-0 mt-1.5 w-40 rounded-xl bg-white border border-slate-200 shadow-xl z-40 py-1 text-xs font-semibold text-slate-700">
-                  <button onClick={handleExportCSV} className="w-full text-left px-4 py-2 hover:bg-slate-50">CSV File</button>
-                  <button onClick={() => { setIsExportOpen(false); toast("Exporting Excel...", "info"); }} className="w-full text-left px-4 py-2 hover:bg-slate-50">Excel Spreadsheet</button>
-                  <button onClick={() => { setIsExportOpen(false); toast("Exporting PDF...", "info"); }} className="w-full text-left px-4 py-2 hover:bg-slate-50">PDF Document</button>
-                </div>
-              </>
+              <div className="absolute right-0 mt-1 z-35 w-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg p-1">
+                <button
+                  onClick={handleExportCsv}
+                  className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
+                >
+                  Export CSV
+                </button>
+              </div>
             )}
           </div>
 
-          {/* Refresh button */}
-          <button
-            onClick={() => { toast("Refreshed activities list.", "success"); router.refresh(); }}
-            className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors shadow-xs"
-            title="Refresh"
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            className="rounded-xl border border-slate-200 dark:border-slate-800 h-9 w-9 p-0 flex items-center justify-center text-slate-500"
           >
             <RefreshCw className="h-4 w-4" />
-          </button>
+          </Button>
 
-          {/* Add New Activity Red Button */}
-          <button
-            onClick={() => {
-              const today = new Date();
-              const draft: ActivityItem = {
-                id: `new-${Date.now()}`,
-                title: "",
-                activity_type: activeTab === "emails" ? "Email" : activeTab === "meetings" ? "Meeting" : "User",
-                due_date: today.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }),
-                time: "10:00",
-                created_at: today.toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
-                owner: currentUserName,
-                description: "",
-                reminder: 15,
-                reminder_unit: "Minutes",
-                guests: []
-              };
-              openEditDrawer(draft);
-            }}
-            className="flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white transition-colors shadow-sm"
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl border border-slate-200 dark:border-slate-800 h-9 w-9 p-0 flex items-center justify-center text-slate-500"
           >
-            <Plus className="h-4 w-4" /> Add New Activity
-          </button>
+            <Layout className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      {/* Main card box holding search and activities table */}
-      <Card className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
-        {/* Search Input block */}
-        <div className="p-4 border-b border-slate-100">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+      {/* FILTER CONTROLS & TABLE CARD */}
+      <Card className="overflow-visible">
+        {/* Search bar & Add Activity button */}
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900">
+          <div className="w-full sm:w-80">
             <Input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="pl-10 h-10 border-slate-200 rounded-xl text-sm"
+              leftIcon={<Search className="h-4 w-4 text-slate-400" />}
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-10 text-sm rounded-xl"
             />
           </div>
+
+          <Button
+            onClick={() => {
+              setEditingActivity(null);
+              setFormTitle("");
+              setFormOwner(currentUserName);
+              setFormDescription("");
+              setFormType("Email");
+              setFormDate(new Date().toISOString().slice(0, 10));
+              setFormTime("10:00");
+              setFormReminder(15);
+              setFormReminderUnit("Minutes");
+              setFormGuests([]);
+              setFormDeal("");
+              setFormContact("");
+              setFormCompany("");
+              setIsDrawerOpen(true);
+            }}
+            className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 flex items-center gap-2 shadow-sm"
+          >
+            <Plus className="h-4 w-4" /> Add New Activity
+          </Button>
         </div>
 
-        {/* Toolbar Header Row */}
-        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <h2 className="text-base font-bold text-slate-800 capitalize">All {activeTab}</h2>
-            <div className="flex items-center rounded-xl border border-slate-200 p-0.5 bg-slate-50">
-              <button
-                onClick={() => { setActiveTab("emails"); setCurrentPage(1); }}
-                className={cn(
-                  "p-2 rounded-lg transition-all",
-                  activeTab === "emails" ? "bg-red-600 text-white shadow-xs" : "text-slate-500 hover:bg-white"
-                )}
-                title="Emails"
-              >
-                <Mail className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => { setActiveTab("meetings"); setCurrentPage(1); }}
-                className={cn(
-                  "p-2 rounded-lg transition-all",
-                  activeTab === "meetings" ? "bg-red-600 text-white shadow-xs" : "text-slate-500 hover:bg-white"
-                )}
-                title="Meetings"
-              >
-                <Calendar className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => { setActiveTab("users"); setCurrentPage(1); }}
-                className={cn(
-                  "p-2 rounded-lg transition-all",
-                  activeTab === "users" ? "bg-red-600 text-white shadow-xs" : "text-slate-500 hover:bg-white"
-                )}
-                title="Users Log"
-              >
-                <User className="h-3.5 w-3.5" />
-              </button>
+        {/* Toolbar: Filters, Types, Columns */}
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50/40 dark:bg-slate-950/10">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-bold text-slate-900 dark:text-white mr-1">All Activities</span>
+
+            {/* Quick type filter icons */}
+            <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 p-0.5 bg-white dark:bg-slate-900 shadow-xs">
+              {([
+                { type: "Calls", icon: Phone, color: "text-emerald-600" },
+                { type: "Email", icon: Mail, color: "text-amber-500" },
+                { type: "Meeting", icon: Calendar, color: "text-blue-600" },
+                { type: "Task", icon: User, color: "text-red-500" },
+              ] as const).map((item) => {
+                const Icon = item.icon;
+                const active = selectedTypes.includes(item.type);
+                return (
+                  <button
+                    key={item.type}
+                    onClick={() => toggleTypeFilter(item.type)}
+                    className={cn(
+                      "p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
+                      active ? "bg-slate-100 dark:bg-slate-800 shadow-inner" : ""
+                    )}
+                    title={`Toggle ${item.type}`}
+                  >
+                    <Icon className={cn("h-4 w-4", item.color)} />
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Sort By Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setIsSortOpen(!isSortOpen)}
-                className="flex items-center gap-1 text-xs font-bold px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                Sort By <ChevronDown className="h-3 w-3" />
-              </button>
-              {isSortOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)} />
-                  <div className="absolute left-0 mt-1.5 w-36 rounded-xl bg-white border border-slate-200 shadow-xl z-40 py-1 text-xs font-semibold text-slate-700">
-                    <button onClick={() => { setSortBy("newest"); setIsSortOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between">Newest {sortBy === "newest" && <span className="h-1.5 w-1.5 rounded-full bg-red-600" />}</button>
-                    <button onClick={() => { setSortBy("oldest"); setIsSortOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between">Oldest {sortBy === "oldest" && <span className="h-1.5 w-1.5 rounded-full bg-red-600" />}</button>
-                    <button onClick={() => { setSortBy("title"); setIsSortOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between">Title {sortBy === "title" && <span className="h-1.5 w-1.5 rounded-full bg-red-600" />}</button>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Sort Select */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "newest" | "oldest" | "title")}
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-650 dark:text-slate-400 outline-none cursor-pointer h-9"
+            >
+              <option value="newest">Sort: Newest first</option>
+              <option value="oldest">Sort: Oldest first</option>
+              <option value="title">Sort: Title A-Z</option>
+            </select>
           </div>
 
-          {/* Filter & Column buttons */}
           <div className="flex items-center gap-2">
-            {/* Filter */}
+            {/* Owner Filter Dropdown */}
             <div className="relative">
-              <button
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={cn(
-                  "flex items-center gap-1.5 text-xs font-bold px-3 py-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-700 transition-colors",
-                  selectedOwnerFilter !== "all" && "border-red-500 bg-red-50/35"
-                )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsFilterOpen(prev => !prev)}
+                className="rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 gap-1.5"
               >
                 <Filter className="h-3.5 w-3.5" /> Filter <ChevronDown className="h-3 w-3" />
-              </button>
+              </Button>
               {isFilterOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setIsFilterOpen(false)} />
-                  <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-white border border-slate-200 shadow-xl z-40 py-1.5 text-xs font-semibold text-slate-700">
-                    <p className="px-3.5 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Filter By Owner</p>
-                    <button onClick={() => { setSelectedOwnerFilter("all"); setIsFilterOpen(false); setCurrentPage(1); }} className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between">Show All {selectedOwnerFilter === "all" && <span className="h-1.5 w-1.5 rounded-full bg-red-600" />}</button>
-                    {uniqueOwners.map(owner => (
-                      <button key={owner} onClick={() => { setSelectedOwnerFilter(owner); setIsFilterOpen(false); setCurrentPage(1); }} className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between truncate">{owner} {selectedOwnerFilter === owner && <span className="h-1.5 w-1.5 rounded-full bg-red-600" />}</button>
+                <div className="absolute right-0 mt-1 z-35 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg p-3 space-y-3">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Filter by Owner</p>
+                  <div className="space-y-2">
+                    {([
+                      { value: "all", label: "All Owners" },
+                      { value: "me", label: "Me" },
+                      { value: "others", label: "Others" },
+                    ] as const).map((opt) => (
+                      <label key={opt.value} className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="ownerFilter"
+                          checked={selectedOwnerFilter === opt.value}
+                          onChange={() => {
+                            setSelectedOwnerFilter(opt.value);
+                            setIsFilterOpen(false);
+                          }}
+                          className="text-indigo-650"
+                        />
+                        {opt.label}
+                      </label>
                     ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
 
-            {/* Manage Columns */}
+            {/* Column Selector */}
             <div className="relative">
-              <button
-                onClick={() => setIsColumnsOpen(!isColumnsOpen)}
-                className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 border border-slate-200 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsColumnsOpen(prev => !prev)}
+                className="rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 gap-1.5"
               >
-                <Columns className="h-3.5 w-3.5" /> Manage Columns
-              </button>
+                <Columns className="h-3.5 w-3.5" /> Manage Columns <ChevronDown className="h-3 w-3" />
+              </Button>
               {isColumnsOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setIsColumnsOpen(false)} />
-                  <div className="absolute right-0 mt-1.5 w-44 rounded-xl bg-white border border-slate-200 shadow-xl z-40 p-3 text-xs font-semibold text-slate-700 space-y-2">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider pb-1.5 border-b border-slate-100">Show/Hide Columns</p>
-                    {[
-                      { key: "title", label: "Title" },
-                      { key: "type", label: "Activity Type" },
-                      { key: "dueDate", label: "Date & Time" },
-                      { key: "owner", label: "Owner" },
-                      { key: "createdAt", label: "Created At" },
-                    ].map(col => (
-                      <button
-                        key={col.key}
-                        onClick={() => toggleColumn(col.key)}
-                        className="w-full flex items-center gap-2 py-1 text-slate-600 hover:text-slate-900"
-                      >
-                        {visibleColumns[col.key] ? <CheckSquare className="h-4 w-4 text-blue-600" /> : <Square className="h-4 w-4 text-slate-300" />}
-                        <span>{col.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <div className="absolute right-0 mt-1 z-35 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg p-2 space-y-1">
+                  <p className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Show Columns</p>
+                  {([
+                    { col: "title", label: "Title" },
+                    { col: "type", label: "Activity Type" },
+                    { col: "dueDate", label: "Due Date" },
+                    { col: "owner", label: "Owner" },
+                    { col: "createdAt", label: "Created At" },
+                  ] as const).map((c) => (
+                    <label key={c.col} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns[c.col]}
+                        onChange={() => setVisibleColumns(prev => ({ ...prev, [c.col]: !prev[c.col] }))}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      {c.label}
+                    </label>
+                  ))}
+                </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Activities Table */}
+        {/* THE TABLE */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/70 border-b border-slate-100 text-left text-xs font-bold uppercase tracking-wider text-slate-400">
-                <th className="px-4 py-3.5 w-10 text-center">
+              <tr className="border-b border-slate-100 dark:border-slate-850 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase bg-slate-50/40 dark:bg-slate-950/20">
+                <th className="py-3 px-4 w-10">
                   <button onClick={handleSelectAll} className="text-slate-400 hover:text-slate-600">
                     {selectedIds.length === filteredAndSorted.length && filteredAndSorted.length > 0 ? (
-                      <CheckSquare className="h-4.5 w-4.5 text-blue-600" />
+                      <CheckSquare className="h-4.5 w-4.5 text-indigo-650" />
                     ) : (
                       <Square className="h-4.5 w-4.5" />
                     )}
                   </button>
                 </th>
-                {visibleColumns.title && <th className="px-4 py-3.5 font-bold">Title</th>}
-                {visibleColumns.type && <th className="px-4 py-3.5 font-bold">Activity Type</th>}
-                {visibleColumns.dueDate && <th className="px-4 py-3.5 font-bold">Date & Time</th>}
-                {visibleColumns.owner && <th className="px-4 py-3.5 font-bold">Owner</th>}
-                {visibleColumns.createdAt && <th className="px-4 py-3.5 font-bold">Created At</th>}
-                <th className="px-4 py-3.5 w-16 text-center font-bold">Action</th>
+                {visibleColumns.title && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Title</th>}
+                {visibleColumns.type && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Activity Type</th>}
+                {visibleColumns.dueDate && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Due Date</th>}
+                {visibleColumns.owner && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Owner</th>}
+                {visibleColumns.createdAt && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Created At</th>}
+                <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400 text-right w-16">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paginatedActivities.length === 0 ? (
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-850/80">
+              {filteredAndSorted.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400 italic">
-                    No matching activities found.
+                  <td colSpan={7} className="py-12 px-4 text-center text-slate-450 text-xs font-semibold">
+                    No activity logs found. Click <strong className="text-slate-700 dark:text-slate-350">Add New Activity</strong> to schedule one.
                   </td>
                 </tr>
-              ) : (
-                paginatedActivities.map((a) => {
-                  const isSelected = selectedIds.includes(a.id);
-                  return (
-                    <tr
-                      key={a.id}
-                      className={cn(
-                        "hover:bg-slate-50/50 transition-colors text-xs text-slate-700",
-                        isSelected && "bg-blue-50/20"
-                      )}
-                    >
-                      {/* Checkbox */}
-                      <td className="px-4 py-3.5 text-center">
-                        <button onClick={() => handleSelectOne(a.id)} className="text-slate-400">
-                          {isSelected ? (
-                            <CheckSquare className="h-4.5 w-4.5 text-blue-600" />
-                          ) : (
-                            <Square className="h-4.5 w-4.5" />
-                          )}
+              )}
+              {filteredAndSorted.map((item) => {
+                const initials = getInitials(item.owner);
+                const avatarCol = getAvatarColor(item.owner);
+                const selected = selectedIds.includes(item.id);
+
+                return (
+                  <tr
+                    key={item.id}
+                    className={cn(
+                      "hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors text-sm",
+                      selected ? "bg-slate-50/20 dark:bg-slate-900/20" : ""
+                    )}
+                  >
+                    <td className="py-3.5 px-4">
+                      <button onClick={() => toggleSelectOne(item.id)} className="text-slate-400 hover:text-slate-600">
+                        {selected ? (
+                          <CheckSquare className="h-4.5 w-4.5 text-indigo-650" />
+                        ) : (
+                          <Square className="h-4.5 w-4.5" />
+                        )}
+                      </button>
+                    </td>
+
+                    {/* Title */}
+                    {visibleColumns.title && (
+                      <td className="py-3.5 px-4">
+                        <button
+                          onClick={() => openEditDrawer(item)}
+                          className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 transition-colors text-left"
+                        >
+                          {item.title}
                         </button>
                       </td>
+                    )}
 
-                      {/* Title */}
-                      {visibleColumns.title && (
-                        <td className="px-4 py-3.5 font-semibold text-slate-900 hover:underline max-w-[280px] truncate">
-                          <button
-                            onClick={() => openEditDrawer(a)}
-                            className="text-left font-bold text-slate-900 hover:text-red-600 transition-colors"
-                          >
-                            {a.title}
-                          </button>
-                        </td>
-                      )}
-
-                      {/* Activity Type */}
-                      {visibleColumns.type && (
-                        <td className="px-4 py-3.5">
-                          <Badge variant="warning" className="bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/20 px-2 py-0.5 rounded font-bold text-[10px]">
-                            {a.activity_type}
+                    {/* Activity Type Badge */}
+                    {visibleColumns.type && (
+                      <td className="py-3.5 px-4">
+                        {item.activity_type === "Meeting" && (
+                          <Badge variant="blue" className="rounded-lg font-bold text-xs gap-1 py-0.5 px-2">
+                            <Calendar className="h-3 w-3" /> Meeting
                           </Badge>
-                        </td>
-                      )}
-
-                      {/* Date & Time */}
-                      {visibleColumns.dueDate && (
-                        <td className="px-4 py-3.5 font-medium text-slate-600">
-                          {a.due_date} {a.time && `· ${a.time}`}
-                        </td>
-                      )}
-
-                      {/* Owner */}
-                      {visibleColumns.owner && (
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <span className={cn("h-6 w-6 rounded-full flex items-center justify-center text-white text-[9px] font-black shadow-xs", avatarColor(a.owner))}>
-                              {initials(a.owner)}
-                            </span>
-                            <span className="font-semibold text-slate-800">{a.owner}</span>
-                          </div>
-                        </td>
-                      )}
-
-                      {/* Created At */}
-                      {visibleColumns.createdAt && (
-                        <td className="px-4 py-3.5 font-medium text-slate-500">
-                          {a.created_at}
-                        </td>
-                      )}
-
-                      {/* Action Dropdown Menu */}
-                      <td className="px-4 py-3.5 text-center relative">
-                        <button
-                          onClick={() => setActiveMenuId(activeMenuId === a.id ? null : a.id)}
-                          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-
-                        {activeMenuId === a.id && (
-                          <>
-                            <div className="fixed inset-0 z-30" onClick={() => setActiveMenuId(null)} />
-                            <div className="absolute right-4 top-10 w-24 bg-white border border-slate-200 rounded-xl shadow-xl z-45 py-1 text-left text-xs font-semibold text-slate-700">
-                              <button
-                                onClick={() => openEditDrawer(a)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-1.5"
-                              >
-                                <Edit className="h-3 w-3" /> Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteActivity(a.id)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-rose-600 flex items-center gap-1.5"
-                              >
-                                <Trash2 className="h-3 w-3" /> Delete
-                              </button>
-                            </div>
-                          </>
+                        )}
+                        {item.activity_type === "Calls" && (
+                          <Badge variant="success" className="rounded-lg font-bold text-xs gap-1 py-0.5 px-2">
+                            <Phone className="h-3 w-3" /> Calls
+                          </Badge>
+                        )}
+                        {item.activity_type === "Email" && (
+                          <Badge variant="warning" className="rounded-lg font-bold text-xs gap-1 py-0.5 px-2 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-250">
+                            <Mail className="h-3 w-3" /> Email
+                          </Badge>
+                        )}
+                        {item.activity_type === "Task" && (
+                          <Badge variant="danger" className="rounded-lg font-bold text-xs gap-1 py-0.5 px-2">
+                            <User className="h-3 w-3" /> Task
+                          </Badge>
                         )}
                       </td>
-                    </tr>
-                  );
-                })
-              )}
+                    )}
+
+                    {/* Due Date */}
+                    {visibleColumns.dueDate && (
+                      <td className="py-3.5 px-4 font-semibold text-slate-600 dark:text-slate-350">
+                        {item.due_date} {item.time && `, ${item.time}`}
+                      </td>
+                    )}
+
+                    {/* Owner avatar & initials */}
+                    {visibleColumns.owner && (
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarCol)}>
+                            {initials}
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[130px]">{item.owner}</span>
+                        </div>
+                      </td>
+                    )}
+
+                    {/* Created At */}
+                    {visibleColumns.createdAt && (
+                      <td className="py-3.5 px-4 text-xs font-semibold text-slate-500 dark:text-slate-500">
+                        {item.created_at}
+                      </td>
+                    )}
+
+                    {/* Action button dot selector */}
+                    <td className="py-3.5 px-4 text-right relative">
+                      <button
+                        onClick={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
+                        className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600"
+                      >
+                        <MoreVertical className="h-4.5 w-4.5" />
+                      </button>
+                      {activeMenuId === item.id && (
+                        <>
+                          <div className="fixed inset-0 z-20" onClick={() => setActiveMenuId(null)} />
+                          <div className="absolute right-4 mt-1 z-30 w-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg p-1 text-left">
+                            <button
+                              onClick={() => openEditDrawer(item)}
+                              className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"
+                            >
+                              <Edit className="h-3.5 w-3.5 text-slate-500" /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteActivity(item.id)}
+                              className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-rose-50 dark:hover:bg-rose-955/40 text-rose-600 flex items-center gap-1.5"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" /> Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-
-        {/* Footer controls */}
-        <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-semibold text-slate-500">
-          <div className="flex items-center gap-2">
-            <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => { setEntriesPerPage(Number(e.target.value)); setCurrentPage(1); }}
-              className="border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
-            >
-              {[10, 25, 50].map(v => (
-                <option key={v} value={v}>{v}</option>
-              ))}
-            </select>
-            <span>entries</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 self-end sm:self-auto">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-slate-600"
-            >
-              <ChevronDown className="rotate-90 h-3 w-3" />
-            </button>
-            <span className="px-3.5 py-1.5 rounded-lg bg-red-600 text-white font-bold shadow-xs">
-              {currentPage}
-            </span>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-slate-600"
-            >
-              <ChevronDown className="-rotate-90 h-3 w-3" />
-            </button>
-          </div>
-        </div>
       </Card>
 
-      {/* RICH CRM SLIDE-OUT EDIT DRAWER */}
-      {editingActivity && (
+      {/* COMPREHENSIVE EDIT/ADD SLIDING SIDE DRAWER */}
+      {isDrawerOpen && (
         <>
-          {/* Backdrop Overlay */}
-          <div 
-            className="fixed inset-0 bg-black/45 backdrop-blur-xs z-50 transition-opacity duration-300" 
-            onClick={() => setEditingActivity(null)} 
-          />
-
-          {/* Drawer Body Container */}
-          <aside className="fixed right-0 top-0 bottom-0 z-[60] w-full max-w-2xl bg-white border-l border-slate-200 shadow-2xl flex flex-col transform transition-transform duration-300 ease-out translate-x-0 overflow-hidden">
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 transition-opacity" onClick={() => setIsDrawerOpen(false)} />
+          
+          {/* Drawer container */}
+          <div className="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[500px] bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-850 flex flex-col h-screen animate-in slide-in-from-right duration-250">
             
-            {/* Drawer Header */}
-            <div className="p-6 border-b border-slate-100 flex items-start justify-between">
-              <div className="min-w-0 pr-8">
-                <h2 className="text-xl font-bold text-slate-900 tracking-tight leading-snug truncate">
-                  {formTitle || "Activity details"}
-                </h2>
-                <p className="text-xs text-slate-400 mt-1 font-semibold">
-                  Commented by <span className="text-slate-600">{formOwner || currentUserName}</span> on {editingActivity.created_at}
-                </p>
+            {/* Header info */}
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight truncate max-w-[380px]">
+                    {editingActivity ? `Edit: ${formTitle || "Activity"}` : "Create New Activity"}
+                  </h3>
+                  <p className="text-[10px] text-slate-450 mt-1 uppercase tracking-wider font-bold">
+                    {editingActivity ? `Owner: ${formOwner || "Unknown"}` : `Creator: ${currentUserName}`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="p-1 rounded-lg text-slate-450 hover:bg-slate-200 dark:hover:bg-slate-800"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button 
-                onClick={() => setEditingActivity(null)}
-                className="h-7 w-7 rounded-full border border-red-200 text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors flex-shrink-0"
-              >
-                <X className="h-4 w-4" />
-              </button>
+
+              {/* Tab selector menu */}
+              <div className="flex items-center gap-4 mt-5 border-b border-slate-200 dark:border-slate-800">
+                <button
+                  onClick={() => setDrawerTab("activity")}
+                  className={cn(
+                    "pb-2 text-xs font-bold uppercase tracking-wider transition-all",
+                    drawerTab === "activity"
+                      ? "border-b-2 border-red-500 text-red-650 dark:text-red-400"
+                      : "text-slate-450 hover:text-slate-700"
+                  )}
+                >
+                  Activity
+                </button>
+                <button
+                  onClick={() => setDrawerTab("comments")}
+                  className={cn(
+                    "pb-2 text-xs font-bold uppercase tracking-wider transition-all",
+                    drawerTab === "comments"
+                      ? "border-b-2 border-red-500 text-red-650 dark:text-red-400"
+                      : "text-slate-450 hover:text-slate-700"
+                  )}
+                >
+                  Comments (0)
+                </button>
+              </div>
             </div>
 
-            {/* Navigation Tabs inside Drawer */}
-            <div className="px-6 border-b border-slate-100 flex gap-5 text-sm font-semibold">
-              <button 
-                onClick={() => setDrawerTab("activity")}
-                className={cn(
-                  "pb-3.5 relative",
-                  drawerTab === "activity" ? "text-red-600" : "text-slate-400 hover:text-slate-600"
-                )}
-              >
-                Activity
-                {drawerTab === "activity" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-600 rounded-full" />}
-              </button>
-              <button 
-                onClick={() => setDrawerTab("comments")}
-                className={cn(
-                  "pb-3.5 relative flex items-center gap-1",
-                  drawerTab === "comments" ? "text-red-600" : "text-slate-400 hover:text-slate-600"
-                )}
-              >
-                Comments <span className="bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
-              </button>
-            </div>
-
-            {/* Scrollable Form Content */}
-            <form onSubmit={handleSaveDrawer} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs text-slate-700">
-              
-              {/* Form - Tab Content: Activity */}
-              {drawerTab === "activity" && (
-                <div className="space-y-5">
-                  {/* Title Field */}
+            {/* Scrollable form */}
+            <form onSubmit={handleSaveDrawer} className="flex-1 overflow-y-auto p-5 space-y-4">
+              {drawerTab === "activity" ? (
+                <div className="space-y-4">
+                  {/* Title field */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Title <span className="text-red-500">*</span></label>
-                    <Input 
-                      value={formTitle}
-                      onChange={e => setFormTitle(e.target.value)}
-                      placeholder="Enter activity title"
+                    <label className="block text-[11px] font-bold text-slate-650 dark:text-slate-450 uppercase mb-1.5">Title</label>
+                    <Input
                       required
-                      className="rounded-xl border-slate-200 h-10 text-sm font-medium"
+                      value={formTitle}
+                      onChange={(e) => setFormTitle(e.target.value)}
+                      placeholder="e.g. Discuss onboarding process"
+                      className="rounded-xl text-sm"
                     />
                   </div>
 
-                  {/* Activity Type Selection */}
+                  {/* Activity Type Selection Tabs */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Activity Type <span className="text-red-500">*</span></label>
-                    <div className="flex flex-wrap gap-2.5">
-                      {[
-                        { key: "Email", label: "Email", icon: Mail },
-                        { key: "Meeting", label: "Meeting", icon: Calendar },
-                      ].map((item) => {
-                        const Icon = item.icon;
-                        const active = formType === item.key;
-                        return (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => setFormType(item.key as "Email" | "Meeting")}
-                            className={cn(
-                              "flex items-center gap-2 px-4 py-2 border rounded-xl text-xs font-bold transition-all shadow-2xs",
-                              active 
-                                ? "border-red-500 text-red-600 bg-red-50/20" 
-                                : "border-slate-200 text-slate-500 hover:bg-slate-50"
-                            )}
-                          >
-                            <Icon className="h-3.5 w-3.5" />
-                            {item.label}
-                          </button>
-                        );
-                      })}
+                    <label className="block text-[11px] font-bold text-slate-650 dark:text-slate-455 uppercase mb-1.5">Activity Type</label>
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setFormType("Email")}
+                        className={cn(
+                          "py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
+                          formType === "Email"
+                            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                            : "text-slate-500 hover:text-slate-700"
+                        )}
+                      >
+                        <Mail className="h-3.5 w-3.5" /> Email
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormType("Meeting")}
+                        className={cn(
+                          "py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
+                          formType === "Meeting"
+                            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                            : "text-slate-500 hover:text-slate-700"
+                        )}
+                      >
+                        <Calendar className="h-3.5 w-3.5" /> Meeting
+                      </button>
                     </div>
                   </div>
 
                   {/* Due Date & Time */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Due Date <span className="text-red-500">*</span></label>
-                      <div className="relative">
-                        <input
-                          type="date"
-                          value={formDate}
-                          onChange={e => setFormDate(e.target.value)}
-                          required
-                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-medium text-xs focus:outline-none focus:ring-1 focus:ring-slate-300"
-                        />
-                      </div>
+                      <label className="block text-[11px] font-bold text-slate-655 dark:text-slate-455 uppercase mb-1.5">Due Date</label>
+                      <Input
+                        required
+                        type="date"
+                        value={formDate}
+                        onChange={(e) => setFormDate(e.target.value)}
+                        className="rounded-xl text-xs"
+                      />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Time</label>
-                      <div className="relative">
-                        <input
-                          type="time"
-                          value={formTime}
-                          onChange={e => setFormTime(e.target.value)}
-                          className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-medium text-xs focus:outline-none focus:ring-1 focus:ring-slate-300"
-                        />
-                      </div>
+                      <label className="block text-[11px] font-bold text-slate-655 dark:text-slate-455 uppercase mb-1.5">Time</label>
+                      <Input
+                        required
+                        type="time"
+                        value={formTime}
+                        onChange={(e) => setFormTime(e.target.value)}
+                        className="rounded-xl text-xs"
+                      />
                     </div>
                   </div>
 
                   {/* Reminder */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Reminder <span className="text-red-500">*</span></label>
-                    <div className="grid grid-cols-3 gap-3 items-center">
-                      <div className="relative col-span-1">
-                        <Bell className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                        <input
-                          type="number"
-                          value={formReminder}
-                          onChange={e => setFormReminder(Number(e.target.value))}
-                          className="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2.5 font-medium text-xs focus:outline-none focus:ring-1 focus:ring-slate-300"
-                        />
-                      </div>
+                    <label className="block text-[11px] font-bold text-slate-650 dark:text-slate-455 uppercase mb-1.5">Reminder</label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={formReminder}
+                        onChange={(e) => setFormReminder(Number(e.target.value))}
+                        className="w-20 rounded-xl text-sm"
+                      />
                       <select
                         value={formReminderUnit}
-                        onChange={e => setFormReminderUnit(e.target.value)}
-                        className="col-span-1 rounded-xl border border-slate-200 px-3.5 py-2.5 font-medium bg-white text-xs focus:outline-none focus:ring-1 focus:ring-slate-300"
+                        onChange={(e) => setFormReminderUnit(e.target.value)}
+                        className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-350 outline-none focus:ring-1 focus:ring-indigo-500 h-10"
                       >
                         <option value="Minutes">Minutes</option>
                         <option value="Hours">Hours</option>
                         <option value="Days">Days</option>
                       </select>
-                      <span className="col-span-1 font-bold text-slate-500 pl-1">Before Due</span>
+                      <span className="text-xs font-semibold text-slate-500">before due</span>
                     </div>
                   </div>
 
-                  {/* Owner & Guests */}
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Owner & Guests list */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Owner <span className="text-red-500">*</span></label>
-                      <select
+                      <label className="block text-[11px] font-bold text-slate-650 dark:text-slate-455 uppercase mb-1.5">Owner</label>
+                      <Select
                         value={formOwner}
-                        onChange={e => setFormOwner(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-semibold bg-white text-xs focus:outline-none"
+                        onChange={(e) => setFormOwner(e.target.value)}
+                        className="rounded-xl text-xs"
                       >
-                        <option value={currentUserName}>{currentUserName}</option>
-                        {uniqueOwners.filter(o => o !== currentUserName).map(owner => (
-                          <option key={owner} value={owner}>{owner}</option>
+                        {ownersList.map((o) => (
+                          <option key={o} value={o}>{o}</option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
+
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Guests <span className="text-red-500">*</span></label>
-                      <div className="space-y-2">
-                        {/* Guest tags list */}
-                        <div className="flex flex-wrap gap-1.5">
-                          {formGuests.map(name => (
-                            <Badge key={name} variant="blue" className="bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center gap-1 text-[10px] py-0.5 px-2">
-                              <span className="h-3.5 w-3.5 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[8px] font-bold">
-                                {initials(name)}
-                              </span>
-                              {name}
-                              <button type="button" onClick={() => removeGuest(name)} className="hover:text-red-500 ml-0.5">
-                                <X className="h-2.5 w-2.5" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                        {/* Add Guest input */}
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Add guest name"
-                            value={newGuestInput}
-                            onChange={e => setNewGuestInput(e.target.value)}
-                            onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addGuest())}
-                            className="rounded-xl border-slate-200 h-8 text-[11px] font-medium"
-                          />
-                          <button
-                            type="button"
-                            onClick={addGuest}
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-[10px] font-bold rounded-lg"
-                          >
-                            Add
-                          </button>
-                        </div>
+                      <label className="block text-[11px] font-bold text-slate-650 dark:text-slate-455 uppercase mb-1.5">Add Guests</label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={newGuestInput}
+                          onChange={(e) => setNewGuestInput(e.target.value)}
+                          placeholder="Name or Email"
+                          className="rounded-xl text-xs"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addGuest();
+                            }
+                          }}
+                        />
+                        <Button type="button" variant="outline" onClick={addGuest} className="rounded-xl flex-shrink-0 h-10 px-3">
+                          <UserPlus className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Description Box with mockup Rich-text toolbar */}
+                  {/* Guests list container */}
+                  {formGuests.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Guest List</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {formGuests.map((g) => (
+                          <span key={g} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-350 border border-slate-200/50 dark:border-slate-800">
+                            {g}
+                            <button type="button" onClick={() => removeGuest(g)} className="text-slate-400 hover:text-red-500">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Text Editor Toolbar & Description textarea */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Description <span className="text-red-500">*</span></label>
-                    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-                      {/* Editor Toolbar */}
-                      <div className="bg-slate-50 border-b border-slate-200 p-2 flex items-center flex-wrap gap-2 text-slate-500">
-                        <select className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-700 outline-none h-6">
-                          <option>Normal</option>
-                          <option>Heading 1</option>
-                          <option>Heading 2</option>
-                        </select>
-                        <div className="h-4 w-px bg-slate-200 mx-0.5" />
-                        <button type="button" className="p-1 hover:bg-slate-100 hover:text-slate-800 rounded transition-colors"><Bold className="h-3.5 w-3.5" /></button>
-                        <button type="button" className="p-1 hover:bg-slate-100 hover:text-slate-800 rounded transition-colors"><Italic className="h-3.5 w-3.5" /></button>
-                        <button type="button" className="p-1 hover:bg-slate-100 hover:text-slate-800 rounded transition-colors"><Underline className="h-3.5 w-3.5" /></button>
-                        <button type="button" className="p-1 hover:bg-slate-100 hover:text-slate-800 rounded transition-colors"><Link2 className="h-3.5 w-3.5" /></button>
-                        <div className="h-4 w-px bg-slate-200 mx-0.5" />
-                        <button type="button" className="p-1 hover:bg-slate-100 hover:text-slate-800 rounded transition-colors"><List className="h-3.5 w-3.5" /></button>
-                        <button type="button" className="p-1 hover:bg-slate-100 hover:text-slate-800 rounded transition-colors"><ListOrdered className="h-3.5 w-3.5" /></button>
-                        <button type="button" className="p-1 hover:bg-slate-100 hover:text-slate-800 rounded transition-colors"><Type className="h-3.5 w-3.5" /></button>
+                    <label className="block text-[11px] font-bold text-slate-650 dark:text-slate-455 uppercase mb-1.5">Description</label>
+                    <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-slate-900">
+                      {/* Rich toolbar mock styling */}
+                      <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-slate-400">
+                        <button type="button" className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-850"><Type className="h-3.5 w-3.5" /></button>
+                        <button type="button" className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-850 font-bold"><Bold className="h-3.5 w-3.5" /></button>
+                        <button type="button" className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-850 italic"><Italic className="h-3.5 w-3.5" /></button>
+                        <button type="button" className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-850 underline"><Underline className="h-3.5 w-3.5" /></button>
+                        <button type="button" className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-850"><Link2 className="h-3.5 w-3.5" /></button>
+                        <span className="w-px h-4 bg-slate-200 dark:bg-slate-850 mx-1" />
+                        <button type="button" className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-850"><List className="h-3.5 w-3.5" /></button>
+                        <button type="button" className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-850"><ListOrdered className="h-3.5 w-3.5" /></button>
                       </div>
                       <textarea
                         value={formDescription}
-                        onChange={e => setFormDescription(e.target.value)}
-                        placeholder="Write activity logs details..."
-                        className="w-full min-h-[100px] p-3 text-xs focus:outline-none resize-y font-medium text-slate-700 leading-relaxed"
+                        onChange={(e) => setFormDescription(e.target.value)}
+                        placeholder="Agenda, goals, or meeting context..."
+                        className="w-full p-3 min-h-[120px] text-sm text-slate-850 dark:text-slate-100 bg-white dark:bg-slate-900 border-none outline-none resize-none leading-relaxed"
                       />
                     </div>
                   </div>
 
-                  {/* Deals, Contacts, Companies selects */}
-                  <div className="space-y-4 pt-2">
-                    {/* Deals select */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="w-1/3">
-                        <span className="font-bold text-slate-500">Deals</span>
-                      </div>
-                      <div className="w-2/3 flex items-center gap-2">
-                        <Input
-                          value={formDeal}
-                          onChange={e => setFormDeal(e.target.value)}
-                          placeholder="No deal linked — not wired up yet"
-                          className="flex-1 rounded-xl border-slate-200 h-9 text-xs font-medium"
-                        />
-                      </div>
+                  {/* Deals & Contacts */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Deal — free text, no real deals data source is wired into this view yet */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-650 dark:text-slate-455 uppercase mb-1.5">Deal</label>
+                      <Input
+                        value={formDeal}
+                        onChange={(e) => setFormDeal(e.target.value)}
+                        placeholder="No deal linked"
+                        className="rounded-xl text-xs"
+                      />
                     </div>
 
-                    {/* Contacts select — real names pulled from this workspace's activities */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="w-1/3">
-                        <span className="font-bold text-slate-500">Contacts</span>
-                      </div>
-                      <div className="w-2/3 flex items-center gap-2">
-                        <select
-                          value={formContact}
-                          onChange={e => setFormContact(e.target.value)}
-                          className="flex-1 rounded-xl border border-slate-200 px-3 py-2 bg-white font-medium"
-                        >
-                          <option value="">— No contact —</option>
-                          {uniqueOwners.map(owner => (
-                            <option key={owner} value={owner}>{owner}</option>
-                          ))}
-                        </select>
-                      </div>
+                    {/* Contact — real names pulled from this workspace's activities/meetings */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-650 dark:text-slate-455 uppercase mb-1.5">Contact</label>
+                      <Select value={formContact} onChange={(e) => setFormContact(e.target.value)} className="rounded-xl text-xs">
+                        <option value="">No linked contact</option>
+                        {contactsList.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </Select>
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* Form - Tab Content: Comments */}
-              {drawerTab === "comments" && (
-                <div className="py-12 text-center text-slate-400 italic">
-                  No comments logged for this activity log.
+              ) : (
+                <div className="py-16 text-center text-slate-400 text-xs font-semibold">
+                  No comments logged for this activity.
                 </div>
               )}
-
-              {/* Drawer Footer Actions */}
-              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 bg-white sticky bottom-0 z-10">
-                <button
-                  type="button"
-                  onClick={() => setEditingActivity(null)}
-                  className="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white transition-colors shadow-sm"
-                >
-                  Save Changes
-                </button>
-              </div>
             </form>
-          </aside>
+
+            {/* Footer buttons */}
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-slate-50/50 dark:bg-slate-950/20 flex-shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDrawerOpen(false)}
+                className="rounded-xl px-4 py-2 font-semibold text-sm border-slate-200 dark:border-slate-800 h-10"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveDrawer}
+                className="rounded-xl px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold h-10 shadow-sm"
+              >
+                Save Changes
+              </Button>
+            </div>
+          </div>
         </>
       )}
     </div>

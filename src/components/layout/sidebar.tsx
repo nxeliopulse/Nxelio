@@ -49,7 +49,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
       if (item.items) {
         const hasActiveSubItem = item.items.some(
           (sub) => pathname === sub.href || pathname.startsWith(sub.href + "/")
-        );
+        ) || pathname === item.href;
         if (hasActiveSubItem) {
           setExpandedItems((prev) => ({ ...prev, [item.label]: true }));
         }

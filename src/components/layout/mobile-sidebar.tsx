@@ -35,7 +35,7 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
       if (item.items) {
         const hasActiveSubItem = item.items.some(
           (sub) => pathname === sub.href || pathname.startsWith(sub.href + "/")
-        );
+        ) || pathname === item.href;
         if (hasActiveSubItem) {
           setExpandedItems((prev) => ({ ...prev, [item.label]: true }));
         }

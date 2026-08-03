@@ -275,7 +275,9 @@ html[data-sidebar-badge="dot"] .sidebar-badge {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
-
+*, ::after, ::before {
+  border-color: var(--color-slate-200);
+}
 
 html, body {
   background: var(--background);
@@ -840,3 +842,16 @@ html, body {
 .recharts-surface {
   outline: none !important;
 }
+
+/* Global input focus ring overrides (fixes blue outline bug across all inputs, textareas, and selects) */
+input:focus,
+textarea:focus,
+select:focus,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 1.5px rgba(24, 167, 184, 0.3) !important;
+}
+

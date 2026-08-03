@@ -1,39 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { getMeetings } from "@/lib/queries/meetings";
-import { ActivitiesDashboardView, type DbActivityRow } from "@/components/activities/activities-dashboard-view";
-
-async function getEmailActivities(): Promise<DbActivityRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("lead_activities")
-    .select(`
-      id,
-      activity_type,
-      created_at,
-      metadata,
-      lead:leads (
-        id,
-        full_name,
-        company_name,
-        email
-      )
-    `)
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    console.error("[getEmailActivities] failed:", error.message);
-    return [];
-  }
-  // Supabase infers the joined `lead` relation as an array even though the FK is many-to-one;
-  // the actual runtime shape is a single object (same quirk handled in lib/queries/analytics.ts).
-  return (data || []) as unknown as DbActivityRow[];
-}
+import { getInboxConversations, getSentMessages } from "@/lib/queries/inbox";
+import { EmailsView } from "@/components/activities/emails-view";
 
 export default async function EmailActivitiesPage() {
-  const [activities, meetings] = await Promise.all([
-    getEmailActivities(),
-    getMeetings(),
+  const [inbox, sent] = await Promise.all([
+    getInboxConversations(),
+    getSentMessages(),
   ]);
 
   const supabase = await createClient();
@@ -46,11 +18,10 @@ export default async function EmailActivitiesPage() {
   const currentUserName = profile?.full_name || "User";
 
   return (
-    <ActivitiesDashboardView
-      dbActivities={activities}
-      dbMeetings={meetings}
+    <EmailsView
+      inbox={inbox}
+      sent={sent}
       currentUserName={currentUserName}
-      defaultTab="emails"
     />
   );
 }
