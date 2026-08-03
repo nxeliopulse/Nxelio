@@ -129,9 +129,25 @@ export function DashboardView({
     "Website Form": "#18A7B8", "Website": "#18A7B8", "Referral": "#8B5CF6",
     "Campaigns": "#EC4899", "Campaign": "#EC4899", "Other": "#64748b",
   };
-  const donutData = stats.trafficSources.map((s) => ({
-    name: s.name, value: s.value, count: s.count, color: sourceColors[s.name] || "#94a3b8",
-  }));
+  const defaultColors = ["#18A7B8", "#6366F1", "#EC4899", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6"];
+  const donutData = stats.trafficSources.map((s, idx) => {
+    const normalized = s.name.trim();
+    let color = "#94a3b8";
+    const matchedKey = Object.keys(sourceColors).find(
+      key => normalized.toLowerCase().includes(key.toLowerCase())
+    );
+    if (matchedKey) {
+      color = sourceColors[matchedKey];
+    } else {
+      color = defaultColors[idx % defaultColors.length];
+    }
+    return {
+      name: s.name,
+      value: s.value,
+      count: s.count,
+      color: color,
+    };
+  });
   const topSource = donutData[0];
 
   const [nowMs] = useState(() => Date.now());
@@ -490,9 +506,19 @@ export function DashboardView({
                     </ResponsiveContainer>
 
                     {/* Text centered inside the donut hole — real top source, not hardcoded */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-xl font-black text-slate-900 dark:text-white">{topSource?.value ?? 0}%</span>
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{topSource?.name ?? "—"}</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4">
+                      <span className="text-lg font-black text-slate-900 dark:text-white leading-none mb-1">{topSource?.value ?? 0}%</span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider max-w-[85px] text-center leading-tight">
+                        {topSource?.name ? (
+                          topSource.name.length <= 12 ? (
+                            topSource.name
+                          ) : (
+                            topSource.name.split(" ").slice(0, 2).join(" ")
+                          )
+                        ) : (
+                          "—"
+                        )}
+                      </span>
                     </div>
                   </div>
                 </>

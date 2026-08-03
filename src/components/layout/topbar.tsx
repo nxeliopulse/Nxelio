@@ -175,7 +175,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
               }
               if (e.key === "Escape") setSearchOpen(false);
             }}
-            className="w-full h-8 pl-8 pr-8 bg-white/15 hover:bg-white/20 focus:bg-white/20 border border-white/20 rounded-full text-xs text-white placeholder-white/60 outline-none transition-colors"
+            className="w-full h-8 pl-8 pr-8 bg-white/12 hover:bg-white/20 focus:bg-white/25 rounded-full text-xs text-white placeholder-white/65 outline-none transition-all"
           />
           {searchLoading && (
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/70 animate-spin" />
@@ -240,7 +240,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* Upgrade pill */}
         <Link
           href="/billing"
-          className="hidden sm:flex items-center gap-1 px-3 py-1 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-medium text-white transition-colors"
+          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/12 hover:bg-white/20 text-xs font-semibold text-white transition-colors"
         >
           <ArrowUpRight className="h-3.5 w-3.5 text-amber-300" />
           <span>Upgrade</span>
@@ -305,7 +305,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         </button>
 
         {/* Notifications bell */}
-        <NotificationsBell className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white" />
+        <NotificationsBell className="h-8 w-8 rounded-full bg-white/12 hover:bg-white/20 text-white flex items-center justify-center transition-colors" />
 
         <div className="h-4 w-px bg-white/20 mx-0.5" />
 

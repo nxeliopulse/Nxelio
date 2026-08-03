@@ -276,9 +276,6 @@ html[data-sidebar-badge="dot"] .sidebar-badge {
   --font-mono: var(--font-geist-mono);
 }
 
-* {
-  border-color: var(--border);
-}
 
 html, body {
   background: var(--background);
@@ -835,4 +832,11 @@ html, body {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;              /* Chrome/Safari/new Edge */
+}
+
+/* Remove default focus outline from Recharts containers */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-surface {
+  outline: none !important;
 }

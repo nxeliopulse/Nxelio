@@ -2,7 +2,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "custom";
 type Size = "sm" | "md" | "lg" | "icon";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,9 +13,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 const variants: Record<Variant, string> = {
   primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-500/20",
   secondary: "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-[var(--muted)]",
-  outline: "border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-700 hover:bg-slate-50 dark:hover:bg-[var(--muted)]",
-  ghost: "text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-[var(--muted)]",
+  outline: "border border-slate-200 bg-white dark:bg-slate-900 text-slate-700 hover:bg-slate-50 dark:hover:bg-[var(--muted)]",
+  ghost: "text-slate-700 hover:bg-slate-100 dark:hover:bg-[var(--muted)]",
   danger: "bg-rose-600 text-white hover:bg-rose-700",
+  custom: "",
 };
 
 const sizes: Record<Size, string> = {
