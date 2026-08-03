@@ -46,6 +46,7 @@ export const navMainItems: NavItem[] = [
     icon: CalendarDays,
     roles: ALL,
     items: [
+      { label: "Dashboard", href: "/activities" },
       { label: "Meetings", href: "/meetings" },
       { label: "Emails", href: "/activities/emails" },
     ],
