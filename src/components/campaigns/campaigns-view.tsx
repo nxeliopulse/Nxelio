@@ -369,14 +369,10 @@ export function CampaignsView({
 
   return (
     <div className="max-w-[1600px] mx-auto">
-      {/* Custom header (breadcrumb + count badge) — kept local to this page, doesn't touch the shared PageHeader used elsewhere */}
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Campaigns</h1>
-            <span className="inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">
-              {rows.length}
-            </span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
             <span>Home</span>

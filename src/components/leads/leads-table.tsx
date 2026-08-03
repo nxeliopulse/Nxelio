@@ -920,11 +920,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       {/* Page header — title + total count badge, breadcrumb, Export/Refresh/Import actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Prospects
-            <span className="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-0.5">
-              {optimisticLeads.length}
-            </span>
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-300">Home</Link>

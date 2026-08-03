@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { X, Sparkles, HelpCircle } from "lucide-react";
+import { X, Sparkles, HelpCircle, ChevronDown } from "lucide-react";
 import { getAiCreditsUsage } from "@/lib/queries/credits";
 import { onCreditsChanged } from "@/lib/credits-refresh";
 import { Logo } from "@/components/brand/logo";
@@ -12,6 +12,14 @@ import { navMainItems, sidebarAdminItems, filterNavByRoleAndOverrides } from "@/
 export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolean; onClose: () => void; role?: string; navAccess?: Record<string, boolean> | null }) {
   const pathname = usePathname();
   const [credits, setCredits] = useState<{ used: number; total: number } | null>(null);
+
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
+    Activities: true,
+  });
+
+  const toggleExpanded = (label: string) => {
+    setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
 
   // Close the drawer on navigation; onClose is stable enough not to need in deps.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,6 +75,54 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
               {main.map((item) => {
                 const Icon = item.icon;
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
+
+                if (item.items) {
+                  const isExpanded = expandedItems[item.label] ?? false;
+                  const hasActiveSubItem = item.items.some(
+                    (sub) => pathname === sub.href || pathname.startsWith(sub.href + "/")
+                  );
+
+                  return (
+                    <li key={item.label} className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(item.label)}
+                        className={cn(
+                          "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
+                          hasActiveSubItem ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className={cn("h-4.5 w-4.5 flex-shrink-0", hasActiveSubItem ? "text-blue-600" : "text-slate-400")} strokeWidth={2} />
+                          <span className="flex-1 text-left">{item.label}</span>
+                        </div>
+                        <ChevronDown className={cn("h-4 w-4 transition-transform duration-200 text-slate-400", isExpanded && "rotate-180")} />
+                      </button>
+                      {isExpanded && (
+                        <ul className="pl-9 space-y-1">
+                          {item.items.map((sub) => {
+                            const subActive = pathname === sub.href || pathname.startsWith(sub.href + "/");
+                            return (
+                              <li key={sub.href}>
+                                <Link
+                                  href={sub.href}
+                                  onClick={onClose}
+                                  className={cn(
+                                    "flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                                    subActive ? "text-blue-600 font-semibold" : "text-slate-500 hover:text-slate-800"
+                                  )}
+                                >
+                                  <span>{sub.label}</span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                }
+
                 return (
                   <li key={item.href}>
                     <Link

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getAiCreditsUsage, type AiCreditsUsage } from "@/lib/queries/credits";
 import { onCreditsChanged } from "@/lib/credits-refresh";
-import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen, ChevronDown } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 import { navMainItems, navAdminItems, sidebarAdminItems, filterNavByRoleAndOverrides, isNavItemAllowed } from "@/lib/nav-config";
@@ -26,6 +26,14 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
   const [credits, setCredits] = useState<AiCreditsUsage | null>(null);
   // Once already on the top plan there's nothing to upgrade to.
   const canUpgrade = !credits || NEXT_PLAN[credits.planId] !== null;
+
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
+    Activities: true,
+  });
+
+  const toggleExpanded = (label: string) => {
+    setExpandedItems((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +61,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
 
     if (collapsed) {
       return (
-        <li key={item.href} className="flex justify-center">
+        <li key={item.label} className="flex justify-center">
           <Link
             href={item.href}
             title={item.label}
@@ -66,6 +74,67 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
           >
             <Icon className="h-[21px] w-[21px]" strokeWidth={2} />
           </Link>
+        </li>
+      );
+    }
+
+    if (item.items) {
+      const isExpanded = expandedItems[item.label] ?? false;
+      const hasActiveSubItem = item.items.some(
+        (sub) => pathname === sub.href || pathname.startsWith(sub.href + "/")
+      );
+
+      return (
+        <li key={item.label} className="space-y-1">
+          <button
+            type="button"
+            onClick={() => toggleExpanded(item.label)}
+            className={cn(
+              "w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-sm font-semibold transition-colors group",
+              hasActiveSubItem
+                ? "bg-white/20 text-white shadow-xs"
+                : "text-white/85 hover:bg-white/15 hover:text-white"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <Icon
+                className={cn(
+                  "h-5 w-5 flex-shrink-0",
+                  hasActiveSubItem ? "text-white" : "text-white/75 group-hover:text-white"
+                )}
+                strokeWidth={2}
+              />
+              <span className="flex-1 whitespace-nowrap text-left">{item.label}</span>
+            </div>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 transition-transform duration-200 text-white/60 group-hover:text-white",
+                isExpanded && "rotate-180"
+              )}
+            />
+          </button>
+          {isExpanded && (
+            <ul className="pl-9 space-y-1">
+              {item.items.map((sub) => {
+                const subActive = pathname === sub.href || pathname.startsWith(sub.href + "/");
+                return (
+                  <li key={sub.href}>
+                    <Link
+                      href={sub.href}
+                      className={cn(
+                        "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors",
+                        subActive
+                          ? "bg-white/25 text-white ring-1 ring-white/35 shadow-xs"
+                          : "text-white/75 hover:bg-white/10 hover:text-white"
+                      )}
+                    >
+                      <span className="flex-1 whitespace-nowrap text-left">{sub.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </li>
       );
     }

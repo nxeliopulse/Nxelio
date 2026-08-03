@@ -3,12 +3,19 @@ import type { LucideIcon } from "lucide-react";
 
 export type Role = "Super Admin" | "Sales Admin" | "Marketing Admin" | string;
 
+export interface SubNavItem {
+  label: string;
+  href: string;
+  roles?: Role[];
+}
+
 export interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
   /** Which roles can see this nav item */
   roles: Role[];
+  items?: SubNavItem[];
 }
 
 const ALL: Role[] = ["Super Admin", "Sales Admin", "Marketing Admin"];
@@ -33,7 +40,16 @@ export const navMainItems: NavItem[] = [
   { label: "Campaigns", href: "/campaigns", icon: Send, roles: SALES },
   { label: "Segments", href: "/segments", icon: Layers3, roles: MARKETING },
   { label: "Opportunities", href: "/opportunities", icon: Briefcase, roles: SALES },
-  { label: "Meetings", href: "/meetings", icon: CalendarDays, roles: SALES },
+  {
+    label: "Activities",
+    href: "/meetings",
+    icon: CalendarDays,
+    roles: SALES,
+    items: [
+      { label: "Meetings", href: "/meetings" },
+      { label: "Emails", href: "/activities/emails" },
+    ],
+  },
   { label: "Newsletters", href: "/newsletters", icon: Newspaper, roles: MARKETING },
   { label: "Analytics", href: "/analytics", icon: BarChart3, roles: ALL },
 ];
@@ -42,7 +58,6 @@ export const navAdminItems: NavItem[] = [
   { label: "Administration", href: "/users", icon: UserCog, roles: SUPER },
   { label: "Capture Form", href: "/capture-form", icon: Link2, roles: SUPER },
   { label: "Settings", href: "/settings", icon: Settings, roles: ALL },
-  { label: "Subscription", href: "/billing", icon: CreditCard, roles: ALL },
 ];
 
 /** Admin nav entries actually rendered in the sidebar. "Settings" stays in
