@@ -438,13 +438,21 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     const matchIndustry = !industryFilter || l.industry === industryFilter;
     const matchInterest = !interestFilter || l.interest_area === interestFilter;
 
-    const created = new Date(l.created_at);
-    const matchDateFrom = !dateFrom || created >= new Date(`${dateFrom}T00:00:00`);
-    const matchDateTo = !dateTo || created <= new Date(`${dateTo}T23:59:59`);
+    // Compare by local calendar day (not exact instant) so "From X to Y" matches
+    // what the user actually sees in the Created Date column, regardless of the
+    // time-of-day a record was created — a UTC timestamp late in the day can
+    // otherwise fall on a different local calendar day than its displayed date.
+    const createdDay = toLocalDayKey(new Date(l.created_at));
+    const matchDateFrom = !dateFrom || createdDay >= dateFrom;
+    const matchDateTo = !dateTo || createdDay <= dateTo;
 
     const matchColumns = activeColumnFilterKeys.every((k) => {
-      const v = (columnFilters[k] || "").toLowerCase();
-      return getColumnText(k, l).toLowerCase().includes(v);
+      const raw = columnFilters[k] || "";
+      if (k === "created_at") {
+        const parsed = new Date(raw);
+        if (!isNaN(parsed.getTime())) return createdDay === toLocalDayKey(parsed);
+      }
+      return getColumnText(k, l).toLowerCase().includes(raw.toLowerCase());
     });
 
     return matchSearch && matchIndustry && matchInterest && matchDateFrom && matchDateTo && matchColumns;
@@ -472,9 +480,18 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
   const sorted = [...filtered].sort((a, b) => {
     if (!sortKey) return 0;
-    // Reuses the same plain-text-per-column logic the header search filter already
-    // relies on (getColumnText), so every column sorts on exactly what it displays —
-    // no separate comparator to keep in sync per column.
+    // Date columns must compare actual timestamps — their displayed text (e.g.
+    // "Jul 30, 2026") sorts alphabetically by month name under localeCompare,
+    // not chronologically, which is why "Newest" previously did nothing sane.
+    if (sortKey === "created_at" || sortKey === "last_activity") {
+      const av = sortKey === "created_at" ? a.created_at : a.updated_at;
+      const bv = sortKey === "created_at" ? b.created_at : b.updated_at;
+      const cmp = new Date(av).getTime() - new Date(bv).getTime();
+      return sortDir === "asc" ? cmp : -cmp;
+    }
+    // Every other column reuses the same plain-text-per-column logic the header
+    // search filter already relies on (getColumnText), so it sorts on exactly
+    // what it displays — no separate comparator to keep in sync per column.
     const cmp = getColumnText(sortKey, a).localeCompare(getColumnText(sortKey, b), undefined, { numeric: true, sensitivity: "base" });
     return sortDir === "asc" ? cmp : -cmp;
   });
@@ -546,6 +563,13 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   }
 
   /** Plain-text value of a column, for the header click-to-search filter. */
+  // Local (browser) calendar-day key, e.g. "2026-07-30" — matches the day
+  // rendered by formatDate/formatDateTime and the value <input type="date"> gives.
+  function toLocalDayKey(d: Date): string {
+    if (isNaN(d.getTime())) return "";
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
   function getColumnText(key: ColKey, l: LeadRow): string {
     switch (key) {
       case "name": return displayName(l);
@@ -999,6 +1023,18 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <div className="w-36 sm:w-48 md:w-56 flex-shrink-0">
               <Input
                 leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
+                rightIcon={
+                  search ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      aria-label="Clear search"
+                      className="pointer-events-auto p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : undefined
+                }
                 placeholder="Search…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -1128,7 +1164,10 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <table className="w-full text-sm border-separate border-spacing-0 min-w-[900px]">
               <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <th className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-2.5 w-10">
+                  <th
+                    className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-2.5"
+                    style={{ width: 40, minWidth: 40, maxWidth: 40 }}
+                  >
                     <input
                       type="checkbox"
                       checked={selected.length === filtered.length && filtered.length > 0}
@@ -1146,9 +1185,17 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         key={c.key}
                         className={cn(
                           "px-3 py-2.5 font-bold whitespace-nowrap",
-                          c.key === "index" && "w-12 sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
+                          c.key === "index" && "sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
                           c.key === "name" && "sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
                         )}
+                        // Sticky offsets below (left-10, left-[88px]) are hardcoded pixel
+                        // sums of the checkbox + Row# column widths — fix both header AND
+                        // body cell widths for these two columns (inline style, not just a
+                        // Tailwind class) so auto table-layout can never resolve a different
+                        // actual width than the offsets assume. Without this, extra visible
+                        // columns / longer content could widen these columns and misalign
+                        // every sticky column to their right during horizontal scroll.
+                        style={c.key === "index" ? { width: 48, minWidth: 48, maxWidth: 48 } : undefined}
                       >
                         <span
                           role={filterable ? "button" : undefined}
@@ -1256,7 +1303,11 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                     onClick={() => openLead(l.id)}
                     className="group hover:bg-slate-50 transition-colors cursor-pointer"
                   >
-                    <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-2"
+                      style={{ width: 40, minWidth: 40, maxWidth: 40 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <input
                         type="checkbox"
                         checked={selected.includes(l.id)}
@@ -1272,6 +1323,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                           c.key === "index" && "sticky left-10 z-10 bg-white group-hover:bg-slate-50 transition-colors",
                           c.key === "name" && "sticky left-[88px] z-10 bg-white group-hover:bg-slate-50 transition-colors"
                         )}
+                        style={c.key === "index" ? { width: 48, minWidth: 48, maxWidth: 48 } : undefined}
                         onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
                       >
                         {renderCell(c.key, l, safePage * pageSize + i + 1)}

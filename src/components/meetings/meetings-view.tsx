@@ -5,7 +5,7 @@ import {
   CalendarDays, Clock, Users, ExternalLink, Pencil, X, Plus, Link2, FileText,
   PlayCircle, Video, MapPin, AlertCircle, Loader2, Wand2,
   Send, Check, ChevronLeft, ChevronRight, UserPlus, CalendarCheck, RefreshCw,
-  CheckSquare, Square, Globe,
+  CheckSquare, Square, Globe, ArrowLeft,
 } from "lucide-react";
 import { generateConferenceLink, type ConferenceProvider } from "@/lib/meetings/conference-link";
 import { Card } from "@/components/ui/card";
@@ -86,12 +86,22 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
 
   const [presetLeadIds, setPresetLeadIds] = useState<string[]>([]);
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get("leads");
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get("leads");
     if (p) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
       setPresetLeadIds(p.split(",").map((s) => s.trim()).filter(Boolean));
       setEditing("new");
     }
+    // Deep-link into a specific meeting's Edit/Delete panel — used by the
+    // Prospect Details page's meeting list, which previously had no way to
+    // reach this panel at all (its rows weren't clickable).
+    const openId = params.get("open");
+    if (openId) {
+      const found = meetings.find((m) => m.id === openId);
+      if (found) setDetail(found);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time init from the URL on mount
   }, []);
 
   const [accounts, setAccounts] = useState<CalendarAccountRow[]>([]);
@@ -197,6 +207,18 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-4">
+      {/* Shown only when arrived from a single prospect's page (Schedule button
+          passes ?leads=<id>) — the only way back to it was the browser's Back
+          button, which is easy to lose once you've clicked around the calendar. */}
+      {presetLeadIds.length === 1 && (
+        <Link
+          href={`/leads/${presetLeadIds[0]}`}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to Prospect Details
+        </Link>
+      )}
+
       {/* Top Header & Primary Schedule Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -836,7 +858,15 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
   function addManualEmail() {
     const e = manualEmail.trim();
     if (!e.includes("@")) return;
-    setAttendees((a) => a.some((x) => x.email.toLowerCase() === e.toLowerCase()) ? a : [...a, { name: "", email: e }]);
+    // Only clear the input once the email is actually added — previously this
+    // cleared unconditionally, so re-adding an email already on the attendee
+    // list (e.g. the lead this meeting was scheduled from) silently wiped the
+    // typed text with no visible attendee added and no explanation why.
+    if (attendees.some((x) => x.email.toLowerCase() === e.toLowerCase())) {
+      setError("That email is already an attendee.");
+      return;
+    }
+    setAttendees((a) => [...a, { name: "", email: e }]);
     setManualEmail("");
   }
   const removeAttendee = (i: number) => setAttendees((a) => a.filter((_, idx) => idx !== i));
@@ -846,12 +876,12 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
   const [generating, setGenerating] = useState(false);
 
   async function handleGenerate() {
+    setError(null);
     if (form.provider !== "google_meet" && form.provider !== "zoom") {
       set("join_url", generateConferenceLink(form.provider as ConferenceProvider));
       return;
     }
     setGenerating(true);
-    setError(null);
     const input = {
       title: form.title || "Meeting",
       startIso: form.startLocal ? new Date(form.startLocal).toISOString() : new Date(nowMs).toISOString(),
