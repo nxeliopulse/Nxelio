@@ -427,7 +427,7 @@ export function LeadDetailView({
 
               {statusDropdownOpen && (
                 <div className="absolute right-0 mt-1.5 w-36 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                  {["New", "Contacted", "Qualified", "Nurturing", "Converted", "Lost"].map((st) => (
+                  {["New", "Contacted", "Qualified", "Nurturing", "Win", "Converted", "Lost"].map((st) => (
                     <button
                       key={st}
                       onClick={() => handleStatusUpdate(st)}
@@ -449,9 +449,20 @@ export function LeadDetailView({
             </Button>
             
             {!converted && (
-              <Button size="sm" onClick={() => setConvertOpen(true)} className="text-xs font-bold gap-1 bg-[#18A7B8] hover:bg-[#14929f] text-white py-1 px-2.5 h-auto border-none">
-                <Briefcase className="h-3.5 w-3.5" /> Convert
-              </Button>
+              <>
+                <Button size="sm" onClick={() => setConvertOpen(true)} className="text-xs font-bold gap-1 bg-[#18A7B8] hover:bg-[#14929f] text-white py-1 px-2.5 h-auto border-none">
+                  <Briefcase className="h-3.5 w-3.5" /> Convert
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setConvertOpen(true)}
+                  disabled={lead.status !== "Win"}
+                  title="Create accounts and contacts from lead record"
+                  className="text-xs font-bold gap-1 bg-green-600 hover:bg-green-700 text-white py-1 px-2.5 h-auto border-none disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  <Building2 className="h-3.5 w-3.5" /> Create Account & Contact
+                </Button>
+              </>
             )}
           </div>
         </div>

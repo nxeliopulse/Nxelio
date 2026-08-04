@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useFeedback } from "@/components/ui/feedback";
-import { EditAccountModal } from "@/components/accounts/edit-account-modal";
+import { EditAccountModal, type AccountOwnerOption } from "@/components/accounts/edit-account-modal";
 import { EditContactModal } from "@/components/contacts/edit-contact-modal";
 import { deleteAccount, type AccountRow } from "@/lib/queries/accounts";
 import type { ContactRow } from "@/lib/queries/contacts";
@@ -17,7 +17,7 @@ import { formatDateTime } from "@/lib/utils";
 import { RecordHeader } from "@/components/records/record-header";
 import { AccountSchema } from "@/core/engine/registry";
 
-export function AccountDetailView({ account, contacts }: { account: AccountRow; contacts: ContactRow[] }) {
+export function AccountDetailView({ account, contacts, owners = [] }: { account: AccountRow; contacts: ContactRow[]; owners?: AccountOwnerOption[] }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
   const [, startDelete] = useTransition();
@@ -169,7 +169,7 @@ export function AccountDetailView({ account, contacts }: { account: AccountRow; 
         </div>
       </div>
 
-      <EditAccountModal open={editOpen} onClose={() => setEditOpen(false)} account={account} />
+      <EditAccountModal open={editOpen} onClose={() => setEditOpen(false)} account={account} owners={owners} />
       <EditContactModal open={addContactOpen} onClose={() => setAddContactOpen(false)} defaultAccountId={account.id} />
     </div>
   );
