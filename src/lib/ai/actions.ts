@@ -1,9 +1,14 @@
 "use server";
 import { aiChat, aiJson, aiConfigured } from "./client";
-import { getLeadById, updateLead } from "@/lib/queries/leads";
+import { getLeadById, updateLead, getDistinctLeadValues } from "@/lib/queries/leads";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { NEWSLETTER_IMAGE_TOPICS, pickImageForTopic } from "@/lib/newsletter-image-topics";
 import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
+import { getPicklistValues } from "@/lib/queries/picklists";
+import { SEGMENT_FIELDS, operatorsForField, newGroup, newCondition, type Group, type RuleNode } from "@/lib/segments";
+import { resolveRuleTree, explainRuleTree, type FieldMapping, type UnmappedItem } from "@/lib/ai/segment-resolver";
+import { previewSegment } from "@/lib/queries/segments";
+import { saveAiPromptHistory } from "@/lib/queries/ai-prompt-history";
 
 export async function isAiConfigured() {
   return aiConfigured();
@@ -388,4 +393,176 @@ export async function improveEmail(currentBody: string, instruction: string): Pr
   });
   await chargeCredits("email_improvement", 2);
   return result;
+}
+
+// ============================================================================
+// AI Builder — natural language → Segmentation Builder rule tree
+// ============================================================================
+export interface SegmentRuleGenerationResult {
+  /** The FINAL rule — every value in here has been checked against this
+   *  workspace's real data by the metadata resolver, never trusted from the
+   *  model directly. */
+  rule: Group;
+  /** 0-100. Lowered automatically when anything couldn't be mapped. */
+  confidence: number;
+  /** Per-condition mapping breakdown — what matched, and how (exact/synonym/fuzzy). */
+  mappings: FieldMapping[];
+  /** Everything that could NOT be turned into a real condition, each with a
+   *  reason — covers both fields/values the model flagged itself and values
+   *  the resolver rejected because they don't exist in this workspace. */
+  unmapped: UnmappedItem[];
+  /** Plain-English bullets generated from the FINAL resolved rule tree, not
+   *  from the raw model response. */
+  explanation: string[];
+  /** Real count from previewSegment() against the final resolved rule. */
+  estimatedAudienceSize: number;
+  /** True when anything is unmapped or confidence is low — the UI should
+   *  call this out, but every generation always requires an explicit Apply
+   *  click regardless, never auto-applied. */
+  requiresReview: boolean;
+}
+
+const SEGMENT_RULE_CONFIDENCE_THRESHOLD = 70;
+
+/** Recursively keeps only nodes that reference a real field/operator this
+ *  evaluator actually supports — the model is instructed not to invent one,
+ *  but this is the enforcement, not just the instruction. */
+function sanitizeRuleNode(node: unknown): RuleNode | null {
+  if (!node || typeof node !== "object") return null;
+  const n = node as Record<string, unknown>;
+  if (n.type === "group") {
+    const op = n.operator;
+    if (op !== "ALL" && op !== "ANY" && op !== "NOT") return null;
+    const children = Array.isArray(n.children)
+      ? (n.children.map(sanitizeRuleNode).filter((c): c is RuleNode => c !== null))
+      : [];
+    if (!children.length) return null;
+    return newGroup(op, children);
+  }
+  if (n.type === "condition") {
+    const field = String(n.field ?? "");
+    if (!SEGMENT_FIELDS.some((f) => f.key === field)) return null;
+    const operator = String(n.operator ?? "");
+    if (!operatorsForField(field).some((o) => o.key === operator)) return null;
+    const value = n.value == null ? "" : String(n.value).trim();
+    if (!value) return null;
+    return newCondition(field, operator, value);
+  }
+  return null;
+}
+
+export async function generateSegmentRules(prompt: string): Promise<SegmentRuleGenerationResult> {
+  await assertCredits(2);
+
+  // A live field catalog — real fields, real operators, and real vocabulary
+  // (picklist / distinct values already on leads) — so the model is grounded
+  // in what this workspace's data actually looks like, not just field names.
+  const catalogLines = await Promise.all(
+    SEGMENT_FIELDS.map(async (f) => {
+      const ops = operatorsForField(f.key).map((o) => o.key).join(", ");
+      let values = "";
+      if (f.options?.kind === "picklist") {
+        const v = await getPicklistValues(f.options.key).catch(() => []);
+        if (v.length) values = ` — for reference only, e.g.: ${v.slice(0, 25).join(", ")}`;
+      } else if (f.options?.kind === "distinct") {
+        const v = await getDistinctLeadValues(f.key as "source" | "country").catch(() => []);
+        if (v.length) values = ` — for reference only, e.g.: ${v.slice(0, 25).join(", ")}`;
+      }
+      return `- ${f.key} (${f.label}, type: ${f.type}) — operators: ${ops}${values}`;
+    })
+  );
+
+  const system = `You convert a plain-English audience description into a structured segmentation rule tree for a CRM. You may ONLY use the fields and operators listed below — never invent a field or operator that isn't listed. Return ONLY valid JSON, no prose, no markdown fences.
+
+Rules you must follow:
+1. "OR" phrasing ("X or Y") must become a nested ANY group, never multiple conditions on the same field directly inside an ALL group — a lead cannot have two different values for the same field at once, so "industry = A AND industry = B" in the same ALL group can never match anything. Put those inside a nested ANY group instead.
+2. The numeric "between" operator and date-range values take "value" formatted as "a|b" (e.g. "20|200" or "2026-01-01|2026-03-01"). Always use "between" (not two separate before/after conditions) when the user gives an explicit range like "between X and Y". "in_last_days" takes a plain integer number of days as "value". Date values are ISO "YYYY-MM-DD".
+3. If the request mentions something with no reasonable match among the fields below, name the exact phrase in "unsupported" instead of forcing it onto an unrelated field. Never list something in "unsupported" if you already included a real condition for it — those two lists must never overlap.
+4. Boolean fields ("is true"/"is false" operators) take no "value" — omit it or leave it empty.
+5. CRITICAL — for any field with example values shown, put the user's OWN word or phrase in "value", exactly as they said it (e.g. "IT Services", "MSP", "Tech") — never substitute the closest-looking example from the list yourself, even if you're confident it's a better match. A separate system checks the value against the real data afterward; your job is only to extract what the user actually said, not to pre-correct it. Silently picking a different value than what the user typed is the single most important mistake to avoid.
+
+Available fields:
+${catalogLines.join("\n")}
+
+Worked example — prompt: "Software or IT Services companies with AI Score above 20":
+{
+  "rule": { "type": "group", "operator": "ALL", "children": [
+    { "type": "condition", "field": "lead_score", "operator": "gt", "value": "20" },
+    { "type": "group", "operator": "ANY", "children": [
+      { "type": "condition", "field": "industry", "operator": "contains", "value": "Software" },
+      { "type": "condition", "field": "industry", "operator": "contains", "value": "IT Services" }
+    ]}
+  ]},
+  "confidence": 90,
+  "unsupported": []
+}
+
+Worked example — prompt: "Show leads created between July 1 and July 31, 2026":
+{
+  "rule": { "type": "group", "operator": "ALL", "children": [
+    { "type": "condition", "field": "created_at", "operator": "between", "value": "2026-07-01|2026-07-31" }
+  ]},
+  "confidence": 90,
+  "unsupported": []
+}
+
+Return JSON in exactly this shape:
+{
+  "rule": { "type": "group", "operator": "ALL", "children": [
+    { "type": "condition", "field": "...", "operator": "...", "value": "..." }
+  ]},
+  "confidence": 0-100,
+  "unsupported": ["any requested attribute not in the field list above, and not already covered by a condition"]
+}`;
+
+  const raw = await aiJson<{ rule: unknown; confidence?: number; unsupported?: string[] }>({
+    system,
+    prompt: `Convert this into a rule tree: "${prompt}"`,
+    temperature: 0.3,
+  });
+  await chargeCredits("segment_rule_generation", 2);
+
+  // Step 1 — structural sanitize: the model may ONLY reference real
+  // fields/operators. This never trusts a value yet, just the shape.
+  const sanitized = sanitizeRuleNode(raw.rule);
+  const structurallyValid: Group = sanitized?.type === "group" ? sanitized : newGroup("ALL", sanitized ? [sanitized] : []);
+
+  // Step 2 — metadata resolution: every remaining value is checked against
+  // this workspace's real data (exact → synonym → fuzzy → unmapped). This is
+  // the actual fix for the model substituting a real-but-wrong value.
+  const { rule, mappings, unmapped: resolverUnmapped } = await resolveRuleTree(structurallyValid);
+
+  // The model's own self-reported "couldn't map this at all" list — folded
+  // into the same shape as the resolver's findings so the UI shows one list.
+  const selfReportedUnmapped: UnmappedItem[] = (Array.isArray(raw.unsupported) ? raw.unsupported : [])
+    .map(String)
+    .filter((phrase) => !mappings.some((m) => m.displayValue.toLowerCase() === phrase.toLowerCase()))
+    .map((phrase) => ({ requested: phrase, reason: "No field in this workspace represents this concept." }));
+
+  const unmapped: UnmappedItem[] = [...resolverUnmapped, ...selfReportedUnmapped];
+
+  // Step 3 — explain the FINAL rule (never the raw response) and get a real count.
+  const explanation = hasAnyCondition(rule) ? explainRuleTree(rule) : [];
+  const estimatedAudienceSize = hasAnyCondition(rule) ? (await previewSegment(rule).catch(() => null))?.matched ?? 0 : 0;
+
+  const modelConfidence = typeof raw.confidence === "number" ? Math.max(0, Math.min(100, Math.round(raw.confidence))) : 50;
+  // Confidence drops with every unmapped item — a generation that couldn't
+  // place half the request shouldn't still claim to be 90% sure of itself.
+  const confidence = unmapped.length ? Math.max(0, modelConfidence - unmapped.length * 15) : modelConfidence;
+
+  await saveAiPromptHistory(prompt).catch(() => {});
+
+  return {
+    rule,
+    confidence,
+    mappings,
+    unmapped,
+    explanation,
+    estimatedAudienceSize,
+    requiresReview: confidence < SEGMENT_RULE_CONFIDENCE_THRESHOLD || unmapped.length > 0,
+  };
+}
+
+function hasAnyCondition(node: RuleNode): boolean {
+  return node.type === "condition" ? true : node.children.some(hasAnyCondition);
 }

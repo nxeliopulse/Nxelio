@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createLead, getLeads, updateLead, deleteLead } from "@/lib/queries/leads";
 import { createCampaign, getCampaigns, getCampaignStats, updateCampaign, deleteCampaign } from "@/lib/queries/campaigns";
 import { createSegment, getSegments, deleteSegment } from "@/lib/queries/segments";
+import { flatRulesToTree } from "@/lib/segments";
 import { createEmailTemplate, getEmailTemplates, deleteEmailTemplate } from "@/lib/queries/templates";
 import { getNewsletters, deleteNewsletter } from "@/lib/queries/newsletters";
 import { sendNewsletter } from "@/lib/email/newsletter-actions";
@@ -841,11 +842,11 @@ async function executeWriteTool(name: string, args: Record<string, unknown>, req
       return { ok: true, detail: `Deleted campaign ${args.display}` };
     case "create_segment": {
       const rules = Array.isArray(args.rules)
-        ? (args.rules as Array<{ field: string; operator: string; value: string }>).map((r, i) => ({
-            field: r.field, operator: r.operator, value: r.value, rule_order: i,
+        ? (args.rules as Array<{ field: string; operator: string; value: string }>).map((r) => ({
+            field: r.field, operator: r.operator, value: r.value,
           }))
         : [];
-      await createSegment(String(args.name), String(args.description || ""), "Dynamic", rules);
+      await createSegment(String(args.name), String(args.description || ""), "Dynamic", flatRulesToTree(rules, "AND"));
       return { ok: true, detail: `Created segment "${args.name}" with ${rules.length} rule${rules.length === 1 ? "" : "s"}` };
     }
     case "delete_segment":

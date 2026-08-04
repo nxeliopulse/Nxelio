@@ -100,7 +100,9 @@ export async function getLeadStats() {
  * picklist (e.g. Source, Country), so it still offers real choices instead
  * of free text, without needing an admin to curate a list first.
  */
-export async function getDistinctLeadValues(column: "source" | "country"): Promise<string[]> {
+export async function getDistinctLeadValues(
+  column: "source" | "country" | "industry" | "interest_area" | "status" | "company_size" | "seniority"
+): Promise<string[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("leads").select(column).not(column, "is", null);
   if (error || !data) return [];

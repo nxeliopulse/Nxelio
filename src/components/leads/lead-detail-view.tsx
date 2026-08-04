@@ -45,6 +45,7 @@ const activityMeta: Record<string, { label: string; color: string; icon: LucideI
   EMAIL_CLICKED: { label: "Clicked link in email", color: "bg-cyan-500", icon: Mouse },
   EMAIL_REPLIED: { label: "Replied to outreach", color: "bg-teal-500", icon: Send },
   EMAIL_BOUNCED: { label: "Email bounced", color: "bg-rose-500", icon: MailOpen },
+  EMAIL_UNSUBSCRIBED: { label: "Unsubscribed", color: "bg-slate-500", icon: MailOpen },
   CONVERTED_TO_OPPORTUNITY: { label: "Converted to opportunity", color: "bg-emerald-600", icon: Target },
   GUIDE_DOWNLOADED: { label: "Downloaded resource guide", color: "bg-indigo-500", icon: FileDown },
   WEBINAR_ATTENDED: { label: "Attended live webinar", color: "bg-amber-500", icon: Calendar },
