@@ -3,9 +3,9 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Search, Plus, Trash2, ChevronDown, Building2, ArrowUpDown, Settings2,
+  Search, Plus, Trash2, ChevronDown, Building2, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, Globe, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  Briefcase, Flame, Target, Pencil, RefreshCw
+  Pencil, RefreshCw, Download, FileText, FileSpreadsheet, Upload
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,22 @@ import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, Dat
 import { Pagination } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 import { useFeedback } from "@/components/ui/feedback";
-import { cn } from "@/lib/utils";
-import { EditAccountModal } from "@/components/accounts/edit-account-modal";
+import { cn, formatDate } from "@/lib/utils";
+import { EditAccountModal, type AccountOwnerOption } from "@/components/accounts/edit-account-modal";
+import { AddAccountsWizard } from "@/components/accounts/add-accounts-wizard";
 import { deleteAccount, bulkDeleteAccounts, type AccountRow } from "@/lib/queries/accounts";
 
-type ColKey = "phone" | "tags" | "location" | "rating" | "contact" | "type";
+// "index" (Row #) is NOT part of this list — like leads-table.tsx's own Row #
+// column, it's always shown and fixed in position, never toggleable.
+type ColKey = "phone" | "tags" | "location" | "rating" | "contact" | "type" | "owner" | "created_at";
 
 interface ColumnDef { key: ColKey; label: string; defaultOn: boolean }
+
+// Every column with real comparable data is sortable — "name" (the fixed, always-shown
+// Name column, so it's not part of ColKey/COLUMNS) plus every ColKey except "contact"
+// (icon-only quick-action buttons, not real data). Matches leads-table.tsx's own pattern
+// of excluding non-sortable columns (its Row # column and any icon-only columns).
+type SortKey = "name" | Exclude<ColKey, "contact">;
 
 const COLUMNS: ColumnDef[] = [
   { key: "phone", label: "Phone", defaultOn: true },
@@ -29,11 +38,19 @@ const COLUMNS: ColumnDef[] = [
   { key: "rating", label: "Rating", defaultOn: true },
   { key: "contact", label: "Contact", defaultOn: true },
   { key: "type", label: "Type", defaultOn: true },
+  { key: "owner", label: "Owner", defaultOn: true },
+  { key: "created_at", label: "Created Date", defaultOn: true },
 ];
 
 const DEFAULT_COLS = COLUMNS.reduce((acc, c) => { acc[c.key] = c.defaultOn; return acc; }, {} as Record<ColKey, boolean>);
 const COLS_STORAGE_KEY = "lp_accounts_columns_redesign";
 const PAGE_SIZE = 15;
+
+// Matches the fixed option lists in edit-account-modal.tsx, so the toolbar filters
+// only ever offer values that are actually selectable when creating/editing an account.
+const STATUS_OPTIONS = ["Active", "Inactive", "Prospect", "On Hold", "Churned"];
+const INDUSTRY_OPTIONS = ["Technology", "Finance", "Healthcare", "Manufacturing", "Retail", "Education", "Consulting", "Other"];
+const ACCOUNT_TYPE_OPTIONS = ["Analyst", "Competitor", "Customer", "Integrator", "Investor", "Partner", "Prospect", "Reseller", "Vendor", "Other"];
 
 function getFlagEmoji(country: string): string {
   const c = country.toLowerCase();
@@ -71,16 +88,27 @@ function accountTypeColor(value: string | null): string {
   }
 }
 
-export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
+export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[]; owners?: AccountOwnerOption[] }) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [nowMs] = useState(() => Date.now());
 
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"none" | "name_az" | "name_za" | "newest">("none");
+  // Per-column header sort — click any column's arrow to sort by it, click again to flip
+  // direction. The "Sort By" toolbar dropdown below is just a few named presets over this
+  // same state (see SORT_PRESETS), so both controls always stay in sync — matches the
+  // shared sortKey/sortDir mechanism in leads-table.tsx.
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  function toggleColumnSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  }
   const [page, setPage] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   // Dropdown toggles
@@ -90,6 +118,19 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [activeDateRange, setActiveDateRange] = useState("Last 30 Days");
   const [ratingFilter, setRatingFilter] = useState<"all" | "Hot" | "Warm" | "Cold">("all");
+
+  // Toolbar filter dropdowns — Status/Industries/Owners/Regions ("all" = no filter
+  // applied). Account Type joins Rating inside "More Filters" rather than getting
+  // its own toolbar slot, to keep the primary row matching the reference exactly.
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [industryFilter, setIndustryFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("all");
+  const [regionFilter, setRegionFilter] = useState("all");
+  const [accountTypeFilter, setAccountTypeFilter] = useState("all");
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [industryDropdownOpen, setIndustryDropdownOpen] = useState(false);
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
+  const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
 
   const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
   const [showCols, setShowCols] = useState(false);
@@ -137,30 +178,103 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
 
   const visibleCols = COLUMNS.filter((c) => cols[c.key]);
 
+  // "Region" has no fixed enum elsewhere in the app (unlike Status/Industry/Type,
+  // which mirror edit-account-modal.tsx's dropdowns) — derived from real billing
+  // countries actually present in the data instead of a guessed-at fixed list.
+  const REGION_OPTIONS = Array.from(
+    new Set(accounts.map((a) => a.billing_country).filter((c): c is string => Boolean(c)))
+  ).sort((a, b) => a.localeCompare(b));
+
   // Apply filters
   const filtered = accounts.filter((a) => {
     const q = search.toLowerCase();
 
-    // Rating Filter
     if (ratingFilter !== "all" && a.rating !== ratingFilter) return false;
+    if (statusFilter !== "all" && a.account_status !== statusFilter) return false;
+    if (industryFilter !== "all" && a.industry !== industryFilter) return false;
+    if (ownerFilter !== "all" && a.account_owner !== ownerFilter) return false;
+    if (regionFilter !== "all" && a.billing_country !== regionFilter) return false;
+    if (accountTypeFilter !== "all" && a.account_type !== accountTypeFilter) return false;
 
-    // Search query
+    // Search query — matches the "name, domain, industry, or owner" the placeholder promises,
+    // plus website/phone as a bonus (kept from the original search).
     if (!q) return true;
+    const ownerName = owners.find((o) => o.id === a.account_owner)?.name;
     return (
       a.account_name.toLowerCase().includes(q) ||
+      (a.domain?.toLowerCase().includes(q) ?? false) ||
       (a.industry?.toLowerCase().includes(q) ?? false) ||
       (a.website?.toLowerCase().includes(q) ?? false) ||
-      (a.phone?.toLowerCase().includes(q) ?? false)
+      (a.phone?.toLowerCase().includes(q) ?? false) ||
+      (ownerName?.toLowerCase().includes(q) ?? false)
     );
   });
 
-  // Apply sorting
-  const sorted = [...filtered].sort((a, b) => {
-    if (sort === "name_az") return a.account_name.localeCompare(b.account_name);
-    if (sort === "name_za") return b.account_name.localeCompare(a.account_name);
-    if (sort === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    return 0;
-  });
+  /** Ordered coldest→hottest so ascending reads like a plain numeric scale (Cold, Warm, Hot)
+   *  and descending flips to hottest-first; accounts with no rating rank lowest (sort first
+   *  ascending, last descending) — same convention as every other column's empty values. */
+  const RATING_RANK: Record<string, number> = { Cold: 1, Warm: 2, Hot: 3 };
+
+  /** One comparator per sortable column, all following the same asc/desc flip convention.
+   *  Missing/null values compare as "" (or rank 0 for rating) so they sort first ascending —
+   *  except phone, which is explicitly pinned last in BOTH directions per spec. */
+  function compareAccounts(a: AccountRow, b: AccountRow, key: SortKey, dir: "asc" | "desc"): number {
+    switch (key) {
+      case "name": {
+        const cmp = a.account_name.localeCompare(b.account_name, undefined, { numeric: true, sensitivity: "base" });
+        return dir === "asc" ? cmp : -cmp;
+      }
+      case "phone": {
+        // Null/blank phone numbers always sort last, regardless of direction.
+        const aEmpty = !a.phone;
+        const bEmpty = !b.phone;
+        if (aEmpty && bEmpty) return 0;
+        if (aEmpty) return 1;
+        if (bEmpty) return -1;
+        const cmp = a.phone!.localeCompare(b.phone!, undefined, { numeric: true, sensitivity: "base" });
+        return dir === "asc" ? cmp : -cmp;
+      }
+      case "tags": {
+        // "Tags" column renders the ownership value (Public/Private/Subsidiary).
+        const cmp = (a.ownership || "").localeCompare(b.ownership || "", undefined, { numeric: true, sensitivity: "base" });
+        return dir === "asc" ? cmp : -cmp;
+      }
+      case "location": {
+        const countryCmp = (a.billing_country || "").localeCompare(b.billing_country || "", undefined, { numeric: true, sensitivity: "base" });
+        const cmp = countryCmp !== 0
+          ? countryCmp
+          : (a.billing_city || "").localeCompare(b.billing_city || "", undefined, { numeric: true, sensitivity: "base" });
+        return dir === "asc" ? cmp : -cmp;
+      }
+      case "rating": {
+        const av = (a.rating && RATING_RANK[a.rating]) || 0;
+        const bv = (b.rating && RATING_RANK[b.rating]) || 0;
+        const cmp = av - bv;
+        return dir === "asc" ? cmp : -cmp;
+      }
+      case "type": {
+        const cmp = (a.account_type || "").localeCompare(b.account_type || "", undefined, { numeric: true, sensitivity: "base" });
+        return dir === "asc" ? cmp : -cmp;
+      }
+      case "owner": {
+        // account_owner is a UUID — compare by the resolved display name, not the raw id.
+        const an = owners.find((o) => o.id === a.account_owner)?.name || "";
+        const bn = owners.find((o) => o.id === b.account_owner)?.name || "";
+        const cmp = an.localeCompare(bn, undefined, { numeric: true, sensitivity: "base" });
+        return dir === "asc" ? cmp : -cmp;
+      }
+      case "created_at": {
+        const cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        return dir === "asc" ? cmp : -cmp;
+      }
+      default:
+        return 0;
+    }
+  }
+
+  // Apply sorting — per-column header arrows and the "Sort By" toolbar dropdown both just
+  // drive sortKey/sortDir, so there is exactly one sort mechanism to keep in sync.
+  const sorted = [...filtered].sort((a, b) => (sortKey ? compareAccounts(a, b, sortKey, sortDir) : 0));
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -200,15 +314,61 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   }
 
+  // Named "Sort By" presets — each is just a shortcut that sets sortKey/sortDir to a
+  // specific value, so choosing one here and clicking a column's header arrow always
+  // agree on what "currently sorted" means (same state, no parallel sort mechanism).
+  const SORT_PRESETS: { key: string; label: string; apply: () => void; isActive: () => boolean }[] = [
+    { key: "none", label: "None", apply: () => { setSortKey(null); setSortDir("asc"); }, isActive: () => !sortKey },
+    { key: "name_az", label: "Name A-Z", apply: () => { setSortKey("name"); setSortDir("asc"); }, isActive: () => sortKey === "name" && sortDir === "asc" },
+    { key: "name_za", label: "Name Z-A", apply: () => { setSortKey("name"); setSortDir("desc"); }, isActive: () => sortKey === "name" && sortDir === "desc" },
+    { key: "newest", label: "Newest", apply: () => { setSortKey("created_at"); setSortDir("desc"); }, isActive: () => sortKey === "created_at" && sortDir === "desc" },
+  ];
+
+  /** Label shown on the "Sort By" toolbar button — falls back to "<Column> asc/desc" when
+   *  the active sort was set via a column header arrow rather than one of the named presets. */
+  function sortByLabel(): string {
+    if (!sortKey) return "None";
+    const preset = SORT_PRESETS.find((p) => p.key !== "none" && p.isActive());
+    if (preset) return preset.label;
+    const label = sortKey === "name" ? "Name" : COLUMNS.find((c) => c.key === sortKey)?.label ?? sortKey;
+    return `${label} ${sortDir === "asc" ? "↑" : "↓"}`;
+  }
+
+  /** Small per-column sort-arrow button next to a header label — neutral gray ArrowUpDown
+   *  when this column isn't the active sort, colored ArrowUp/ArrowDown when it is. Matches
+   *  leads-table.tsx's own header sort control exactly. */
+  function renderSortButton(key: SortKey) {
+    const isSorted = sortKey === key;
+    const label = key === "name" ? "Name" : COLUMNS.find((c) => c.key === key)?.label ?? key;
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); toggleColumnSort(key); }}
+        title={`Sort by ${label}`}
+        className={cn("p-0.5 rounded hover:bg-slate-200/70 dark:hover:bg-slate-700", isSorted && "text-blue-600 dark:text-blue-400")}
+      >
+        {isSorted ? (
+          sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 text-slate-400" />
+        )}
+      </button>
+    );
+  }
+
   return (
     <div className="max-w-[1600px] mx-auto w-full px-4 sm:px-6 pb-10 text-slate-800 dark:text-slate-700">
 
       {/* Redesigned Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
+<<<<<<< HEAD
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Accounts</h1>
           </div>
+=======
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Accounts</h1>
+>>>>>>> 94e7a8cbb9941446477ceb4713460e7bda984d7f
           <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mt-1">
             <Link href="/dashboard" className="hover:text-slate-600">Home</Link>
             <span>&gt;</span>
@@ -221,15 +381,14 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
           {/* Export Dropdown */}
           <div className="relative">
             <Button
-              variant="outline"
               size="sm"
               onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-              className="h-8 rounded-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1"
+              className="h-8 rounded-md bg-[var(--primary)] hover:opacity-90 text-white text-xs font-semibold gap-1.5"
             >
-              Export <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+              <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3.5 w-3.5" />
             </Button>
             {exportDropdownOpen && (
-              <div className="absolute right-0 mt-1.5 w-36 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+              <div className="absolute right-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
                 <button
                   onClick={() => {
                     toast("Exporting PDF accounts...", "info");
@@ -237,7 +396,7 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
                 >
-                  Export PDF
+                  <FileText className="h-3.5 w-3.5 text-slate-400" /> Export as PDF
                 </button>
                 <button
                   onClick={() => {
@@ -246,11 +405,21 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
                 >
-                  Export Excel
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-slate-400" /> Export as Excel
                 </button>
               </div>
             )}
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImportWizard(true)}
+            className="h-8 w-8 p-0 rounded-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+            title="Import CSV"
+          >
+            <Upload className="h-4 w-4 text-slate-500" />
+          </Button>
 
           <Button
             variant="outline"
@@ -268,41 +437,211 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        {[
-          { label: "Total accounts", value: accounts.length, icon: Building2, accent: "bg-amber-500" },
-          { label: "Customers", value: accounts.filter((a) => a.account_type === "Customer").length, icon: Briefcase, accent: "bg-blue-500" },
-          { label: "Prospects", value: accounts.filter((a) => a.account_type === "Prospect").length, icon: Target, accent: "bg-emerald-500" },
-          { label: "Hot accounts", value: accounts.filter((a) => a.rating === "Hot").length, icon: Flame, accent: "bg-rose-500" },
-        ].map((s) => {
-          const Icon = s.icon;
-          return (
-            <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
-              <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
-                <Icon className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
-                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value.toLocaleString()}</p>
+      {(() => {
+        // "vs last 30 days" is computed from created_at, which is the only
+        // historical signal we actually have (no snapshot/audit table tracks
+        // status changes over time). For "Total" this is an exact comparison.
+        // For status/type-based counts it's an approximation — an account
+        // could have changed status since it was created — but it's a real,
+        // derived number rather than a fabricated one.
+        const cutoff = nowMs - 30 * 24 * 60 * 60 * 1000;
+        const pctChange = (matches: (a: AccountRow) => boolean) => {
+          const current = accounts.filter(matches).length;
+          const previous = accounts.filter((a) => matches(a) && new Date(a.created_at).getTime() <= cutoff).length;
+          if (previous === 0) return current > 0 ? 100 : 0;
+          return Math.round(((current - previous) / previous) * 100);
+        };
+        const cards = [
+          { label: "Total Accounts", value: accounts.length, pct: pctChange(() => true) },
+          { label: "Active Accounts", value: accounts.filter((a) => a.account_status === "Active").length, pct: pctChange((a) => a.account_status === "Active") },
+          { label: "Prospect Accounts", value: accounts.filter((a) => a.account_status === "Prospect").length, pct: pctChange((a) => a.account_status === "Prospect") },
+          { label: "Customer Accounts", value: accounts.filter((a) => a.account_type === "Customer").length, pct: pctChange((a) => a.account_type === "Customer") },
+          { label: "Inactive Accounts", value: accounts.filter((a) => a.account_status === "Inactive").length, pct: pctChange((a) => a.account_status === "Inactive") },
+        ];
+        return (
+          <Card className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800 mb-5 overflow-hidden">
+            {cards.map((s) => (
+              <div key={s.label} className="p-4 sm:p-5 min-w-0">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
+                <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">{s.value.toLocaleString()}</p>
+                <p className={cn("text-[11px] font-semibold mt-1 flex items-center gap-0.5", s.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                  {s.pct >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                  {Math.abs(s.pct)}% vs last 30 days
+                </p>
               </div>
-            </Card>
-          );
-        })}
-      </div>
+            ))}
+          </Card>
+        );
+      })()}
 
       {/* Redesigned Sub-header / Actions Controls bar */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-3 sm:p-4 rounded-xl shadow-2xs">
 
-        {/* Left Side: Search, Sort, Date range */}
+        {/* Left Side: Search, Status/Industries/Owners/Regions, Sort, Date range */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div className="w-full sm:w-48 md:w-56 flex-shrink-0">
+          <div className="w-full sm:w-64 md:w-72 flex-shrink-0">
             <Input
               leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
-              placeholder="Search"
+              placeholder="Search accounts by name, domain, industry, or owner..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs"
             />
+          </div>
+
+          {/* Status Filter */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <span>{statusFilter === "all" ? "All Status" : statusFilter}</span>
+              <ChevronDown className="h-3 w-3 text-slate-450" />
+            </Button>
+            {statusDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setStatusDropdownOpen(false)} />
+                <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  {["all", ...STATUS_OPTIONS].map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => { setStatusFilter(opt); setStatusDropdownOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        statusFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {opt === "all" ? "All Status" : opt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Industry Filter */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIndustryDropdownOpen(!industryDropdownOpen)}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <span>{industryFilter === "all" ? "All Industries" : industryFilter}</span>
+              <ChevronDown className="h-3 w-3 text-slate-450" />
+            </Button>
+            {industryDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIndustryDropdownOpen(false)} />
+                <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  {["all", ...INDUSTRY_OPTIONS].map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => { setIndustryFilter(opt); setIndustryDropdownOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        industryFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {opt === "all" ? "All Industries" : opt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Owner Filter */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <span>{ownerFilter === "all" ? "All Owners" : (owners.find((o) => o.id === ownerFilter)?.name ?? "Unknown owner")}</span>
+              <ChevronDown className="h-3 w-3 text-slate-450" />
+            </Button>
+            {ownerDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setOwnerDropdownOpen(false)} />
+                <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  <button
+                    onClick={() => { setOwnerFilter("all"); setOwnerDropdownOpen(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                      ownerFilter === "all" ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                    )}
+                  >
+                    All Owners
+                  </button>
+                  {owners.map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => { setOwnerFilter(o.id); setOwnerDropdownOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        ownerFilter === o.id ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {o.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Region Filter — options derived from real billing_country values present in the data */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <span>{regionFilter === "all" ? "All Regions" : regionFilter}</span>
+              <ChevronDown className="h-3 w-3 text-slate-450" />
+            </Button>
+            {regionDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setRegionDropdownOpen(false)} />
+                <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  <button
+                    onClick={() => { setRegionFilter("all"); setRegionDropdownOpen(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                      regionFilter === "all" ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                    )}
+                  >
+                    All Regions
+                  </button>
+                  {REGION_OPTIONS.length === 0 && (
+                    <p className="px-4 py-2 text-slate-400">No regions yet</p>
+                  )}
+                  {REGION_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => { setRegionFilter(opt); setRegionDropdownOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        regionFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Count Chip — matches leads-table.tsx's bordered icon+count pill */}
+          <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
+            <Building2 className="h-3.5 w-3.5 text-slate-400" />
+            <span>{filtered.length} Account{filtered.length === 1 ? "" : "s"}</span>
           </div>
 
           {/* Sort By Dropdown Button */}
@@ -315,28 +654,23 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
             >
               <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
               <span>
-                Sort By: {sort === "name_az" ? "Name A-Z" : sort === "name_za" ? "Name Z-A" : sort === "newest" ? "Newest" : "None"}
+                Sort By: {sortByLabel()}
               </span>
               <ChevronDown className="h-3 w-3 text-slate-450" />
             </Button>
             {sortDropdownOpen && (
               <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                {[
-                  { key: "none", label: "None" },
-                  { key: "name_az", label: "Name A-Z" },
-                  { key: "name_za", label: "Name Z-A" },
-                  { key: "newest", label: "Newest" }
-                ].map((opt) => (
+                {SORT_PRESETS.map((opt) => (
                   <button
                     key={opt.key}
                     onClick={() => {
-                      setSort(opt.key as "none" | "name_az" | "name_za" | "newest");
+                      opt.apply();
                       setSortDropdownOpen(false);
                       toast(`Sorted accounts by ${opt.label}`, "success");
                     }}
                     className={cn(
                       "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      sort === opt.key ? "text-rose-500 bg-rose-50/50 dark:bg-rose-950/20" : "text-slate-700 dark:text-slate-600"
+                      opt.isActive() ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
                     )}
                   >
                     {opt.label}
@@ -368,7 +702,7 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                     }}
                     className={cn(
                       "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      activeDateRange === opt ? "text-rose-500 bg-rose-50/50 dark:bg-rose-950/20" : "text-slate-700 dark:text-slate-600"
+                      activeDateRange === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
                     )}
                   >
                     {opt}
@@ -382,17 +716,18 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
         {/* Right Side: Add Account, Filter, Columns, Toggle Grid */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
 
-          {/* Add Account Red Button */}
+          {/* Add Account Button */}
           <Button
             size="sm"
             onClick={() => setShowModal(true)}
-            className="rounded-lg gap-1.5 font-bold h-8 px-3.5 text-xs bg-red-600 hover:bg-red-700 text-white shadow-sm flex-shrink-0"
+            className="rounded-lg gap-1.5 font-bold h-8 px-3.5 text-xs bg-[var(--primary)] hover:opacity-90 text-white shadow-sm flex-shrink-0"
           >
             <Plus className="h-4 w-4" />
             <span>Add Account</span>
           </Button>
 
-          {/* Filter Dropdown */}
+          {/* More Filters — Rating + Account Type, the two filter dimensions that don't
+              have their own dedicated toolbar dropdown (Status/Industry/Owner/Region do) */}
           <div className="relative">
             <Button
               variant="outline"
@@ -401,34 +736,55 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
               className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
             >
               <Filter className="h-3.5 w-3.5 text-slate-500" />
-              <span>Filter</span>
+              <span>More Filters</span>
+              {(ratingFilter !== "all" || accountTypeFilter !== "all") && (
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
+              )}
               <ChevronDown className="h-3 w-3 text-slate-450" />
             </Button>
             {filterDropdownOpen && (
-              <div className="absolute right-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                <p className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filter Rating</p>
-                {[
-                  { key: "all", label: "All Accounts" },
-                  { key: "Hot", label: "Hot" },
-                  { key: "Warm", label: "Warm" },
-                  { key: "Cold", label: "Cold" }
-                ].map((opt) => (
-                  <button
-                    key={opt.key}
-                    onClick={() => {
-                      setRatingFilter(opt.key as "all" | "Hot" | "Warm" | "Cold");
-                      setFilterDropdownOpen(false);
-                      toast(`Filtering by rating: ${opt.label}`, "info");
-                    }}
-                    className={cn(
-                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      ratingFilter === opt.key ? "text-rose-500 bg-rose-50/50 dark:bg-rose-950/20" : "text-slate-700 dark:text-slate-600"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setFilterDropdownOpen(false)} />
+                <div className="absolute right-0 mt-1.5 w-48 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  <p className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rating</p>
+                  {[
+                    { key: "all", label: "All Ratings" },
+                    { key: "Hot", label: "Hot" },
+                    { key: "Warm", label: "Warm" },
+                    { key: "Cold", label: "Cold" }
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => {
+                        setRatingFilter(opt.key as "all" | "Hot" | "Warm" | "Cold");
+                        toast(`Filtering by rating: ${opt.label}`, "info");
+                      }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        ratingFilter === opt.key ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                  <p className="px-3 py-1.5 mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 dark:border-slate-800 pt-2">Account Type</p>
+                  {["all", ...ACCOUNT_TYPE_OPTIONS].map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => {
+                        setAccountTypeFilter(opt);
+                        toast(`Filtering by account type: ${opt === "all" ? "All Types" : opt}`, "info");
+                      }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        accountTypeFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {opt === "all" ? "All Types" : opt}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
@@ -450,7 +806,7 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
               onClick={() => setViewMode("list")}
               className={cn(
                 "p-1 rounded-md transition-colors",
-                viewMode === "list" ? "bg-emerald-500 text-white" : "text-slate-550 dark:text-slate-500 hover:text-slate-700"
+                viewMode === "list" ? "bg-[var(--primary)] text-white" : "text-slate-550 dark:text-slate-500 hover:text-slate-700"
               )}
               title="List View"
             >
@@ -460,7 +816,7 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
               onClick={() => setViewMode("grid")}
               className={cn(
                 "p-1 rounded-md transition-colors",
-                viewMode === "grid" ? "bg-emerald-500 text-white" : "text-slate-550 dark:text-slate-500 hover:text-slate-700"
+                viewMode === "grid" ? "bg-[var(--primary)] text-white" : "text-slate-550 dark:text-slate-500 hover:text-slate-700"
               )}
               title="Grid View"
             >
@@ -486,25 +842,60 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                       className="rounded border-slate-350 dark:border-slate-750"
                     />
                   </DataTableTh>
-                  <DataTableTh className="px-3 py-2.5">Name</DataTableTh>
-                  {cols.phone && <DataTableTh className="px-3 py-2.5">Phone</DataTableTh>}
-                  {cols.tags && <DataTableTh className="px-3 py-2.5">Tags</DataTableTh>}
-                  {cols.location && <DataTableTh className="px-3 py-2.5">Location</DataTableTh>}
-                  {cols.rating && <DataTableTh className="px-3 py-2.5">Rating</DataTableTh>}
+                  {/* Row # — always shown, fixed position, not part of the Manage Columns toggle (matches leads-table.tsx) */}
+                  <DataTableTh className="w-10 px-3 py-2.5">#</DataTableTh>
+                  <DataTableTh className="px-3 py-2.5">
+                    <span className="inline-flex items-center gap-1">Name{renderSortButton("name")}</span>
+                  </DataTableTh>
+                  {cols.phone && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Phone{renderSortButton("phone")}</span>
+                    </DataTableTh>
+                  )}
+                  {cols.tags && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Tags{renderSortButton("tags")}</span>
+                    </DataTableTh>
+                  )}
+                  {cols.location && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Location{renderSortButton("location")}</span>
+                    </DataTableTh>
+                  )}
+                  {cols.rating && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Rating{renderSortButton("rating")}</span>
+                    </DataTableTh>
+                  )}
                   {cols.contact && <DataTableTh className="px-3 py-2.5 text-center">Contact</DataTableTh>}
-                  {cols.type && <DataTableTh className="px-3 py-2.5">Type</DataTableTh>}
+                  {cols.type && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Type{renderSortButton("type")}</span>
+                    </DataTableTh>
+                  )}
+                  {cols.owner && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Owner{renderSortButton("owner")}</span>
+                    </DataTableTh>
+                  )}
+                  {cols.created_at && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Created Date{renderSortButton("created_at")}</span>
+                    </DataTableTh>
+                  )}
                   <DataTableTh className="w-12 px-3 py-2.5 text-center">Action</DataTableTh>
                 </tr>
               </DataTableHead>
               <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paged.length === 0 && (
-                  <DataTableEmpty colSpan={visibleCols.length + 3}>
+                  <DataTableEmpty colSpan={visibleCols.length + 4}>
                     No accounts found matching the filters. Click <strong>Add Account</strong> to create one.
                   </DataTableEmpty>
                 )}
-                {paged.map((a) => {
+                {paged.map((a, i) => {
                   const isStarred = starred.includes(a.id);
                   const isChecked = selected.includes(a.id);
+                  const rowNumber = safePage * PAGE_SIZE + i + 1;
 
                   const countryName = a.billing_country;
                   const flag = countryName ? getFlagEmoji(countryName) : null;
@@ -526,6 +917,11 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                           onChange={() => toggle(a.id)}
                           className="rounded border-slate-350 dark:border-slate-700"
                         />
+                      </DataTableTd>
+
+                      {/* Row # — always shown, matches leads-table.tsx's Row # column */}
+                      <DataTableTd className="px-3 py-2.5">
+                        <span className="text-slate-400 dark:text-slate-500 tabular-nums font-mono text-xs">{rowNumber}</span>
                       </DataTableTd>
 
                       {/* Name with star & Avatar details */}
@@ -554,10 +950,18 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                         </div>
                       </DataTableTd>
 
-                      {/* Phone Column */}
+                      {/* Phone Column — matches leads-table.tsx's "+ Add phone" quick-fill treatment */}
                       {cols.phone && (
                         <td className="px-3 py-2.5 text-slate-500 dark:text-slate-500 whitespace-nowrap font-medium">
-                          {a.phone || "—"}
+                          {a.phone || (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setEditingAccount(a); }}
+                              className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
+                            >
+                              <Plus className="h-3 w-3" /> Add phone
+                            </button>
+                          )}
                         </td>
                       )}
 
@@ -603,16 +1007,29 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                       {cols.contact && (
                         <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-2">
-                            <a
-                              href={a.website ? (a.website.startsWith("http") ? a.website : `https://${a.website}`) : "#"}
-                              target={a.website ? "_blank" : undefined}
-                              rel="noopener noreferrer"
-                              onClick={() => a.website && toast(`Opening website for ${a.account_name}`, "success")}
-                              className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900"
-                              title={a.website || "No Website"}
-                            >
-                              <Globe className="h-3.5 w-3.5" />
-                            </a>
+                            {a.website ? (
+                              <a
+                                href={a.website.startsWith("http") ? a.website : `https://${a.website}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => toast(`Opening website for ${a.account_name}`, "success")}
+                                className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-900"
+                                title={a.website}
+                              >
+                                <Globe className="h-3.5 w-3.5" />
+                              </a>
+                            ) : (
+                              // Quick-fill — matches leads-table.tsx's "+ Add website" treatment for an empty
+                              // value, adapted to this row's icon-button layout; opens the existing Edit modal.
+                              <button
+                                type="button"
+                                onClick={() => setEditingAccount(a)}
+                                className="p-1 rounded-md border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70"
+                                title="Add website"
+                              >
+                                <Globe className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                             <a
                               href={a.phone ? `tel:${a.phone}` : "#"}
                               onClick={() => a.phone && toast(`Opening call dialer for ${a.phone}`, "success")}
@@ -649,6 +1066,34 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
                           ) : (
                             <span className="text-slate-400">—</span>
                           )}
+                        </td>
+                      )}
+
+                      {/* Owner Column — colored-initial avatar + name, matches leads-table.tsx's Owner cell.
+                          account_owner is a UUID (accounts.account_owner references users.user_id) — look
+                          up the display name via the owners prop rather than rendering the id directly. */}
+                      {cols.owner && (
+                        <td className="px-3 py-2.5">
+                          {(() => {
+                            const ownerName = owners.find((o) => o.id === a.account_owner)?.name;
+                            return ownerName ? (
+                              <span className="flex items-center gap-1.5 max-w-[140px]">
+                                <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0", avatarColor(ownerName))}>
+                                  {ownerName.trim()[0]?.toUpperCase() || "?"}
+                                </span>
+                                <span className="truncate text-slate-600 dark:text-slate-500 whitespace-nowrap">{ownerName}</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            );
+                          })()}
+                        </td>
+                      )}
+
+                      {/* Created Date Column */}
+                      {cols.created_at && (
+                        <td className="px-3 py-2.5 text-slate-500 dark:text-slate-500 text-xs whitespace-nowrap">
+                          {formatDate(a.created_at)}
                         </td>
                       )}
 
@@ -784,10 +1229,11 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
       </div>
 
       {/* Modal overlays */}
-      <EditAccountModal open={showModal} onClose={() => setShowModal(false)} />
+      <EditAccountModal open={showModal} onClose={() => setShowModal(false)} owners={owners} />
       {editingAccount && (
-        <EditAccountModal open={true} onClose={() => setEditingAccount(null)} account={editingAccount} />
+        <EditAccountModal open={true} onClose={() => setEditingAccount(null)} account={editingAccount} owners={owners} />
       )}
+      <AddAccountsWizard open={showImportWizard} onClose={() => setShowImportWizard(false)} />
 
       {/* Row actions menu — kebab button in the rightmost column, Edit + Delete */}
       {rowMenu && (

@@ -91,6 +91,7 @@ function StatusPill({ status }: { status: string }) {
     Contacted: "bg-indigo-500 dark:bg-indigo-600",
     Qualified: "bg-teal-500 dark:bg-teal-600",
     Nurturing: "bg-amber-500 dark:bg-amber-600",
+    Win: "bg-green-600 dark:bg-green-700",
     Converted: "bg-emerald-500 dark:bg-emerald-600",
     Warm: "bg-amber-500 dark:bg-amber-600",
     Hot: "bg-rose-500 dark:bg-rose-600",

@@ -8,6 +8,7 @@ import { useSidebar } from "@/components/layout/sidebar-context";
 import { cn } from "@/lib/utils";
 import { createContact, updateContact, type ContactRow } from "@/lib/queries/contacts";
 import { getAccounts, type AccountRow } from "@/lib/queries/accounts";
+import type { OwnerOption } from "@/components/contacts/contacts-table";
 
 const SALUTATIONS = ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof."];
 const LEAD_SOURCES = [
@@ -45,11 +46,13 @@ export function EditContactModal({
   onClose,
   contact,
   defaultAccountId,
+  owners = [],
 }: {
   open: boolean;
   onClose: () => void;
   contact?: ContactRow;
   defaultAccountId?: string;
+  owners?: OwnerOption[];
 }) {
   const router = useRouter();
   const { toast } = useFeedback();
@@ -57,7 +60,7 @@ export function EditContactModal({
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
 
   const initialForm = {
-    contact_owner: "Hari",
+    contact_owner: contact?.contact_owner || "",
     account_id: contact?.account_id || defaultAccountId || "",
     salutation: contact?.salutation || "",
     first_name: contact?.first_name || "",
@@ -111,6 +114,7 @@ export function EditContactModal({
     try {
       const payload = {
         account_id: form.account_id || null,
+        contact_owner: form.contact_owner || null,
         salutation: form.salutation || null,
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
@@ -201,7 +205,8 @@ export function EditContactModal({
             <FormRow label="Contact Owner">
               <div className="relative w-full">
                 <select className={selectStyle} value={form.contact_owner} onChange={(e) => set("contact_owner", e.target.value)}>
-                  <option value="Hari">Hari</option>
+                  <option value="">-None-</option>
+                  {owners.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </select>
                 <div className="absolute right-2 top-1.5 pointer-events-none text-slate-400 bg-slate-100 p-0.5 rounded border border-slate-200">
                   <User className="h-3 w-3" />

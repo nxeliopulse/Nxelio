@@ -418,7 +418,7 @@ export function CampaignsView({
             </div>
 
             {/* Badged Count Button */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-600">
               <Megaphone className="h-3.5 w-3.5 text-slate-500" />
               <span>{filtered.length} Campaigns</span>
             </div>
@@ -430,7 +430,7 @@ export function CampaignsView({
                 "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all h-9 shadow-sm",
                 activeOnly
                   ? "bg-slate-900 text-white border-transparent dark:bg-slate-100 dark:text-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-600 dark:border-slate-800"
               )}
             >
               {activeOnly ? "✓ Active Only" : "Active Only"}
@@ -467,7 +467,7 @@ export function CampaignsView({
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
                 max={dateTo || undefined}
-                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 aria-label="Last modified from"
               />
               <span className="text-slate-400">–</span>
@@ -476,7 +476,7 @@ export function CampaignsView({
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
                 min={dateFrom || undefined}
-                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                 aria-label="Last modified to"
               />
             </div>
@@ -506,7 +506,7 @@ export function CampaignsView({
                       <p className="text-xs font-semibold text-slate-500 mb-1.5">Type</p>
                       <div className="flex flex-col gap-1.5">
                         {(["Email", "LinkedIn", "Multichannel"] as const).map((t) => (
-                          <label key={t} className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                          <label key={t} className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-600 cursor-pointer select-none">
                             <input
                               type="checkbox"
                               checked={typeFilter.includes(t)}
@@ -526,7 +526,7 @@ export function CampaignsView({
                         value={dateFrom}
                         onChange={(e) => setDateFrom(e.target.value)}
                         max={dateTo || undefined}
-                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
@@ -537,13 +537,13 @@ export function CampaignsView({
                         value={dateTo}
                         onChange={(e) => setDateTo(e.target.value)}
                         min={dateFrom || undefined}
-                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
                     <div>
                       <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
-                      <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer select-none mb-2">
+                      <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-600 cursor-pointer select-none mb-2">
                         <input
                           type="checkbox"
                           checked={activeOnly}
@@ -590,7 +590,7 @@ export function CampaignsView({
                       ["owner", "Owner"],
                       ["lastModified", "Last modified"],
                     ] as const).map(([key, label]) => (
-                      <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer select-none">
+                      <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={visibleCols[key]}

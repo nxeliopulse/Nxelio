@@ -10,12 +10,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback";
 import { EditContactModal } from "@/components/contacts/edit-contact-modal";
+import type { OwnerOption } from "@/components/contacts/contacts-table";
 import { deleteContact, type ContactWithAccount } from "@/lib/queries/contacts";
 import { formatDateTime } from "@/lib/utils";
 import { RecordHeader } from "@/components/records/record-header";
 import { ContactSchema } from "@/core/engine/registry";
 
-export function ContactDetailView({ contact }: { contact: ContactWithAccount }) {
+export function ContactDetailView({ contact, owners = [] }: { contact: ContactWithAccount; owners?: OwnerOption[] }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
   const [, startDelete] = useTransition();
@@ -132,7 +133,7 @@ export function ContactDetailView({ contact }: { contact: ContactWithAccount }) 
         </div>
       </div>
 
-      <EditContactModal open={editOpen} onClose={() => setEditOpen(false)} contact={contact} />
+      <EditContactModal open={editOpen} onClose={() => setEditOpen(false)} contact={contact} owners={owners} />
     </div>
   );
 }

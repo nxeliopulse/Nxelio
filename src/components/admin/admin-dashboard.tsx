@@ -126,7 +126,7 @@ export function AdminDashboard({
       </div>
 
       {/* Navigation Tabs Bar */}
-      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 mb-8 overflow-x-auto shadow-sm scrollbar-hide">
+      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 mb-8 overflow-x-auto shadow-sm scrollbar-hide">
         {TABS.map((t) => {
           const isActive = tab === t.id;
           return (

@@ -3,9 +3,9 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, Settings2,
+  Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  TrendingUp, Pencil, RefreshCw, User, Link2
+  TrendingUp, Pencil, RefreshCw, User, Link2, Download, FileText, FileSpreadsheet, Upload
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,13 +13,34 @@ import { Card } from "@/components/ui/card";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { EditContactModal } from "@/components/contacts/edit-contact-modal";
+import { AddContactsWizard } from "@/components/contacts/add-contacts-wizard";
 import { deleteContact, bulkDeleteContacts, type ContactRow } from "@/lib/queries/contacts";
 
-type ColKey = "phone" | "tags" | "location" | "rating" | "contact" | "status";
+/** Owner picker option — same shape as accounts' AccountOwnerOption (id/name/role),
+ *  kept as a local type here since Contacts has no need for the rest of that module. */
+export interface OwnerOption {
+  id: string;
+  name: string;
+  role: string;
+}
+
+// "index" (Row #) is a fixed, always-shown column — like leads-table.tsx's own Row #
+// column, it is NOT part of the Manage Columns toggle system below.
+type ColKey = "phone" | "tags" | "location" | "rating" | "contact" | "status" | "owner" | "created_at";
 
 interface ColumnDef { key: ColKey; label: string; defaultOn: boolean }
+
+// Per-column header sort — click any sortable column's arrow to sort by it, click
+// again to flip direction (same mechanism as leads-table.tsx's toggleColumnSort).
+// "name" isn't a ColKey (it's a fixed, always-shown column, not part of the Manage
+// Columns toggle system) but is still a valid sort target, so this is its own type
+// rather than reusing ColKey. "tags" and "rating" are deliberately excluded — both
+// are hash-derived mock display values with no real backing field (see hashCode()
+// below), so there's nothing meaningful to sort by. "contact" (icon buttons) is
+// excluded too, same as leads-table.tsx excludes its own icon-only columns.
+type SortKey = "name" | "phone" | "location" | "status" | "owner" | "created_at";
 
 const COLUMNS: ColumnDef[] = [
   { key: "phone", label: "Phone", defaultOn: true },
@@ -28,6 +49,8 @@ const COLUMNS: ColumnDef[] = [
   { key: "rating", label: "Rating", defaultOn: true },
   { key: "contact", label: "Contact", defaultOn: true },
   { key: "status", label: "Status", defaultOn: true },
+  { key: "owner", label: "Owner", defaultOn: true },
+  { key: "created_at", label: "Created Date", defaultOn: true },
 ];
 
 const DEFAULT_COLS = COLUMNS.reduce((acc, c) => { acc[c.key] = c.defaultOn; return acc; }, {} as Record<ColKey, boolean>);
@@ -55,7 +78,7 @@ function getFlagEmoji(country: string): string {
   return "🇺🇸"; // default fallback for template matches
 }
 
-export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
+export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[]; owners?: OwnerOption[] }) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,9 +87,18 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
 
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"none" | "name_az" | "name_za" | "newest">("none");
+  // Per-column header sort state — the toolbar "Sort By" dropdown below is just a
+  // few named presets over this SAME state (see toggleColumnSort), so the dropdown
+  // and the per-column header arrows always stay in sync (matches leads-table.tsx).
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  function toggleColumnSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  }
   const [page, setPage] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   // Dropdown toggles
@@ -145,14 +177,51 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
     );
   });
 
-  // Apply sorting
+  /** Plain-text value of a sortable column. Owner resolves through the `owners` list
+   *  (contact_owner is a UUID, not a display name) rather than sorting by raw id. */
+  function getSortText(key: Exclude<SortKey, "created_at" | "status">, c: ContactRow): string {
+    switch (key) {
+      case "name": return `${c.first_name} ${c.last_name}`.trim();
+      case "phone": return c.phone || "";
+      case "location": return c.mailing_country || "";
+      case "owner": return owners.find((o) => o.id === c.contact_owner)?.name || "";
+      default: return "";
+    }
+  }
+
+  /** String comparator that always sorts blank values (missing phone/location/owner)
+   *  to the end, in BOTH ascending and descending order — otherwise an empty string
+   *  would sort first ascending and last descending, scattering "no data" rows
+   *  unpredictably instead of keeping them out of the way. */
+  function compareTextBlankLast(av: string, bv: string, dir: "asc" | "desc"): number {
+    const aBlank = !av.trim();
+    const bBlank = !bv.trim();
+    if (aBlank && bBlank) return 0;
+    if (aBlank) return 1;
+    if (bBlank) return -1;
+    const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+    return dir === "asc" ? cmp : -cmp;
+  }
+
+  // Apply sorting — per-column header arrows and the toolbar "Sort By" dropdown both
+  // drive sortKey/sortDir, so there is exactly one sort mechanism, never two that
+  // could disagree.
   const sorted = [...filtered].sort((a, b) => {
-    const nameA = `${a.first_name} ${a.last_name}`.toLowerCase();
-    const nameB = `${b.first_name} ${b.last_name}`.toLowerCase();
-    if (sort === "name_az") return nameA.localeCompare(nameB);
-    if (sort === "name_za") return nameB.localeCompare(nameA);
-    if (sort === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    return 0;
+    if (!sortKey) return 0;
+    // Created Date must compare actual timestamps, not display text.
+    if (sortKey === "created_at") {
+      const cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return sortDir === "asc" ? cmp : -cmp;
+    }
+    // Status is a derived-but-real field (email_opt_out) — Active sorts before
+    // Inactive ascending, a deliberate, consistent ordering choice (no natural
+    // alphabetical/numeric order exists for a 2-value status).
+    if (sortKey === "status") {
+      const rank = (c: ContactRow) => (c.email_opt_out ? 1 : 0);
+      const cmp = rank(a) - rank(b);
+      return sortDir === "asc" ? cmp : -cmp;
+    }
+    return compareTextBlankLast(getSortText(sortKey, a), getSortText(sortKey, b), sortDir);
   });
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
@@ -202,15 +271,54 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   }
 
+  /** Small inline per-column sort-arrow button for a table header — neutral gray
+   *  ArrowUpDown when this column isn't the active sort, or a colored ArrowUp/
+   *  ArrowDown when it is (matches leads-table.tsx's header sort icon exactly). */
+  function renderSortIcon(key: SortKey, label: string) {
+    const isSorted = sortKey === key;
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); toggleColumnSort(key); }}
+        title={`Sort by ${label}`}
+        className={cn("p-0.5 rounded hover:bg-slate-200/70 dark:hover:bg-slate-700 flex-shrink-0", isSorted && "text-blue-600 dark:text-blue-400")}
+      >
+        {isSorted ? (
+          sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 text-slate-400" />
+        )}
+      </button>
+    );
+  }
+
+  /** Whether a "Sort By" dropdown preset matches the current sortKey/sortDir —
+   *  drives its highlighted/active state. Presets are just shortcuts onto the same
+   *  shared state the header arrows use, so an option can also go "unselected" (no
+   *  highlight) when the user has sorted by a column the dropdown has no preset for
+   *  (e.g. Phone, Location, Owner, Status) — the table still sorts correctly either way. */
+  function isActiveSortPreset(key: "none" | "name_az" | "name_za" | "newest"): boolean {
+    switch (key) {
+      case "none": return !sortKey;
+      case "name_az": return sortKey === "name" && sortDir === "asc";
+      case "name_za": return sortKey === "name" && sortDir === "desc";
+      case "newest": return sortKey === "created_at" && sortDir === "desc";
+    }
+  }
+
   return (
     <div className="max-w-[1600px] mx-auto w-full px-4 sm:px-6 pb-10 text-slate-800 dark:text-slate-700">
       
       {/* Redesigned Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
+<<<<<<< HEAD
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Contacts</h1>
           </div>
+=======
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Contacts</h1>
+>>>>>>> 94e7a8cbb9941446477ceb4713460e7bda984d7f
           <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mt-1">
             <Link href="/dashboard" className="hover:text-slate-600">Home</Link>
             <span>&gt;</span>
@@ -223,15 +331,14 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
           {/* Export Dropdown */}
           <div className="relative">
             <Button
-              variant="outline"
               size="sm"
               onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-              className="h-8 rounded-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1"
+              className="h-8 rounded-md bg-[var(--primary)] hover:opacity-90 text-white text-xs font-semibold gap-1.5"
             >
-              Export <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+              <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3.5 w-3.5" />
             </Button>
             {exportDropdownOpen && (
-              <div className="absolute right-0 mt-1.5 w-36 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+              <div className="absolute right-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
                 <button
                   onClick={() => {
                     toast("Exporting PDF contacts...", "info");
@@ -239,7 +346,7 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
                 >
-                  Export PDF
+                  <FileText className="h-3.5 w-3.5 text-slate-400" /> Export as PDF
                 </button>
                 <button
                   onClick={() => {
@@ -248,11 +355,21 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
                 >
-                  Export Excel
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-slate-400" /> Export as Excel
                 </button>
               </div>
             )}
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImportModal(true)}
+            className="h-8 w-8 p-0 rounded-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+            title="Import from CSV"
+          >
+            <Upload className="h-4 w-4 text-slate-500" />
+          </Button>
 
           <Button
             variant="outline"
@@ -307,6 +424,12 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
             />
           </div>
 
+          {/* Count Chip */}
+          <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
+            <Users2 className="h-3.5 w-3.5 text-slate-400" />
+            <span>{filtered.length} Contact{filtered.length === 1 ? "" : "s"}</span>
+          </div>
+
           {/* Sort By Dropdown Button */}
           <div className="relative">
             <Button
@@ -317,28 +440,41 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
             >
               <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
               <span>
-                Sort By: {sort === "name_az" ? "Name A-Z" : sort === "name_za" ? "Name Z-A" : sort === "newest" ? "Newest" : "None"}
+                Sort By: {
+                  !sortKey ? "None"
+                  : sortKey === "name" && sortDir === "asc" ? "Name A-Z"
+                  : sortKey === "name" && sortDir === "desc" ? "Name Z-A"
+                  : sortKey === "created_at" && sortDir === "desc" ? "Newest"
+                  : "Custom"
+                }
               </span>
               <ChevronDown className="h-3 w-3 text-slate-450" />
             </Button>
             {sortDropdownOpen && (
               <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                {[
-                  { key: "none", label: "None" },
-                  { key: "name_az", label: "Name A-Z" },
-                  { key: "name_za", label: "Name Z-A" },
-                  { key: "newest", label: "Newest" }
-                ].map((opt) => (
+                {(
+                  [
+                    { key: "none", label: "None" },
+                    { key: "name_az", label: "Name A-Z" },
+                    { key: "name_za", label: "Name Z-A" },
+                    { key: "newest", label: "Newest" },
+                  ] as const
+                ).map((opt) => (
                   <button
                     key={opt.key}
                     onClick={() => {
-                      setSort(opt.key as "none" | "name_az" | "name_za" | "newest");
+                      // Named presets just set the same sortKey/sortDir state the
+                      // per-column header arrows use — one shared sort mechanism.
+                      if (opt.key === "none") { setSortKey(null); setSortDir("asc"); }
+                      else if (opt.key === "name_az") { setSortKey("name"); setSortDir("asc"); }
+                      else if (opt.key === "name_za") { setSortKey("name"); setSortDir("desc"); }
+                      else if (opt.key === "newest") { setSortKey("created_at"); setSortDir("desc"); }
                       setSortDropdownOpen(false);
                       toast(`Sorted contacts by ${opt.label}`, "success");
                     }}
                     className={cn(
                       "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      sort === opt.key ? "text-rose-500 bg-rose-50/50 dark:bg-rose-950/20" : "text-slate-700 dark:text-slate-600"
+                      isActiveSortPreset(opt.key) ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/15" : "text-slate-700 dark:text-slate-600"
                     )}
                   >
                     {opt.label}
@@ -370,7 +506,7 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                     }}
                     className={cn(
                       "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      activeDateRange === opt ? "text-rose-500 bg-rose-50/50 dark:bg-rose-950/20" : "text-slate-700 dark:text-slate-600"
+                      activeDateRange === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/15" : "text-slate-700 dark:text-slate-600"
                     )}
                   >
                     {opt}
@@ -384,11 +520,11 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
         {/* Right Side: Add Contact, Filter, Columns, Toggle Grid */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
           
-          {/* Add Contacts Red Button */}
+          {/* Add Contacts Button */}
           <Button
             size="sm"
             onClick={() => setShowModal(true)}
-            className="rounded-lg gap-1.5 font-bold h-8 px-3.5 text-xs bg-red-600 hover:bg-red-700 text-white shadow-sm flex-shrink-0"
+            className="rounded-lg gap-1.5 font-bold h-8 px-3.5 text-xs bg-[var(--primary)] hover:opacity-90 text-white shadow-sm flex-shrink-0"
           >
             <Plus className="h-4 w-4" />
             <span>Add Contacts</span>
@@ -423,7 +559,7 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                     }}
                     className={cn(
                       "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      statusFilter === opt.key ? "text-rose-500 bg-rose-50/50 dark:bg-rose-950/20" : "text-slate-700 dark:text-slate-600"
+                      statusFilter === opt.key ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/15" : "text-slate-700 dark:text-slate-600"
                     )}
                   >
                     {opt.label}
@@ -451,7 +587,7 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
               onClick={() => setViewMode("list")}
               className={cn(
                 "p-1 rounded-md transition-colors",
-                viewMode === "list" ? "bg-emerald-500 text-white" : "text-slate-550 dark:text-slate-500 hover:text-slate-700"
+                viewMode === "list" ? "bg-[var(--primary)] text-white" : "text-slate-550 dark:text-slate-500 hover:text-slate-700"
               )}
               title="List View"
             >
@@ -461,7 +597,7 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
               onClick={() => setViewMode("grid")}
               className={cn(
                 "p-1 rounded-md transition-colors",
-                viewMode === "grid" ? "bg-emerald-500 text-white" : "text-slate-550 dark:text-slate-500 hover:text-slate-700"
+                viewMode === "grid" ? "bg-[var(--primary)] text-white" : "text-slate-550 dark:text-slate-500 hover:text-slate-700"
               )}
               title="Grid View"
             >
@@ -497,19 +633,52 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                       className="rounded border-slate-350 dark:border-slate-750"
                     />
                   </DataTableTh>
-                  <DataTableTh className="px-3 py-2.5">Name</DataTableTh>
-                  {cols.phone && <DataTableTh className="px-3 py-2.5">Phone</DataTableTh>}
+                  {/* Row # — fixed, always shown, not part of the Manage Columns toggle system (matches leads-table.tsx) */}
+                  <DataTableTh className="w-10 px-3 py-2.5">#</DataTableTh>
+                  <DataTableTh className="px-3 py-2.5">
+                    <span className="inline-flex items-center gap-1">Name{renderSortIcon("name", "Name")}</span>
+                  </DataTableTh>
+                  {cols.phone && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Phone{renderSortIcon("phone", "Phone")}</span>
+                    </DataTableTh>
+                  )}
+                  {/* Tags is a hash-derived mock display value (see hashCode()) with no
+                      real backing field — deliberately not sortable. */}
                   {cols.tags && <DataTableTh className="px-3 py-2.5">Tags</DataTableTh>}
-                  {cols.location && <DataTableTh className="px-3 py-2.5">Location</DataTableTh>}
+                  {cols.location && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Location{renderSortIcon("location", "Location")}</span>
+                    </DataTableTh>
+                  )}
+                  {/* Rating is also a hash-derived mock value with no real backing
+                      field — deliberately not sortable, same reasoning as Tags. */}
                   {cols.rating && <DataTableTh className="px-3 py-2.5">Rating</DataTableTh>}
+                  {/* Contact is icon buttons (mail/phone/message/eye), not comparable
+                      data — deliberately not sortable, matches leads-table.tsx's own
+                      pattern of excluding icon-only columns. */}
                   {cols.contact && <DataTableTh className="px-3 py-2.5 text-center">Contact</DataTableTh>}
-                  {cols.status && <DataTableTh className="px-3 py-2.5">Status</DataTableTh>}
+                  {cols.status && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Status{renderSortIcon("status", "Status")}</span>
+                    </DataTableTh>
+                  )}
+                  {cols.owner && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Owner{renderSortIcon("owner", "Owner")}</span>
+                    </DataTableTh>
+                  )}
+                  {cols.created_at && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Created Date{renderSortIcon("created_at", "Created Date")}</span>
+                    </DataTableTh>
+                  )}
                   <DataTableTh className="w-12 px-3 py-2.5 text-center">Action</DataTableTh>
                 </tr>
               </DataTableHead>
               <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paged.length === 0 && (
-                  <DataTableEmpty colSpan={visibleCols.length + 3}>
+                  <DataTableEmpty colSpan={visibleCols.length + 4}>
                     No contacts found matching the filters. Click <strong>Add Contacts</strong> to create one.
                   </DataTableEmpty>
                 )}
@@ -556,6 +725,11 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                         />
                       </DataTableTd>
 
+                      {/* Row # column — fixed, always shown */}
+                      <td className="px-3 py-2.5 text-slate-400 dark:text-slate-500 tabular-nums font-mono text-xs">
+                        {safePage * PAGE_SIZE + i + 1}
+                      </td>
+
                       {/* Name with star & Avatar details */}
                       <DataTableTd className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
@@ -584,8 +758,18 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
 
                       {/* Phone Column */}
                       {cols.phone && (
-                        <td className="px-3 py-2.5 text-slate-500 dark:text-slate-500 whitespace-nowrap font-medium">
-                          {c.phone || "—"}
+                        <td className="px-3 py-2.5 whitespace-nowrap font-medium">
+                          {c.phone ? (
+                            <span className="text-slate-500 dark:text-slate-500">{c.phone}</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setEditingContact(c); }}
+                              className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
+                            >
+                              <Plus className="h-3 w-3" /> Add phone
+                            </button>
+                          )}
                         </td>
                       )}
 
@@ -662,6 +846,38 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
                           <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold", statusColor)}>
                             {status}
                           </span>
+                        </td>
+                      )}
+
+                      {/* Owner Column — contact_owner is a UUID (contacts.contact_owner references
+                          users.user_id), not a name — look up the display name via the owners prop.
+                          A former team member no longer in `owners` renders as "Unassigned" rather
+                          than a raw id. */}
+                      {cols.owner && (() => {
+                        const owner = owners.find((o) => o.id === c.contact_owner);
+                        return (
+                        <td className="px-3 py-2.5">
+                          {owner ? (
+                            <span
+                              className="flex items-center gap-1.5 max-w-[140px]"
+                              title={owner.role}
+                            >
+                              <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0", avatarColor(owner.name))}>
+                                {owner.name.trim()[0]?.toUpperCase() || "?"}
+                              </span>
+                              <span className="truncate text-slate-600 dark:text-slate-500 whitespace-nowrap">{owner.name}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs whitespace-nowrap">Unassigned</span>
+                          )}
+                        </td>
+                        );
+                      })()}
+
+                      {/* Created Date Column */}
+                      {cols.created_at && (
+                        <td className="px-3 py-2.5 text-slate-500 dark:text-slate-500 text-xs whitespace-nowrap">
+                          {formatDate(c.created_at)}
                         </td>
                       )}
 
@@ -801,10 +1017,11 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
       </div>
 
       {/* Modal overlays */}
-      <EditContactModal open={showModal} onClose={() => setShowModal(false)} defaultAccountId={accountFilterId || undefined} />
+      <EditContactModal open={showModal} onClose={() => setShowModal(false)} defaultAccountId={accountFilterId || undefined} owners={owners} />
       {editingContact && (
-        <EditContactModal open={true} onClose={() => setEditingContact(null)} contact={editingContact} />
+        <EditContactModal open={true} onClose={() => setEditingContact(null)} contact={editingContact} owners={owners} />
       )}
+      <AddContactsWizard open={showImportModal} onClose={() => setShowImportModal(false)} />
 
       {/* Row actions menu — kebab button in the rightmost column, Edit + Delete */}
       {rowMenu && (

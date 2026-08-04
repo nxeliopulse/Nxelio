@@ -509,7 +509,7 @@ export function ActivitiesDashboardView({
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as "newest" | "oldest" | "title")}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-650 dark:text-slate-400 outline-none cursor-pointer h-9"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-650 dark:text-slate-500 outline-none cursor-pointer h-9"
             >
               <option value="newest">Sort: Newest first</option>
               <option value="oldest">Sort: Oldest first</option>
@@ -606,12 +606,12 @@ export function ActivitiesDashboardView({
                     )}
                   </button>
                 </th>
-                {visibleColumns.title && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Title</th>}
-                {visibleColumns.type && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Activity Type</th>}
-                {visibleColumns.dueDate && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Due Date</th>}
-                {visibleColumns.owner && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Owner</th>}
-                {visibleColumns.createdAt && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400">Created At</th>}
-                <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-400 text-right w-16">Action</th>
+                {visibleColumns.title && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-500">Title</th>}
+                {visibleColumns.type && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-500">Activity Type</th>}
+                {visibleColumns.dueDate && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-500">Due Date</th>}
+                {visibleColumns.owner && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-500">Owner</th>}
+                {visibleColumns.createdAt && <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-500">Created At</th>}
+                <th className="py-3 px-4 font-bold text-slate-500 dark:text-slate-500 text-right w-16">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-850/80">
@@ -632,7 +632,7 @@ export function ActivitiesDashboardView({
                     key={item.id}
                     className={cn(
                       "hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors text-sm",
-                      selected ? "bg-slate-50/20 dark:bg-slate-900/20" : ""
+                      selected ? "bg-slate-50/20 dark:bg-[var(--muted)]" : ""
                     )}
                   >
                     <td className="py-3.5 px-4">
@@ -968,7 +968,7 @@ export function ActivitiesDashboardView({
                         value={formDescription}
                         onChange={(e) => setFormDescription(e.target.value)}
                         placeholder="Agenda, goals, or meeting context..."
-                        className="w-full p-3 min-h-[120px] text-sm text-slate-850 dark:text-slate-100 bg-white dark:bg-slate-900 border-none outline-none resize-none leading-relaxed"
+                        className="w-full p-3 min-h-[120px] text-sm text-slate-850 dark:text-slate-800 bg-white dark:bg-slate-900 border-none outline-none resize-none leading-relaxed"
                       />
                     </div>
                   </div>

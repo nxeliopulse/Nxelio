@@ -310,7 +310,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                     )}>
                       <Check className="h-3 w-3 stroke-[3]" />
                     </div>
-                    <span className="text-slate-700 dark:text-slate-300 font-bold">{cat.name}</span>
+                    <span className="text-slate-700 dark:text-slate-600 font-bold">{cat.name}</span>
                   </button>
                 );
               })}
@@ -331,7 +331,7 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                     <div key={idx} className="flex items-start gap-3 text-xs">
                       <span className={cn("h-2.5 w-2.5 rounded-full mt-1 shrink-0", colorClass)} />
                       <div className="min-w-0 flex-1">
-                        <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{evt.title}</p>
+                        <p className="font-bold text-slate-800 dark:text-slate-700 truncate">{evt.title}</p>
                         <p className="text-[11px] text-slate-400 font-medium mt-0.5">{evt.timeLabel}</p>
                       </div>
                     </div>
@@ -358,19 +358,19 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
               <div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-800 p-0.5 bg-white dark:bg-slate-900">
                 <button
                   onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() - 1); setCalendarMonth(d); }}
-                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => { const d = new Date(); d.setDate(1); setCalendarMonth(d); setSelectedDay(new Date()); }}
-                  className="px-3 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border-x border-slate-200 dark:border-slate-800"
+                  className="px-3 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border-x border-slate-200 dark:border-slate-800"
                 >
                   Today
                 </button>
                 <button
                   onClick={() => { const d = new Date(calendarMonth); d.setMonth(d.getMonth() + 1); setCalendarMonth(d); }}
-                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -750,7 +750,7 @@ function CalendarGrid({
                   : isSelected
                   ? "text-indigo-600 font-bold"
                   : inMonth
-                  ? "text-slate-700 dark:text-slate-300"
+                  ? "text-slate-700 dark:text-slate-600"
                   : "text-slate-300 dark:text-slate-700"
               )}>
                 {d.getDate()}
