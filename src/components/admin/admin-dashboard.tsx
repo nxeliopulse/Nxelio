@@ -8,7 +8,13 @@ import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
 import { AdminLeadArchiveView } from "@/components/admin/lead-archive-view";
 import { VendorSubscriptionsTab } from "@/components/admin/vendor-subscriptions-tab";
 import { AiProviderTab } from "@/components/admin/ai-provider-tab";
-import type { PlatformOverviewStats, HotCustomerRow, SubscriptionRow } from "@/lib/queries/platform-overview";
+import type {
+  PlatformOverviewStats,
+  HotCustomerRow,
+  SubscriptionRow,
+  PlatformOverviewTrendPoint,
+  WorkspaceAttentionItem,
+} from "@/lib/queries/platform-overview";
 import type { LeadArchiveRow } from "@/lib/queries/lead-import-archive";
 import type { VendorSubscriptionRow } from "@/lib/queries/platform-vendor-subscriptions";
 import type { AiProviderStatus } from "@/lib/queries/ai-provider-settings";
@@ -29,6 +35,8 @@ export function AdminDashboard({
   leadArchive,
   vendorSubscriptions,
   aiProviderStatus,
+  trendData,
+  attentionWorkspaces,
 }: {
   stats: PlatformOverviewStats;
   hotCustomers: HotCustomerRow[];
@@ -36,6 +44,8 @@ export function AdminDashboard({
   leadArchive: (LeadArchiveRow & { workspace_name: string | null })[];
   vendorSubscriptions: VendorSubscriptionRow[];
   aiProviderStatus: AiProviderStatus;
+  trendData: PlatformOverviewTrendPoint[];
+  attentionWorkspaces: WorkspaceAttentionItem[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
@@ -138,7 +148,14 @@ export function AdminDashboard({
 
       {/* Tab Content */}
       <div className="transition-all duration-300">
-        {tab === "overview" && <OverviewTab stats={stats} hotCustomers={hotCustomers} />}
+        {tab === "overview" && (
+          <OverviewTab
+            stats={stats}
+            hotCustomers={hotCustomers}
+            trendData={trendData}
+            attentionWorkspaces={attentionWorkspaces}
+          />
+        )}
         {tab === "subscriptions" && <SubscriptionsTab rows={subscriptions} />}
         {tab === "leads" && <AdminLeadArchiveView rows={leadArchive} />}
         {tab === "vendors" && <VendorSubscriptionsTab rows={vendorSubscriptions} />}

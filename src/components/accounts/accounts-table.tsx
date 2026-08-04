@@ -208,9 +208,6 @@ export function AccountsTable({ accounts }: { accounts: AccountRow[] }) {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Accounts</h1>
-            <span className="bg-red-50 text-red-500 text-xs px-2 py-0.5 rounded-full font-bold dark:bg-rose-950/20 dark:text-rose-400">
-              {accounts.length}
-            </span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mt-1">
             <Link href="/dashboard" className="hover:text-slate-600">Home</Link>

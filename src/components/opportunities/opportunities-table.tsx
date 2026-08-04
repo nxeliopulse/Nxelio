@@ -239,9 +239,6 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Opportunities</h1>
-            <span className="inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">
-              {rows.length}
-            </span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 mt-1">
             <span>Home</span>

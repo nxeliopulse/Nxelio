@@ -384,10 +384,7 @@ export function ActivitiesDashboardView({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-              Activities 
-              <Badge className="bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold py-0.5 px-2">
-                {activities.length}
-              </Badge>
+              Activities
             </h1>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
