@@ -46,7 +46,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   accentColor: "teal",
   sidebarBadgeStyle: "default",
   sidebarDensity: "default",
-  mixedColorPreset: "none",
+  mixedColorPreset: "slate_blue",
 };
 
 /** Reads the saved appearance preferences from localStorage. */
@@ -98,7 +98,7 @@ export function applyAppearance(settings: AppearanceSettings) {
   root.setAttribute("data-accent-color", settings.accentColor || "teal");
   root.setAttribute("data-sidebar-badge", settings.sidebarBadgeStyle || "default");
   root.setAttribute("data-sidebar-density", settings.sidebarDensity || "default");
-  root.setAttribute("data-mixed-preset", settings.mixedColorPreset || "none");
+  root.setAttribute("data-mixed-preset", settings.mixedColorPreset || "slate_blue");
 }
 
 /** Legacy helper for simple theme toggling */
