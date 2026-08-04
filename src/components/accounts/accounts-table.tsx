@@ -362,13 +362,9 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
       {/* Redesigned Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
-<<<<<<< HEAD
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Accounts</h1>
           </div>
-=======
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Accounts</h1>
->>>>>>> 94e7a8cbb9941446477ceb4713460e7bda984d7f
           <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mt-1">
             <Link href="/dashboard" className="hover:text-slate-600">Home</Link>
             <span>&gt;</span>
