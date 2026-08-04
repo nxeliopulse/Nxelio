@@ -6,6 +6,20 @@ export type DarkPreset = "dark" | "midnight" | "obsidian" | "emerald";
 export type AccentColor = "vermilion" | "blue" | "indigo" | "emerald" | "teal" | "black";
 export type SidebarBadgeStyle = "default" | "numeric" | "dot" | "hidden";
 export type SidebarDensity = "default" | "compact";
+export type MixedColorPreset =
+  | "none"
+  | "teal_aqua"
+  | "green_lime"
+  | "purple_lavender"
+  | "indigo_purple"
+  | "emerald_teal"
+  | "amber_orange"
+  | "rose_pink"
+  | "slate_blue"
+  | "charcoal_lime"
+  | "charcoal_yellow"
+  | "coral_peach"
+  | "sand_olive";
 
 export interface AppearanceSettings {
   theme: Theme;
@@ -18,6 +32,7 @@ export interface AppearanceSettings {
   accentColor: AccentColor;
   sidebarBadgeStyle: SidebarBadgeStyle;
   sidebarDensity: SidebarDensity;
+  mixedColorPreset: MixedColorPreset;
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -31,6 +46,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   accentColor: "teal",
   sidebarBadgeStyle: "default",
   sidebarDensity: "default",
+  mixedColorPreset: "none",
 };
 
 /** Reads the saved appearance preferences from localStorage. */
@@ -82,6 +98,7 @@ export function applyAppearance(settings: AppearanceSettings) {
   root.setAttribute("data-accent-color", settings.accentColor || "teal");
   root.setAttribute("data-sidebar-badge", settings.sidebarBadgeStyle || "default");
   root.setAttribute("data-sidebar-density", settings.sidebarDensity || "default");
+  root.setAttribute("data-mixed-preset", settings.mixedColorPreset || "none");
 }
 
 /** Legacy helper for simple theme toggling */

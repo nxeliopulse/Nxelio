@@ -39,6 +39,8 @@
      on a dark surface, so dark gets a soft dark shadow instead). */
   --card-radius: 5px;
   --card-shadow: 0 4px 4px rgba(219,219,219,.35);
+  --sidebar-bg: var(--primary);
+  --topbar-bg: var(--primary);
 }
 
 /* Dynamic font sizing */
@@ -175,6 +177,56 @@ html[data-accent-color="teal"] {
   --color-teal-600: #18A7B8;
   --color-emerald-600: #18A7B8;
 }
+
+/* Sidebar and Topbar Mixed-Color Theme Presets */
+html[data-mixed-preset="teal_aqua"] {
+  --sidebar-bg: #0f4c5c;
+  --topbar-bg: #14929f;
+}
+html[data-mixed-preset="green_lime"] {
+  --sidebar-bg: #14532d;
+  --topbar-bg: #84cc16;
+}
+html[data-mixed-preset="purple_lavender"] {
+  --sidebar-bg: #3b2c6f;
+  --topbar-bg: #8b5cf6;
+}
+html[data-mixed-preset="indigo_purple"] {
+  --sidebar-bg: #22153b;
+  --topbar-bg: #6875f5;
+}
+html[data-mixed-preset="emerald_teal"] {
+  --sidebar-bg: #064e3b;
+  --topbar-bg: #0d9488;
+}
+html[data-mixed-preset="amber_orange"] {
+  --sidebar-bg: #4c1c02;
+  --topbar-bg: #ea580c;
+}
+html[data-mixed-preset="rose_pink"] {
+  --sidebar-bg: #580527;
+  --topbar-bg: #e11d48;
+}
+html[data-mixed-preset="slate_blue"] {
+  --sidebar-bg: #1e293b;
+  --topbar-bg: #2563eb;
+}
+html[data-mixed-preset="charcoal_lime"] {
+  --sidebar-bg: #1c1917;
+  --topbar-bg: #65a30d;
+}
+html[data-mixed-preset="charcoal_yellow"] {
+  --sidebar-bg: #18181b;
+  --topbar-bg: #eab308;
+}
+html[data-mixed-preset="coral_peach"] {
+  --sidebar-bg: #9a3412;
+  --topbar-bg: #ff7a59;
+}
+html[data-mixed-preset="sand_olive"] {
+  --sidebar-bg: #2e302f;
+  --topbar-bg: #a1a89c;
+}
 /* Sidebar Density & Badges */
 html[data-sidebar-density="compact"] aside nav {
   padding-top: 0.35rem !important;
@@ -230,6 +282,8 @@ html[data-sidebar-badge="dot"] .sidebar-badge {
   --color-slate-700: #e2e8f0;
   --color-slate-800: #eef2f7;
   --color-slate-900: #f8fafc;
+  --sidebar-bg: var(--primary);
+  --topbar-bg: var(--primary);
 }
 
 /* white surfaces → dynamic card variable so light & dark presets update surfaces */

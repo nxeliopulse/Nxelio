@@ -182,7 +182,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
   return (
     <aside
       className={cn(
-        "hidden lg:flex h-screen sticky top-0 bg-[var(--primary)] overflow-hidden transition-[width] duration-300 ease-in-out flex-shrink-0 z-40",
+        "hidden lg:flex h-screen sticky top-0 bg-transparent overflow-hidden transition-[width] duration-300 ease-in-out flex-shrink-0 z-40",
         collapsed ? COLLAPSED : EXPANDED
       )}
     >

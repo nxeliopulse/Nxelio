@@ -32,10 +32,10 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
   return (
     <AssistantProvider toggle={() => setAssistantOpen((v) => !v)}>
       <TourProvider onTourEnd={(pageKey) => { markTourSeen(pageKey, CURRENT_VERSIONS[pageKey] ?? "1").catch(() => {}); }}>
-        <div className="flex h-screen bg-slate-50 overflow-hidden">
+        <div className="flex h-screen overflow-hidden bg-[linear-gradient(to_right,var(--sidebar-bg),var(--topbar-bg))]">
           <Sidebar role={userRole} navAccess={navAccess} />
           <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} role={userRole} navAccess={navAccess} />
-          <div className={cn("flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[var(--primary)]", assistantExpanded && "hidden")}>
+          <div className={cn("flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-transparent", assistantExpanded && "hidden")}>
             <Topbar
               userName={userName}
               userEmail={userEmail}
