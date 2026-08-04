@@ -3,7 +3,7 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, MoreHorizontal, Pause, Play, Copy, Pencil, Search, LayoutTemplate, ChevronDown, ChevronRight, Megaphone, Link2, Send, CheckCircle2, Undo2, Archive, Star, LayoutGrid, List, Columns3, ArrowUp, ArrowDown, ArrowUpDown, Eye, MessageSquare, Filter as FilterIcon, X } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Copy, Pencil, Search, LayoutTemplate, ChevronDown, ChevronRight, Megaphone, Link2, Send, CheckCircle2, Undo2, Archive, Star, LayoutGrid, List, Columns3, ArrowUp, ArrowDown, ArrowUpDown, Eye, MessageSquare, Filter as FilterIcon, X, RefreshCw } from "lucide-react";
 import { ConnectionsModal } from "@/components/campaigns/connections-modal";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -681,6 +681,21 @@ export function CampaignsView({
                 <LayoutGrid className="h-4 w-4" />
               </button>
             </div>
+
+            {/* Refresh Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                toast("Refreshing campaigns...", "info");
+                router.refresh();
+                setTimeout(() => window.location.reload(), 100);
+              }}
+              className="h-9 w-9 p-0 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              title="Refresh"
+            >
+              <RefreshCw className="h-4 w-4 text-slate-500" />
+            </Button>
 
             {/* New Campaign Button */}
             <Link href="/campaigns/builder">

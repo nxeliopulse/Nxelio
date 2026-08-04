@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, Mail, MoreHorizontal, Send, Eye, Copy, Trash2,
-  TrendingUp, MousePointer, Calendar, CheckCircle2, Clock, Sparkles, Filter,
+  TrendingUp, MousePointer, Calendar, CheckCircle2, Clock, Sparkles, Filter, RefreshCw,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ interface Props {
 
 export function NewslettersView({ newsletters, stats }: Props) {
   const router = useRouter();
-  const { confirm } = useFeedback();
+  const { confirm, toast } = useFeedback();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [templateCatFilter, setTemplateCatFilter] = useState<"All" | NewsletterTemplateCategory>("All");
@@ -83,11 +83,26 @@ export function NewslettersView({ newsletters, stats }: Props) {
         title="Newsletters"
         description="Send rich content updates, digests, and product announcements to your subscribed leads"
         actions={
-          <Link href="/newsletters/builder">
-            <Button className="rounded-xl font-bold px-4 py-2.5 gap-2">
-              <Plus className="h-4 w-4" /> New Newsletter
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                toast("Refreshing newsletters...", "info");
+                router.refresh();
+                setTimeout(() => window.location.reload(), 100);
+              }}
+              className="h-10 w-10 p-0 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              title="Refresh"
+            >
+              <RefreshCw className="h-4 w-4 text-slate-500" />
             </Button>
-          </Link>
+            <Link href="/newsletters/builder">
+              <Button className="rounded-xl font-bold px-4 py-2.5 gap-2 h-10">
+                <Plus className="h-4 w-4" /> New Newsletter
+              </Button>
+            </Link>
+          </div>
         }
       />
 

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useTransition, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CalendarDays, Clock, Users, ExternalLink, Pencil, X, Plus, Link2, FileText,
   PlayCircle, Video, MapPin, AlertCircle, Loader2, Wand2,
@@ -72,7 +73,8 @@ const STATUS_VARIANT: Record<string, "blue" | "success" | "danger" | "default"> 
 };
 
 export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; leads: LeadOption[] }) {
-  const { confirm } = useFeedback();
+  const { confirm, toast } = useFeedback();
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [viewMode, setViewMode] = useState<"month" | "upcoming" | "past">("month");
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
@@ -410,6 +412,21 @@ export function MeetingsView({ meetings, leads }: { meetings: MeetingRow[]; lead
                   Past
                 </button>
               </div>
+
+              {/* Refresh Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  toast("Refreshing calendar...", "info");
+                  router.refresh();
+                  setTimeout(() => window.location.reload(), 100);
+                }}
+                className="h-9 w-9 p-0 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                title="Refresh"
+              >
+                <RefreshCw className="h-4 w-4 text-slate-500" />
+              </Button>
 
               {/* Add event button */}
               <Button

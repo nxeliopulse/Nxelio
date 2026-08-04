@@ -190,6 +190,7 @@ export function ActivitiesDashboardView({
   const handleRefresh = () => {
     toast("Refreshing activities...", "info");
     router.refresh();
+    setTimeout(() => window.location.reload(), 100);
   };
 
   const handleExportCsv = () => {

@@ -18,6 +18,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/modal";
+import { useFeedback } from "@/components/ui/feedback";
 import { getAnalyticsStatsRanged, getAnalyticsStatsCustom } from "@/lib/queries/analytics";
 import type { AnalyticsStats } from "@/lib/queries/analytics";
 
@@ -524,6 +525,7 @@ function getFilteredStats(base: AnalyticsStats, f: FilterState, facet: { type: s
 
 // ── Main Page Component ────────────────────────────────────────────────────────
 export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
+  const { toast } = useFeedback();
   const [stats,        setStats]        = useState(initial);
   const [tab,          setTab]          = useState<TabId>("overview");
   const [filters,      setFilters]      = useState<FilterState>(DEFAULT_FILTERS);
@@ -1455,6 +1457,18 @@ export function AnalyticsView({stats:initial}:{stats:AnalyticsStats}){
             {/* Customize */}
             <button onClick={()=>setCustomizing(p=>!p)} className={cn("flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all shadow-2xs cursor-pointer", customizing?"bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800":"bg-white dark:bg-slate-100 text-slate-700 dark:text-slate-700 border-slate-200 dark:border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-200")}>
               <Settings2 size={12}/>{customizing?"Editing Grid":"Edit Dashboard Layout"}
+            </button>
+
+            {/* Refresh Button */}
+            <button
+              onClick={() => {
+                toast("Refreshing analytics...", "info");
+                setTimeout(() => window.location.reload(), 100);
+              }}
+              className="flex items-center justify-center h-8 w-8 rounded-lg border text-xs font-bold transition-all bg-white dark:bg-slate-100 hover:bg-slate-50 dark:hover:bg-slate-200 text-slate-700 dark:text-slate-700 border-slate-200 dark:border-slate-200 cursor-pointer"
+              title="Refresh"
+            >
+              <RefreshCw size={12} className="text-slate-500" />
             </button>
 
             {/* Export */}

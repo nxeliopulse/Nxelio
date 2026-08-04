@@ -171,6 +171,7 @@ export function EmailsView({
   const handleRefresh = () => {
     toast("Refreshing…", "info");
     router.refresh();
+    setTimeout(() => window.location.reload(), 100);
   };
 
   const handleSelectAll = () => {

@@ -263,6 +263,7 @@ export function ContactsTable({ contacts }: { contacts: ContactRow[] }) {
             onClick={() => {
               toast("Refreshing contacts...", "info");
               router.refresh();
+              setTimeout(() => window.location.reload(), 100);
             }}
             className="h-8 w-8 p-0 rounded-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
             title="Refresh"

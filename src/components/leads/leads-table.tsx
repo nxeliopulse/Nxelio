@@ -975,7 +975,11 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               </>
             )}
           </div>
-          <Button variant="outline" size="icon" onClick={() => router.refresh()} title="Refresh" className="rounded-xl h-8 w-8">
+          <Button variant="outline" size="icon" onClick={() => {
+            toast("Refreshing prospects...", "info");
+            router.refresh();
+            setTimeout(() => window.location.reload(), 100);
+          }} title="Refresh" className="rounded-xl h-8 w-8">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
           <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import prospects" className="rounded-xl h-8 w-8">
