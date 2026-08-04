@@ -3,12 +3,19 @@ import type { LucideIcon } from "lucide-react";
 
 export type Role = "Super Admin" | "Sales Admin" | "Marketing Admin" | string;
 
+export interface SubNavItem {
+  label: string;
+  href: string;
+  roles?: Role[];
+}
+
 export interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
   /** Which roles can see this nav item */
   roles: Role[];
+  items?: SubNavItem[];
 }
 
 const ALL: Role[] = ["Super Admin", "Sales Admin", "Marketing Admin"];
@@ -33,23 +40,37 @@ export const navMainItems: NavItem[] = [
   { label: "Campaigns", href: "/campaigns", icon: Send, roles: SALES },
   { label: "Segments", href: "/segments", icon: Layers3, roles: MARKETING },
   { label: "Opportunities", href: "/opportunities", icon: Briefcase, roles: SALES },
-  { label: "Meetings", href: "/meetings", icon: CalendarDays, roles: SALES },
+  {
+    label: "Activities",
+    href: "/activities",
+    icon: CalendarDays,
+    roles: ALL,
+    items: [
+      { label: "Dashboard", href: "/activities" },
+      { label: "Meetings", href: "/meetings" },
+      { label: "Emails", href: "/activities/emails" },
+    ],
+  },
   { label: "Newsletters", href: "/newsletters", icon: Newspaper, roles: MARKETING },
   { label: "Analytics", href: "/analytics", icon: BarChart3, roles: ALL },
 ];
 
 export const navAdminItems: NavItem[] = [
   { label: "Administration", href: "/users", icon: UserCog, roles: SUPER },
+  { label: "Subscription", href: "/billing", icon: CreditCard, roles: SUPER },
   { label: "Capture Form", href: "/capture-form", icon: Link2, roles: SUPER },
   { label: "Settings", href: "/settings", icon: Settings, roles: ALL },
-  { label: "Subscription", href: "/billing", icon: CreditCard, roles: ALL },
 ];
 
 /** Admin nav entries actually rendered in the sidebar. "Settings" stays in
  *  navAdminItems (permission checks — e.g. the per-user nav-access toggle
  *  list — still key off it) but is reached from the topbar profile menu
- *  instead of the sidebar, so it's excluded from the rendered list. */
-export const sidebarAdminItems: NavItem[] = navAdminItems.filter((i) => i.href !== "/settings");
+ *  instead of the sidebar, so it's excluded from the rendered list.
+ *  "Subscription" (/billing) is excluded the same way — it's already reachable
+ *  via the topbar Upgrade button and the sidebar's AI Credits widget, so it
+ *  stays in navAdminItems purely so isNavItemAllowed() and the per-user
+ *  nav-access toggle list (User Management) can resolve it correctly. */
+export const sidebarAdminItems: NavItem[] = navAdminItems.filter((i) => i.href !== "/settings" && i.href !== "/billing");
 
 export function filterNavByRole(items: NavItem[], role: Role | null | undefined): NavItem[] {
   if (!role) return items;

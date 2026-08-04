@@ -18,6 +18,8 @@ import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { deleteLead, bulkDeleteLeads, updateLead, type LeadRow } from "@/lib/queries/leads";
 import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
 import { createStaticSegment } from "@/lib/queries/segments";
+import { usePageTour } from "@/components/tour/use-page-tour";
+import { LEADS_TOUR_STEPS } from "@/components/tour/tour-registry";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
 // Customizable columns. Users toggle these via the gear menu in the header; the
@@ -89,6 +91,7 @@ function StatusPill({ status }: { status: string }) {
     Contacted: "bg-indigo-500 dark:bg-indigo-600",
     Qualified: "bg-teal-500 dark:bg-teal-600",
     Nurturing: "bg-amber-500 dark:bg-amber-600",
+    Win: "bg-green-600 dark:bg-green-700",
     Converted: "bg-emerald-500 dark:bg-emerald-600",
     Warm: "bg-amber-500 dark:bg-amber-600",
     Hot: "bg-rose-500 dark:bg-rose-600",
@@ -122,6 +125,7 @@ function CompanyLogo({ name }: { name?: string | null }) {
 export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
+  usePageTour("leads", LEADS_TOUR_STEPS);
   const [pending, start] = useTransition();
   const [optimisticLeads, setOptimisticLeads] = useOptimistic(
     leads,
@@ -804,7 +808,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           return (
             <span className="flex items-center gap-1.5 max-w-[180px]">
               <CompanyLogo name={l.company_name} />
-              <span className="truncate text-slate-700 dark:text-slate-300 whitespace-nowrap" title={l.company_name || undefined}>{l.company_name}</span>
+              <span className="truncate text-slate-700 dark:text-slate-600 whitespace-nowrap" title={l.company_name || undefined}>{l.company_name}</span>
             </span>
           );
         }
@@ -833,7 +837,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       }
       case "email":
         return l.email ? (
-          <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-300 whitespace-nowrap" title={l.email}>{l.email}</span>
+          <span className="block max-w-[240px] truncate text-slate-600 dark:text-slate-600 whitespace-nowrap" title={l.email}>{l.email}</span>
         ) : (
           <button
             type="button"
@@ -849,7 +853,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         );
       case "industry":
         return l.industry ? (
-          <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-400 whitespace-nowrap" title={l.industry}>{l.industry}</span>
+          <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-500 whitespace-nowrap" title={l.industry}>{l.industry}</span>
         ) : (
           <button
             type="button"
@@ -874,7 +878,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         return <StatusPill status={l.status} />;
       case "phone":
         return l.phone ? (
-          <span className="text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">{l.phone}</span>
+          <span className="text-slate-600 dark:text-slate-500 font-mono text-xs whitespace-nowrap">{l.phone}</span>
         ) : (
           <button
             type="button"
@@ -885,9 +889,9 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           </button>
         );
       case "interest_area":
-        return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.interest_area || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-500 truncate max-w-[140px] block whitespace-nowrap">{l.interest_area || "—"}</span>;
       case "source":
-        return <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap">{l.source || "—"}</span>;
+        return <span className="text-slate-600 dark:text-slate-500 truncate max-w-[140px] block whitespace-nowrap">{l.source || "—"}</span>;
       case "owner": {
         const ownerName = l.owner_id ? owners[l.owner_id] : undefined;
         return ownerName ? (
@@ -895,14 +899,14 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0", logoColor(ownerName))}>
               {ownerName.trim()[0]?.toUpperCase() || "?"}
             </span>
-            <span className="truncate text-slate-600 dark:text-slate-400 whitespace-nowrap">{ownerName}</span>
+            <span className="truncate text-slate-600 dark:text-slate-500 whitespace-nowrap">{ownerName}</span>
           </span>
         ) : (
-          <span className="text-slate-600 dark:text-slate-400 truncate max-w-[140px] block whitespace-nowrap"><span className="text-slate-400">Unassigned</span></span>
+          <span className="text-slate-600 dark:text-slate-500 truncate max-w-[140px] block whitespace-nowrap"><span className="text-slate-400">Unassigned</span></span>
         );
       }
       case "last_activity":
-        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDate(l.updated_at)}</span>;
+        return <span className="text-slate-500 dark:text-slate-500 text-xs whitespace-nowrap">{formatDate(l.updated_at)}</span>;
       case "linkedin":
         return l.linkedin ? (
           <a href={l.linkedin} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
@@ -932,7 +936,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap"><CheckCircle2 className="h-3.5 w-3.5" /> Verified</span>
           : <span className="text-xs text-slate-400 whitespace-nowrap">No</span>;
       case "created_at":
-        return <span className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">{formatDateTime(l.created_at)}</span>;
+        return <span className="text-slate-500 dark:text-slate-500 text-xs whitespace-nowrap">{formatDateTime(l.created_at)}</span>;
       default:
         return null;
     }
@@ -944,16 +948,13 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       {/* Page header — title + total count badge, breadcrumb, Export/Refresh/Import actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h1 data-tour-id="leads-title" className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Prospects
-            <span className="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-0.5">
-              {optimisticLeads.length}
-            </span>
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-300">Home</Link>
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
+            <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-600">Home</Link>
             <span className="mx-1">›</span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium">Prospects</span>
+            <span className="text-slate-700 dark:text-slate-600 font-medium">Prospects</span>
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -965,17 +966,21 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
                 <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-1">
-                  <button onClick={handleExportPdf} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">
+                  <button onClick={handleExportPdf} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">
                     <FileText className="h-3.5 w-3.5 text-slate-400" /> Export as PDF
                   </button>
-                  <button onClick={handleExportExcel} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">
+                  <button onClick={handleExportExcel} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">
                     <FileSpreadsheet className="h-3.5 w-3.5 text-slate-400" /> Export as Excel
                   </button>
                 </div>
               </>
             )}
           </div>
-          <Button variant="outline" size="icon" onClick={() => router.refresh()} title="Refresh" className="rounded-xl h-8 w-8">
+          <Button variant="outline" size="icon" onClick={() => {
+            toast("Refreshing prospects...", "info");
+            router.refresh();
+            setTimeout(() => window.location.reload(), 100);
+          }} title="Refresh" className="rounded-xl h-8 w-8">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
           <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import prospects" className="rounded-xl h-8 w-8">
@@ -985,7 +990,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       </div>
 
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div data-tour-id="leads-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {[
             { label: "Total prospects", value: stats.total, icon: Users2, accent: "bg-amber-500" },
             { label: "Hot prospects", value: stats.hot, icon: Flame, accent: "bg-rose-500" },
@@ -999,7 +1004,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                   <Icon className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{s.label}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
                   <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value.toLocaleString()}</p>
                 </div>
               </Card>
@@ -1032,7 +1037,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       type="button"
                       onClick={() => setSearch("")}
                       aria-label="Clear search"
-                      className="pointer-events-auto p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300"
+                      className="pointer-events-auto p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-[var(--muted)] hover:text-slate-600 dark:hover:text-slate-600"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -1046,7 +1051,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             </div>
 
             {/* Count Chip */}
-            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0 whitespace-nowrap">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
               <Users2 className="h-3.5 w-3.5 text-slate-400" />
               <span>{filtered.length} Prospect{filtered.length === 1 ? "" : "s"}</span>
             </div>
@@ -1068,6 +1073,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
             {/* Filter Button */}
             <Button
+              data-tour-id="leads-filter"
               variant="outline"
               size="sm"
               onClick={openFiltersPopover}
@@ -1113,7 +1119,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             {/* Sort Dropdown */}
             <div className="relative inline-flex items-center gap-1 flex-shrink-0 w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 pl-2.5 pr-1.5 shadow-sm">
               <ArrowUpDown className="h-3 w-3 text-slate-400 flex-shrink-0" />
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0 whitespace-nowrap">Sort By</span>
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">Sort By</span>
               <select
                 value={
                   !sortKey ? "none"
@@ -1129,7 +1135,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                   else if (v === "score") { setSortKey("score"); setSortDir("desc"); }
                   else if (v === "newest") { setSortKey("created_at"); setSortDir("desc"); }
                 }}
-                className="appearance-none bg-transparent border-0 pl-1 pr-4 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer truncate"
+                className="appearance-none bg-transparent border-0 pl-1 pr-4 py-1 text-xs font-semibold text-slate-700 dark:text-slate-600 focus:outline-none cursor-pointer truncate"
               >
                 <option value="none">Default</option>
                 <option value="name">Name A–Z</option>
@@ -1141,12 +1147,13 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
             {/* List/Grid View Toggle */}
             <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0">
-              <button type="button" onClick={() => setView("list")} className={cn("h-8 w-8 flex items-center justify-center transition-colors", view === "list" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800")} title="List view"><LayoutList className="h-3.5 w-3.5" /></button>
-              <button type="button" onClick={() => setView("grid")} className={cn("h-8 w-8 flex items-center justify-center transition-colors border-l border-slate-200 dark:border-slate-800", view === "grid" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800")} title="Grid view"><LayoutGrid className="h-3.5 w-3.5" /></button>
+              <button type="button" onClick={() => setView("list")} className={cn("h-8 w-8 flex items-center justify-center transition-colors", view === "list" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800")} title="List view"><LayoutList className="h-3.5 w-3.5" /></button>
+              <button type="button" onClick={() => setView("grid")} className={cn("h-8 w-8 flex items-center justify-center transition-colors border-l border-slate-200 dark:border-slate-800", view === "grid" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800")} title="Grid view"><LayoutGrid className="h-3.5 w-3.5" /></button>
             </div>
 
             {/* Add Lead — opens the source-picker screen directly (Manual, CSV, LinkedIn, Buy Leads, etc.) */}
             <Button
+              data-tour-id="leads-add-prospect"
               size="sm"
               onClick={() => setShowWizard(true)}
               className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap"
@@ -1166,7 +1173,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                 Chrome/Safari when combined with position:sticky cells. */}
             <table className="w-full text-sm border-separate border-spacing-0 min-w-[900px]">
               <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
-                <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-500">
                   <th
                     className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-2.5"
                     style={{ width: 40, minWidth: 40, maxWidth: 40 }}
@@ -1383,11 +1390,11 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-slate-900 dark:text-white truncate text-sm">{displayName(l)}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{l.company_name || "—"}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{l.company_name || "—"}</p>
                   </div>
                   <StatusPill status={l.status} />
                 </div>
-                <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <div className="space-y-1 text-xs text-slate-500 dark:text-slate-500">
                   <p>{l.email || "—"}</p>
                   <p>{l.phone || "—"}</p>
                   <p>{formatDateTime(l.created_at)}</p>
@@ -1395,19 +1402,19 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               </div>
             ))}
             {paged.length === 0 && (
-              <p className="col-span-full text-center text-slate-500 dark:text-slate-400 py-16">No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</p>
+              <p className="col-span-full text-center text-slate-500 dark:text-slate-500 py-16">No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</p>
             )}
           </div>
         )}
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-400">
+        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-500">
           <div className="flex items-center gap-1.5 text-xs">
             <span>Show</span>
             <select
               value={pageSize}
               onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
-              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+              className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
             >
               <option value={10}>10</option>
               <option value={25}>25</option>
@@ -1422,7 +1429,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={safePage === 0}
               aria-label="Previous page"
-              className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
+              className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
             >
               <ChevronDown className="h-3.5 w-3.5 rotate-90" />
             </button>
@@ -1455,7 +1462,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       "h-7 min-w-7 px-2 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors",
                       n === current
                         ? "bg-red-600 text-white"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        : "text-slate-600 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
                     )}
                   >
                     {n}
@@ -1468,7 +1475,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
               disabled={safePage >= pageCount - 1}
               aria-label="Next page"
-              className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
+              className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none flex-shrink-0"
             >
               <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
             </button>
@@ -1514,7 +1521,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           <div className="fixed z-50 w-36 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-1" style={{ top: rowMenu.top, left: rowMenu.left }}>
             <button
               onClick={() => { const id = rowMenu.id; const lead = paged.find((x) => x.id === id) || optimisticLeads.find((x) => x.id === id); setRowMenu(null); if (lead) setEditingLead(lead); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <Pencil className="h-3.5 w-3.5" /> Edit
             </button>
@@ -1864,7 +1871,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       <button
                         key={id}
                         onClick={() => handleAssignOwner(id)}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left truncate"
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 text-left truncate"
                       >
                         {name}
                       </button>
@@ -1876,7 +1883,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <div className="relative">
               <button
                 onClick={() => setShowMoreMenu((v) => !v)}
-                className="inline-flex items-center gap-1 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+                className="inline-flex items-center gap-1 rounded-full text-slate-600 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
               >
                 More <ChevronDown className={cn("h-3 w-3 transition-transform", showMoreMenu && "rotate-180")} />
               </button>
@@ -1898,7 +1905,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <span className="h-5 w-px bg-slate-200 dark:bg-slate-800" />
             <button
               onClick={() => setSelected([])}
-              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 px-2 whitespace-nowrap"
+              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-700 px-2 whitespace-nowrap"
             >
               Deselect all
             </button>

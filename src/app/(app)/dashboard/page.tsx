@@ -1,15 +1,19 @@
 import { getDashboardStats } from "@/lib/queries/analytics";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { getUsers } from "@/lib/queries/users";
+import { getAiCreditsUsage } from "@/lib/queries/credits";
+import { getMeetings } from "@/lib/queries/meetings";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const [stats, { data: onboardingData, completed: essentialsDone }, users] = await Promise.all([
+  const [stats, { data: onboardingData, completed: essentialsDone }, users, credits, meetings] = await Promise.all([
     getDashboardStats(),
     getOnboarding(),
     getUsers(),
+    getAiCreditsUsage(),
+    getMeetings(),
   ]);
 
   const { count: outreachCount } = await supabase
@@ -48,6 +52,8 @@ export default async function DashboardPage() {
       onboardingStatus={onboardingStatus}
       recentDeals={recentDeals || []}
       collaborators={collaborators}
+      meetings={meetings}
+      credits={credits}
     />
   );
 }

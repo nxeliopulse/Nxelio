@@ -8,7 +8,13 @@ import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
 import { AdminLeadArchiveView } from "@/components/admin/lead-archive-view";
 import { VendorSubscriptionsTab } from "@/components/admin/vendor-subscriptions-tab";
 import { AiProviderTab } from "@/components/admin/ai-provider-tab";
-import type { PlatformOverviewStats, HotCustomerRow, SubscriptionRow } from "@/lib/queries/platform-overview";
+import type {
+  PlatformOverviewStats,
+  HotCustomerRow,
+  SubscriptionRow,
+  PlatformOverviewTrendPoint,
+  WorkspaceAttentionItem,
+} from "@/lib/queries/platform-overview";
 import type { LeadArchiveRow } from "@/lib/queries/lead-import-archive";
 import type { VendorSubscriptionRow } from "@/lib/queries/platform-vendor-subscriptions";
 import type { AiProviderStatus } from "@/lib/queries/ai-provider-settings";
@@ -29,6 +35,8 @@ export function AdminDashboard({
   leadArchive,
   vendorSubscriptions,
   aiProviderStatus,
+  trendData,
+  attentionWorkspaces,
 }: {
   stats: PlatformOverviewStats;
   hotCustomers: HotCustomerRow[];
@@ -36,6 +44,8 @@ export function AdminDashboard({
   leadArchive: (LeadArchiveRow & { workspace_name: string | null })[];
   vendorSubscriptions: VendorSubscriptionRow[];
   aiProviderStatus: AiProviderStatus;
+  trendData: PlatformOverviewTrendPoint[];
+  attentionWorkspaces: WorkspaceAttentionItem[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
@@ -78,7 +88,7 @@ export function AdminDashboard({
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
               Nxelio Nurture Admin
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-500 font-medium mt-0.5">
               Platform-wide control center &mdash; not the customer app.
             </p>
           </div>
@@ -88,7 +98,7 @@ export function AdminDashboard({
           {/* Theme Switcher Button */}
           <button
             onClick={toggleTheme}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-[var(--muted)] transition-all shadow-sm"
             title="Toggle Light / Dark theme"
           >
             {isDark ? (
@@ -108,15 +118,15 @@ export function AdminDashboard({
           <button
             onClick={handleSignOut}
             disabled={signingOut}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-[var(--muted)] transition-all shadow-sm disabled:opacity-50"
           >
-            <LogOut className="h-4 w-4 text-slate-500 dark:text-slate-400" /> {signingOut ? "Signing out…" : "Sign out"}
+            <LogOut className="h-4 w-4 text-slate-500 dark:text-slate-500" /> {signingOut ? "Signing out…" : "Sign out"}
           </button>
         </div>
       </div>
 
       {/* Navigation Tabs Bar */}
-      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 mb-8 overflow-x-auto shadow-sm scrollbar-hide">
+      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 mb-8 overflow-x-auto shadow-sm scrollbar-hide">
         {TABS.map((t) => {
           const isActive = tab === t.id;
           return (
@@ -126,7 +136,7 @@ export function AdminDashboard({
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
                 isActive
                   ? "bg-[#18A7B8] text-white shadow-md shadow-[#18A7B8]/20"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/80"
+                  : "text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-[var(--muted)]"
               }`}
             >
               <t.icon className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400 dark:text-slate-500"}`} />
@@ -138,7 +148,14 @@ export function AdminDashboard({
 
       {/* Tab Content */}
       <div className="transition-all duration-300">
-        {tab === "overview" && <OverviewTab stats={stats} hotCustomers={hotCustomers} />}
+        {tab === "overview" && (
+          <OverviewTab
+            stats={stats}
+            hotCustomers={hotCustomers}
+            trendData={trendData}
+            attentionWorkspaces={attentionWorkspaces}
+          />
+        )}
         {tab === "subscriptions" && <SubscriptionsTab rows={subscriptions} />}
         {tab === "leads" && <AdminLeadArchiveView rows={leadArchive} />}
         {tab === "vendors" && <VendorSubscriptionsTab rows={vendorSubscriptions} />}

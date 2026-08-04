@@ -23,12 +23,12 @@ export function NewsletterTemplateGallery({ catFilter, onCatFilterChange, onPick
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           {backHref && (
-            <Link href={backHref} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-[#18A7B8] mb-1 transition-colors">
+            <Link href={backHref} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-500 hover:text-[#18A7B8] mb-1 transition-colors">
               <ArrowLeft className="h-3 w-3" /> Back to newsletters
             </Link>
           )}
           <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Choose a Template</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
             Select a template to customize or start with a blank design.
           </p>
         </div>
@@ -46,7 +46,7 @@ export function NewsletterTemplateGallery({ catFilter, onCatFilterChange, onPick
                     "px-2.5 py-1 rounded-lg text-xs font-bold transition-all",
                     isActive
                       ? "bg-[#18A7B8] text-white shadow-xs"
-                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                      : "text-slate-600 dark:text-slate-600 hover:text-slate-900 dark:hover:text-white"
                   )}
                 >
                   {c}
@@ -92,7 +92,7 @@ export function NewsletterTemplateGallery({ catFilter, onCatFilterChange, onPick
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
-                      <div className="p-2 flex flex-col gap-1 h-full justify-center bg-slate-50/50 dark:bg-slate-900/40">
+                      <div className="p-2 flex flex-col gap-1 h-full justify-center bg-slate-50/50 dark:bg-[var(--muted)]">
                         {t.blocks.slice(0, 3).map((b, i) => {
                           if (b.type === "banner") {
                             return (
@@ -137,7 +137,7 @@ export function NewsletterTemplateGallery({ catFilter, onCatFilterChange, onPick
                         {t.name}
                       </p>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium line-clamp-1 leading-normal">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-500 font-medium line-clamp-1 leading-normal">
                       {t.description}
                     </p>
                   </div>

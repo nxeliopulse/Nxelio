@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, Mail, MoreHorizontal, Send, Eye, Copy, Trash2,
-  TrendingUp, MousePointer, Calendar, CheckCircle2, Clock, Sparkles, Filter,
+  TrendingUp, MousePointer, Calendar, CheckCircle2, Clock, Sparkles, Filter, RefreshCw,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ interface Props {
 
 export function NewslettersView({ newsletters, stats }: Props) {
   const router = useRouter();
-  const { confirm } = useFeedback();
+  const { confirm, toast } = useFeedback();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [templateCatFilter, setTemplateCatFilter] = useState<"All" | NewsletterTemplateCategory>("All");
@@ -83,11 +83,26 @@ export function NewslettersView({ newsletters, stats }: Props) {
         title="Newsletters"
         description="Send rich content updates, digests, and product announcements to your subscribed leads"
         actions={
-          <Link href="/newsletters/builder">
-            <Button className="rounded-xl font-bold px-4 py-2.5 gap-2">
-              <Plus className="h-4 w-4" /> New Newsletter
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                toast("Refreshing newsletters...", "info");
+                router.refresh();
+                setTimeout(() => window.location.reload(), 100);
+              }}
+              className="h-10 w-10 p-0 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              title="Refresh"
+            >
+              <RefreshCw className="h-4 w-4 text-slate-500" />
             </Button>
-          </Link>
+            <Link href="/newsletters/builder">
+              <Button className="rounded-xl font-bold px-4 py-2.5 gap-2 h-10">
+                <Plus className="h-4 w-4" /> New Newsletter
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -206,7 +221,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                           <p className="font-bold text-slate-900 dark:text-white group-hover:text-[var(--primary)] transition-colors text-sm">
                             {n.title}
                           </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                          <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5 line-clamp-1">
                             {n.subject || "(No subject line)"}
                           </p>
                         </Link>
@@ -214,7 +229,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                       <DataTableTd>
                         <Badge variant={statusVariant[n.status] || "default"}>{n.status}</Badge>
                       </DataTableTd>
-                      <DataTableTd className="text-slate-900 dark:text-slate-200 font-bold">
+                      <DataTableTd className="text-slate-900 dark:text-slate-700 font-bold">
                         {n.recipient_count.toLocaleString()}
                       </DataTableTd>
                       <DataTableTd>
@@ -223,7 +238,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                             <div className="w-16 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                               <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(100, openRate)}%` }} />
                             </div>
-                            <span className="text-slate-900 dark:text-slate-200 font-bold text-xs">{openRate}%</span>
+                            <span className="text-slate-900 dark:text-slate-700 font-bold text-xs">{openRate}%</span>
                           </div>
                         ) : (
                           <span className="text-slate-400 dark:text-slate-600">—</span>
@@ -236,7 +251,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                           <span className="text-slate-400 dark:text-slate-600">—</span>
                         )}
                       </DataTableTd>
-                      <DataTableTd className="text-slate-500 dark:text-slate-400 text-xs">
+                      <DataTableTd className="text-slate-500 dark:text-slate-500 text-xs">
                         {n.sent_at ? formatDate(n.sent_at) : "—"}
                       </DataTableTd>
                       <DataTableTd className="text-right relative">
@@ -260,7 +275,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                             >
                               <Link
                                 href={`/newsletters/builder?id=${n.id}`}
-                                className="flex items-center gap-2 px-3.5 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80"
+                                className="flex items-center gap-2 px-3.5 py-2 text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-[var(--muted)]"
                                 onClick={() => setMenuOpen(null)}
                               >
                                 <Eye className="h-3.5 w-3.5 text-[var(--primary)]" /> Edit / View
@@ -268,7 +283,7 @@ export function NewslettersView({ newsletters, stats }: Props) {
                               <button
                                 onClick={() => handleDuplicate(n.id)}
                                 disabled={pending}
-                                className="w-full flex items-center gap-2 px-3.5 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-left"
+                                className="w-full flex items-center gap-2 px-3.5 py-2 text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-[var(--muted)] text-left"
                               >
                                 <Copy className="h-3.5 w-3.5 text-indigo-500" /> Duplicate
                               </button>

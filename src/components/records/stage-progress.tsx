@@ -35,7 +35,7 @@ export function StageProgress({
               "relative flex-1 h-9 flex items-center justify-center gap-1.5 text-xs font-semibold transition-colors first:rounded-l-lg last:rounded-r-lg",
               state === "done" && "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
               state === "current" && "bg-blue-600 text-white",
-              state === "upcoming" && "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
+              state === "upcoming" && "bg-slate-100 text-slate-400 dark:bg-[var(--muted)] dark:text-slate-500",
               onSelect && !disabled && "cursor-pointer hover:opacity-90",
               (disabled || !onSelect) && "cursor-default"
             )}

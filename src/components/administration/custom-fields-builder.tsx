@@ -100,7 +100,7 @@ export function CustomFieldsBuilder() {
           <Layers className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">Object Schema & Custom Fields</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-500">
               Customize backend enterprise fields and layout definitions for your CRM entities.
             </p>
           </div>
@@ -127,7 +127,7 @@ export function CustomFieldsBuilder() {
         <div className="lg:col-span-7 space-y-4">
           <Card className="border border-slate-200 dark:border-slate-800">
             <CardHeader className="py-3.5 px-4 flex flex-row items-center justify-between border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-700">
                 {schema.pluralLabel} Fields ({fields.length})
               </CardTitle>
               <Button size="sm" onClick={() => setShowAddModal(true)} className="h-8 text-xs gap-1.5">
@@ -136,12 +136,12 @@ export function CustomFieldsBuilder() {
             </CardHeader>
             <CardContent className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
               {fields.map((field) => (
-                <div key={field.name} className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                <div key={field.name} className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-[var(--muted)]">
                   <div className="flex items-center gap-3 min-w-0">
                     <MoveVertical className="h-4 w-4 text-slate-300 dark:text-slate-600 cursor-move" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+                        <span className="text-xs font-semibold text-slate-900 dark:text-slate-800 truncate">
                           {field.label}
                         </span>
                         {field.required && <Badge variant="danger" className="text-[10px] py-0 px-1">Required</Badge>}
@@ -174,14 +174,14 @@ export function CustomFieldsBuilder() {
         <div className="lg:col-span-5 space-y-4">
           <Card className="border border-slate-200 dark:border-slate-800">
             <CardHeader className="py-3.5 px-4 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-700">
                 Live Layout Preview
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               {fields.map((field) => (
                 <div key={field.name} className="flex flex-col gap-1 min-w-0">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-400">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-500">
                     {field.label}
                     {field.required && <span className="text-rose-500 ml-0.5">*</span>}
                   </span>
@@ -216,7 +216,7 @@ export function CustomFieldsBuilder() {
 
             <form onSubmit={handleAddField} className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Field Label</label>
+                <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-600">Field Label</label>
                 <Input
                   value={newFieldLabel}
                   onChange={(e) => {
@@ -229,7 +229,7 @@ export function CustomFieldsBuilder() {
               </div>
 
               <div>
-                <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Field Key (API Name)</label>
+                <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-600">Field Key (API Name)</label>
                 <Input
                   value={newFieldName}
                   onChange={(e) => setNewFieldName(e.target.value)}
@@ -239,7 +239,7 @@ export function CustomFieldsBuilder() {
               </div>
 
               <div>
-                <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Data Type</label>
+                <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-600">Data Type</label>
                 <select
                   value={newFieldType}
                   onChange={(e) => setNewFieldType(e.target.value as FieldDataType)}
@@ -259,7 +259,7 @@ export function CustomFieldsBuilder() {
 
               {newFieldType === "picklist" && (
                 <div>
-                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Dropdown Options (One per line)</label>
+                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-600">Dropdown Options (One per line)</label>
                   <textarea
                     rows={3}
                     value={newOptionsText}
@@ -270,7 +270,7 @@ export function CustomFieldsBuilder() {
                 </div>
               )}
 
-              <label className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-600 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={newRequired}

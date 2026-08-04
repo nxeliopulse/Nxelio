@@ -1,6 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/queries/audit-log";
+import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
 import type { ContactRow } from "@/lib/queries/contacts";
 
@@ -11,6 +12,8 @@ export interface AccountRow {
   parent_account_id: string | null;
   phone: string | null;
   website: string | null;
+  domain: string | null;
+  account_status: string | null;
   industry: string | null;
   account_type: string | null;
   annual_revenue: number | null;
@@ -30,8 +33,18 @@ export interface AccountRow {
   shipping_country: string | null;
   shipping_zip: string | null;
   description: string | null;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Current user's display name, for stamping created_by/updated_by (mirrors logAudit's actor_name fallback). */
+async function getCurrentUserName(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: profile } = await supabase.from("users").select("full_name, email").eq("user_id", user.id).single();
+  return profile?.full_name || profile?.email || null;
 }
 
 export async function getAccounts(): Promise<AccountRow[]> {
@@ -99,7 +112,8 @@ export async function findMatchingAccount({ companyName, website }: { companyNam
 
 export async function createAccount(payload: Partial<AccountRow>) {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("accounts").insert(payload).select().single();
+  const actorName = await getCurrentUserName(supabase);
+  const { data, error } = await supabase.from("accounts").insert({ ...payload, created_by: actorName, updated_by: actorName }).select().single();
   if (error) throw error;
   revalidatePath("/accounts");
   await logAudit({ action: "account.created", entityType: "account", entityId: data.id, entityLabel: data.account_name });
@@ -108,7 +122,8 @@ export async function createAccount(payload: Partial<AccountRow>) {
 
 export async function updateAccount(id: string, payload: Partial<AccountRow>) {
   const supabase = await createClient();
-  const { error } = await supabase.from("accounts").update(payload).eq("id", id);
+  const actorName = await getCurrentUserName(supabase);
+  const { error } = await supabase.from("accounts").update({ ...payload, updated_by: actorName }).eq("id", id);
   if (error) throw error;
   revalidatePath("/accounts");
   revalidatePath(`/accounts/${id}`);
@@ -129,4 +144,93 @@ export async function bulkDeleteAccounts(ids: string[]) {
   if (error) throw error;
   revalidatePath("/accounts");
   await logAudit({ action: "account.bulk_deleted", entityType: "account", metadata: { count: ids.length, ids } });
+}
+
+/**
+ * Bulk-imports accounts (e.g. from a CSV upload) — mirrors bulkInsertLeads'
+ * shape/behavior: build a set of identifiers already in the DB, skip
+ * duplicates from the incoming batch (counting them), insert the rest in one
+ * batch, then revalidate + notify + audit-log.
+ *
+ * Dedup key: normalized website host (reusing normalizeHost) OR an exact
+ * (case-insensitive) account name match — whichever matches first wins.
+ */
+export async function bulkInsertAccounts(
+  accounts: Array<Partial<AccountRow>>
+): Promise<{ inserted: number; duplicates: number; error?: string }> {
+  if (!accounts.length) return { inserted: 0, duplicates: 0 };
+  const supabase = await createClient();
+  const actorName = await getCurrentUserName(supabase);
+
+  // Build dedup sets from what's already in the DB.
+  const { data: existingRows } = await supabase.from("accounts").select("account_name, website");
+  const existingHosts = new Set<string>();
+  const existingNames = new Set<string>();
+  for (const r of existingRows || []) {
+    if (r.website) {
+      const host = normalizeHost(r.website);
+      if (host) existingHosts.add(host);
+    }
+    if (r.account_name) existingNames.add(r.account_name.toLowerCase().trim());
+  }
+
+  const seenHosts = new Set<string>();
+  const seenNames = new Set<string>();
+  let duplicates = 0;
+  const rows: Array<Record<string, unknown>> = [];
+  for (const a of accounts) {
+    // account_name is required — drop rows without one instead of failing the whole batch.
+    const name = (a.account_name || "").trim();
+    if (!name) continue;
+    const nameKey = name.toLowerCase();
+    const host = a.website ? normalizeHost(a.website) : "";
+    const isDup =
+      existingNames.has(nameKey) || seenNames.has(nameKey) ||
+      (!!host && (existingHosts.has(host) || seenHosts.has(host)));
+    if (isDup) {
+      duplicates++;
+      continue;
+    }
+    seenNames.add(nameKey);
+    if (host) seenHosts.add(host);
+    rows.push({
+      account_name: name,
+      website: a.website ?? null,
+      domain: a.domain ?? null,
+      phone: a.phone ?? null,
+      industry: a.industry ?? null,
+      account_type: a.account_type ?? null,
+      employees: a.employees ?? null,
+      annual_revenue: a.annual_revenue ?? null,
+      rating: a.rating ?? null,
+      ownership: a.ownership ?? null,
+      account_status: a.account_status ?? null,
+      created_by: actorName,
+      updated_by: actorName,
+    });
+  }
+
+  if (!rows.length) return { inserted: 0, duplicates };
+
+  const { data, error } = await supabase.from("accounts").insert(rows).select();
+  if (error) {
+    console.error("bulkInsertAccounts error:", error);
+    return { inserted: 0, duplicates, error: error.message };
+  }
+  revalidatePath("/accounts");
+  const inserted = data?.length ?? 0;
+  if (inserted > 0) {
+    await notifyCurrentUser({
+      type: "accounts",
+      title: `${inserted} account${inserted === 1 ? "" : "s"} imported`,
+      message: "Via CSV upload",
+      link: "/accounts",
+    });
+    await logAudit({
+      action: "accounts.imported",
+      entityType: "account",
+      metadata: { count: inserted, duplicates, source: "CSV Upload" },
+    });
+  }
+  return { inserted, duplicates };
 }

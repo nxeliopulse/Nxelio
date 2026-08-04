@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import {
   Search,
   Rocket,
@@ -181,6 +182,22 @@ export function HelpView() {
             </div>
           </div>
         </div>
+      </Card>
+
+      {/* Replay the guided product tour */}
+      <Card className="p-5 mb-8 flex items-center justify-between gap-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+            <PlayCircle className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900">Replay the product tour</h3>
+            <p className="text-sm text-slate-600">Get a guided walkthrough of the Dashboard, Prospects, and Campaigns.</p>
+          </div>
+        </div>
+        <Link href="/dashboard?tour=dashboard">
+          <Button size="sm">Start tour</Button>
+        </Link>
       </Card>
 
       {/* Category cards */}

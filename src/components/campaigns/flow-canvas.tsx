@@ -89,7 +89,7 @@ export function FlowCanvas({ children, height = 560 }: { children: React.ReactNo
       </div>
 
       {/* Zoom readout */}
-      <div className="absolute bottom-4 right-4 text-xs text-slate-400 bg-white/80 dark:bg-slate-800/80 rounded px-2 py-1 border border-slate-200">{Math.round(scale * 100)}%</div>
+      <div className="absolute bottom-4 right-4 text-xs text-slate-400 bg-white/80 dark:bg-[var(--muted)] rounded px-2 py-1 border border-slate-200">{Math.round(scale * 100)}%</div>
     </div>
   );
 }

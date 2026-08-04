@@ -117,7 +117,7 @@ export function OpportunityDetailView({
   ];
 
   return (
-    <div className="max-w-[1400px] mx-auto pb-10 text-slate-800 dark:text-slate-200">
+    <div className="max-w-[1400px] mx-auto pb-10 text-slate-800 dark:text-slate-700">
       <RecordHeader
         breadcrumbHref="/opportunities"
         breadcrumbLabel="Opportunities"
@@ -162,16 +162,16 @@ export function OpportunityDetailView({
               <div className="space-y-3">
                 <InfoGrid>
                   <div>
-                    <label className="block text-xs text-slate-500 font-medium mb-1 dark:text-slate-400">Amount</label>
+                    <label className="block text-xs text-slate-500 font-medium mb-1 dark:text-slate-500">Amount</label>
                     <Input type="number" value={draft.dealValue} onChange={(e) => setDraft((d) => ({ ...d, dealValue: e.target.value }))} />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 font-medium mb-1 dark:text-slate-400">Close Date</label>
+                    <label className="block text-xs text-slate-500 font-medium mb-1 dark:text-slate-500">Close Date</label>
                     <Input type="date" value={draft.expectedCloseDate} onChange={(e) => setDraft((d) => ({ ...d, expectedCloseDate: e.target.value }))} />
                   </div>
                 </InfoGrid>
                 <div>
-                  <label className="block text-xs text-slate-500 font-medium mb-1 dark:text-slate-400">Description</label>
+                  <label className="block text-xs text-slate-500 font-medium mb-1 dark:text-slate-500">Description</label>
                   <Textarea value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} rows={4} />
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">

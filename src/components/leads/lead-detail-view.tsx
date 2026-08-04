@@ -279,7 +279,7 @@ export function LeadDetailView({
   ];
 
   return (
-    <div className="max-w-[1650px] mx-auto pb-10 text-slate-800 dark:text-slate-200 px-4 sm:px-6">
+    <div className="max-w-[1650px] mx-auto pb-10 text-slate-800 dark:text-slate-700 px-4 sm:px-6">
       {/* Redesigned Breadcrumbs & Export Header */}
       <div className="d-flex align-items-center justify-content-between gap-2 mb-4 flex-wrap flex justify-between items-center">
         <div>
@@ -290,12 +290,12 @@ export function LeadDetailView({
             </span>
           </h4>
           <nav aria-label="breadcrumb">
-            <ol className="breadcrumb mb-0 p-0 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <li className="breadcrumb-item hover:text-slate-700 dark:hover:text-slate-200">
+            <ol className="breadcrumb mb-0 p-0 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-500">
+              <li className="breadcrumb-item hover:text-slate-700 dark:hover:text-slate-700">
                 <Link href="/">Home</Link>
               </li>
               <span>/</span>
-              <li className="breadcrumb-item active text-slate-700 dark:text-slate-200 font-medium" aria-current="page">
+              <li className="breadcrumb-item active text-slate-700 dark:text-slate-700 font-medium" aria-current="page">
                 Prospects
               </li>
             </ol>
@@ -319,7 +319,7 @@ export function LeadDetailView({
                     toast("Exporting as PDF...", "info");
                     setExportDropdownOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 font-medium flex items-center gap-1.5"
+                  className="w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-[var(--muted)] font-medium flex items-center gap-1.5"
                 >
                   <FileDown className="h-3.5 w-3.5 text-red-500" /> Export as PDF
                 </button>
@@ -328,7 +328,7 @@ export function LeadDetailView({
                     toast("Exporting as Excel...", "info");
                     setExportDropdownOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 font-medium flex items-center gap-1.5"
+                  className="w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-[var(--muted)] font-medium flex items-center gap-1.5"
                 >
                   <FileDown className="h-3.5 w-3.5 text-emerald-500" /> Export as Excel
                 </button>
@@ -394,7 +394,7 @@ export function LeadDetailView({
                   />
                 </button>
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1 text-xs text-slate-500 dark:text-slate-500">
                 {lead.company_name && (
                   <span className="flex items-center gap-1">
                     <Building2 className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
@@ -428,13 +428,13 @@ export function LeadDetailView({
 
               {statusDropdownOpen && (
                 <div className="absolute right-0 mt-1.5 w-36 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                  {["New", "Contacted", "Qualified", "Nurturing", "Converted", "Lost"].map((st) => (
+                  {["New", "Contacted", "Qualified", "Nurturing", "Win", "Converted", "Lost"].map((st) => (
                     <button
                       key={st}
                       onClick={() => handleStatusUpdate(st)}
                       className={cn(
-                        "w-full text-left px-3 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                        lead.status === st ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"
+                        "w-full text-left px-3 py-2 font-medium hover:bg-slate-50 dark:hover:bg-[var(--muted)]",
+                        lead.status === st ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-600"
                       )}
                     >
                       {st}
@@ -450,9 +450,20 @@ export function LeadDetailView({
             </Button>
             
             {!converted && (
-              <Button size="sm" onClick={() => setConvertOpen(true)} className="text-xs font-bold gap-1 bg-[#18A7B8] hover:bg-[#14929f] text-white py-1 px-2.5 h-auto border-none">
-                <Briefcase className="h-3.5 w-3.5" /> Convert
-              </Button>
+              <>
+                <Button size="sm" onClick={() => setConvertOpen(true)} className="text-xs font-bold gap-1 bg-[#18A7B8] hover:bg-[#14929f] text-white py-1 px-2.5 h-auto border-none">
+                  <Briefcase className="h-3.5 w-3.5" /> Convert
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setConvertOpen(true)}
+                  disabled={lead.status !== "Win"}
+                  title="Create accounts and contacts from lead record"
+                  className="text-xs font-bold gap-1 bg-green-600 hover:bg-green-700 text-white py-1 px-2.5 h-auto border-none disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  <Building2 className="h-3.5 w-3.5" /> Create Account & Contact
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -464,39 +475,39 @@ export function LeadDetailView({
         {/* LEFT COLUMN: Sidebar (Lead Information & Metadata) */}
         <div className="lg:col-span-4 space-y-4">
           <Card className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm rounded-xl">
-            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3 tracking-wide">Lead Information</h6>
+            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-3 tracking-wide">Lead Information</h6>
             
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3 space-y-2">
               <div className="flex justify-between items-center text-xs py-1">
-                <p className="text-slate-500 dark:text-slate-400 font-medium">Date Created</p>
-                <p className="text-slate-800 dark:text-slate-200 font-semibold">{formatDateTime(lead.created_at)}</p>
+                <p className="text-slate-500 dark:text-slate-500 font-medium">Date Created</p>
+                <p className="text-slate-800 dark:text-slate-700 font-semibold">{formatDateTime(lead.created_at)}</p>
               </div>
               <div className="flex justify-between items-center text-xs py-1">
-                <p className="text-slate-500 dark:text-slate-400 font-medium">Deal Value</p>
-                <p className="text-slate-800 dark:text-slate-200 font-bold text-emerald-600">
+                <p className="text-slate-500 dark:text-slate-500 font-medium">Deal Value</p>
+                <p className="text-slate-800 dark:text-slate-700 font-bold text-emerald-600">
                   {opportunities.length > 0
                     ? money(opportunities.reduce((acc, o) => acc + Number(o.deal_value || 0), 0))
                     : "$25,11,145"}
                 </p>
               </div>
               <div className="flex justify-between items-center text-xs py-1">
-                <p className="text-slate-500 dark:text-slate-400 font-medium">Due Date</p>
-                <p className="text-slate-800 dark:text-slate-200 font-semibold">
+                <p className="text-slate-500 dark:text-slate-500 font-medium">Due Date</p>
+                <p className="text-slate-800 dark:text-slate-700 font-semibold">
                   {meetings.length > 0 ? formatDate(meetings[0].start_at) : "27 Sep 2025, 11:45 PM"}
                 </p>
               </div>
               <div className="flex justify-between items-center text-xs py-1">
-                <p className="text-slate-500 dark:text-slate-400 font-medium">Follow Up</p>
-                <p className="text-slate-800 dark:text-slate-200 font-semibold">27 Sep 2025</p>
+                <p className="text-slate-500 dark:text-slate-500 font-medium">Follow Up</p>
+                <p className="text-slate-800 dark:text-slate-700 font-semibold">27 Sep 2025</p>
               </div>
               <div className="flex justify-between items-center text-xs py-1">
-                <p className="text-slate-500 dark:text-slate-400 font-medium">Source</p>
-                <p className="text-slate-800 dark:text-slate-200 font-semibold">{lead.source || "Google"}</p>
+                <p className="text-slate-500 dark:text-slate-500 font-medium">Source</p>
+                <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.source || "Google"}</p>
               </div>
               {lead.message && (
                 <div className="pt-2 text-xs border-t border-slate-100 dark:border-slate-800/80">
-                  <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">About</p>
-                  <p className="text-slate-800 dark:text-slate-200 leading-relaxed bg-slate-50 dark:bg-slate-950 p-2 rounded-lg whitespace-pre-wrap font-medium">
+                  <p className="text-slate-500 dark:text-slate-500 font-medium mb-1">About</p>
+                  <p className="text-slate-800 dark:text-slate-700 leading-relaxed bg-slate-50 dark:bg-slate-950 p-2 rounded-lg whitespace-pre-wrap font-medium">
                     {lead.message}
                   </p>
                 </div>
@@ -504,20 +515,20 @@ export function LeadDetailView({
             </div>
 
             {/* Owner Section */}
-            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3 tracking-wide">Owner</h6>
+            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-3 tracking-wide">Owner</h6>
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
               <div className="flex items-center">
                 <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-bold mr-2">
                   SV
                 </div>
                 <div className="text-xs">
-                  <p className="text-slate-800 dark:text-slate-200 font-semibold">Steve Vaughan</p>
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold">Steve Vaughan</p>
                 </div>
               </div>
             </div>
 
             {/* Tags Section */}
-            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2 tracking-wide">Tags</h6>
+            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-2 tracking-wide">Tags</h6>
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3 flex flex-wrap gap-1.5">
               <Badge variant="success" className="text-[10px] py-0.5 px-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20 rounded font-medium">
                 Collab
@@ -528,7 +539,7 @@ export function LeadDetailView({
             </div>
 
             {/* Priority Section */}
-            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2 tracking-wide">Priority</h6>
+            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-2 tracking-wide">Priority</h6>
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
               <select
                 value={priority}
@@ -545,12 +556,12 @@ export function LeadDetailView({
             </div>
 
             {/* Projects Section */}
-            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2 tracking-wide">Projects</h6>
+            <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-2 tracking-wide">Projects</h6>
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3 flex flex-wrap gap-1.5">
-              <span className="text-[10px] py-0.5 px-2 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded font-semibold">
+              <span className="text-[10px] py-0.5 px-2 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-600 border border-slate-200 dark:border-slate-800 rounded font-semibold">
                 Devops Design
               </span>
-              <span className="text-[10px] py-0.5 px-2 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded font-semibold">
+              <span className="text-[10px] py-0.5 px-2 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-600 border border-slate-200 dark:border-slate-800 rounded font-semibold">
                 Margrate Design
               </span>
             </div>
@@ -558,18 +569,18 @@ export function LeadDetailView({
             {/* Last Modified Auditing */}
             <div className="space-y-2 text-xs pt-1">
               <div className="flex justify-between items-center">
-                <p className="text-slate-500 dark:text-slate-400 font-medium">Last Modified</p>
-                <p className="text-slate-800 dark:text-slate-200 font-semibold">
+                <p className="text-slate-500 dark:text-slate-500 font-medium">Last Modified</p>
+                <p className="text-slate-800 dark:text-slate-700 font-semibold">
                   {formatDateTime(history?.lastModifiedAt || lead.updated_at)}
                 </p>
               </div>
               <div className="flex justify-between items-center">
-                <p className="text-slate-500 dark:text-slate-400 font-medium">Modified By</p>
+                <p className="text-slate-500 dark:text-slate-500 font-medium">Modified By</p>
                 <div className="flex items-center">
                   <div className="h-5 w-5 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 flex items-center justify-center text-[9px] font-bold mr-1">
                     DR
                   </div>
-                  <p className="text-slate-800 dark:text-slate-200 font-semibold">
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold">
                     {history?.lastModifiedByName || "Darlee Robertson"}
                   </p>
                 </div>
@@ -582,8 +593,8 @@ export function LeadDetailView({
             <div className="flex items-center gap-2">
               <Sparkles className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
               <div className="text-xs">
-                <h4 className="font-bold text-slate-800 dark:text-slate-200">AI Score Breakdown</h4>
-                <p className="text-slate-500 dark:text-slate-400">Score: {lead.lead_score} / 100</p>
+                <h4 className="font-bold text-slate-800 dark:text-slate-700">AI Score Breakdown</h4>
+                <p className="text-slate-500 dark:text-slate-500">Score: {lead.lead_score} / 100</p>
               </div>
             </div>
             <Button size="sm" onClick={() => setShowAiScoreDrawer(true)} variant="outline" className="text-xs font-semibold py-1 px-2.5 h-auto">
@@ -596,7 +607,7 @@ export function LeadDetailView({
         <div className="lg:col-span-8 space-y-4">
           {/* Stepper Pipeline Status */}
           <div className="mb-1">
-            <h5 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">Lead Pipeline Status</h5>
+            <h5 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-2">Lead Pipeline Status</h5>
             
             <div className="flex flex-wrap gap-y-2 w-full my-3">
               {steps.map((step, idx) => {
@@ -645,7 +656,7 @@ export function LeadDetailView({
                         "flex items-center gap-1.5 py-3 px-1 border-b-2 text-xs font-semibold whitespace-nowrap transition-colors focus:outline-none",
                         isActive
                           ? "border-rose-500 text-rose-600 dark:text-rose-400"
-                          : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                          : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-700"
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -663,7 +674,7 @@ export function LeadDetailView({
               {activeTab === "activities" && (
                 <div className="space-y-4">
                   <div className="flex align-items-center justify-between flex-wrap row-gap-3 items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                    <h5 className="font-bold text-slate-800 dark:text-slate-200 text-xs">Activities</h5>
+                    <h5 className="font-bold text-slate-800 dark:text-slate-700 text-xs">Activities</h5>
                     
                     <div className="flex items-center gap-2">
                       <div className="relative">
@@ -695,13 +706,13 @@ export function LeadDetailView({
                               const TimelineIcon = item.icon;
                               const styleMeta = getTimelineStyle(item.label);
                               return (
-                                <Card key={index} className="p-3 bg-slate-50/50 dark:bg-slate-900/30 border-slate-100 dark:border-slate-800/80 shadow-none rounded-lg">
+                                <Card key={index} className="p-3 bg-slate-50/50 dark:bg-[var(--muted)] border-slate-100 dark:border-slate-800/80 shadow-none rounded-lg">
                                   <div className="flex items-start">
                                     <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white mr-3", styleMeta.bg)}>
                                       <TimelineIcon className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                      <h6 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                      <h6 className="text-xs font-bold text-slate-800 dark:text-slate-700">
                                         {item.label}
                                       </h6>
                                       <p className="text-[10px] text-slate-400 mt-0.5">{item.timeFormatted || item.time}</p>
@@ -722,7 +733,7 @@ export function LeadDetailView({
               {activeTab === "notes" && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
-                    <h5 className="font-bold text-slate-800 dark:text-slate-200 text-xs">Notes</h5>
+                    <h5 className="font-bold text-slate-800 dark:text-slate-700 text-xs">Notes</h5>
                     <button
                       onClick={() => bodyRef.current?.focus()}
                       className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
@@ -732,7 +743,7 @@ export function LeadDetailView({
                   </div>
 
                   {/* Add note input form */}
-                  <div className="space-y-2 bg-slate-50/30 dark:bg-slate-900/10 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                  <div className="space-y-2 bg-slate-50/30 dark:bg-[var(--muted)] p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                     <textarea
                       ref={bodyRef}
                       value={noteBody}
@@ -752,7 +763,7 @@ export function LeadDetailView({
                         />
                         <label
                           htmlFor="redesign-note-file"
-                          className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer font-semibold flex-shrink-0"
+                          className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-600 cursor-pointer font-semibold flex-shrink-0"
                         >
                           <Paperclip className="h-3.5 w-3.5" /> Attach file
                         </label>
@@ -790,11 +801,11 @@ export function LeadDetailView({
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5 mb-1 text-[10px] text-slate-400 font-medium">
-                                <span className="font-bold text-slate-700 dark:text-slate-300">{n.author_name || "Unknown"}</span>
+                                <span className="font-bold text-slate-700 dark:text-slate-600">{n.author_name || "Unknown"}</span>
                                 <span>·</span>
                                 <span>{formatDateTime(n.created_at)}</span>
                               </div>
-                              <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words leading-relaxed">
+                              <p className="text-xs text-slate-800 dark:text-slate-700 whitespace-pre-wrap break-words leading-relaxed">
                                 {n.body}
                               </p>
                               {n.file_url && (
@@ -811,7 +822,7 @@ export function LeadDetailView({
                             
                             <button
                               onClick={() => handleDeleteNote(n.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-300 hover:text-rose-600 flex-shrink-0 transition-opacity"
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-slate-50 dark:hover:bg-[var(--muted)] text-slate-300 hover:text-rose-600 flex-shrink-0 transition-opacity"
                               title="Delete note"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -828,7 +839,7 @@ export function LeadDetailView({
               {activeTab === "calls" && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
-                    <h5 className="font-bold text-slate-800 dark:text-slate-200 text-xs">Meetings & Calls</h5>
+                    <h5 className="font-bold text-slate-800 dark:text-slate-700 text-xs">Meetings & Calls</h5>
                     <button
                       onClick={() => {
                         toast("Opening meeting scheduler...", "info");
@@ -852,7 +863,7 @@ export function LeadDetailView({
                         >
                           <div className="flex items-center justify-between">
                             <div className="min-w-0">
-                              <h6 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{m.title}</h6>
+                              <h6 className="text-xs font-bold text-slate-800 dark:text-slate-700 truncate">{m.title}</h6>
                               <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                                 <CalendarDays className="h-3 w-3" />
                                 {formatDateTime(m.start_at)}
@@ -873,7 +884,7 @@ export function LeadDetailView({
               {activeTab === "files" && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
-                    <h5 className="font-bold text-slate-800 dark:text-slate-200 text-xs">Files & Attachments</h5>
+                    <h5 className="font-bold text-slate-800 dark:text-slate-700 text-xs">Files & Attachments</h5>
                     <button
                       onClick={() => {
                         // Files here are just notes with an attachment (see the filter
@@ -905,7 +916,7 @@ export function LeadDetailView({
                               <FileIcon className="h-4 w-4" />
                             </div>
                             <div className="min-w-0">
-                              <a href={n.file_url!} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-slate-800 dark:text-slate-200 hover:underline truncate block">
+                              <a href={n.file_url!} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-slate-800 dark:text-slate-700 hover:underline truncate block">
                                 {n.file_name || "Attached file"}
                               </a>
                               <p className="text-[9px] text-slate-400 mt-0.5">Uploaded by {n.author_name || "Unknown"} on {formatDate(n.created_at)}</p>
@@ -931,7 +942,7 @@ export function LeadDetailView({
               {activeTab === "email" && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
-                    <h5 className="font-bold text-slate-800 dark:text-slate-200 text-xs">Emails & Outreach</h5>
+                    <h5 className="font-bold text-slate-800 dark:text-slate-700 text-xs">Emails & Outreach</h5>
                     <button
                       onClick={() => setEmailOpen(true)}
                       className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
@@ -941,10 +952,10 @@ export function LeadDetailView({
                   </div>
 
                   <div className="space-y-3">
-                    <Card className="p-6 text-center border-slate-100 dark:border-slate-800/80 shadow-none bg-slate-50/20 dark:bg-slate-900/10">
+                    <Card className="p-6 text-center border-slate-100 dark:border-slate-800/80 shadow-none bg-slate-50/20 dark:bg-[var(--muted)]">
                       <Mail className="h-8 w-8 text-slate-300 mx-auto mb-2.5" />
-                      <h6 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">Interact with your contact</h6>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-3">
+                      <h6 className="text-xs font-bold text-slate-800 dark:text-slate-700 mb-1">Interact with your contact</h6>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-500 max-w-sm mx-auto mb-3">
                         Draft and send email campaigns, personalized follow-ups, or request calls directly.
                       </p>
                       <Button
@@ -972,7 +983,7 @@ export function LeadDetailView({
                 <Sparkles className="h-5 w-5 text-blue-600" />
                 <h3 className="font-bold text-lg text-slate-900 dark:text-white">AI Prospect Score Breakdown</h3>
               </div>
-              <button onClick={() => setShowAiScoreDrawer(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+              <button onClick={() => setShowAiScoreDrawer(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-[var(--muted)]">
                 <X className="h-5 w-5" />
               </button>
             </div>

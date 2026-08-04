@@ -75,6 +75,10 @@ async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo }
       to: [{ email: to }],
       subject,
       htmlContent: toHtml(html, text),
+      // A plain-text alternative alongside the HTML body is a well-known
+      // spam-score signal — HTML-only emails (no multipart fallback) are
+      // one of the simplest heuristics spam filters use to flag mail.
+      textContent: text || html?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
       ...(effectiveReplyTo ? { replyTo: { email: effectiveReplyTo } } : {}),
       ...(tags && tags.length ? { tags } : {}),
     }),

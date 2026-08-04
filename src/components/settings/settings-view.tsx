@@ -29,6 +29,7 @@ import {
   type AccentColor,
   type SidebarBadgeStyle,
   type SidebarDensity,
+  type MixedColorPreset,
 } from "@/lib/theme";
 
 const sections = [
@@ -441,6 +442,33 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
                       { value: "midnight", label: "• Aa Midnight Blue" },
                       { value: "obsidian", label: "• Aa Obsidian" },
                       { value: "emerald", label: "• Aa Emerald Dark" },
+                    ]}
+                  />
+                </div>
+
+                {/* Row 4: Mixed-color theme */}
+                <div className="flex items-center justify-between p-5">
+                  <div className="space-y-0.5 pr-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Mixed-color theme</h4>
+                    <p className="text-xs text-slate-500">Professional sidebar and topbar color combinations</p>
+                  </div>
+                  <CustomSelect<MixedColorPreset>
+                    value={appearance.mixedColorPreset || "none"}
+                    onChange={(val) => updateAppearance({ mixedColorPreset: val })}
+                    options={[
+                      { value: "none", label: "None (Use Accent)" },
+                      { value: "teal_aqua", label: "Teal + Aqua (Fresh & Professional)" },
+                      { value: "green_lime", label: "Green + Lime (Growth & Success)" },
+                      { value: "purple_lavender", label: "Purple + Lavender" },
+                      { value: "indigo_purple", label: "Indigo + Purple" },
+                      { value: "emerald_teal", label: "Emerald + Teal" },
+                      { value: "amber_orange", label: "Amber + Orange" },
+                      { value: "rose_pink", label: "Rose + Pink" },
+                      { value: "slate_blue", label: "Slate + Blue" },
+                      { value: "charcoal_lime", label: "Charcoal + Lime" },
+                      { value: "charcoal_yellow", label: "Charcoal + Yellow" },
+                      { value: "coral_peach", label: "Coral + Peach" },
+                      { value: "sand_olive", label: "Sand + Olive" },
                     ]}
                   />
                 </div>

@@ -13,7 +13,7 @@ const STATUS_STYLE: Record<string, string> = {
   active: "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold",
   trialing: "bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-semibold",
   past_due: "bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-semibold",
-  canceled: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-semibold",
+  canceled: "bg-slate-100 dark:bg-[var(--muted)] text-slate-600 dark:text-slate-500 border border-slate-200 dark:border-slate-700 font-semibold",
 };
 
 const PAGE_SIZE = 15;
@@ -28,7 +28,7 @@ export function SubscriptionsTab({ rows }: { rows: SubscriptionRow[] }) {
     <Card className="overflow-hidden">
       <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
         <h3 className="font-bold text-slate-900 dark:text-white text-base">Customer Subscriptions</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">View-only &mdash; billed and managed via Stripe.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">View-only &mdash; billed and managed via Stripe.</p>
       </div>
       <div className="max-h-[calc(100vh-320px)] overflow-y-auto scrollbar-hide">
         <DataTable className="min-w-[800px]">
@@ -50,15 +50,15 @@ export function SubscriptionsTab({ rows }: { rows: SubscriptionRow[] }) {
             {paged.map((r) => (
               <DataTableRow key={r.workspace_id}>
                 <DataTableTd className="font-semibold text-slate-900 dark:text-white">{r.workspace_name}</DataTableTd>
-                <DataTableTd className="text-slate-600 dark:text-slate-400 font-medium">{r.plan_name}</DataTableTd>
-                <DataTableTd className="text-slate-500 dark:text-slate-400 capitalize">{r.billing_interval}</DataTableTd>
+                <DataTableTd className="text-slate-600 dark:text-slate-500 font-medium">{r.plan_name}</DataTableTd>
+                <DataTableTd className="text-slate-500 dark:text-slate-500 capitalize">{r.billing_interval}</DataTableTd>
                 <DataTableTd>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs capitalize ${STATUS_STYLE[r.status] || "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"}`}>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs capitalize ${STATUS_STYLE[r.status] || "bg-slate-100 dark:bg-[var(--muted)] text-slate-600 dark:text-slate-500"}`}>
                     {r.status.replace("_", " ")}
                   </span>
                 </DataTableTd>
-                <DataTableTd className="text-slate-900 dark:text-slate-200 font-semibold tabular-nums">{r.credits_remaining} / {r.credits_total}</DataTableTd>
-                <DataTableTd className="text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatDate(r.current_period_end)}</DataTableTd>
+                <DataTableTd className="text-slate-900 dark:text-slate-700 font-semibold tabular-nums">{r.credits_remaining} / {r.credits_total}</DataTableTd>
+                <DataTableTd className="text-slate-600 dark:text-slate-500 whitespace-nowrap">{formatDate(r.current_period_end)}</DataTableTd>
                 <DataTableTd className="text-slate-400 dark:text-slate-500 font-mono text-xs">{r.stripe_customer_id || "—"}</DataTableTd>
               </DataTableRow>
             ))}

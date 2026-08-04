@@ -135,7 +135,7 @@ export function EntityTable<T extends Record<string, any>>({
         {/* Bulk Action Bar */}
         {selectedKeys.size > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-600">
               {selectedKeys.size} selected
             </span>
             {bulkActions.map((action, idx) => (
@@ -159,7 +159,7 @@ export function EntityTable<T extends Record<string, any>>({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-[var(--muted)] text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 <th className="p-3.5 w-10 text-center">
                   <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600">
                     {selectedKeys.size > 0 && selectedKeys.size === paginatedData.length ? (
@@ -174,7 +174,7 @@ export function EntityTable<T extends Record<string, any>>({
                     {col.sortable !== false ? (
                       <button
                         onClick={() => handleSort(col.key)}
-                        className="inline-flex items-center gap-1.5 hover:text-slate-800 dark:hover:text-slate-200"
+                        className="inline-flex items-center gap-1.5 hover:text-slate-800 dark:hover:text-slate-700"
                       >
                         {col.label}
                         {sortKey === col.key ? (
@@ -199,7 +199,7 @@ export function EntityTable<T extends Record<string, any>>({
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
                     <td className="p-4" colSpan={initialColumns.length + 1}>
-                      <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-full" />
+                      <div className="h-4 bg-slate-100 dark:bg-[var(--muted)] rounded w-full" />
                     </td>
                   </tr>
                 ))
@@ -218,7 +218,7 @@ export function EntityTable<T extends Record<string, any>>({
                       key={key}
                       onClick={() => onRowClick?.(row)}
                       className={cn(
-                        "hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors cursor-pointer",
+                        "hover:bg-slate-50/80 dark:hover:bg-[var(--muted)] transition-colors cursor-pointer",
                         isSelected && "bg-blue-50/40 dark:bg-blue-950/20"
                       )}
                     >
@@ -236,7 +236,7 @@ export function EntityTable<T extends Record<string, any>>({
                           ) : col.fieldDef ? (
                             <FieldRenderer definition={col.fieldDef} value={row[col.key]} />
                           ) : (
-                            <span className="text-slate-700 dark:text-slate-200">
+                            <span className="text-slate-700 dark:text-slate-700">
                               {row[col.key] !== undefined && row[col.key] !== null ? String(row[col.key]) : "—"}
                             </span>
                           )}

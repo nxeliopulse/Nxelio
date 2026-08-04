@@ -3,7 +3,7 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, MoreHorizontal, Pause, Play, Copy, Pencil, Search, LayoutTemplate, ChevronDown, ChevronRight, Megaphone, Link2, Send, CheckCircle2, Undo2, Archive, Star, LayoutGrid, List, Columns3, ArrowUp, ArrowDown, ArrowUpDown, Eye, MessageSquare, Filter as FilterIcon, X } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Copy, Pencil, Search, LayoutTemplate, ChevronDown, ChevronRight, Megaphone, Link2, Send, CheckCircle2, Undo2, Archive, Star, LayoutGrid, List, Columns3, ArrowUp, ArrowDown, ArrowUpDown, Eye, MessageSquare, Filter as FilterIcon, X, RefreshCw } from "lucide-react";
 import { ConnectionsModal } from "@/components/campaigns/connections-modal";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,9 @@ import { setSequenceStatus, duplicateSequence, type OutreachSequenceRow } from "
 import { submitForReview, approveCampaign, sendBackToDraft, archiveCampaign } from "@/lib/queries/campaign-approval";
 import { APPROVAL_STATUSES, approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { campaignTemplates } from "@/lib/campaign-templates";
-import { formatDate } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
+import { usePageTour } from "@/components/tour/use-page-tour";
+import { CAMPAIGNS_TOUR_STEPS } from "@/components/tour/tour-registry";
 
 interface UnifiedRow {
   id: string;
@@ -121,6 +123,7 @@ export function CampaignsView({
 }) {
   const { toast, prompt } = useFeedback();
   const router = useRouter();
+  usePageTour("campaigns", CAMPAIGNS_TOUR_STEPS);
   const [pending, start] = useTransition();
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
@@ -369,28 +372,16 @@ export function CampaignsView({
 
   return (
     <div className="max-w-[1600px] mx-auto">
-      {/* Custom header (breadcrumb + count badge) — kept local to this page, doesn't touch the shared PageHeader used elsewhere */}
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Campaigns</h1>
-            <span className="inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">
-              {rows.length}
-            </span>
+            <h1 data-tour-id="campaigns-title" className="text-2xl font-bold text-slate-900 tracking-tight">Campaigns</h1>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
             <span>Home</span>
             <ChevronRight className="h-3 w-3" />
             <span className="text-slate-600 font-medium">Campaigns</span>
           </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => setConnectionsOpen(true)}>
-            <Link2 className="h-4 w-4" /> Connections
-          </Button>
-          <Link href="/campaigns/builder">
-            <Button><Plus className="h-4 w-4" /> New Campaign</Button>
-          </Link>
         </div>
       </div>
 
@@ -412,70 +403,87 @@ export function CampaignsView({
       </div>
 
       <Card className="overflow-visible">
-        {/* Toolbar */}
-        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-[200px] max-w-sm">
-            <Input
-              leftIcon={<Search className="h-4 w-4" />}
-              placeholder="Search campaigns..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <label className="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={activeOnly}
-              onChange={(e) => setActiveOnly(e.target.checked)}
-              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            />
-            Active only
-          </label>
-          <Select value={approvalFilter} onChange={(e) => setApprovalFilter(e.target.value)} className="w-auto max-w-[200px]">
-            <option value="All">All approval stages</option>
-            {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </Select>
-        </div>
+        {/* Toolbar: Search, Filters, Actions, View Mode Toggle, Create button */}
+        <div data-tour-id="campaigns-filter" className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900">
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
+            {/* Search Input */}
+            <div className="w-full sm:w-52">
+              <Input
+                leftIcon={<Search className="h-4 w-4 text-slate-400" />}
+                placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 text-xs rounded-xl"
+              />
+            </div>
 
-        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
-          <Select
-            value={`${sortField}:${sortDir}`}
-            onChange={(e) => { const [f, d] = e.target.value.split(":"); setSortField(f as SortField); setSortDir(d as "asc" | "desc"); }}
-            className="w-auto max-w-[190px]"
-          >
-            <option value="updatedAt:desc">Sort: Newest first</option>
-            <option value="updatedAt:asc">Sort: Oldest first</option>
-            <option value="name:asc">Sort: Name A-Z</option>
-            <option value="leads:desc">Sort: Most prospects</option>
-            <option value="sent:desc">Sort: Most sent</option>
-            <option value="replyRate:desc">Sort: Best reply rate</option>
-          </Select>
+            {/* Badged Count Button */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-600">
+              <Megaphone className="h-3.5 w-3.5 text-slate-500" />
+              <span>{filtered.length} Campaigns</span>
+            </div>
 
-          <div className="flex items-center gap-1.5 text-sm text-slate-500">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              max={dateTo || undefined}
-              className="h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-label="Last modified from"
-            />
-            <span className="text-slate-400">–</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              min={dateFrom || undefined}
-              className="h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-label="Last modified to"
-            />
-          </div>
+            {/* Active only filter button */}
+            <button
+              onClick={() => setActiveOnly((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all h-9 shadow-sm",
+                activeOnly
+                  ? "bg-slate-900 text-white border-transparent dark:bg-slate-100 dark:text-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-600 dark:border-slate-800"
+              )}
+            >
+              {activeOnly ? "✓ Active Only" : "Active Only"}
+            </button>
 
-          <div className="ml-auto flex items-center gap-2">
-            {/* Filter dropdown — consolidates search/status/type/date into one panel;
-                each field mirrors the standalone controls above, so both stay in sync. */}
+            {/* Approval stages select dropdown */}
+            <select
+              value={approvalFilter}
+              onChange={(e) => setApprovalFilter(e.target.value)}
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-450 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9"
+            >
+              <option value="All">All approval stages</option>
+              {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+
+            {/* Sort Select */}
+            <select
+              value={`${sortField}:${sortDir}`}
+              onChange={(e) => { const [f, d] = e.target.value.split(":"); setSortField(f as SortField); setSortDir(d as "asc" | "desc"); }}
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-450 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9"
+            >
+              <option value="updatedAt:desc">Sort: Newest first</option>
+              <option value="updatedAt:asc">Sort: Oldest first</option>
+              <option value="name:asc">Sort: Name A-Z</option>
+              <option value="leads:desc">Sort: Most prospects</option>
+              <option value="sent:desc">Sort: Most sent</option>
+              <option value="replyRate:desc">Sort: Best reply rate</option>
+            </select>
+
+            {/* Date range inputs */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                max={dateTo || undefined}
+                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                aria-label="Last modified from"
+              />
+              <span className="text-slate-400">–</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                min={dateFrom || undefined}
+                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                aria-label="Last modified to"
+              />
+            </div>
+
+            {/* Filter Dropdown */}
             <div className="relative" ref={filterRef}>
-              <Button variant="outline" onClick={() => setFilterOpen((v) => !v)}>
+              <Button variant="outline" size="sm" onClick={() => setFilterOpen((v) => !v)} className="h-9 text-xs rounded-xl font-bold border border-slate-200 dark:border-slate-800">
                 <FilterIcon className="h-4 w-4" /> Filter
                 {activeFilterCount > 0 && (
                   <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
@@ -485,30 +493,20 @@ export function CampaignsView({
                 <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
               </Button>
               {filterOpen && (
-                <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-72 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                    <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900"><FilterIcon className="h-4 w-4" /> Filter</span>
-                    <button onClick={() => setFilterOpen(false)} aria-label="Close" className="p-1 rounded-md hover:bg-slate-100 text-slate-400">
+                <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-72 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white"><FilterIcon className="h-4 w-4" /> Filter</span>
+                    <button onClick={() => setFilterOpen(false)} aria-label="Close" className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
                       <X className="h-4 w-4" />
                     </button>
                   </div>
 
                   <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
                     <div>
-                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Name</p>
-                      <Input
-                        leftIcon={<Search className="h-4 w-4" />}
-                        placeholder="Search campaigns..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                    </div>
-
-                    <div>
                       <p className="text-xs font-semibold text-slate-500 mb-1.5">Type</p>
                       <div className="flex flex-col gap-1.5">
                         {(["Email", "LinkedIn", "Multichannel"] as const).map((t) => (
-                          <label key={t} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+                          <label key={t} className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-600 cursor-pointer select-none">
                             <input
                               type="checkbox"
                               checked={typeFilter.includes(t)}
@@ -528,7 +526,7 @@ export function CampaignsView({
                         value={dateFrom}
                         onChange={(e) => setDateFrom(e.target.value)}
                         max={dateTo || undefined}
-                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
@@ -539,13 +537,13 @@ export function CampaignsView({
                         value={dateTo}
                         onChange={(e) => setDateTo(e.target.value)}
                         min={dateFrom || undefined}
-                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
                     <div>
                       <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
-                      <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none mb-2">
+                      <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-600 cursor-pointer select-none mb-2">
                         <input
                           type="checkbox"
                           checked={activeOnly}
@@ -561,7 +559,7 @@ export function CampaignsView({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 p-3 border-t border-slate-100">
+                  <div className="flex items-center gap-2 p-3 border-t border-slate-100 dark:border-slate-800">
                     <Button variant="outline" className="flex-1" onClick={resetFilters}>Reset</Button>
                     <Button className="flex-1" onClick={() => setFilterOpen(false)}>Filter</Button>
                   </div>
@@ -572,16 +570,16 @@ export function CampaignsView({
             {/* Manage Columns dropdown — list view only */}
             {viewMode === "list" && (
               <div className="relative" ref={colsRef}>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setColumnsOpen((v) => !v)}
-                  className={`inline-flex items-center gap-2 h-10 px-3.5 rounded-lg border text-sm font-medium transition-colors ${
-                    columnsOpen ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-indigo-50/60 border-indigo-100 text-indigo-600 hover:bg-indigo-50"
-                  }`}
+                  className="h-9 text-xs rounded-xl font-bold border border-slate-200 dark:border-slate-800"
                 >
                   <Columns3 className="h-4 w-4" /> Manage Columns
-                </button>
+                </Button>
                 {columnsOpen && (
-                  <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-56 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden p-1">
+                  <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-56 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden p-1">
                     <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
                     {([
                       ["status", "Status"],
@@ -592,7 +590,7 @@ export function CampaignsView({
                       ["owner", "Owner"],
                       ["lastModified", "Last modified"],
                     ] as const).map(([key, label]) => (
-                      <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none">
+                      <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={visibleCols[key]}
@@ -607,31 +605,18 @@ export function CampaignsView({
               </div>
             )}
 
-            {/* List / grid view toggle */}
-            <div className="flex items-center rounded-lg border border-slate-200 p-0.5">
-              <button
-                onClick={() => setViewMode("list")}
-                aria-label="List view"
-                className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600"}`}
-              >
-                <List className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setViewMode("grid")}
-                aria-label="Grid view"
-                className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600"}`}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-            </div>
-
             {/* Templates dropdown */}
             <div className="relative" ref={tplRef}>
-              <Button variant="outline" onClick={() => setTemplatesOpen((v) => !v)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTemplatesOpen((v) => !v)}
+                className="h-9 text-xs rounded-xl font-bold border border-slate-200 dark:border-slate-800"
+              >
                 <LayoutTemplate className="h-4 w-4" /> Templates <ChevronDown className={`h-3.5 w-3.5 transition-transform ${templatesOpen ? "rotate-180" : ""}`} />
               </Button>
               {templatesOpen && (
-                <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-72 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden p-1">
+                <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-72 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden p-1">
                   <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Start from a template</p>
                   <div className="max-h-80 overflow-y-auto">
                     {campaignTemplates.map((t) => {
@@ -640,25 +625,84 @@ export function CampaignsView({
                         <button
                           key={t.id}
                           onClick={() => { setTemplatesOpen(false); router.push(`/campaigns/builder?template=${t.id}`); }}
-                          className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-50"
+                          className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                         >
                           <span className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${t.accent}`}>
                             <Icon className="h-4 w-4" />
                           </span>
                           <span className="min-w-0">
-                            <span className="block text-sm font-medium text-slate-900">{t.name} <span className="text-[11px] font-normal text-slate-400">· {t.steps.length} steps</span></span>
+                            <span className="block text-sm font-medium text-slate-900 dark:text-white">{t.name} <span className="text-[11px] font-normal text-slate-400">· {t.steps.length} steps</span></span>
                             <span className="block text-xs text-slate-500 line-clamp-1">{t.description}</span>
                           </span>
                         </button>
                       );
                     })}
                   </div>
-                  <Link href="/campaigns/builder" onClick={() => setTemplatesOpen(false)} className="block px-3 py-2 mt-1 border-t border-slate-100 text-sm font-medium text-blue-600 hover:bg-slate-50">
-                    Start blank →
-                  </Link>
                 </div>
               )}
             </div>
+
+            {/* Connections */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConnectionsOpen(true)}
+              className="h-9 text-xs rounded-xl font-bold border border-slate-200 dark:border-slate-800"
+            >
+              <Link2 className="h-4 w-4" /> Connections
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-0.5 rounded-xl border border-slate-200 dark:border-slate-800 p-0.5 bg-slate-50 dark:bg-slate-950/60">
+              <button
+                onClick={() => setViewMode("list")}
+                aria-label="List view"
+                className={cn(
+                  "p-1.5 rounded-lg text-xs font-semibold transition-all",
+                  viewMode === "list"
+                    ? "bg-[var(--primary)] text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                )}
+              >
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("grid")}
+                aria-label="Grid view"
+                className={cn(
+                  "p-1.5 rounded-lg text-xs font-semibold transition-all",
+                  viewMode === "grid"
+                    ? "bg-[var(--primary)] text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                )}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Refresh Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                toast("Refreshing campaigns...", "info");
+                router.refresh();
+                setTimeout(() => window.location.reload(), 100);
+              }}
+              className="h-9 w-9 p-0 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              title="Refresh"
+            >
+              <RefreshCw className="h-4 w-4 text-slate-500" />
+            </Button>
+
+            {/* New Campaign Button */}
+            <Link href="/campaigns/builder">
+              <Button data-tour-id="campaigns-new" className="rounded-xl font-bold px-4 py-2 text-xs sm:text-sm gap-2">
+                <Plus className="h-4 w-4" /> New Campaign
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -673,7 +717,7 @@ export function CampaignsView({
             <Link href="/campaigns/builder"><Button><Plus className="h-4 w-4" /> Create campaign</Button></Link>
           </div>
         ) : viewMode === "grid" ? (
-          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div data-tour-id="campaigns-list" className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.length === 0 && (
               <p className="col-span-full px-1 py-12 text-center text-slate-500 text-sm">No campaigns match your filters.</p>
             )}
@@ -742,7 +786,7 @@ export function CampaignsView({
             })}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div data-tour-id="campaigns-list" className="overflow-x-auto">
             <table className="w-full text-sm min-w-[880px]">
               <thead>
                 <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100 bg-slate-50">

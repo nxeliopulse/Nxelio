@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown, LogOut, User as UserIcon, Settings, Menu, Sparkles,
-  Phone, ShoppingBag, HelpCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2,
-  Building2, Check, Plus
+  Phone, ShoppingBag, HelpCircle, PlayCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2,
+  Building2, Check, Plus, Sun, Moon
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { globalSearch, type GlobalSearchResult } from "@/lib/queries/global-search";
@@ -13,6 +13,7 @@ import { switchWorkspace, createWorkspace, type MyWorkspaceRow } from "@/lib/que
 import { NotificationsBell } from "./notifications-bell";
 import { useSidebar } from "./sidebar-context";
 import { Modal } from "@/components/ui/modal";
+import { getStoredAppearance, applyTheme } from "@/lib/theme";
 
 interface TopbarProps {
   userName?: string;
@@ -27,6 +28,20 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [open, setOpen] = useState(false);
+  const [theme, setTheme] = useState<string>("light");
+
+  // Read theme on mount
+  useEffect(() => {
+    const appearance = getStoredAppearance();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs client-only localStorage value after mount to avoid SSR hydration mismatch
+    setTheme(appearance.theme);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    applyTheme(nextTheme);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -133,7 +148,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
   }
 
   return (
-    <header className="h-16 py-2.5 bg-[var(--primary)] px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-3 sticky top-0 z-30 text-white shadow-sm rounded-br-2xl">
+    <header className="h-16 py-2.5 bg-transparent px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-3 sticky top-0 z-30 text-white">
       {/* Left side: hamburger (mobile) + global search */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {/* Hamburger — mobile/tablet only */}
@@ -160,7 +175,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
               }
               if (e.key === "Escape") setSearchOpen(false);
             }}
-            className="w-full h-8 pl-8 pr-8 bg-white/15 hover:bg-white/20 focus:bg-white/20 border border-white/20 rounded-full text-xs text-white placeholder-white/60 outline-none transition-colors"
+            className="w-full h-8 pl-8 pr-8 bg-white/12 hover:bg-white/20 focus:bg-white/25 rounded-full text-xs text-white placeholder-white/65 outline-none transition-all"
           />
           {searchLoading && (
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/70 animate-spin" />
@@ -225,7 +240,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* Upgrade pill */}
         <Link
           href="/billing"
-          className="hidden sm:flex items-center gap-1 px-3 py-1 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-medium text-white transition-colors"
+          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/12 hover:bg-white/20 text-xs font-semibold text-white transition-colors"
         >
           <ArrowUpRight className="h-3.5 w-3.5 text-amber-300" />
           <span>Upgrade</span>
@@ -249,6 +264,15 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
           <ShoppingBag className="h-4 w-4" />
         </button>
 
+        {/* Replay product tour */}
+        <button
+          onClick={() => router.push("/dashboard?tour=dashboard")}
+          title="Replay product tour"
+          className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+        >
+          <PlayCircle className="h-4 w-4" />
+        </button>
+
         {/* Help icon */}
         <Link
           href="/help"
@@ -267,8 +291,21 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
           <Settings className="h-4 w-4" />
         </Link>
 
+        {/* Dark/Light mode theme toggle */}
+        <button
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors animate-fade-in"
+        >
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4 text-amber-300 fill-amber-300" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
+        </button>
+
         {/* Notifications bell */}
-        <NotificationsBell className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white" />
+        <NotificationsBell className="h-8 w-8 rounded-full bg-white/12 hover:bg-white/20 text-white flex items-center justify-center transition-colors" />
 
         <div className="h-4 w-px bg-white/20 mx-0.5" />
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   DollarSign, TrendingUp, Trophy, Target, GripVertical, Pencil, Trash2, Loader2, Building2, Search,
   Filter as FilterIcon, X, ChevronDown, ChevronRight, Plus, List, LayoutGrid, Columns3,
-  ArrowUp, ArrowDown, ArrowUpDown,
+  ArrowUp, ArrowDown, ArrowUpDown, RefreshCw,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,7 @@ function SortTh({ label, field, defaultDir = "desc", sortField, sortDir, onSort 
   const active = sortField === field;
   return (
     <DataTableTh className="text-[11px] uppercase tracking-wider">
-      <button onClick={() => onSort(field, defaultDir)} className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200">
+      <button onClick={() => onSort(field, defaultDir)} className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-700">
         {label}
         {active ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300 dark:text-slate-600" />}
       </button>
@@ -239,14 +239,11 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Opportunities</h1>
-            <span className="inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-semibold">
-              {rows.length}
-            </span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 mt-1">
             <span>Home</span>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-slate-600 dark:text-slate-300 font-medium">Opportunities</span>
+            <span className="text-slate-600 dark:text-slate-600 font-medium">Opportunities</span>
           </div>
         </div>
         {/* Opportunities can only be created by converting a lead (no standalone-create endpoint exists),
@@ -261,7 +258,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
           <Card key={t.label} className="p-4 dark:bg-slate-900 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{t.label}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-500">{t.label}</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{t.value}</p>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t.sub}</p>
               </div>
@@ -273,12 +270,12 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
 
       {rows.length === 0 ? (
         <Card className="p-12 text-center dark:bg-slate-900 dark:border-slate-800">
-          <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+          <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 dark:bg-[var(--muted)] flex items-center justify-center mb-4">
             <Target className="h-6 w-6 text-slate-400" />
           </div>
           <p className="font-semibold text-slate-900 dark:text-white">No opportunities yet</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
-            Open a lead and click <span className="font-medium text-slate-700 dark:text-slate-200">Convert to Opportunity</span> to start building your pipeline.
+          <p className="text-sm text-slate-500 dark:text-slate-500 mt-1 max-w-md mx-auto">
+            Open a lead and click <span className="font-medium text-slate-700 dark:text-slate-700">Convert to Opportunity</span> to start building your pipeline.
           </p>
         </Card>
       ) : (
@@ -307,14 +304,14 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                 <div className="lp-anim-pop origin-top-left absolute left-0 top-full mt-1 z-20 w-72 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
                     <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white"><FilterIcon className="h-4 w-4" /> Filter</span>
-                    <button onClick={() => setFilterOpen(false)} aria-label="Close" className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                    <button onClick={() => setFilterOpen(false)} aria-label="Close" className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-[var(--muted)] text-slate-400">
                       <X className="h-4 w-4" />
                     </button>
                   </div>
 
                   <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
                     <div>
-                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Expected close — start</p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 mb-1.5">Expected close — start</p>
                       <input
                         type="date"
                         value={dateFrom}
@@ -324,7 +321,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                       />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Expected close — end</p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 mb-1.5">Expected close — end</p>
                       <input
                         type="date"
                         value={dateTo}
@@ -334,10 +331,10 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                       />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Stage columns shown</p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 mb-1.5">Stage columns shown</p>
                       <div className="flex flex-col gap-1.5">
                         {OPPORTUNITY_STAGES.map((s) => (
-                          <label key={s} className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                          <label key={s} className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-700 cursor-pointer select-none">
                             <input
                               type="checkbox"
                               checked={!hiddenStages.has(s)}
@@ -396,7 +393,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                         ["closeDate", "Expected Close Date"],
                         ["status", "Status"],
                       ] as const).map(([key, label]) => (
-                        <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer select-none">
+                        <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-700 hover:bg-slate-50 dark:hover:bg-[var(--muted)] cursor-pointer select-none">
                           <input
                             type="checkbox"
                             checked={visibleCols[key]}
@@ -415,25 +412,40 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                 <button
                   onClick={() => setViewMode("table")}
                   aria-label="Table view"
-                  className={`p-1.5 rounded-md transition-colors ${viewMode === "table" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"}`}
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === "table" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-600"}`}
                 >
                   <List className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode("kanban")}
                   aria-label="Kanban view"
-                  className={`p-1.5 rounded-md transition-colors ${viewMode === "kanban" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"}`}
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === "kanban" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-600"}`}
                 >
                   <LayoutGrid className="h-4 w-4" />
                 </button>
               </div>
+
+              {/* Refresh Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  toast("Refreshing opportunities...", "info");
+                  router.refresh();
+                  setTimeout(() => window.location.reload(), 100);
+                }}
+                className="h-9 w-9 p-0 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                title="Refresh"
+              >
+                <RefreshCw className="h-4 w-4 text-slate-500" />
+              </Button>
             </div>
           </div>
 
           {filteredRows.length === 0 && (
             <Card className="p-12 text-center mb-4 dark:bg-slate-900 dark:border-slate-800">
               <p className="font-semibold text-slate-900 dark:text-white">No opportunities match your filters</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Try widening the date range or clearing the search.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">Try widening the date range or clearing the search.</p>
             </Card>
           )}
 
@@ -460,12 +472,12 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                     const closed = row.stage === "won" || row.stage === "lost";
                     return (
                       <DataTableRow key={row.id} onClick={() => router.push(`/opportunities/${row.id}`)} className="cursor-pointer">
-                        <DataTableTd className="text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">{displayIdMap.get(row.id)}</DataTableTd>
-                        <DataTableTd className="font-medium text-slate-900 dark:text-slate-100">{row.name}</DataTableTd>
+                        <DataTableTd className="text-slate-500 dark:text-slate-500 font-medium whitespace-nowrap">{displayIdMap.get(row.id)}</DataTableTd>
+                        <DataTableTd className="font-medium text-slate-900 dark:text-slate-800">{row.name}</DataTableTd>
                         {visibleCols.account && (
                           <DataTableTd>
                             {row.company ? (
-                              <span className="inline-flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                              <span className="inline-flex items-center gap-2 text-slate-700 dark:text-slate-600">
                                 <span className="h-6 w-6 rounded-full bg-blue-600 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
                                   {row.company.charAt(0).toUpperCase()}
                                 </span>
@@ -474,16 +486,16 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                             ) : <span className="text-slate-400 dark:text-slate-500">—</span>}
                           </DataTableTd>
                         )}
-                        {visibleCols.value && <DataTableTd className="text-slate-600 dark:text-slate-300">{money(Number(row.deal_value || 0))}</DataTableTd>}
+                        {visibleCols.value && <DataTableTd className="text-slate-600 dark:text-slate-600">{money(Number(row.deal_value || 0))}</DataTableTd>}
                         {visibleCols.stage && <DataTableTd><Badge variant={stageBadgeVariant(row.stage)}>{STAGE_TABLE_LABEL[row.stage]}</Badge></DataTableTd>}
-                        {visibleCols.closeDate && <DataTableTd className="text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.expected_close_date ? formatDate(row.expected_close_date) : "—"}</DataTableTd>}
+                        {visibleCols.closeDate && <DataTableTd className="text-slate-500 dark:text-slate-500 whitespace-nowrap">{row.expected_close_date ? formatDate(row.expected_close_date) : "—"}</DataTableTd>}
                         {visibleCols.status && <DataTableTd><OpenClosedPill closed={closed} /></DataTableTd>}
                         <DataTableTd onClick={(e) => e.stopPropagation()}>
                           <div className="relative">
                             <button
                               onClick={() => setEditing(row)}
                               aria-label="Edit opportunity"
-                              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-[var(--muted)] text-slate-400 hover:text-slate-600 dark:hover:text-slate-600"
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
@@ -509,15 +521,15 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                 onDragOver={(e) => { e.preventDefault(); setOverStage(stage); }}
                 onDragLeave={() => setOverStage((s) => (s === stage ? null : s))}
                 onDrop={() => drop(stage)}
-                className={`w-72 flex-shrink-0 rounded-xl border transition-colors ${overStage === stage ? "border-blue-400 bg-blue-50/50 dark:bg-blue-950/20" : "border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60"}`}
+                className={`w-72 flex-shrink-0 rounded-xl border transition-colors ${overStage === stage ? "border-blue-400 bg-blue-50/50 dark:bg-blue-950/20" : "border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-[var(--muted)]"}`}
               >
                 <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${STAGE_ACCENT[stage]}`} />
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{STAGE_LABELS[stage]}</span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-700">{STAGE_LABELS[stage]}</span>
                     <span className="text-xs text-slate-400 dark:text-slate-500">{items.length}</span>
                   </div>
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{money(colValue)}</span>
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-500">{money(colValue)}</span>
                 </div>
                 <div className="p-2 space-y-2 min-h-[80px]">
                   {items.map((row) => (
@@ -534,7 +546,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{row.name}</p>
                           {row.company && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                            <p className="text-xs text-slate-500 dark:text-slate-500 flex items-center gap-1 mt-0.5 truncate">
                               <Building2 className="h-3 w-3 flex-shrink-0" /> {row.company}
                             </p>
                           )}
@@ -606,33 +618,33 @@ function EditOpportunityModal({ row, onClose, onSaved }: { row: OpportunityRow; 
     <Modal open onClose={onClose} title="Edit opportunity" size="md">
       <div className="p-5 space-y-3">
         <div>
-          <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Deal name</label>
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-600">Deal name</label>
           <input className={field} value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Company</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-600">Company</label>
             <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Deal value ($)</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-600">Deal value ($)</label>
             <input type="number" min="0" className={field} value={value} onChange={(e) => setValue(e.target.value)} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Stage</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-600">Stage</label>
             <select className={field} value={stage} onChange={(e) => setStage(e.target.value as OpportunityStage)}>
               {OPPORTUNITY_STAGES.map((s) => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Expected close</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-600">Expected close</label>
             <input type="date" className={field} value={closeDate} onChange={(e) => setCloseDate(e.target.value)} />
           </div>
         </div>
         <div>
-          <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Notes</label>
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-600">Notes</label>
           <textarea className={field} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
       </div>

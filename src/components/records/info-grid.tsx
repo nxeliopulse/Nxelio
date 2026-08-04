@@ -19,7 +19,7 @@ export function FieldRow({
   if (value === null || value === undefined || value === "") return null;
   return (
     <div className={cn("min-w-0", className)}>
-      <span className="block text-xs text-slate-500 font-medium mb-0.5 dark:text-slate-400">{label}</span>
+      <span className="block text-xs text-slate-500 font-medium mb-0.5 dark:text-slate-500">{label}</span>
       <span className="block text-sm font-semibold text-slate-900 truncate dark:text-white">{value}</span>
     </div>
   );

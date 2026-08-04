@@ -321,8 +321,8 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
             <div className="flex items-center gap-2 flex-wrap">
               {hasPortal && (
                 <Button
-                  variant="outline"
-                  className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                  variant="custom"
+                  className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
                   onClick={goPortal}
                   disabled={portalPending}
                 >
@@ -331,14 +331,15 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                 </Button>
               )}
               <Button
-                variant="outline"
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                variant="custom"
+                className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
                 onClick={() => setCancelOpen(true)}
               >
                 <X className="h-4 w-4" />
                 Cancel subscription
               </Button>
               <Button
+                variant="custom"
                 className="bg-white text-blue-700 hover:bg-blue-50"
                 onClick={() => {
                   const next = plans.find(p => planOrder[p.id] > planOrder[currentPlanId]);
