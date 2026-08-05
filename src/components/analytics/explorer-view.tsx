@@ -55,13 +55,15 @@ export function ExplorerView({
 
   return (
     <div className="space-y-5 pb-10">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
           {activeFolder && <p className="text-xs text-slate-500 mt-0.5">Filtered by category</p>}
         </div>
-        <div className="flex items-center gap-2 flex-wrap ml-auto">
-          <Input leftIcon={<Search className="h-4 w-4" />} placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-48" />
+        <div className="flex items-center gap-2 flex-wrap sm:ml-auto">
+          <div className="w-48">
+            <Input leftIcon={<Search className="h-4 w-4" />} placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
           <Button variant="outline" size="sm" onClick={() => setNewReportOpen(true)}>
             <Plus className="h-4 w-4" /> New report
           </Button>
