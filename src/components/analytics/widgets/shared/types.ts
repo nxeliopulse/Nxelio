@@ -1,4 +1,4 @@
-import type { ChartType, ReportResultRow } from "@/lib/analytics-reports";
+import type { ChartType, ReportResultRow, ChartConfig } from "@/lib/analytics-reports";
 
 export interface WidgetConfig {
   chartType: ChartType;
@@ -10,6 +10,7 @@ export interface WidgetConfig {
   tableColumns?: { key: string; label: string }[];
   /** Leaderboard-style tables (e.g. "Prolific Sales Reps") number each row "1.", "2.", ... */
   showRank?: boolean;
+  chartConfig?: ChartConfig;
 }
 
 export interface WidgetProps {

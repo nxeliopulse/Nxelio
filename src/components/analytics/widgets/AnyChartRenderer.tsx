@@ -33,7 +33,7 @@ export function AnyChartRenderer({
 }) {
   switch (data.kind) {
     case "comparator":
-      return <ComparatorWidget result={data.result} />;
+      return <ComparatorWidget config={config} result={data.result} />;
     case "quadrant":
       return <QuadrantWidget result={data.result} xLabel={quadrantAxisLabels?.x} yLabel={quadrantAxisLabels?.y} />;
     case "cohort":

@@ -55,6 +55,11 @@ export interface ChartConfig {
   cohortBreakdownField?: string;
   /** Anomaly Detection: how many standard deviations from the mean counts as an outlier. */
   anomalyThreshold?: number;
+  // Style variations matching Zoho CRM options
+  kpiStyle?: "standard" | "growth" | "basic";
+  comparatorStyle?: "elegant" | "sport" | "classic";
+  targetMeterStyle?: "dial" | "traffic" | "bar" | "multibar";
+  funnelStyle?: "standard" | "compact" | "segment" | "classic" | "path";
 }
 
 export interface ReportDefinition {

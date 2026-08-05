@@ -42,7 +42,7 @@ export function ReportOpenView({
           <SystemWidget data={systemData} title={report.name} chartType={report.chartType} />
         ) : chartData ? (
           <AnyChartRenderer
-            config={{ chartType: report.chartType, title: report.name }}
+            config={{ chartType: report.chartType, title: report.name, chartConfig: report.chartConfig }}
             data={chartData.kind === "standard" ? { kind: "standard", rows: chartData.rows } : chartData}
             quadrantAxisLabels={{ x: report.chartConfig?.quadrantXLabel, y: report.chartConfig?.quadrantYLabel }}
           />
