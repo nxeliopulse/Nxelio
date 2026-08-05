@@ -4353,3 +4353,61 @@ BEGIN
     PERFORM seed_default_picklists_for_workspace(ws.id);
   END LOOP;
 END $$;
+
+-- >>> FILE: 0088_segment_rule_tree.sql
+-- Segmentation Builder Phase 1: nested rule tree + suppression enforcement.
+
+-- 1. Nested ALL/ANY/NOT rule tree, replacing the flat segment_rules model.
+-- segment_rules stays in place (read-only, for the one-time backfill below and
+-- as a fallback for any code path not yet migrated) — new writes go to rule_json.
+ALTER TABLE segments ADD COLUMN IF NOT EXISTS rule_json JSONB;
+
+-- Backfill every existing segment's flat rules into an equivalent single-level
+-- tree: AND -> ALL, OR -> ANY, so nothing that currently matches stops matching.
+UPDATE segments s
+SET rule_json = jsonb_build_object(
+  'type', 'group',
+  'operator', CASE WHEN s.logic_type = 'OR' THEN 'ANY' ELSE 'ALL' END,
+  'children', COALESCE((
+    SELECT jsonb_agg(
+      jsonb_build_object('type', 'condition', 'field', r.field, 'operator', r.operator, 'value', r.value)
+      ORDER BY r.rule_order
+    )
+    FROM segment_rules r
+    WHERE r.segment_id = s.id
+  ), '[]'::jsonb)
+)
+WHERE s.rule_json IS NULL;
+
+-- 2. Suppression flags on leads — none of these existed before; every send path
+-- silently had zero enforcement of unsubscribe/do-not-contact/bounce status.
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS email_opt_out BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS do_not_contact BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS email_bounced BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- >>> FILE: 0089_ai_prompt_history.sql
+-- AI Builder prompt history — lets a user reuse/regenerate from a recent
+-- prompt instead of retyping it. Scoped per-user (not per-workspace) since
+-- prompt history is a personal convenience, not shared team data.
+CREATE TABLE IF NOT EXISTS ai_segment_prompt_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  prompt TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_segment_prompt_history_user ON ai_segment_prompt_history(user_id, created_at DESC);
+
+ALTER TABLE ai_segment_prompt_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ws_select_ai_segment_prompt_history ON ai_segment_prompt_history;
+CREATE POLICY ws_select_ai_segment_prompt_history ON ai_segment_prompt_history
+  FOR SELECT USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS ws_insert_ai_segment_prompt_history ON ai_segment_prompt_history;
+CREATE POLICY ws_insert_ai_segment_prompt_history ON ai_segment_prompt_history
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS ws_delete_ai_segment_prompt_history ON ai_segment_prompt_history;
+CREATE POLICY ws_delete_ai_segment_prompt_history ON ai_segment_prompt_history
+  FOR DELETE USING (user_id = auth.uid());

@@ -66,3 +66,21 @@ export async function getAuditLog(): Promise<AuditLogRow[]> {
     .limit(200);
   return (data as AuditLogRow[]) || [];
 }
+
+/**
+ * Any workspace member's own view of one record's history — e.g. a segment's
+ * "who changed this and when" — scoped by entity, not admin-gated like the
+ * full workspace-wide audit log above. RLS still limits results to this
+ * workspace's own rows.
+ */
+export async function getEntityAuditLog(entityType: string, entityId: string, limit = 20): Promise<AuditLogRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("audit_log")
+    .select("*")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data as AuditLogRow[]) || [];
+}

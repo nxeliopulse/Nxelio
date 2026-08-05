@@ -9,10 +9,13 @@ export const dynamic = "force-dynamic";
  * Brevo (Sendinblue) event webhook. Configure it in the Brevo dashboard
  * (Transactional → Settings → Webhook) to point at:
  *   https://YOUR_APP_URL/api/brevo/webhook?secret=<BREVO_WEBHOOK_SECRET>
- * Subscribe to: opened, click, hard_bounce, soft_bounce, blocked.
+ * Subscribe to: opened, click, hard_bounce, soft_bounce, blocked, unsubscribe.
  *
  * Each email is sent with the campaign id as a Brevo `tag`, so we can attribute
  * the event back to a campaign, log it as a lead activity, and recompute rates.
+ * Bounce and unsubscribe events also flip a persistent suppression flag on the
+ * lead (leads.email_bounced / email_opt_out) — every future send everywhere
+ * (segment preview, campaign sending) checks these via isSuppressed().
  */
 
 // Brevo event name -> our lead_activities.activity_type
@@ -20,6 +23,7 @@ function mapEvent(event: string): string | null {
   const e = event.toLowerCase();
   if (e.includes("open")) return "EMAIL_OPENED";
   if (e === "click" || e === "clicked") return "EMAIL_CLICKED";
+  if (e.includes("unsubscrib")) return "EMAIL_UNSUBSCRIBED";
   if (e.includes("bounce") || e === "blocked" || e === "spam" || e === "invalid_email") return "EMAIL_BOUNCED";
   return null;
 }
@@ -106,6 +110,12 @@ export async function POST(request: NextRequest) {
     });
     recorded++;
     if (campaignId) touchedCampaigns.add(campaignId);
+
+    if (activityType === "EMAIL_BOUNCED") {
+      await db.from("leads").update({ email_bounced: true }).eq("id", lead.id);
+    } else if (activityType === "EMAIL_UNSUBSCRIBED") {
+      await db.from("leads").update({ email_opt_out: true }).eq("id", lead.id);
+    }
   }
 
   for (const id of touchedCampaigns) {

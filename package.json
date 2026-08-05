@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:ai-builder": "npx tsx scripts/test-ai-builder-resolver.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

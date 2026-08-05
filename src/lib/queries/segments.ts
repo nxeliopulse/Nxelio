@@ -2,12 +2,25 @@
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
-import { leadMatches, isRuleComplete, type EvalRule } from "@/lib/segments";
+import { leadMatchesTree, hasAnyComplete, flatRulesToTree, isSuppressed, validateRuleTree, type Group, type EvalRule } from "@/lib/segments";
 import type { LeadRow } from "@/lib/queries/leads";
 
-// Only the columns a rule can match (see SEGMENT_FIELDS in lib/segments.ts) —
-// keeps the membership scan lightweight.
-const LEAD_MATCH_FIELDS = "id, industry, interest_area, source, status, lead_score, company_size, seniority, country, owner_id, company_name, job_title";
+// Only the columns a rule can match (see SEGMENT_FIELDS in lib/segments.ts),
+// plus the three suppression flags and the fields the sample-prospect preview
+// displays — keeps the membership scan lightweight without a second query.
+const LEAD_MATCH_FIELDS =
+  "id, full_name, job_title, company_name, lead_score, industry, interest_area, source, status, company_size, seniority, country, owner_id, created_at, updated_at, verified, email_opt_out, do_not_contact, email_bounced";
+
+type MatchLead = Record<string, unknown> & {
+  id: string;
+  full_name: string | null;
+  job_title: string | null;
+  company_name: string | null;
+  lead_score: number;
+  email_opt_out: boolean;
+  do_not_contact: boolean;
+  email_bounced: boolean;
+};
 
 export interface SegmentRow {
   id: string;
@@ -16,17 +29,9 @@ export interface SegmentRow {
   segment_type: string;
   status: string;
   logic_type: string;
+  rule_json: Group | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface SegmentRule {
-  id: string;
-  segment_id: string;
-  field: string;
-  operator: string;
-  value: string | null;
-  rule_order: number;
 }
 
 export async function getSegments(): Promise<(SegmentRow & { contacts: number })[]> {
@@ -51,40 +56,33 @@ export async function getSegments(): Promise<(SegmentRow & { contacts: number })
   return segments.map((s, i) => ({ ...s, contacts: counts[i] }));
 }
 
-export async function getSegmentWithRules(id: string) {
+/** Loads a segment's rule tree — falls back to converting its legacy flat
+ *  segment_rules if rule_json is somehow still null (shouldn't happen after
+ *  the Phase 1 backfill, but keeps old segments openable either way). */
+export async function getSegmentWithRules(id: string): Promise<{ segment: SegmentRow | null; rule: Group | null }> {
   const supabase = await createClient();
   const { data: segment } = await supabase.from("segments").select("*").eq("id", id).single();
-  const { data: rules } = await supabase
-    .from("segment_rules")
-    .select("*")
-    .eq("segment_id", id)
-    .order("rule_order");
-  return { segment, rules: rules || [] };
+  if (!segment) return { segment: null, rule: null };
+  if (segment.rule_json) return { segment, rule: segment.rule_json as Group };
+
+  const { data: rules } = await supabase.from("segment_rules").select("field, operator, value, rule_order").eq("segment_id", id).order("rule_order");
+  const rule = flatRulesToTree((rules || []) as EvalRule[], segment.logic_type === "OR" ? "OR" : "AND");
+  return { segment, rule };
 }
 
-export async function createSegment(
-  name: string,
-  description: string,
-  type: string,
-  rules: Omit<SegmentRule, "id" | "segment_id">[],
-  logic: "AND" | "OR" = "AND"
-) {
+export async function createSegment(name: string, description: string, type: string, rule: Group) {
+  const errors = validateRuleTree(rule);
+  if (errors.length) throw new Error(errors[0]);
+
   const supabase = await createClient();
   const { data: segment, error } = await supabase
     .from("segments")
-    .insert({ segment_name: name, description, segment_type: type, status: "Active", logic_type: logic })
+    .insert({ segment_name: name, description, segment_type: type, status: "Active", rule_json: rule })
     .select()
     .single();
   if (error) throw error;
 
-  if (rules.length > 0) {
-    await supabase.from("segment_rules").insert(
-      rules.map((r) => ({ segment_id: segment.id, ...r }))
-    );
-  }
-
-  // Evaluate the rules now so the segment actually has members (was previously
-  // never populated, leaving every segment empty).
+  // Evaluate the rules now so the segment actually has members.
   await materializeSegmentMembers(segment.id);
 
   revalidatePath("/segments");
@@ -92,27 +90,18 @@ export async function createSegment(
   return segment;
 }
 
-/** Updates an existing segment's name/rules/logic and re-evaluates its members. */
-export async function updateSegment(
-  id: string,
-  name: string,
-  description: string,
-  type: string,
-  rules: Omit<SegmentRule, "id" | "segment_id">[],
-  logic: "AND" | "OR" = "AND"
-) {
+/** Updates an existing segment's name/rules and re-evaluates its members. */
+export async function updateSegment(id: string, name: string, description: string, type: string, rule: Group) {
+  const errors = validateRuleTree(rule);
+  if (errors.length) throw new Error(errors[0]);
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("segments")
-    .update({ segment_name: name, description, segment_type: type, logic_type: logic })
+    .update({ segment_name: name, description, segment_type: type, rule_json: rule })
     .eq("id", id);
   if (error) throw error;
 
-  // Replace the rule set wholesale, then recompute membership.
-  await supabase.from("segment_rules").delete().eq("segment_id", id);
-  if (rules.length > 0) {
-    await supabase.from("segment_rules").insert(rules.map((r) => ({ segment_id: id, ...r })));
-  }
   await materializeSegmentMembers(id);
 
   revalidatePath("/segments");
@@ -120,16 +109,39 @@ export async function updateSegment(
   return { id };
 }
 
+export interface SegmentPreview {
+  /** Satisfies the business rules, regardless of contactability. */
+  matched: number;
+  /** Of the matched leads, how many are unsubscribed / do-not-contact / bounced. */
+  suppressed: number;
+  /** matched - suppressed — the count that could actually be enrolled in a campaign. */
+  eligible: number;
+}
+
 /**
- * Counts how many leads a draft rule set would match — used by the builder's
- * live preview (replaces the old Math.random() placeholder). Does not persist.
+ * Evaluates a draft rule tree against real leads — used by the builder's live
+ * preview. Does not persist. Distinguishes matched/suppressed/eligible so a
+ * segment's true business match count is never silently conflated with who
+ * can legally be contacted.
  */
-export async function previewSegmentCount(rules: EvalRule[], logic: "AND" | "OR"): Promise<number> {
-  if (!rules.filter(isRuleComplete).length) return 0;
+export async function previewSegment(rule: Group): Promise<SegmentPreview> {
+  if (!hasAnyComplete(rule)) return { matched: 0, suppressed: 0, eligible: 0 };
   const supabase = await createClient();
   const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
-  if (!leads) return 0;
-  return leads.filter((l) => leadMatches(l as Record<string, unknown>, rules, logic)).length;
+  const matched = ((leads || []) as MatchLead[]).filter((l) => leadMatchesTree(l, rule));
+  const suppressed = matched.filter(isSuppressed).length;
+  return { matched: matched.length, suppressed, eligible: matched.length - suppressed };
+}
+
+/** Five sample matching leads (name/title/company/score) for the preview panel. */
+export async function getSamplePreviewLeads(rule: Group, limit = 5): Promise<{ id: string; name: string; title: string | null; company: string | null; score: number }[]> {
+  if (!hasAnyComplete(rule)) return [];
+  const supabase = await createClient();
+  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
+  return ((leads || []) as MatchLead[])
+    .filter((l) => leadMatchesTree(l, rule) && !isSuppressed(l))
+    .slice(0, limit)
+    .map((l) => ({ id: l.id, name: l.full_name || l.company_name || "—", title: l.job_title, company: l.company_name, score: l.lead_score }));
 }
 
 /**
@@ -144,7 +156,7 @@ export async function createStaticSegment(name: string, description: string, lea
   const supabase = await createClient();
   const { data: segment, error } = await supabase
     .from("segments")
-    .insert({ segment_name: name, description, segment_type: "Static", status: "Active", logic_type: "AND" })
+    .insert({ segment_name: name, description, segment_type: "Static", status: "Active" })
     .select()
     .single();
   if (error) throw error;
@@ -163,35 +175,32 @@ export async function createStaticSegment(name: string, description: string, lea
 }
 
 /**
- * Recomputes a segment's membership from its stored rules: matches every lead in
- * the workspace and rewrites segment_members. Returns the new member count.
- * No-ops for "Static" segments (see createStaticSegment) — their membership is
- * a manually-picked list, not something a rule set should ever recompute.
+ * Recomputes a segment's membership from its stored rule tree: matches every
+ * lead in the workspace and rewrites segment_members. Returns the new member
+ * count. No-ops for "Static" segments (see createStaticSegment) — their
+ * membership is a manually-picked list, not something a rule set should ever
+ * recompute. Membership reflects "Matched", independent of suppression —
+ * suppression is applied downstream at preview/send time, matching the doc's
+ * distinction between Matched, Suppressed, and Eligible.
  */
 export async function materializeSegmentMembers(segmentId: string): Promise<number> {
   const supabase = await createClient();
 
-  const { data: segment } = await supabase.from("segments").select("logic_type, segment_type").eq("id", segmentId).single();
+  const { data: segment } = await supabase.from("segments").select("rule_json, segment_type").eq("id", segmentId).single();
   if (segment?.segment_type === "Static") {
     const { count } = await supabase.from("segment_members").select("*", { count: "exact", head: true }).eq("segment_id", segmentId);
     return count || 0;
   }
-  const logic: "AND" | "OR" = segment?.logic_type === "OR" ? "OR" : "AND";
-
-  const { data: rules } = await supabase
-    .from("segment_rules")
-    .select("field, operator, value")
-    .eq("segment_id", segmentId);
-  const active = (rules || []).filter((r) => isRuleComplete(r as EvalRule)) as EvalRule[];
+  const rule = segment?.rule_json as Group | null;
 
   // Always start clean so removed/edited rules don't leave stale members behind.
   await supabase.from("segment_members").delete().eq("segment_id", segmentId);
-  if (!active.length) return 0;
+  if (!rule || !hasAnyComplete(rule)) return 0;
 
   const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
-  const matchIds = (leads || [])
-    .filter((l) => leadMatches(l as Record<string, unknown>, active, logic))
-    .map((l) => (l as { id: string }).id);
+  const matchIds = ((leads || []) as MatchLead[])
+    .filter((l) => leadMatchesTree(l, rule))
+    .map((l) => l.id);
 
   if (matchIds.length) {
     await supabase.from("segment_members").insert(matchIds.map((lead_id) => ({ segment_id: segmentId, lead_id })));
@@ -212,6 +221,59 @@ export async function deleteSegment(id: string) {
   if (error) throw error;
   revalidatePath("/segments");
   await logAudit({ action: "segment.deleted", entityType: "segment", entityId: id });
+}
+
+/** Clones a segment's rule tree (and, for a Static segment, its exact
+ *  member list) into a new "<name> (Copy)" segment — never shares state with
+ *  the original afterward, so editing the copy can't affect it. */
+export async function duplicateSegment(id: string): Promise<{ id: string }> {
+  const supabase = await createClient();
+  const { data: original } = await supabase.from("segments").select("*").eq("id", id).single();
+  if (!original) throw new Error("Segment not found");
+
+  const { data: copy, error } = await supabase
+    .from("segments")
+    .insert({
+      segment_name: `${original.segment_name} (Copy)`,
+      description: original.description,
+      segment_type: original.segment_type,
+      status: "Active",
+      rule_json: original.rule_json,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  if (original.segment_type === "Static") {
+    const { data: members } = await supabase.from("segment_members").select("lead_id").eq("segment_id", id);
+    if (members?.length) {
+      await supabase.from("segment_members").insert(members.map((m) => ({ segment_id: copy.id, lead_id: m.lead_id })));
+    }
+  } else {
+    await materializeSegmentMembers(copy.id);
+  }
+
+  revalidatePath("/segments");
+  await logAudit({ action: "segment.duplicated", entityType: "segment", entityId: copy.id, entityLabel: copy.segment_name, metadata: { duplicatedFrom: id } });
+  return { id: copy.id };
+}
+
+/** Archives a segment — hidden from the active list, membership stops being
+ *  recalculated, but nothing is deleted (Restore brings it back as-is). */
+export async function archiveSegment(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("segments").update({ status: "Archived" }).eq("id", id);
+  if (error) throw error;
+  revalidatePath("/segments");
+  await logAudit({ action: "segment.archived", entityType: "segment", entityId: id });
+}
+
+export async function restoreSegment(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("segments").update({ status: "Active" }).eq("id", id);
+  if (error) throw error;
+  revalidatePath("/segments");
+  await logAudit({ action: "segment.restored", entityType: "segment", entityId: id });
 }
 
 function csvEscape(val: unknown): string {

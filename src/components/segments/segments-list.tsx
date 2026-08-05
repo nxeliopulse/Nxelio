@@ -21,6 +21,10 @@ import {
   Layers,
   ArrowUpRight,
   Zap,
+  Copy,
+  Archive,
+  ArchiveRestore,
+  History,
 } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,8 +35,9 @@ import { Modal } from "@/components/ui/modal";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
-import { deleteSegment, exportSegmentCsv, refreshSegment, type SegmentRow } from "@/lib/queries/segments";
+import { deleteSegment, exportSegmentCsv, refreshSegment, type SegmentRow, duplicateSegment, archiveSegment, restoreSegment } from "@/lib/queries/segments";
 import { formatDate, cn } from "@/lib/utils";
+import { SegmentHistoryModal } from "@/components/segments/segment-history-modal";
 
 const typeColor: Record<string, "blue" | "purple" | "pink"> = {
   Dynamic: "blue",
@@ -41,10 +46,11 @@ const typeColor: Record<string, "blue" | "purple" | "pink"> = {
   Engagement: "pink",
 };
 
-const statusColor: Record<string, "success" | "warning" | "default"> = {
+const statusColor: Record<string, "success" | "warning" | "default" | "info"> = {
   Active: "success",
   Paused: "warning",
   Draft: "default",
+  Archived: "info",
 };
 
 const SALES_REPS = ["Sarah", "Ryan", "Aisha"];
@@ -77,6 +83,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [page, setPage] = useState(0);
+  const [historySegmentId, setHistorySegmentId] = useState<string | null>(null);
   const PAGE_SIZE = 15;
 
   const filteredSegments = segments.filter((s) => {
@@ -85,7 +92,9 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
       s.segment_name.toLowerCase().includes(search.toLowerCase()) ||
       (s.description && s.description.toLowerCase().includes(search.toLowerCase()));
     const matchesType = typeFilter === "all" || s.segment_type.toLowerCase() === typeFilter.toLowerCase();
-    const matchesStatus = statusFilter === "all" || s.status.toLowerCase() === statusFilter.toLowerCase();
+    // "all" means "all active statuses" — Archived only shows up once the
+    // user explicitly filters for it, so it doesn't clutter the main list.
+    const matchesStatus = statusFilter === "all" ? s.status !== "Archived" : s.status.toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesType && matchesStatus;
   });
   const pageCount = Math.max(1, Math.ceil(filteredSegments.length / PAGE_SIZE));
@@ -109,6 +118,31 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
     start(async () => {
       await deleteSegment(id);
       setSelected((prev) => prev.filter((x) => x !== id));
+    });
+  }
+
+  async function handleDuplicate(id: string, name: string) {
+    start(async () => {
+      await duplicateSegment(id);
+      toast(`Duplicated "${name}" successfully`, "success");
+      router.refresh();
+    });
+  }
+
+  async function handleArchive(id: string, name: string) {
+    if (!(await confirm({ title: "Archive segment?", message: `Archive "${name}"? It will be hidden from the active list but can be restored later.`, confirmLabel: "Archive" }))) return;
+    start(async () => {
+      await archiveSegment(id);
+      toast(`"${name}" archived`, "success");
+      router.refresh();
+    });
+  }
+
+  async function handleRestore(id: string) {
+    start(async () => {
+      await restoreSegment(id);
+      toast(`Segment restored`, "success");
+      router.refresh();
     });
   }
 
@@ -292,6 +326,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
               <option value="active">Active</option>
               <option value="paused">Paused</option>
               <option value="draft">Draft</option>
+              <option value="archived">Archived</option>
             </select>
 
             {/* Action Buttons to match Prospects */}
@@ -440,6 +475,40 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                           <Pencil className="h-4 w-4" />
                         </Link>
                         <button
+                          onClick={() => setHistorySegmentId(s.id)}
+                          title="View history"
+                          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                        >
+                          <History className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDuplicate(s.id, s.segment_name)}
+                          disabled={pending}
+                          title="Duplicate Segment"
+                          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                        {s.status !== "Archived" ? (
+                          <button
+                            onClick={() => handleArchive(s.id, s.segment_name)}
+                            disabled={pending}
+                            title="Archive Segment"
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                          >
+                            <Archive className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleRestore(s.id)}
+                            disabled={pending}
+                            title="Restore Segment"
+                            className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                          >
+                            <ArchiveRestore className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button
                           onClick={() => handleDelete(s.id)}
                           disabled={pending}
                           title="Delete Segment"
@@ -485,9 +554,33 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
                     <span className="text-lg font-bold text-slate-900 dark:text-white tabular-nums">{s.contacts.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleDuplicate(s.id, s.segment_name)}
+                      disabled={pending}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white mr-1"
+                    >
+                      Duplicate
+                    </button>
+                    {s.status !== "Archived" ? (
+                      <button
+                        onClick={() => handleArchive(s.id, s.segment_name)}
+                        disabled={pending}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white mr-1"
+                      >
+                        Archive
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleRestore(s.id)}
+                        disabled={pending}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 mr-1"
+                      >
+                        Restore
+                      </button>
+                    )}
                     <Link
                       href={`/segments/builder?id=${s.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-[var(--primary)] hover:underline"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-[var(--primary)] hover:underline ml-1"
                     >
                       Edit <ArrowUpRight className="h-3.5 w-3.5" />
                     </Link>
@@ -560,6 +653,13 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
           </div>
         </div>
       </Modal>
+
+      {historySegmentId && (
+        <SegmentHistoryModal
+          segmentId={historySegmentId}
+          onClose={() => setHistorySegmentId(null)}
+        />
+      )}
     </div>
   );
 }

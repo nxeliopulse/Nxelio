@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import { substituteMergeTags } from "@/lib/email/merge-tags";
 import { sendEmail as brevoSendEmail } from "@/lib/email/resend";
+import { isSuppressed } from "@/lib/segments";
 import {
   unipileConfigured,
   unipileSendEmail,
@@ -73,6 +74,16 @@ export async function processDueJobs(limit = 25): Promise<ProcessResult> {
     const { data: lead } = await db.from("leads").select("*").eq("id", job.lead_id).single();
     if (!lead) {
       await db.from("outreach_jobs").update({ status: "skipped", last_error: "Lead not found", updated_at: nowIso }).eq("id", job.id);
+      result.skipped++;
+      continue;
+    }
+
+    // Suppression must be rechecked before every step, not just at enrollment
+    // time — a lead can unsubscribe, get marked do-not-contact, or bounce in
+    // between steps. Any of these stops the whole sequence, not just this job.
+    if (isSuppressed(lead)) {
+      await db.from("outreach_jobs").update({ status: "canceled", last_error: "Lead is suppressed (unsubscribed / do-not-contact / bounced)", updated_at: nowIso }).eq("id", job.id);
+      await db.from("outreach_enrollments").update({ status: "exited", updated_at: nowIso }).eq("id", job.enrollment_id);
       result.skipped++;
       continue;
     }
