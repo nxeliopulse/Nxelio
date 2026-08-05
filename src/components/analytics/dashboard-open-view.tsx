@@ -48,6 +48,7 @@ export function DashboardOpenView({ dashboard, resolvedWidgets }: { dashboard: D
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-syncs local widget order after router.refresh() delivers fresh server props to this same, already-mounted instance (e.g. after add/remove/reorder)
     setItems(resolvedWidgets);
   }, [resolvedWidgets]);
 
