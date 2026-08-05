@@ -1,0 +1,11 @@
+-- ============================================================================
+-- 0090 — Per-chart-type config for the report builder's newer component
+-- types (Comparator, Quadrant, Cohort). Additive only: the core report
+-- shape (data_source/metric/group_by/filters/chart_type) is untouched;
+-- chart_config just holds the extra fields those three chart types need
+-- (e.g. Comparator's list of metrics + period mode, Quadrant's second
+-- numeric axis, Cohort's cohort date field/interval/breakdown field).
+-- Zone/Stage/Waterfall/Anomaly Detection need no new fields — they reuse
+-- the existing single-metric + group-by shape, just rendered differently.
+-- ============================================================================
+ALTER TABLE analytics_reports ADD COLUMN IF NOT EXISTS chart_config JSONB NOT NULL DEFAULT '{}'::jsonb;

@@ -553,93 +553,99 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
       {/* ── Optional: LinkedIn + Calendar + Zoom (never block Finish — only the mailbox above is mandatory) ── */}
       {step === 4 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                <LinkedInGlyph className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
+          <Card className="p-5 flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
+                  <LinkedInGlyph className="h-5 w-5" />
+                </div>
                 <h3 className="font-semibold text-slate-900 text-sm">LinkedIn</h3>
-                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Send connection requests and messages from your own LinkedIn account.</p>
-                <div className="mt-3">
-                  {linkedinConnected ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                      <CheckCircle2 className="h-4 w-4" /> Connected
-                    </span>
-                  ) : (
-                    <>
-                      <Button variant="outline" size="sm" onClick={connectLinkedin} disabled={connectingLinkedin} style={LIGHT_OUTLINE_STYLE}>
-                        {connectingLinkedin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />} Connect LinkedIn
-                      </Button>
-                      {linkedinStarted && (
-                        <p className="text-xs text-slate-500 mt-2">Authorize in the new tab, then come back here.</p>
-                      )}
-                    </>
+              </div>
+              <p className="text-xs text-slate-500 mt-2.5 leading-relaxed">Send connection requests and messages from your own LinkedIn account.</p>
+            </div>
+            <div className="mt-4">
+              {linkedinConnected ? (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+                  <CheckCircle2 className="h-4 w-4" /> Connected
+                </span>
+              ) : (
+                <div className="w-full">
+                  <Button variant="outline" size="sm" onClick={connectLinkedin} disabled={connectingLinkedin} style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
+                    {connectingLinkedin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />} Connect LinkedIn
+                  </Button>
+                  {linkedinStarted && (
+                    <p className="text-xs text-slate-500 mt-2">Authorize in the new tab, then come back here.</p>
                   )}
                 </div>
-              </div>
+              )}
             </div>
           </Card>
 
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
+          <Card className="p-5 flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
+                  <Calendar className="h-5 w-5" />
+                </div>
                 <h3 className="font-semibold text-slate-900 text-sm">Calendar</h3>
-                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Sync availability and get real Google Meet links on your meetings.</p>
-                <div className="mt-3">
-                  {calendarConnected ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                      <CheckCircle2 className="h-4 w-4" /> Connected
-                    </span>
-                  ) : calendarProviderStatus.google || calendarProviderStatus.microsoft ? (
-                    <div className="flex flex-wrap gap-2">
-                      {calendarProviderStatus.google && (
-                        <a href="/api/calendar/google/connect?next=/onboarding" target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE}><ExternalLink className="h-3.5 w-3.5" /> Google Calendar</Button>
-                        </a>
-                      )}
-                      {calendarProviderStatus.microsoft && (
-                        <a href="/api/calendar/microsoft/connect?next=/onboarding" target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE}><ExternalLink className="h-3.5 w-3.5" /> Outlook</Button>
-                        </a>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
+              </div>
+              <p className="text-xs text-slate-500 mt-2.5 leading-relaxed">Sync availability and get real Google Meet links on your meetings.</p>
+            </div>
+            <div className="mt-4">
+              {calendarConnected ? (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+                  <CheckCircle2 className="h-4 w-4" /> Connected
+                </span>
+              ) : calendarProviderStatus.google || calendarProviderStatus.microsoft ? (
+                <div className="flex flex-col gap-2 w-full">
+                  {calendarProviderStatus.google && (
+                    <a href="/api/calendar/google/connect?next=/onboarding" target="_blank" rel="noopener noreferrer" className="block w-full">
+                      <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
+                        <ExternalLink className="h-3.5 w-3.5" /> Google Calendar
+                      </Button>
+                    </a>
+                  )}
+                  {calendarProviderStatus.microsoft && (
+                    <a href="/api/calendar/microsoft/connect?next=/onboarding" target="_blank" rel="noopener noreferrer" className="block w-full">
+                      <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
+                        <ExternalLink className="h-3.5 w-3.5" /> Outlook
+                      </Button>
+                    </a>
                   )}
                 </div>
-              </div>
+              ) : (
+                <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
+              )}
             </div>
           </Card>
 
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                <Video className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="font-semibold text-slate-900 text-sm">Zoom</h3>
-                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Create real Zoom meeting links directly from your meetings.</p>
-                <div className="mt-3">
-                  {zoomConnected ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                      <CheckCircle2 className="h-4 w-4" /> Connected
-                    </span>
-                  ) : zoomConfigured ? (
-                    <a href="/api/zoom/connect?next=/onboarding" target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE}><ExternalLink className="h-3.5 w-3.5" /> Connect Zoom</Button>
-                    </a>
-                  ) : (
-                    <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
-                  )}
+          <Card className="p-5 flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
+                  <Video className="h-5 w-5" />
                 </div>
+                <h3 className="font-semibold text-slate-900 text-sm">Zoom</h3>
               </div>
+              <p className="text-xs text-slate-500 mt-2.5 leading-relaxed">Create real Zoom meeting links directly from your meetings.</p>
+            </div>
+            <div className="mt-4">
+              {zoomConnected ? (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+                  <CheckCircle2 className="h-4 w-4" /> Connected
+                </span>
+              ) : zoomConfigured ? (
+                <a href="/api/zoom/connect?next=/onboarding" target="_blank" rel="noopener noreferrer" className="block w-full">
+                  <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
+                    <ExternalLink className="h-3.5 w-3.5" /> Connect Zoom
+                  </Button>
+                </a>
+              ) : (
+                <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
+              )}
             </div>
           </Card>
         </div>
