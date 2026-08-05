@@ -1,12 +1,13 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import DOMPurify from "isomorphic-dompurify";
 
-/** Note bodies are rich text (HTML) from the TipTap editor — sanitize server-side
- *  before storing, as defense in depth on top of the client-side sanitize-on-render. */
+/** Note bodies are rich text (HTML) from the TipTap editor. The actual XSS
+ *  defense is the client-side DOMPurify sanitize that always runs before
+ *  rendering via dangerouslySetInnerHTML (account-notes-card.tsx) — sanitizing
+ *  here too would need jsdom, which Next.js's serverless bundle can't load. */
 function sanitizeBody(html: string): string {
-  return DOMPurify.sanitize(html, { ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "span", "h1", "h2", "h3"], ALLOWED_ATTR: ["href", "target", "rel", "style"] });
+  return html.trim();
 }
 
 export interface AccountNoteFile {
