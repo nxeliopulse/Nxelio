@@ -108,6 +108,20 @@ export function ReportBuilderDrawer({
   const [cohortInterval, setCohortInterval] = useState<"week" | "month">(editReport?.chartConfig?.cohortInterval ?? "month");
   const [cohortBreakdownField, setCohortBreakdownField] = useState<string>(editReport?.chartConfig?.cohortBreakdownField ?? "");
 
+  // Styling options (Zoho style variations)
+  const [kpiStyle, setKpiStyle] = useState<"standard" | "growth" | "basic">(
+    editReport?.chartConfig?.kpiStyle ?? "standard"
+  );
+  const [comparatorStyle, setComparatorStyle] = useState<"elegant" | "sport" | "classic">(
+    editReport?.chartConfig?.comparatorStyle ?? "classic"
+  );
+  const [targetMeterStyle, setTargetMeterStyle] = useState<"dial" | "traffic" | "bar" | "multibar">(
+    editReport?.chartConfig?.targetMeterStyle ?? "dial"
+  );
+  const [funnelStyle, setFunnelStyle] = useState<"standard" | "compact" | "segment" | "classic" | "path">(
+    editReport?.chartConfig?.funnelStyle ?? "standard"
+  );
+
   const [saving, setSaving] = useState(false);
   const [previewData, setPreviewData] = useState<AnyChartData>(EMPTY_PREVIEW);
   const [previewing, setPreviewing] = useState(false);
@@ -121,7 +135,12 @@ export function ReportBuilderDrawer({
   const kind = chartKindFor(chartType);
 
   function buildDefinition(): ReportDefinition {
-    const chartConfig: ChartConfig = {};
+    const chartConfig: ChartConfig = {
+      kpiStyle,
+      comparatorStyle,
+      targetMeterStyle,
+      funnelStyle,
+    };
     let metric: ReportDefinition["metric"] = metricType === "count" ? { type: "count" } : { type: metricType, column: metricColumn };
 
     if (chartType === "comparator") {
@@ -177,6 +196,7 @@ export function ReportBuilderDrawer({
     open, dataSource, metricType, metricColumn, groupBy, chartType, rulesKey,
     comparatorMetricsKey, comparatorPeriod, quadrantXColumn, quadrantYColumn,
     cohortDateField, cohortInterval, cohortBreakdownField,
+    kpiStyle, comparatorStyle, targetMeterStyle, funnelStyle,
   ]);
 
   useEffect(() => {
@@ -200,6 +220,10 @@ export function ReportBuilderDrawer({
     setCohortDateField(editReport?.chartConfig?.cohortDateField ?? "");
     setCohortInterval(editReport?.chartConfig?.cohortInterval ?? "month");
     setCohortBreakdownField(editReport?.chartConfig?.cohortBreakdownField ?? "");
+    setKpiStyle(editReport?.chartConfig?.kpiStyle ?? "standard");
+    setComparatorStyle(editReport?.chartConfig?.comparatorStyle ?? "classic");
+    setTargetMeterStyle(editReport?.chartConfig?.targetMeterStyle ?? "dial");
+    setFunnelStyle(editReport?.chartConfig?.funnelStyle ?? "standard");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editReport]);
 
@@ -484,6 +508,101 @@ export function ReportBuilderDrawer({
           </div>
         </div>
 
+        {/* Style configurations based on selected chart type */}
+        {chartType === "kpi" && (
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">KPI Style</label>
+            <div className="flex gap-2">
+              {(["standard", "growth", "basic"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setKpiStyle(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${
+                    kpiStyle === s
+                      ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {s === "growth" ? "Growth Index" : s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {chartType === "comparator" && (
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Comparator Style</label>
+            <div className="flex gap-2">
+              {(["classic", "elegant", "sport"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setComparatorStyle(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${
+                    comparatorStyle === s
+                      ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {chartType === "gauge" && (
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Target Meter Style</label>
+            <div className="flex flex-wrap gap-2">
+              {(["dial", "traffic", "bar", "multibar"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setTargetMeterStyle(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${
+                    targetMeterStyle === s
+                      ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {s === "dial"
+                    ? "Dial Gauge"
+                    : s === "traffic"
+                    ? "Traffic Lights"
+                    : s === "multibar"
+                    ? "Multiple Bar"
+                    : s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {chartType === "funnel" && (
+          <div>
+            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Funnel Style</label>
+            <div className="flex flex-wrap gap-2">
+              {(["standard", "compact", "segment", "classic", "path"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setFunnelStyle(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${
+                    funnelStyle === s
+                      ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Live preview</label>
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 min-h-[140px]">
@@ -492,7 +611,14 @@ export function ReportBuilderDrawer({
             ) : previewing && previewData === EMPTY_PREVIEW ? (
               <p className="p-5 text-xs text-slate-400 text-center">Loading preview…</p>
             ) : (
-              <AnyChartRenderer config={{ chartType, title: name || "Preview" }} data={previewData} />
+              <AnyChartRenderer
+                config={{
+                  chartType,
+                  title: name || "Preview",
+                  chartConfig: buildDefinition().chartConfig,
+                }}
+                data={previewData}
+              />
             )}
           </div>
         </div>

@@ -47,6 +47,10 @@ export function DashboardOpenView({ dashboard, resolvedWidgets }: { dashboard: D
     listDashboards().then(setAllDashboards);
   }, []);
 
+  useEffect(() => {
+    setItems(resolvedWidgets);
+  }, [resolvedWidgets]);
+
   async function persistOrder(next: ResolvedWidget[]) {
     setItems(next);
     await Promise.all(next.map((r, i) => updateWidgetLayout(r.widget.id, { sortOrder: i })));
@@ -151,7 +155,7 @@ export function DashboardOpenView({ dashboard, resolvedWidgets }: { dashboard: D
                   <SystemWidget data={r.systemData} title={r.report.name} chartType={r.report.chartType} />
                 ) : r.chartData ? (
                   <AnyChartRenderer
-                    config={{ chartType: r.report.chartType, title: r.report.name }}
+                    config={{ chartType: r.report.chartType, title: r.report.name, chartConfig: r.report.chartConfig }}
                     data={r.chartData.kind === "standard" ? { kind: "standard", rows: r.chartData.rows } : r.chartData}
                     quadrantAxisLabels={{ x: r.report.chartConfig?.quadrantXLabel, y: r.report.chartConfig?.quadrantYLabel }}
                   />
