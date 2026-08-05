@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  TrendingUp, Pencil, RefreshCw, User, Link2, Download, FileText, FileSpreadsheet, Upload
+  Pencil, RefreshCw, User, Link2, Download, FileText, FileSpreadsheet, Upload
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -36,11 +36,11 @@ interface ColumnDef { key: ColKey; label: string; defaultOn: boolean }
 // again to flip direction (same mechanism as leads-table.tsx's toggleColumnSort).
 // "name" isn't a ColKey (it's a fixed, always-shown column, not part of the Manage
 // Columns toggle system) but is still a valid sort target, so this is its own type
-// rather than reusing ColKey. "tags" and "rating" are deliberately excluded — both
-// are hash-derived mock display values with no real backing field (see hashCode()
-// below), so there's nothing meaningful to sort by. "contact" (icon buttons) is
-// excluded too, same as leads-table.tsx excludes its own icon-only columns.
-type SortKey = "name" | "phone" | "location" | "status" | "owner" | "created_at";
+// rather than reusing ColKey. "tags"/"rating" are now real columns (contacts.tags,
+// contacts.rating — see 0091/0092 migrations), so they're sortable like Accounts'
+// own Tags/Rating columns. "contact" (icon buttons) stays excluded — not comparable
+// data, same as leads-table.tsx excludes its own icon-only columns.
+type SortKey = "name" | "phone" | "tags" | "location" | "rating" | "contact" | "status" | "owner" | "created_at";
 
 const COLUMNS: ColumnDef[] = [
   { key: "phone", label: "Phone", defaultOn: true },
@@ -125,7 +125,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
       if (rawCols) setCols({ ...DEFAULT_COLS, ...JSON.parse(rawCols) });
 
       const rawStarred = localStorage.getItem("lp_starred_contacts");
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- same one-time init
       if (rawStarred) setStarred(JSON.parse(rawStarred));
     } catch { /* ignore malformed storage */ }
   }, []);
@@ -179,11 +178,13 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
 
   /** Plain-text value of a sortable column. Owner resolves through the `owners` list
    *  (contact_owner is a UUID, not a display name) rather than sorting by raw id. */
-  function getSortText(key: Exclude<SortKey, "created_at" | "status">, c: ContactRow): string {
+  function getSortText(key: Exclude<SortKey, "created_at" | "status" | "rating">, c: ContactRow): string {
     switch (key) {
       case "name": return `${c.first_name} ${c.last_name}`.trim();
       case "phone": return c.phone || "";
+      case "tags": return c.tags || "";
       case "location": return c.mailing_country || "";
+      case "contact": return c.email || "";
       case "owner": return owners.find((o) => o.id === c.contact_owner)?.name || "";
       default: return "";
     }
@@ -219,6 +220,16 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
     if (sortKey === "status") {
       const rank = (c: ContactRow) => (c.email_opt_out ? 1 : 0);
       const cmp = rank(a) - rank(b);
+      return sortDir === "asc" ? cmp : -cmp;
+    }
+    // Rating is numeric (1-5), not text — blanks (no rating set) always sort last.
+    if (sortKey === "rating") {
+      const aBlank = a.rating == null;
+      const bBlank = b.rating == null;
+      if (aBlank && bBlank) return 0;
+      if (aBlank) return 1;
+      if (bBlank) return -1;
+      const cmp = a.rating! - b.rating!;
       return sortDir === "asc" ? cmp : -cmp;
     }
     return compareTextBlankLast(getSortText(sortKey, a), getSortText(sortKey, b), sortDir);
@@ -639,21 +650,28 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                       <span className="inline-flex items-center gap-1">Phone{renderSortIcon("phone", "Phone")}</span>
                     </DataTableTh>
                   )}
-                  {/* Tags is a hash-derived mock display value (see hashCode()) with no
-                      real backing field — deliberately not sortable. */}
-                  {cols.tags && <DataTableTh className="px-3 py-2.5">Tags</DataTableTh>}
+                  {cols.tags && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Tags{renderSortIcon("tags", "Tags")}</span>
+                    </DataTableTh>
+                  )}
                   {cols.location && (
                     <DataTableTh className="px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Location{renderSortIcon("location", "Location")}</span>
                     </DataTableTh>
                   )}
-                  {/* Rating is also a hash-derived mock value with no real backing
-                      field — deliberately not sortable, same reasoning as Tags. */}
-                  {cols.rating && <DataTableTh className="px-3 py-2.5">Rating</DataTableTh>}
-                  {/* Contact is icon buttons (mail/phone/message/eye), not comparable
-                      data — deliberately not sortable, matches leads-table.tsx's own
-                      pattern of excluding icon-only columns. */}
-                  {cols.contact && <DataTableTh className="px-3 py-2.5 text-center">Contact</DataTableTh>}
+                  {cols.rating && (
+                    <DataTableTh className="px-3 py-2.5">
+                      <span className="inline-flex items-center gap-1">Rating{renderSortIcon("rating", "Rating")}</span>
+                    </DataTableTh>
+                  )}
+                  {/* Contact is icon buttons (mail/phone/message/eye) — sorts by email,
+                      the most meaningful of the four fields behind those icons. */}
+                  {cols.contact && (
+                    <DataTableTh className="px-3 py-2.5 text-center">
+                      <span className="inline-flex items-center gap-1 justify-center">Contact{renderSortIcon("contact", "Contact")}</span>
+                    </DataTableTh>
+                  )}
                   {cols.status && (
                     <DataTableTh className="px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Status{renderSortIcon("status", "Status")}</span>
@@ -682,20 +700,13 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                   const isStarred = starred.includes(c.id);
                   const isChecked = selected.includes(c.id);
                   
-                  // Consistent derived tags, flags, rating, status
-                  const tagsList = ["Collab", "VIP", "Promotion"];
-                  const tag = tagsList[hashCode(c.id) % tagsList.length];
-                  const tagColor = tag === "Collab"
-                    ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-250 dark:border-emerald-800/40"
-                    : tag === "VIP"
-                      ? "text-amber-500 bg-amber-50 dark:bg-amber-950/20 border-amber-250 dark:border-amber-800/40"
-                      : "text-rose-500 bg-rose-50 dark:bg-rose-950/20 border-rose-250 dark:border-rose-800/40";
+                  // Derived flags/status; Tags and Rating now come straight off the
+                  // real contact record (contacts.tags, contacts.rating), no mock.
+                  const rowTags = (c.tags || "").split(",").map((t) => t.trim()).filter(Boolean);
 
                   const countries = ["USA", "UAE", "Germany", "France", "India", "Brazil", "Mexico"];
                   const countryName = c.mailing_country || countries[hashCode(c.id) % countries.length];
                   const flag = getFlagEmoji(countryName);
-
-                  const rating = (3.0 + (hashCode(c.id) % 21) * 0.1).toFixed(1);
 
                   const status = c.email_opt_out ? "Inactive" : "Active";
                   const statusColor = status === "Active"
@@ -772,9 +783,18 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                       {/* Tags Column */}
                       {cols.tags && (
                         <td className="px-3 py-2.5">
-                          <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold border", tagColor)}>
-                            {tag}
-                          </span>
+                          {rowTags.length ? (
+                            <div className="flex flex-wrap gap-1 max-w-[160px]">
+                              {rowTags.slice(0, 2).map((t) => (
+                                <span key={t} className="px-2 py-0.5 rounded text-[10px] font-bold border text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800/40 dark:text-blue-400 whitespace-nowrap">
+                                  {t}
+                                </span>
+                              ))}
+                              {rowTags.length > 2 && <span className="text-[10px] text-slate-400 font-semibold">+{rowTags.length - 2}</span>}
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-700">—</span>
+                          )}
                         </td>
                       )}
 
@@ -791,10 +811,14 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                       {/* Rating Column */}
                       {cols.rating && (
                         <td className="px-3 py-2.5">
-                          <div className="flex items-center gap-1 font-bold text-slate-700 dark:text-slate-350">
-                            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 flex-shrink-0" />
-                            <span>{rating}</span>
-                          </div>
+                          {c.rating != null ? (
+                            <div className="flex items-center gap-1 font-bold text-slate-700 dark:text-slate-350">
+                              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 flex-shrink-0" />
+                              <span>{c.rating}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-700">—</span>
+                          )}
                         </td>
                       )}
 
@@ -903,18 +927,11 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE).map((c) => {
             const isStarred = starred.includes(c.id);
-            const tagsList = ["Collab", "VIP", "Promotion"];
-            const tag = tagsList[hashCode(c.id) % tagsList.length];
-            const tagColor = tag === "Collab"
-              ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-250"
-              : tag === "VIP"
-                ? "text-amber-500 bg-amber-50 dark:bg-amber-950/20 border-amber-250"
-                : "text-rose-500 bg-rose-50 dark:bg-rose-950/20 border-rose-250";
+            const rowTags = (c.tags || "").split(",").map((t) => t.trim()).filter(Boolean);
 
             const countries = ["USA", "UAE", "Germany", "France", "India", "Brazil", "Mexico"];
             const countryName = c.mailing_country || countries[hashCode(c.id) % countries.length];
             const flag = getFlagEmoji(countryName);
-            const rating = (3.0 + (hashCode(c.id) % 21) * 0.1).toFixed(1);
 
             const status = c.email_opt_out ? "Inactive" : "Active";
             const statusColor = status === "Active"
@@ -968,10 +985,26 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                   <div className="flex justify-between">
                     <span className="text-slate-400">Rating:</span>
                     <span className="text-slate-800 dark:text-slate-700 flex items-center gap-1">
-                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                      <span>{rating}</span>
+                      {c.rating != null ? (
+                        <>
+                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          <span>{c.rating}</span>
+                        </>
+                      ) : "—"}
                     </span>
                   </div>
+                  {rowTags.length > 0 && (
+                    <div className="flex justify-between items-start">
+                      <span className="text-slate-400 flex-shrink-0">Tags:</span>
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {rowTags.slice(0, 2).map((t) => (
+                          <span key={t} className="px-1.5 py-0.5 rounded text-[10px] font-bold border text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800/40 dark:text-blue-400">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Grid contact quick action footer */}

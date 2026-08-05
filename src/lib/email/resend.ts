@@ -52,6 +52,9 @@ interface SendArgs {
   /** Where replies should land. Callers should pass the workspace's actually-connected
    *  mailbox address when known — falls back to REPLY_TO_EMAIL only if omitted. */
   replyTo?: string;
+  /** Optional extra recipients — supported by Brevo's API directly. */
+  cc?: string[];
+  bcc?: string[];
 }
 
 function toHtml(html?: string, text?: string): string {
@@ -61,7 +64,7 @@ function toHtml(html?: string, text?: string): string {
   );
 }
 
-async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo }: SendArgs): Promise<SendResult> {
+async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo, cc, bcc }: SendArgs): Promise<SendResult> {
   const effectiveReplyTo = replyTo || REPLY_TO_EMAIL;
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -81,6 +84,8 @@ async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo }
       textContent: text || html?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
       ...(effectiveReplyTo ? { replyTo: { email: effectiveReplyTo } } : {}),
       ...(tags && tags.length ? { tags } : {}),
+      ...(cc && cc.length ? { cc: cc.map((email) => ({ email })) } : {}),
+      ...(bcc && bcc.length ? { bcc: bcc.map((email) => ({ email })) } : {}),
     }),
   });
 

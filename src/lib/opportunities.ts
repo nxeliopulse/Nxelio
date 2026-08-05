@@ -40,6 +40,16 @@ export interface OpportunityRow {
   expected_close_date: string | null;
   notes: string | null;
   closed_at: string | null;
+  pipeline: string | null;
+  currency: string | null;
+  period: string | null;
+  period_value: number | null;
+  due_date: string | null;
+  follow_up_date: string | null;
+  source: string | null;
+  tags: string | null;
+  priority: "Low" | "Medium" | "High" | null;
+  projects: string | null;
   created_at: string;
   updated_at: string;
 }

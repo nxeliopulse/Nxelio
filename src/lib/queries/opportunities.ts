@@ -21,6 +21,28 @@ export async function getOpportunityById(id: string): Promise<OpportunityRow | n
   return data as OpportunityRow | null;
 }
 
+/** A single contact's deals, newest-first — for the "Create New File" modal's Deal picker. */
+export async function getOpportunitiesForContact(contactId: string): Promise<OpportunityRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("opportunities")
+    .select("*")
+    .eq("contact_id", contactId)
+    .order("created_at", { ascending: false });
+  return (data as OpportunityRow[]) || [];
+}
+
+/** A single account's deals, newest-first — for the "Create New File" modal's Deal picker. */
+export async function getOpportunitiesForAccount(accountId: string): Promise<OpportunityRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("opportunities")
+    .select("*")
+    .eq("account_id", accountId)
+    .order("created_at", { ascending: false });
+  return (data as OpportunityRow[]) || [];
+}
+
 export async function getOpportunitiesForLead(leadId: string): Promise<OpportunityRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -121,6 +143,157 @@ export async function createOpportunityFromLead(input: CreateOpportunityInput): 
   revalidatePath(`/leads/${input.leadId}`);
   revalidatePath("/dashboard");
   await logAudit({ action: "opportunity.created", entityType: "opportunity", entityId: data.id, entityLabel: input.name, metadata: { deal_value: input.dealValue, lead_id: input.leadId } });
+  return data as OpportunityRow;
+}
+
+export interface CreateOpportunityFromContactInput {
+  contactId: string;
+  accountId?: string | null;
+  name: string;
+  company?: string | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  dealValue: number;
+  stage?: OpportunityStage;
+  pipeline?: string | null;
+  currency?: string | null;
+  period?: string | null;
+  periodValue?: number | null;
+  dueDate?: string | null;
+  expectedCloseDate?: string | null;
+  ownerId?: string | null;
+  followUpDate?: string | null;
+  source?: string | null;
+  tags?: string | null;
+  priority?: "Low" | "Medium" | "High" | null;
+  projects?: string | null;
+  notes?: string | null;
+}
+
+/** Creates a deal from a Contact's "+ Add Deal" button — links via the real
+ *  contact_id/account_id FKs (0084_lead_conversion.sql), not just the
+ *  denormalized company/contact_name/contact_email snapshot (kept too, for
+ *  consistency with how Leads' converted opportunities already look). */
+export async function createOpportunityFromContact(input: CreateOpportunityFromContactInput): Promise<OpportunityRow> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase
+    .from("opportunities")
+    .insert({
+      lead_id: null,
+      contact_id: input.contactId,
+      account_id: input.accountId ?? null,
+      name: input.name,
+      company: input.company ?? null,
+      contact_name: input.contactName ?? null,
+      contact_email: input.contactEmail ?? null,
+      deal_value: input.dealValue || 0,
+      stage: input.stage || "new",
+      pipeline: input.pipeline ?? null,
+      currency: input.currency ?? null,
+      period: input.period ?? null,
+      period_value: input.periodValue ?? null,
+      due_date: input.dueDate ?? null,
+      expected_close_date: input.expectedCloseDate ?? null,
+      follow_up_date: input.followUpDate ?? null,
+      source: input.source ?? null,
+      tags: input.tags ?? null,
+      priority: input.priority ?? null,
+      projects: input.projects ?? null,
+      notes: input.notes ?? null,
+      owner_id: input.ownerId ?? user?.id ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  await notifyCurrentUser({
+    type: "opportunity",
+    title: "New deal created",
+    message: `${input.name}${input.dealValue ? ` — $${input.dealValue.toLocaleString()}` : ""}`,
+    link: "/opportunities",
+  });
+
+  revalidatePath("/opportunities");
+  revalidatePath(`/contacts/${input.contactId}`);
+  revalidatePath("/dashboard");
+  await logAudit({ action: "opportunity.created", entityType: "opportunity", entityId: data.id, entityLabel: input.name, metadata: { deal_value: input.dealValue, contact_id: input.contactId } });
+  return data as OpportunityRow;
+}
+
+export interface CreateOpportunityFromAccountInput {
+  accountId: string;
+  contactId?: string | null;
+  name: string;
+  company?: string | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  dealValue: number;
+  stage?: OpportunityStage;
+  pipeline?: string | null;
+  currency?: string | null;
+  period?: string | null;
+  periodValue?: number | null;
+  dueDate?: string | null;
+  expectedCloseDate?: string | null;
+  ownerId?: string | null;
+  followUpDate?: string | null;
+  source?: string | null;
+  tags?: string | null;
+  priority?: "Low" | "Medium" | "High" | null;
+  projects?: string | null;
+  notes?: string | null;
+}
+
+/** Creates a deal from an Account's "+ Add Deal" button — same shape as
+ *  createOpportunityFromContact, but contact_id is optional since a deal can
+ *  be tied to a company with no specific contact picked yet. */
+export async function createOpportunityFromAccount(input: CreateOpportunityFromAccountInput): Promise<OpportunityRow> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase
+    .from("opportunities")
+    .insert({
+      lead_id: null,
+      contact_id: input.contactId ?? null,
+      account_id: input.accountId,
+      name: input.name,
+      company: input.company ?? null,
+      contact_name: input.contactName ?? null,
+      contact_email: input.contactEmail ?? null,
+      deal_value: input.dealValue || 0,
+      stage: input.stage || "new",
+      pipeline: input.pipeline ?? null,
+      currency: input.currency ?? null,
+      period: input.period ?? null,
+      period_value: input.periodValue ?? null,
+      due_date: input.dueDate ?? null,
+      expected_close_date: input.expectedCloseDate ?? null,
+      follow_up_date: input.followUpDate ?? null,
+      source: input.source ?? null,
+      tags: input.tags ?? null,
+      priority: input.priority ?? null,
+      projects: input.projects ?? null,
+      notes: input.notes ?? null,
+      owner_id: input.ownerId ?? user?.id ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  await notifyCurrentUser({
+    type: "opportunity",
+    title: "New deal created",
+    message: `${input.name}${input.dealValue ? ` — $${input.dealValue.toLocaleString()}` : ""}`,
+    link: "/opportunities",
+  });
+
+  revalidatePath("/opportunities");
+  revalidatePath(`/accounts/${input.accountId}`);
+  revalidatePath("/dashboard");
+  await logAudit({ action: "opportunity.created", entityType: "opportunity", entityId: data.id, entityLabel: input.name, metadata: { deal_value: input.dealValue, account_id: input.accountId } });
   return data as OpportunityRow;
 }
 
