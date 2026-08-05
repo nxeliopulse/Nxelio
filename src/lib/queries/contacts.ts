@@ -38,13 +38,32 @@ export interface ContactRow {
   secondary_email: string | null;
   twitter: string | null;
   linkedin: string | null;
+  facebook: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+  youtube: string | null;
+  pinterest: string | null;
   description: string | null;
+  photo_url: string | null;
+  tags: string | null;
+  rating: number | null;
+  industry: string | null;
+  language: string | null;
+  currency: string | null;
+  visibility: "public" | "private" | "select_people";
+  visible_to: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface ContactWithAccount extends ContactRow {
-  account: { id: string; account_name: string } | null;
+  account: { id: string; account_name: string; website: string | null } | null;
+}
+
+export async function getContactsCount(): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase.from("contacts").select("id", { count: "exact", head: true });
+  return count ?? 0;
 }
 
 export async function getContacts(): Promise<ContactRow[]> {
@@ -64,7 +83,7 @@ export async function getContactById(id: string): Promise<ContactWithAccount | n
   const supabase = await createClient();
   const { data } = await supabase
     .from("contacts")
-    .select("*, account:accounts(id, account_name)")
+    .select("*, account:accounts(id, account_name, website)")
     .eq("id", id)
     .single();
   return data as ContactWithAccount | null;
