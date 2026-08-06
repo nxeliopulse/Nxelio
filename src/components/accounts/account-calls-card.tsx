@@ -38,7 +38,7 @@ export function AccountCallsCard({ accountId, calls, onAddNew }: { accountId: st
     <div className="space-y-3">
       <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80">
         <h5 className="font-bold text-slate-800 dark:text-slate-700 text-xs">Calls</h5>
-        <button onClick={onAddNew} className="text-[11px] font-bold text-rose-600 hover:underline flex items-center gap-1">
+        <button onClick={onAddNew} className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
           <Plus className="h-3 w-3" /> Add New
         </button>
       </div>

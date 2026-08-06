@@ -90,7 +90,7 @@ export function ContactNotesCard({ contactId, notes }: { contactId: string; note
               </>
             )}
           </div>
-          <button onClick={() => setAddOpen(true)} className="text-[11px] font-bold text-rose-600 hover:underline flex items-center gap-1">
+          <button onClick={() => setAddOpen(true)} className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
             <Plus className="h-3 w-3" /> Add New
           </button>
         </div>
@@ -183,7 +183,7 @@ function NoteItem({ note, contactId, onDelete }: { note: ContactNoteRow; contact
               <RichTextEditor value={editBody} onChange={setEditBody} minHeight={90} toolbar="compact" />
               <div className="flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={pending} className="h-7 text-[11px]">Cancel</Button>
-                <Button size="sm" onClick={saveEdit} disabled={pending} className="h-7 text-[11px] bg-rose-600 hover:bg-rose-700 text-white">Save</Button>
+                <Button size="sm" onClick={saveEdit} disabled={pending} className="h-7 text-[11px] bg-blue-600 hover:bg-blue-700 text-white">Save</Button>
               </div>
             </div>
           ) : (
@@ -236,7 +236,7 @@ function NoteItem({ note, contactId, onDelete }: { note: ContactNoteRow; contact
               <Button size="sm" onClick={submitReply} disabled={pending || !reply.trim()} className="h-7 text-[11px]">Send</Button>
             </div>
           ) : (
-            <button onClick={() => setReplyOpen(true)} className="mt-2 text-[11px] font-bold text-rose-600 hover:underline flex items-center gap-1">
+            <button onClick={() => setReplyOpen(true)} className="mt-2 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
               <Plus className="h-3 w-3" /> Add Comment
             </button>
           ))}

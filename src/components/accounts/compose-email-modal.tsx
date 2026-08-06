@@ -111,13 +111,13 @@ export function ComposeEmailModal({
             <RichTextEditor value={body} onChange={setBody} toolbar="compact" minHeight={110} />
           </div>
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
-            <Button onClick={handleSend} disabled={busy !== null} className="bg-rose-600 hover:bg-rose-700 text-white">
+            <Button onClick={handleSend} disabled={busy !== null} className="bg-blue-600 hover:bg-blue-700 text-white">
               {busy === "send" ? "Sending…" : "Send"}
             </Button>
-            <Button onClick={handleDraft} disabled={busy !== null} className="bg-rose-600 hover:bg-rose-700 text-white">
+            <Button variant="outline" onClick={handleDraft} disabled={busy !== null}>
               {busy === "draft" ? "Saving…" : "Draft"}
             </Button>
-            <Button onClick={handleDelete} disabled={busy !== null} className="bg-rose-600 hover:bg-rose-700 text-white">
+            <Button variant="outline" onClick={handleDelete} disabled={busy !== null} className="border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-950/30">
               {busy === "delete" ? "…" : "Delete"}
             </Button>
           </div>

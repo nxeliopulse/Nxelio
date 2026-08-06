@@ -44,7 +44,7 @@ export function AccountEmailCard({
             <h5 className="font-bold text-slate-800 dark:text-slate-700 text-sm">Manage Emails</h5>
             <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-0.5">You can send and reply to emails directly via this section.</p>
           </div>
-          <button onClick={() => setConnectOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex-shrink-0">
+          <button onClick={() => setConnectOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex-shrink-0">
             Connect Account
           </button>
         </div>
@@ -56,7 +56,7 @@ export function AccountEmailCard({
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button size="sm" onClick={openCompose} className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white">
+        <Button size="sm" onClick={openCompose} className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white">
           <Send className="h-3.5 w-3.5" /> Compose Email
         </Button>
       </div>
@@ -68,7 +68,7 @@ export function AccountEmailCard({
           <p className="text-[11px] text-slate-500 dark:text-slate-500 max-w-sm mx-auto mb-3">
             Draft and send a real email, or reply to what you&apos;ve already sent.
           </p>
-          <Button onClick={openCompose} className="text-xs h-8 bg-rose-600 hover:bg-rose-700 text-white font-bold px-4">
+          <Button onClick={openCompose} className="text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white font-bold px-4">
             Compose Email
           </Button>
         </Card>

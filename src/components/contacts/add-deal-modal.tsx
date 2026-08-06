@@ -291,7 +291,7 @@ export function AddDealModal({
 
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 sticky bottom-0 bg-white dark:bg-slate-900">
             <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button onClick={save} disabled={saving} className="bg-rose-600 hover:bg-rose-700 text-white">
+            <Button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white">
               {saving ? "Creating…" : "Create"}
             </Button>
           </div>

@@ -33,7 +33,7 @@ export function AccountDocumentsCard({ accountId, documents, owners, onAddNew }:
           <h5 className="font-bold text-slate-800 dark:text-slate-700 text-sm">Manage Documents</h5>
           <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-0.5">Upload and track quotes, proposals and contracts for this account.</p>
         </div>
-        <Button onClick={onAddNew} className="bg-rose-600 hover:bg-rose-700 text-white flex-shrink-0 gap-1.5">
+        <Button onClick={onAddNew} className="bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0 gap-1.5">
           <Upload className="h-3.5 w-3.5" /> Create Document
         </Button>
       </div>

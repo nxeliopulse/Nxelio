@@ -67,7 +67,7 @@ export function ConnectAccountModal({ open, onClose }: { open: boolean; onClose:
           </div>
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
             <Button variant="outline" onClick={onClose} disabled={connecting}>Cancel</Button>
-            <Button onClick={connect} disabled={connecting} className="bg-rose-600 hover:bg-rose-700 text-white gap-1.5">
+            <Button onClick={connect} disabled={connecting} className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
               {connecting ? "Opening…" : <>Connect Account <ExternalLink className="h-3.5 w-3.5" /></>}
             </Button>
           </div>

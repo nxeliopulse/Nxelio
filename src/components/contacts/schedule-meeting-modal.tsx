@@ -144,7 +144,7 @@ export function ScheduleMeetingModal({
           </div>
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
             <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button onClick={save} disabled={saving} className="bg-slate-900 hover:bg-slate-800 text-white">
+            <Button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white">
               {saving ? "Scheduling…" : "Schedule Meeting"}
             </Button>
           </div>

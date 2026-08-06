@@ -101,7 +101,7 @@ export function AddDocumentModal({ open, onClose, accountId, owners, deals = [] 
         <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto">
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <h2 className="font-bold text-base text-slate-900 dark:text-white">Create New File</h2>
-            <button onClick={handleClose} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-full p-1.5">
+            <button onClick={handleClose} className="text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg p-1.5">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -109,13 +109,13 @@ export function AddDocumentModal({ open, onClose, accountId, owners, deals = [] 
           <div className="p-4 pb-0 flex items-center gap-2">
             <button
               onClick={() => setTab("basic")}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold ${tab === "basic" ? "bg-rose-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"}`}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold ${tab === "basic" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"}`}
             >
               <FileText className="h-3.5 w-3.5" /> Basic Info
             </button>
             <button
               onClick={() => setTab("recipients")}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold ${tab === "recipients" ? "bg-rose-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"}`}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold ${tab === "recipients" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"}`}
             >
               <UserPlus className="h-3.5 w-3.5" /> Add Recipient
             </button>
@@ -221,7 +221,7 @@ export function AddDocumentModal({ open, onClose, accountId, owners, deals = [] 
                 <button
                   type="button"
                   onClick={() => setRecipients((r) => [...r, { name: "", email: "" }])}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   <Plus className="h-3.5 w-3.5" /> Add another recipient
                 </button>
@@ -231,7 +231,7 @@ export function AddDocumentModal({ open, onClose, accountId, owners, deals = [] 
 
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
             <Button variant="outline" onClick={handleClose} disabled={saving}>Cancel</Button>
-            <Button onClick={save} disabled={saving} className="bg-rose-600 hover:bg-rose-700 text-white">
+            <Button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white">
               {saving ? "Creating…" : "Create"}
             </Button>
           </div>

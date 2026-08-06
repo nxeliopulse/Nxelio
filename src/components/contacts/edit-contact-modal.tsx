@@ -333,7 +333,7 @@ export function EditContactModal({
               </div>
               <div>
                 <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif" className="hidden" onChange={handlePhotoSelect} />
-                <Button type="button" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploadingPhoto} className="h-8 text-xs px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white gap-1.5">
+                <Button type="button" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploadingPhoto} className="h-8 text-xs px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
                   <Upload className="h-3.5 w-3.5" />
                   {uploadingPhoto ? "Uploading..." : "Upload file"}
                 </Button>
@@ -582,7 +582,7 @@ export function EditContactModal({
           <Button variant="outline" onClick={() => handleSave(true)} disabled={saving} className="rounded-lg px-4 py-2 font-semibold text-sm border-slate-200 h-10">
             Save and New
           </Button>
-          <Button onClick={() => handleSave(false)} disabled={saving} className="rounded-lg px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold h-10 shadow-sm">
+          <Button onClick={() => handleSave(false)} disabled={saving} className="rounded-lg px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 shadow-sm">
             {saving ? "Saving…" : isEdit ? "Save" : "Create New"}
           </Button>
         </div>

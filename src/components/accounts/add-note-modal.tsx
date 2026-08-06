@@ -77,7 +77,7 @@ export function AddNoteModal({ open, onClose, accountId }: { open: boolean; onCl
         <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto">
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <h2 className="font-bold text-base text-slate-900 dark:text-white">Add New Notes</h2>
-            <button onClick={handleClose} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-full p-1.5">
+            <button onClick={handleClose} className="text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg p-1.5">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -106,7 +106,7 @@ export function AddNoteModal({ open, onClose, accountId }: { open: boolean; onCl
                 <FolderOpen className="h-6 w-6 text-rose-400 mx-auto mb-2" />
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   Drop your files here or{" "}
-                  <button type="button" onClick={() => fileRef.current?.click()} className="text-rose-600 font-semibold hover:underline">
+                  <button type="button" onClick={() => fileRef.current?.click()} className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
                     browse
                   </button>
                 </p>
@@ -137,7 +137,7 @@ export function AddNoteModal({ open, onClose, accountId }: { open: boolean; onCl
 
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
             <Button variant="outline" onClick={handleClose} disabled={saving}>Cancel</Button>
-            <Button onClick={save} disabled={saving} className="bg-rose-600 hover:bg-rose-700 text-white">
+            <Button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white">
               {saving ? "Saving…" : "Confirm"}
             </Button>
           </div>
