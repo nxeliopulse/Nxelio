@@ -172,11 +172,14 @@ export function AddLeadsWizard({
   open,
   onClose,
   initialSource,
+  initialEntry,
 }: {
   open: boolean;
   onClose: () => void;
   /** Jumps straight to that source's data-entry screen (step 2) instead of the source picker — used by toolbar quick-add shortcuts. */
   initialSource?: SourceId | null;
+  /** Phase 2 — pre-fills the manual-entry form (assistant "open_lead_form" UI action). Nothing is saved until the user imports. */
+  initialEntry?: Partial<ManualEntry> | null;
 }) {
   const router = useRouter();
   const { confirm } = useFeedback();
@@ -195,6 +198,18 @@ export function AddLeadsWizard({
   const [csvName, setCsvName] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Phase 2 — assistant "open_lead_form" pre-fill: jump to Manual Entry with
+  // the provided details (name/email/company/title/phone). Not saved until the
+  // user imports, so this never mutates data by itself.
+  useEffect(() => {
+    if (open && initialEntry && Object.keys(initialEntry).length) {
+      setSource("manual");
+      setStep(2);
+      setEntries([{ ...newEntry(), ...initialEntry, id: `e${++_mid}` }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Buy leads (real prospects via Bright Data, or AI samples as fallback)
   const [buy, setBuy] = useState({

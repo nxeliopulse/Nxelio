@@ -68,6 +68,8 @@ import {
 import { cn } from "@/lib/utils";
 import { VisualBuilder } from "@/components/segments/visual-builder";
 import { SegmentHistoryModal } from "@/components/segments/segment-history-modal";
+import { SegmentShareModal } from "@/components/segments/segment-share-modal";
+import { LaunchCampaignModal } from "@/components/segments/launch-campaign-modal";
 
 function updateAtPath(root: Group, path: number[], fn: (node: RuleNode) => RuleNode): Group {
   if (path.length === 0) return fn(root) as Group;
@@ -113,6 +115,8 @@ export default function SegmentBuilderPage() {
   const [mode, setMode] = useState<"rule" | "ai" | "visual">("rule");
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [launchModalOpen, setLaunchModalOpen] = useState(false);
 
   // Live preview
   const [preview, setPreview] = useState<SegmentPreview | null>(null);
@@ -304,8 +308,11 @@ export default function SegmentBuilderPage() {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} />
                 <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-slate-200 bg-white shadow-lg p-1 text-xs space-y-0.5">
-                  <button onClick={() => { setShowActionsMenu(false); handleLaunchCampaignCurrent(); }} className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg">
+                  <button onClick={() => { setShowActionsMenu(false); setLaunchModalOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg">
                     <Send className="h-3.5 w-3.5 text-blue-600" /> Launch Campaign
+                  </button>
+                  <button onClick={() => { setShowActionsMenu(false); setShareModalOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg">
+                    <Share2 className="h-3.5 w-3.5" /> Share
                   </button>
                   {editId && (
                     <>
@@ -314,9 +321,6 @@ export default function SegmentBuilderPage() {
                       </button>
                       <button onClick={() => { setShowActionsMenu(false); handleExportCsvCurrent(); }} className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg">
                         <Download className="h-3.5 w-3.5" /> Export CSV
-                      </button>
-                      <button onClick={() => { setShowActionsMenu(false); toast("Share link copied to clipboard", "success"); }} className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg">
-                        <Share2 className="h-3.5 w-3.5" /> Share
                       </button>
                       <div className="my-1 border-t border-slate-100" />
                       <button onClick={() => { setShowActionsMenu(false); handleArchiveCurrent(); }} className="w-full flex items-center gap-2 px-3 py-2 text-amber-700 hover:bg-amber-50 rounded-lg">
@@ -497,9 +501,35 @@ export default function SegmentBuilderPage() {
         </div>
       </div>
 
-      {/* History Modal */}
+      {/* History & Version Restoration Modal */}
       {historyModalOpen && editId && (
-        <SegmentHistoryModal segmentId={editId} onClose={() => setHistoryModalOpen(false)} />
+        <SegmentHistoryModal
+          segmentId={editId}
+          onClose={() => setHistoryModalOpen(false)}
+          onRestoreVersion={(rule) => {
+            setRoot(rule);
+            toast("Restored previous rule version snapshot into builder", "success");
+          }}
+        />
+      )}
+
+      {/* Share Modal */}
+      {shareModalOpen && (
+        <SegmentShareModal
+          segmentId={editId || "new"}
+          segmentName={name}
+          onClose={() => setShareModalOpen(false)}
+        />
+      )}
+
+      {/* Launch Campaign Modal */}
+      {launchModalOpen && (
+        <LaunchCampaignModal
+          segmentId={editId || "new"}
+          segmentName={name}
+          matchedCount={preview?.matched ?? 0}
+          onClose={() => setLaunchModalOpen(false)}
+        />
       )}
     </div>
   );
@@ -784,11 +814,12 @@ function GroupBox({
 }
 
 function ConditionRow({
-  condition, onChange, onRemove, valueOptionsFor,
+  condition, onChange, onRemove, onDuplicate, valueOptionsFor,
 }: {
   condition: Condition;
   onChange: (fn: (node: RuleNode) => RuleNode) => void;
   onRemove: () => void;
+  onDuplicate?: () => void;
   valueOptionsFor: (field: string) => { value: string; label: string }[] | null;
 }) {
   const f = SEGMENT_FIELDS.find((sf) => sf.key === condition.field);
@@ -858,7 +889,12 @@ function ConditionRow({
           disabled={isDisabled}
         />
       )}
-      <button onClick={onRemove} className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0"><X className="h-3.5 w-3.5" /></button>
+      {onDuplicate && (
+        <button onClick={onDuplicate} className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex-shrink-0" title="Duplicate rule">
+          <Copy className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <button onClick={onRemove} className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0" title="Remove rule"><X className="h-3.5 w-3.5" /></button>
     </div>
   );
 }

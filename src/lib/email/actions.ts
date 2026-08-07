@@ -73,6 +73,13 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
     is_read: true,
   });
 
+  // Surface in the Activities feed + lead detail activity log.
+  await supabase.from("lead_activities").insert({
+    lead_id: leadId,
+    activity_type: "EMAIL_SENT",
+    metadata: { subject: finalSubject },
+  });
+
   revalidatePath("/inbox");
   revalidatePath(`/leads/${leadId}`);
 

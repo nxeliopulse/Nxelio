@@ -1,5 +1,8 @@
 "use server";
+import { headers } from "next/headers";
 import { resolveAiConfig } from "@/lib/ai/provider";
+import { rateLimit, scanPrompt, maskSensitiveData } from "@/lib/ai/security";
+import { auditRateLimited, auditInjectionBlocked, auditInjectionSanitized, auditSecretMasked } from "@/lib/ai/audit";
 
 export interface LandingChatMessage {
   role: "user" | "assistant";
@@ -73,18 +76,54 @@ async function call(apiKey: string, baseUrl: string, model: string, messages: { 
 /** Public, unauthenticated Q&A chat for the marketing landing page. No workspace/credit
  *  gating — bounded instead by trimming history and message length below. */
 export async function askLandingAssistant(history: LandingChatMessage[]): Promise<LandingChatResult> {
+  // ---- Security layer: rate limit (per visitor IP) ------------------------
+  // Unauthenticated endpoint — key on the request IP so one visitor can't
+  // burn the AI budget (and the provider API bill) in a tight loop.
+  const hdrs = await headers();
+  const ip =
+    hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    hdrs.get("x-real-ip") ||
+    "unknown";
+  const rl = rateLimit(`landing:${ip}`, "landing");
+  if (!rl.allowed) {
+    await auditRateLimited("landing");
+    return { reply: "I'm getting a lot of questions right now — please try again in a moment." };
+  }
+
+  // ---- Security layer: prompt-injection scan + secret masking -------------
+  // Public endpoint — same enforcement as the authenticated assistant. Any
+  // user message that trips a high-confidence injection/jailbreak pattern is
+  // refused outright; lower-confidence spans are stripped before the LLM call,
+  // and the reply is masked for secrets before it reaches the visitor.
+  const safeHistory: LandingChatMessage[] = [];
+  let refused = false;
+  for (const m of history.slice(-8)) {
+    const content = m.content.slice(0, 600);
+    if (m.role !== "user") {
+      safeHistory.push({ role: m.role, content });
+      continue;
+    }
+    const scan = scanPrompt(content);
+    if (scan.blocked) {
+      refused = true;
+      await auditInjectionBlocked(scan.flags);
+      break;
+    }
+    if (scan.sanitized) await auditInjectionSanitized(scan.flags);
+    safeHistory.push({ role: "user", content: scan.safeText });
+  }
+  if (refused) {
+    return { reply: "I can't help with that — but I'd be happy to answer questions about Nxelio Nurture instead." };
+  }
+  if (safeHistory.length === 0) return { reply: "" };
+
+  const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...safeHistory];
+
   const { apiKey, baseUrl, model } = await resolveAiConfig();
   if (!apiKey) {
     return { reply: "Our AI assistant isn't available right now, but I'd love to show you around — try booking a demo instead!" };
   }
 
-  const trimmed = history.slice(-8).map((m) => ({
-    role: m.role,
-    content: m.content.slice(0, 600),
-  }));
-  if (trimmed.length === 0) return { reply: "" };
-
-  const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...trimmed];
   const res = await call(apiKey, baseUrl, model, messages);
   if (!res.ok) {
     return {
@@ -94,5 +133,5 @@ export async function askLandingAssistant(history: LandingChatMessage[]): Promis
     };
   }
 
-  return { reply: res.content.trim() || "I'm not sure how to answer that — want to book a demo and ask our team directly?" };
+  return { reply: maskSensitiveData(res.content.trim() || "I'm not sure how to answer that — want to book a demo and ask our team directly?") };
 }

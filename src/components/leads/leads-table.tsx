@@ -11,11 +11,13 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
 import { getPicklistValues } from "@/lib/queries/picklists";
-import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
+import { PICKLIST_FALLBACK_VALUES } from "@/lib/picklists";
+import { AddLeadsWizard, type SourceId } from "@/components/leads/add-leads-wizard";
+import { useUiActions } from "@/components/layout/ui-action-provider";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
-import { deleteLead, bulkDeleteLeads, updateLead, type LeadRow } from "@/lib/queries/leads";
+import { updateLead, type LeadRow } from "@/lib/queries/leads";
 import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
 import { createStaticSegment } from "@/lib/queries/segments";
 import { usePageTour } from "@/components/tour/use-page-tour";
@@ -97,8 +99,13 @@ function StatusPill({ status }: { status: string }) {
     Hot: "bg-rose-500 dark:bg-rose-600",
     Scored: "bg-violet-500 dark:bg-violet-600",
   };
+  // Deterministic color for statuses added later via Administration — same
+  // hash-palette approach as logoColor, so every render keeps the same color.
+  const palette = ["bg-slate-500", "bg-cyan-600", "bg-fuchsia-600", "bg-orange-600", "bg-lime-600", "bg-teal-600", "bg-purple-600", "bg-red-500"];
+  let hash = 0;
+  for (let i = 0; i < status.length; i++) hash = (hash * 31 + status.charCodeAt(i)) >>> 0;
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white whitespace-nowrap", styles[status] || "bg-slate-400 dark:bg-slate-600")}>
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white whitespace-nowrap", styles[status] || palette[hash % palette.length])}>
       {status}
     </span>
   );
@@ -136,23 +143,74 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   const [search, setSearch] = useState(initialSearch ?? "");
   const [industryFilter, setIndustryFilter] = useState("");
   const [interestFilter, setInterestFilter] = useState("");
+  // M2 — exact-status filter driven by the Administration lead_status picklist
+  // ("" = all). Admin-added statuses appear here automatically.
+  const [statusFilter, setStatusFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showWizard, setShowWizard] = useState(false);
+  const [wizardPrefill, setWizardPrefill] = useState<Record<string, string> | null>(null);
+  // M2 — assistant "open_lead_import" UI action: which import screen to open.
+  const [wizardSource, setWizardSource] = useState<SourceId | null>(null);
+  const ALL_SOURCE_IDS: SourceId[] = ["linkedin-search", "linkedin-post", "youtube", "manual", "buy", "csv"];
+  // Phase 2 — assistant "open_lead_form" UI action: open the Add Leads wizard
+  // pre-filled with the assistant's details. Nothing is saved until the user
+  // imports, so this never mutates data on its own.
+  const { pendingModal, clearPendingModal, pendingFilters, clearPendingFilters } = useUiActions();
+  useEffect(() => {
+    if (pendingModal?.id === "lead_wizard") {
+      const p = pendingModal.params;
+      setWizardPrefill({
+        name: String(p.name ?? ""),
+        email: String(p.email ?? ""),
+        company: String(p.company ?? ""),
+        title: String(p.job_title ?? ""),
+        phone: String(p.phone ?? ""),
+      });
+      // M2 — "open_lead_import": jump straight to a data-entry screen
+      // (e.g. csv) instead of the source picker; validated against the
+      // wizard's known sources so the assistant can't invent one.
+      const src = String(p.source ?? "");
+      setWizardSource(ALL_SOURCE_IDS.includes(src as SourceId) ? (src as SourceId) : null);
+      setShowWizard(true);
+      clearPendingModal();
+    }
+  }, [pendingModal, clearPendingModal]);
+  // M2 — "apply_lead_filters": apply assistant-chosen status/industry/interest
+  // filters to the table. Values are validated client-side; unknown ones are
+  // ignored (the table simply shows the current data unfiltered).
+  useEffect(() => {
+    if (pendingFilters?.id === "apply_lead_filters") {
+      const p = pendingFilters.params;
+      const quick = String(p.quick ?? "");
+      if (quick === "all" || (["new", "qualified", "hot", "followup", "converted"] as string[]).includes(quick)) {
+        setQuickFilter(quick as QuickFilter);
+      }
+      // Exact status from the Administration picklist (any admin-added value).
+      setStatusFilter(String(p.status ?? ""));
+      setIndustryFilter(String(p.industry ?? ""));
+      setInterestFilter(String(p.interest ?? ""));
+      clearPendingFilters();
+    }
+  }, [pendingFilters, clearPendingFilters]);
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"list" | "grid">("list");
 
   const [industries, setIndustries] = useState(FALLBACK_INDUSTRIES);
   const [interestAreas, setInterestAreas] = useState(FALLBACK_INTEREST_AREAS);
+  // M2 — lead statuses come from the Administration picklist so admin-added
+  // statuses show up in the filter dropdown (and detail views) immediately.
+  const [statuses, setStatuses] = useState<string[]>(PICKLIST_FALLBACK_VALUES.lead_status);
   useEffect(() => {
     getPicklistValues("lead_industry").then(setIndustries).catch(() => {});
     getPicklistValues("lead_interest_area").then(setInterestAreas).catch(() => {});
+    getPicklistValues("lead_status").then(setStatuses).catch(() => {});
   }, []);
 
   // Quick status/score filters — a row of pill shortcuts above the table.
   // "Needs Follow-up" is a chosen proxy (no dedicated field exists): a lead
   // that's been Contacted or is in Nurturing, i.e. worked but not yet resolved.
-  type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup";
+  type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup" | "converted";
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
 
   // Missing-data quick actions — inline instead of a bare "—".
@@ -251,7 +309,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
   // Selection contextual bar — replaces the toolbar controls while rows are selected.
   const [showOwnerMenu, setShowOwnerMenu] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
   const [segmentName, setSegmentName] = useState("");
   const [segmentDescription, setSegmentDescription] = useState("");
@@ -283,7 +340,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   // Industry/interest filters — opened as a popover next to the count chip.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersPos, setFiltersPos] = useState<{ top: number; left: number } | null>(null);
-  const hasActiveFilters = Boolean(industryFilter || interestFilter || quickFilter !== "all");
+  const hasActiveFilters = Boolean(industryFilter || interestFilter || statusFilter || quickFilter !== "all");
   function openFiltersPopover(e: React.MouseEvent<HTMLButtonElement>) {
     const r = e.currentTarget.getBoundingClientRect();
     setFiltersPos({ top: r.bottom + 6, left: r.left });
@@ -441,6 +498,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       (l.website_url?.toLowerCase().includes(q) ?? false);
     const matchIndustry = !industryFilter || l.industry === industryFilter;
     const matchInterest = !interestFilter || l.interest_area === interestFilter;
+    const matchStatus = !statusFilter || l.status === statusFilter;
 
     // Compare by local calendar day (not exact instant) so "From X to Y" matches
     // what the user actually sees in the Created Date column, regardless of the
@@ -459,7 +517,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       return getColumnText(k, l).toLowerCase().includes(raw.toLowerCase());
     });
 
-    return matchSearch && matchIndustry && matchInterest && matchDateFrom && matchDateTo && matchColumns;
+    return matchSearch && matchStatus && matchIndustry && matchInterest && matchDateFrom && matchDateTo && matchColumns;
   });
 
   function matchesQuickFilter(l: LeadRow, f: QuickFilter): boolean {
@@ -468,6 +526,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       case "qualified": return l.status === "Qualified";
       case "hot": return scoreLevel(l.lead_score).label === "Hot";
       case "followup": return l.status === "Contacted" || l.status === "Nurturing";
+      case "converted": return l.status === "Converted";
       default: return true;
     }
   }
@@ -478,6 +537,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     qualified: baseFiltered.filter((l) => matchesQuickFilter(l, "qualified")).length,
     hot: baseFiltered.filter((l) => matchesQuickFilter(l, "hot")).length,
     followup: baseFiltered.filter((l) => matchesQuickFilter(l, "followup")).length,
+    converted: baseFiltered.filter((l) => matchesQuickFilter(l, "converted")).length,
   };
 
   const filtered = baseFiltered.filter((l) => matchesQuickFilter(l, quickFilter));
@@ -695,17 +755,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     printWindow.print();
   }
 
-  async function handleBulkDelete() {
-    setShowMoreMenu(false);
-    const n = selected.length;
-    if (!(await confirm({ title: "Delete lead?", message: `Delete ${n} lead${n === 1 ? "" : "s"}? This action cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
-    const ids = [...selected];
-    setSelected([]);
-    start(async () => {
-      await bulkDeleteLeads(ids); // single query instead of N round-trips
-    });
-  }
-
   function openSegmentDialog() {
     setSegmentName("");
     setSegmentDescription("");
@@ -761,14 +810,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       } catch (err) {
         toast("Failed to update favorite status", "error");
       }
-    });
-  }
-
-  async function handleDelete(id: string) {
-    if (!(await confirm({ title: "Delete lead?", message: "Delete this lead? This action cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
-    start(async () => {
-      await deleteLead(id);
-      setSelected((s) => s.filter((x) => x !== id));
     });
   }
 
@@ -1012,6 +1053,32 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           })}
         </div>
       )}
+
+      {/* Quick status/score filters — pill shortcuts above the table (also
+          driven by the assistant's apply_lead_filters action). */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+        {([
+          { id: "all", label: `All (${quickFilterCounts.all})` },
+          { id: "new", label: `New (${quickFilterCounts.new})` },
+          { id: "qualified", label: `Qualified (${quickFilterCounts.qualified})` },
+          { id: "hot", label: `Hot Prospects (${quickFilterCounts.hot})` },
+          { id: "followup", label: `Needs Follow-up (${quickFilterCounts.followup})` },
+          { id: "converted", label: `Converted (${quickFilterCounts.converted})` },
+        ] as { id: QuickFilter; label: string }[]).map((q) => (
+          <button
+            key={q.id}
+            onClick={() => setQuickFilter(q.id)}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors",
+              quickFilter === q.id
+                ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-blue-300 hover:text-slate-900 dark:hover:text-slate-200"
+            )}
+          >
+            {q.label}
+          </button>
+        ))}
+      </div>
 
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
@@ -1483,7 +1550,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         </div>
       </Card>
 
-      <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
+      <AddLeadsWizard open={showWizard} onClose={() => { setShowWizard(false); setWizardSource(null); }} initialEntry={wizardPrefill} initialSource={wizardSource} />
 
       {editingLead && (
         <EditLeadModal open={Boolean(editingLead)} onClose={() => setEditingLead(null)} lead={editingLead} />
@@ -1514,7 +1581,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         </>
       )}
 
-      {/* Row actions menu — kebab button in the rightmost column, Edit + Delete */}
+      {/* Row actions menu — kebab button in the rightmost column, Edit only */}
       {rowMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setRowMenu(null)} />
@@ -1524,13 +1591,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <Pencil className="h-3.5 w-3.5" /> Edit
-            </button>
-            <button
-              onClick={() => { const id = rowMenu.id; setRowMenu(null); handleDelete(id); }}
-              disabled={pending}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-rose-950/50 rounded-lg disabled:opacity-50"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
             </button>
           </div>
         </>
@@ -1708,12 +1768,11 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
-              <Select value={quickFilter} onChange={(e) => setQuickFilter(e.target.value as QuickFilter)}>
-                <option value="all">All ({quickFilterCounts.all})</option>
-                <option value="new">New ({quickFilterCounts.new})</option>
-                <option value="qualified">Qualified ({quickFilterCounts.qualified})</option>
-                <option value="hot">Hot Prospects ({quickFilterCounts.hot})</option>
-                <option value="followup">Needs Follow-up ({quickFilterCounts.followup})</option>
+              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">All statuses</option>
+                {statuses.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </Select>
             </div>
             <div>
@@ -1876,28 +1935,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         {name}
                       </button>
                     ))}
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setShowMoreMenu((v) => !v)}
-                className="inline-flex items-center gap-1 rounded-full text-slate-600 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
-              >
-                More <ChevronDown className={cn("h-3 w-3 transition-transform", showMoreMenu && "rotate-180")} />
-              </button>
-              {showMoreMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
-                  <div className="lp-anim-pop origin-bottom-left absolute left-0 bottom-full mb-1 z-50 w-44 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
-                    <button
-                      onClick={handleBulkDelete}
-                      disabled={pending}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 text-left"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </button>
                   </div>
                 </>
               )}
