@@ -154,6 +154,11 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   // that's been Contacted or is in Nurturing, i.e. worked but not yet resolved.
   type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup";
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const [cardFilter, setCardFilter] = useState<"all" | "hot" | "scored" | "converted">("all");
+  const handleCardFilterChange = (newFilter: "all" | "hot" | "scored" | "converted") => {
+    setCardFilter(newFilter);
+    setPage(0);
+  };
 
   // Missing-data quick actions — inline instead of a bare "—".
   const [editingLead, setEditingLead] = useState<LeadRow | null>(null);
@@ -480,7 +485,14 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     followup: baseFiltered.filter((l) => matchesQuickFilter(l, "followup")).length,
   };
 
-  const filtered = baseFiltered.filter((l) => matchesQuickFilter(l, quickFilter));
+  const filtered = baseFiltered
+    .filter((l) => matchesQuickFilter(l, quickFilter))
+    .filter((l) => {
+      if (cardFilter === "hot") return l.status === "Hot";
+      if (cardFilter === "scored") return l.lead_score > 0;
+      if (cardFilter === "converted") return l.status === "Converted";
+      return true;
+    });
 
   const sorted = [...filtered].sort((a, b) => {
     if (!sortKey) return 0;
@@ -992,14 +1004,24 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       {stats && (
         <div data-tour-id="leads-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {[
-            { label: "Total prospects", value: stats.total, icon: Users2, accent: "bg-amber-500" },
-            { label: "Hot prospects", value: stats.hot, icon: Flame, accent: "bg-rose-500" },
-            { label: "AI scored", value: stats.scored, icon: Sparkles, accent: "bg-blue-500" },
-            { label: "Converted", value: stats.converted, icon: CheckCircle2, accent: "bg-emerald-500" },
+            { label: "Total prospects", value: stats.total, icon: Users2, accent: "bg-amber-500", key: "all", ring: "ring-amber-500", bg: "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]" },
+            { label: "Hot prospects", value: stats.hot, icon: Flame, accent: "bg-rose-500", key: "hot", ring: "ring-rose-500", bg: "bg-rose-500/[0.04] dark:bg-rose-500/[0.08]" },
+            { label: "AI scored", value: stats.scored, icon: Sparkles, accent: "bg-blue-500", key: "scored", ring: "ring-blue-500", bg: "bg-blue-500/[0.04] dark:bg-blue-500/[0.08]" },
+            { label: "Converted", value: stats.converted, icon: CheckCircle2, accent: "bg-emerald-500", key: "converted", ring: "ring-emerald-500", bg: "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" },
           ].map((s) => {
             const Icon = s.icon;
+            const active = cardFilter === s.key;
             return (
-              <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
+              <Card
+                key={s.label}
+                onClick={() => handleCardFilterChange(s.key as any)}
+                className={cn(
+                  "p-4 sm:p-5 flex items-center gap-3 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                  active
+                    ? `ring-2 ${s.ring} ${s.bg} border-transparent shadow-xs`
+                    : "bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800"
+                )}
+              >
                 <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
                   <Icon className="h-5 w-5" />
                 </span>
@@ -1051,9 +1073,28 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             </div>
 
             {/* Count Chip */}
-            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
               <Users2 className="h-3.5 w-3.5 text-slate-400" />
-              <span>{filtered.length} Prospect{filtered.length === 1 ? "" : "s"}</span>
+              <span>
+                {filtered.length}{" "}
+                {cardFilter === "hot"
+                  ? "Hot Prospect"
+                  : cardFilter === "scored"
+                  ? "AI Scored Prospect"
+                  : cardFilter === "converted"
+                  ? "Converted Prospect"
+                  : "Prospect"}
+                {filtered.length === 1 ? "" : "s"}
+              </span>
+              {cardFilter !== "all" && (
+                <button
+                  onClick={() => handleCardFilterChange("all")}
+                  title="Clear filter"
+                  className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
 
             {/* Date Range Button */}

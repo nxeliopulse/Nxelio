@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  Pencil, RefreshCw, User, Link2, Download, FileText, FileSpreadsheet, Upload
+  Pencil, RefreshCw, User, Link2, Download, FileText, FileSpreadsheet, Upload, X
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [activeDateRange, setActiveDateRange] = useState("Last 30 Days");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [cardFilter, setCardFilter] = useState<"all" | "linked" | "unassigned" | "email">("all");
 
   const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
   const [showCols, setShowCols] = useState(false);
@@ -163,6 +164,11 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
     // Status Filter
     const status = c.email_opt_out ? "inactive" : "active";
     if (statusFilter !== "all" && status !== statusFilter) return false;
+
+    // Card Filter
+    if (cardFilter === "linked" && !c.account_id) return false;
+    if (cardFilter === "unassigned" && c.account_id) return false;
+    if (cardFilter === "email" && !c.email) return false;
 
     // Search query
     if (!q) return true;
@@ -396,14 +402,27 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         {[
-          { label: "Total contacts", value: scoped.length, icon: Users2, accent: "bg-amber-500" },
-          { label: "Linked to account", value: scoped.filter((c) => c.account_id).length, icon: Link2, accent: "bg-blue-500" },
-          { label: "Unassigned", value: scoped.filter((c) => !c.account_id).length, icon: User, accent: "bg-rose-500" },
-          { label: "With email", value: scoped.filter((c) => c.email).length, icon: Mail, accent: "bg-emerald-500" },
+          { label: "Total contacts", value: scoped.length, icon: Users2, accent: "bg-amber-500", key: "all", ring: "ring-amber-500", bg: "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]" },
+          { label: "Linked to account", value: scoped.filter((c) => c.account_id).length, icon: Link2, accent: "bg-blue-500", key: "linked", ring: "ring-blue-500", bg: "bg-blue-50/[0.04] dark:bg-blue-50/[0.08]" },
+          { label: "Unassigned", value: scoped.filter((c) => !c.account_id).length, icon: User, accent: "bg-rose-500", key: "unassigned", ring: "ring-rose-500", bg: "bg-rose-500/[0.04] dark:bg-rose-500/[0.08]" },
+          { label: "With email", value: scoped.filter((c) => c.email).length, icon: Mail, accent: "bg-emerald-500", key: "email", ring: "ring-emerald-500", bg: "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" },
         ].map((s) => {
           const Icon = s.icon;
+          const active = cardFilter === s.key;
           return (
-            <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
+            <Card
+              key={s.label}
+              onClick={() => {
+                setCardFilter(s.key as any);
+                setPage(0);
+              }}
+              className={cn(
+                "p-4 sm:p-5 flex items-center gap-3 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                active
+                  ? `ring-2 ${s.ring} ${s.bg} border-transparent shadow-xs`
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              )}
+            >
               <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
                 <Icon className="h-5 w-5" />
               </span>
@@ -432,9 +451,28 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
           </div>
 
           {/* Count Chip */}
-          <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
             <Users2 className="h-3.5 w-3.5 text-slate-400" />
-            <span>{filtered.length} Contact{filtered.length === 1 ? "" : "s"}</span>
+            <span>
+              {filtered.length}{" "}
+              {cardFilter === "linked"
+                ? "Linked Contact"
+                : cardFilter === "unassigned"
+                ? "Unassigned Contact"
+                : cardFilter === "email"
+                ? "Contact with Email"
+                : "Contact"}
+              {filtered.length === 1 ? "" : "s"}
+            </span>
+            {cardFilter !== "all" && (
+              <button
+                onClick={() => { setCardFilter("all"); setPage(0); }}
+                title="Clear filter"
+                className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
 
           {/* Sort By Dropdown Button */}

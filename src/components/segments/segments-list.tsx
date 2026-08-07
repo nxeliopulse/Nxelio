@@ -25,6 +25,7 @@ import {
   Archive,
   ArchiveRestore,
   History,
+  X,
 } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [cardFilter, setCardFilter] = useState<"all" | "active" | "dynamic" | "segmented">("all");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
 
   const [assignOpen, setAssignOpen] = useState(false);
@@ -95,7 +97,13 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
     // "all" means "all active statuses" — Archived only shows up once the
     // user explicitly filters for it, so it doesn't clutter the main list.
     const matchesStatus = statusFilter === "all" ? s.status !== "Archived" : s.status.toLowerCase() === statusFilter.toLowerCase();
-    return matchesSearch && matchesType && matchesStatus;
+    
+    let matchesCard = true;
+    if (cardFilter === "active") matchesCard = s.status === "Active";
+    else if (cardFilter === "dynamic") matchesCard = s.segment_type === "Dynamic";
+    else if (cardFilter === "segmented") matchesCard = (s.contacts || 0) > 0;
+    
+    return matchesSearch && matchesType && matchesStatus && matchesCard;
   });
   const pageCount = Math.max(1, Math.ceil(filteredSegments.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -217,45 +225,40 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
 
       {/* Metrics Summary Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Total Segments</span>
-            <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <Layers className="h-5 w-5" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{segments.length}</p>
-        </Card>
-
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Active Rules</span>
-            <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{activeCount}</p>
-        </Card>
-
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Dynamic Rules</span>
-            <div className="h-9 w-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400">
-              <Zap className="h-5 w-5" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{dynamicCount}</p>
-        </Card>
-
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-wider">Segmented Contacts</span>
-            <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <Users className="h-5 w-5" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{totalContacts.toLocaleString()}</p>
-        </Card>
+        {[
+          { label: "Total Segments", value: segments.length, icon: Layers, key: "all", ring: "ring-blue-500", bg: "bg-blue-50/20 dark:bg-blue-950/40", accent: "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400" },
+          { label: "Active Rules", value: activeCount, icon: CheckCircle2, key: "active", ring: "ring-emerald-500", bg: "bg-emerald-50/20 dark:bg-emerald-950/40", accent: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400" },
+          { label: "Dynamic Rules", value: dynamicCount, icon: Zap, key: "dynamic", ring: "ring-purple-500", bg: "bg-purple-50/20 dark:bg-purple-950/40", accent: "bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400" },
+          { label: "Segmented Contacts", value: totalContacts, icon: Users, key: "segmented", ring: "ring-amber-500", bg: "bg-amber-50/20 dark:bg-amber-950/40", accent: "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400" },
+        ].map((t) => {
+          const Icon = t.icon;
+          const active = cardFilter === t.key;
+          return (
+            <Card
+              key={t.label}
+              onClick={() => {
+                setCardFilter(t.key as any);
+                setPage(0);
+              }}
+              className={cn(
+                "p-5 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                active
+                  ? `ring-2 ${t.ring} ${t.bg} border-transparent shadow-xs`
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-wider">{t.label}</span>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{t.value.toLocaleString()}</p>
+                </div>
+                <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${t.accent}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Dynamic Bulk Action Bar when items selected */}
@@ -300,7 +303,26 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             {/* Badged Count Button */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-600">
               <Layers className="h-3.5 w-3.5 text-slate-500" />
-              <span>{filteredSegments.length} Segments</span>
+              <span>
+                {filteredSegments.length}{" "}
+                {cardFilter === "active"
+                  ? "Active Rules Segment"
+                  : cardFilter === "dynamic"
+                  ? "Dynamic Rules Segment"
+                  : cardFilter === "segmented"
+                  ? "Segmented Contacts Segment"
+                  : "Segment"}
+                {filteredSegments.length === 1 ? "" : "s"}
+              </span>
+              {cardFilter !== "all" && (
+                <button
+                  onClick={() => { setCardFilter("all"); setPage(0); }}
+                  title="Clear filter"
+                  className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
 
             {/* Type Filter */}

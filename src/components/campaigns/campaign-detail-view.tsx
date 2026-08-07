@@ -1,10 +1,10 @@
 "use client";
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Users2, Send, MailOpen, Reply, AlertTriangle, Clock,
-  BarChart3, MousePointerClick, CalendarClock, Loader2,
+  BarChart3, MousePointerClick, CalendarClock, Loader2, X,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,16 @@ export function CampaignDetailView({
   const [steps, setSteps] = useState<FlowStep[]>(() => parseSequence(campaign.content));
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState<FlowStep>({ day: "Day 1", subject: "", body: "" });
+  const [activityFilter, setActivityFilter] = useState<"all" | "sent" | "opened" | "replied" | "bounced">("all");
+  const filteredActivity = useMemo(() => {
+    return (leadActivity ?? []).filter((act) => {
+      if (activityFilter === "sent") return !!act.sentAt;
+      if (activityFilter === "opened") return !!act.openedAt;
+      if (activityFilter === "replied") return !!act.repliedAt;
+      if (activityFilter === "bounced") return !!act.bouncedAt;
+      return true;
+    });
+  }, [leadActivity, activityFilter]);
 
   function openStep(i: number) {
     setEditIndex(i);
@@ -138,12 +148,12 @@ export function CampaignDetailView({
 
   // Honest tiles derived from real columns (not invented status buckets).
   const tiles = [
-    { label: "Audience", value: audience, icon: <Users2 className="h-4 w-4" />, color: "text-blue-600 bg-blue-50" },
-    { label: "Sent", value: sent, icon: <Send className="h-4 w-4" />, color: "text-indigo-600 bg-indigo-50" },
-    { label: "Opened", value: opened, icon: <MailOpen className="h-4 w-4" />, color: "text-emerald-600 bg-emerald-50" },
-    { label: "Replied", value: replied, icon: <Reply className="h-4 w-4" />, color: "text-teal-600 bg-teal-50" },
-    { label: "Bounced", value: bounced, icon: <AlertTriangle className="h-4 w-4" />, color: "text-red-600 bg-red-50" },
-    { label: "Pending", value: pending_, icon: <Clock className="h-4 w-4" />, color: "text-amber-600 bg-amber-50" },
+    { label: "Audience", value: audience, icon: <Users2 className="h-4 w-4" />, color: "text-blue-600 bg-blue-50", key: "all", ring: "ring-blue-500", bg: "bg-blue-50/20" },
+    { label: "Sent", value: sent, icon: <Send className="h-4 w-4" />, color: "text-indigo-600 bg-indigo-50", key: "sent", ring: "ring-indigo-500", bg: "bg-indigo-50/20" },
+    { label: "Opened", value: opened, icon: <MailOpen className="h-4 w-4" />, color: "text-emerald-600 bg-emerald-50", key: "opened", ring: "ring-emerald-500", bg: "bg-emerald-50/20" },
+    { label: "Replied", value: replied, icon: <Reply className="h-4 w-4" />, color: "text-teal-600 bg-teal-50", key: "replied", ring: "ring-teal-500", bg: "bg-teal-50/20" },
+    { label: "Bounced", value: bounced, icon: <AlertTriangle className="h-4 w-4" />, color: "text-red-600 bg-red-50", key: "bounced", ring: "ring-red-500", bg: "bg-red-50/20" },
+    { label: "Pending", value: pending_, icon: <Clock className="h-4 w-4" />, color: "text-amber-600 bg-amber-50", key: "all", ring: "ring-amber-500", bg: "bg-amber-50/20" },
   ];
 
   function toggleStatus() {
@@ -268,13 +278,25 @@ export function CampaignDetailView({
       {tab === "Analytics" && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {tiles.map((t) => (
-              <Card key={t.label} className="p-4">
-                <div className={`h-8 w-8 rounded-lg flex items-center justify-center mb-2 ${t.color}`}>{t.icon}</div>
-                <p className="text-2xl font-bold text-slate-900 tabular-nums">{t.value.toLocaleString()}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{t.label}</p>
-              </Card>
-            ))}
+            {tiles.map((t) => {
+              const active = activityFilter === t.key;
+              return (
+                <Card
+                  key={t.label}
+                  onClick={() => setActivityFilter(t.key as any)}
+                  className={cn(
+                    "p-4 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                    active
+                      ? `ring-2 ${t.ring} ${t.bg} border-transparent shadow-xs`
+                      : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                  )}
+                >
+                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center mb-2 ${t.color}`}>{t.icon}</div>
+                  <p className="text-2xl font-bold text-slate-900 tabular-nums">{t.value.toLocaleString()}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{t.label}</p>
+                </Card>
+              );
+            })}
           </div>
 
           <Card className="p-5">
@@ -312,12 +334,28 @@ export function CampaignDetailView({
 
           {/* Per-lead activity — who was sent to, who opened (and when), who replied/bounced */}
           <Card className="overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-900 flex items-center gap-2"><CalendarClock className="h-4 w-4 text-slate-400" /> Prospect activity</p>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-slate-400" /> Prospect activity
+                </p>
+                {activityFilter !== "all" && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
+                    <span className="capitalize">{activityFilter}</span>
+                    <button
+                      onClick={() => setActivityFilter("all")}
+                      title="Clear filter"
+                      className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 cursor-pointer ml-0.5"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-slate-400">{leadActivity.filter((r) => isToday(r.openedAt)).length} opened today</p>
             </div>
-            {leadActivity.length === 0 ? (
-              <p className="p-8 text-center text-sm text-slate-500">No activity recorded yet.</p>
+            {filteredActivity.length === 0 ? (
+              <p className="p-8 text-center text-sm text-slate-500">No matching activity recorded yet.</p>
             ) : (
               <DataTable>
                 <DataTableHead>
@@ -331,7 +369,7 @@ export function CampaignDetailView({
                   </tr>
                 </DataTableHead>
                 <DataTableBody className="divide-y divide-slate-100">
-                  {leadActivity.map((r) => (
+                  {filteredActivity.map((r) => (
                     <DataTableRow key={r.leadId}>
                       <DataTableTd>
                         <p className="font-medium text-slate-900">{r.leadName}</p>

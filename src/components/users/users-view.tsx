@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useTransition } from "react";
-import { Search, Plus, Shield, ShieldCheck, User, AlertCircle, CheckCircle2, Copy, Check, KeyRound, Trash2, Calendar, Mail, RefreshCw, Lock } from "lucide-react";
+import { Search, Plus, Shield, ShieldCheck, User, AlertCircle, CheckCircle2, Copy, Check, KeyRound, Trash2, Calendar, Mail, RefreshCw, Lock, X } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import { inviteUser, deleteUser, resetUserPassword, getUserAuthInfo, updateUserNavAccess, type UserWithRole } from "@/lib/queries/users";
 import { navMainItems, navAdminItems } from "@/lib/nav-config";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime, cn } from "@/lib/utils";
 
 interface Props {
   users: UserWithRole[];
@@ -55,6 +55,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
   const [savedNavAccess, setSavedNavAccess] = useState<Record<string, boolean>>({});
   const [permsMsg, setPermsMsg] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [cardFilter, setCardFilter] = useState<"all" | "Super Admin" | "Marketing Admin" | "Sales Admin">("all");
   const PAGE_SIZE = 15;
 
   useEffect(() => {
@@ -73,7 +74,11 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
     setSavedNavAccess({ ...initial });
   }, [detailUser]);
 
-  const filtered = visibleUsers.filter((u) => !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+  const filtered = visibleUsers.filter((u) => {
+    const matchSearch = !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase());
+    const matchCard = cardFilter === "all" || u.role_name === cardFilter;
+    return matchSearch && matchCard;
+  });
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const paged = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
@@ -170,24 +175,63 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { role: "Super Admin", count: adminCount, color: "bg-indigo-50 text-indigo-600" },
-          { role: "Marketing Admin", count: marketingCount, color: "bg-pink-50 text-pink-600" },
-          { role: "Sales Admin", count: salesCount, color: "bg-blue-50 text-blue-600" },
-        ].map((r) => (
-          <Card key={r.role} className="p-5 flex items-center gap-4">
-            <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${r.color}`}>{roleIcon[r.role]}</div>
-            <div>
-              <p className="text-sm text-slate-500">{r.role}s</p>
-              <p className="text-2xl font-bold text-slate-900">{r.count}</p>
-            </div>
-          </Card>
-        ))}
+          { role: "Super Admin", count: adminCount, color: "bg-indigo-50 text-indigo-600", key: "Super Admin", ring: "ring-indigo-500", bg: "bg-indigo-50/30" },
+          { role: "Marketing Admin", count: marketingCount, color: "bg-pink-50 text-pink-600", key: "Marketing Admin", ring: "ring-pink-500", bg: "bg-pink-50/30" },
+          { role: "Sales Admin", count: salesCount, color: "bg-blue-50 text-blue-600", key: "Sales Admin", ring: "ring-blue-500", bg: "bg-blue-50/30" },
+        ].map((r) => {
+          const active = cardFilter === r.key;
+          return (
+            <Card
+              key={r.role}
+              onClick={() => {
+                setCardFilter((prev) => prev === r.key ? "all" : (r.key as any));
+                setPage(0);
+              }}
+              className={cn(
+                "p-5 flex items-center gap-4 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                active
+                  ? `ring-2 ${r.ring} ${r.bg} border-transparent shadow-xs`
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              )}
+            >
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${r.color}`}>{roleIcon[r.role]}</div>
+              <div>
+                <p className="text-sm text-slate-500">{r.role}s</p>
+                <p className="text-2xl font-bold text-slate-900">{r.count}</p>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       <Card className="overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[240px] max-w-md">
             <Input leftIcon={<Search className="h-4 w-4" />} placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          {/* Count / Filter Chip */}
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap animate-fade-in">
+            <User className="h-3.5 w-3.5 text-slate-400" />
+            <span>
+              {filtered.length}{" "}
+              {cardFilter === "Super Admin"
+                ? "Super Admin"
+                : cardFilter === "Marketing Admin"
+                ? "Marketing Admin"
+                : cardFilter === "Sales Admin"
+                ? "Sales Admin"
+                : "User"}
+              {filtered.length === 1 ? "" : "s"}
+            </span>
+            {cardFilter !== "all" && (
+              <button
+                onClick={() => { setCardFilter("all"); setPage(0); }}
+                title="Clear filter"
+                className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
         </div>
 

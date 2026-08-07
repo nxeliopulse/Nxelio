@@ -15,7 +15,7 @@ import { Modal } from "@/components/ui/modal";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
-import { formatDate } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
 import { moveOpportunityStage, updateOpportunity, deleteOpportunity } from "@/lib/queries/opportunities";
 import {
   OPPORTUNITY_STAGES, STAGE_LABELS,
@@ -93,6 +93,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
   const [editing, setEditing] = useState<OpportunityRow | null>(null);
 
   const [search, setSearch] = useState("");
+  const [tileFilter, setTileFilter] = useState<"all" | "open" | "won" | "winrate">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [hiddenStages, setHiddenStages] = useState<Set<OpportunityStage>>(new Set());
@@ -140,9 +141,9 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
     });
   }
   function resetFilters() {
-    setSearch(""); setDateFrom(""); setDateTo(""); setHiddenStages(new Set());
+    setSearch(""); setDateFrom(""); setDateTo(""); setHiddenStages(new Set()); setTileFilter("all");
   }
-  const activeFilterCount = (search ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (hiddenStages.size > 0 ? 1 : 0);
+  const activeFilterCount = (search ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (hiddenStages.size > 0 ? 1 : 0) + (tileFilter !== "all" ? 1 : 0);
 
   const filteredRows = useMemo(() => rows.filter((r) => {
     const q = search.trim().toLowerCase();
@@ -150,8 +151,14 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
     const matchFrom = !dateFrom || (!!r.expected_close_date && r.expected_close_date >= dateFrom);
     const matchTo = !dateTo || (!!r.expected_close_date && r.expected_close_date <= dateTo);
     const matchStage = !hiddenStages.has(r.stage);
-    return matchSearch && matchFrom && matchTo && matchStage;
-  }), [rows, search, dateFrom, dateTo, hiddenStages]);
+    
+    let matchTile = true;
+    if (tileFilter === "open") matchTile = r.stage !== "won" && r.stage !== "lost";
+    else if (tileFilter === "won") matchTile = r.stage === "won";
+    else if (tileFilter === "winrate") matchTile = r.stage === "won" || r.stage === "lost";
+    
+    return matchSearch && matchFrom && matchTo && matchStage && matchTile;
+  }), [rows, search, dateFrom, dateTo, hiddenStages, tileFilter]);
 
   const sortedRows = useMemo(() => [...filteredRows].sort((a, b) => {
     let cmp: number;
@@ -227,10 +234,10 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
   }
 
   const tiles = [
-    { label: "Open pipeline", value: money(live.openValue), sub: `${live.openCount} open deal${live.openCount === 1 ? "" : "s"}`, icon: <DollarSign className="h-5 w-5" />, color: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" },
-    { label: "Won revenue", value: money(live.wonValue), sub: `${live.wonCount} won`, icon: <Trophy className="h-5 w-5" />, color: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400" },
-    { label: "Win rate", value: `${live.winRate}%`, sub: `${live.wonCount} won · ${live.lostCount} lost`, icon: <TrendingUp className="h-5 w-5" />, color: "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400" },
-    { label: "Total deals", value: String(rows.length), sub: "in pipeline", icon: <Target className="h-5 w-5" />, color: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400" },
+    { label: "Open pipeline", value: money(live.openValue), sub: `${live.openCount} open deal${live.openCount === 1 ? "" : "s"}`, icon: <DollarSign className="h-5 w-5" />, color: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400", key: "open", ring: "ring-blue-500", bg: "bg-blue-50/30 dark:bg-blue-950/10" },
+    { label: "Won revenue", value: money(live.wonValue), sub: `${live.wonCount} won`, icon: <Trophy className="h-5 w-5" />, color: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400", key: "won", ring: "ring-emerald-500", bg: "bg-emerald-50/30 dark:bg-emerald-950/10" },
+    { label: "Win rate", value: `${live.winRate}%`, sub: `${live.wonCount} won · ${live.lostCount} lost`, icon: <TrendingUp className="h-5 w-5" />, color: "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400", key: "winrate", ring: "ring-indigo-500", bg: "bg-indigo-50/30 dark:bg-indigo-950/10" },
+    { label: "Total deals", value: String(rows.length), sub: "in pipeline", icon: <Target className="h-5 w-5" />, color: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400", key: "all", ring: "ring-amber-500", bg: "bg-amber-50/30 dark:bg-amber-950/10" },
   ];
 
   return (
@@ -254,18 +261,33 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {tiles.map((t) => (
-          <Card key={t.label} className="p-4 dark:bg-slate-900 dark:border-slate-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-500">{t.label}</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{t.value}</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t.sub}</p>
+        {tiles.map((t) => {
+          const active = tileFilter === t.key;
+          return (
+            <Card
+              key={t.label}
+              onClick={() => {
+                setTileFilter(t.key as any);
+                setPage(0);
+              }}
+              className={cn(
+                "p-4 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                active
+                  ? `ring-2 ${t.ring} ${t.bg} border-transparent shadow-xs`
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500 dark:text-slate-500">{t.label}</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{t.value}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t.sub}</p>
+                </div>
+                <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${t.color}`}>{t.icon}</div>
               </div>
-              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${t.color}`}>{t.icon}</div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
       {rows.length === 0 ? (
@@ -288,6 +310,31 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               />
+            </div>
+
+            {/* Count / Filter Chip */}
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-400 flex-shrink-0 whitespace-nowrap h-10 shadow-3xs">
+              <Target className="h-4 w-4 text-slate-400" />
+              <span>
+                {filteredRows.length}{" "}
+                {tileFilter === "open"
+                  ? "Open Deal"
+                  : tileFilter === "won"
+                  ? "Closed Won"
+                  : tileFilter === "winrate"
+                  ? "Closed Deal"
+                  : "Deal"}
+                {filteredRows.length === 1 ? "" : "s"}
+              </span>
+              {tileFilter !== "all" && (
+                <button
+                  onClick={() => { setTileFilter("all"); setPage(0); }}
+                  title="Clear filter"
+                  className="p-0.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
 
             <div className="relative" ref={filterRef}>
