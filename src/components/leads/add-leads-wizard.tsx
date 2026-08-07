@@ -16,7 +16,8 @@ import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outr
 import { searchBuyLeads, type GeneratedProspect } from "@/lib/leads/buy-leads";
 import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
 import { MultiLocationInput } from "@/components/leads/location-search-input";
-import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
+import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, deductLeads } from "@/lib/queries/subscriptions";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { cn } from "@/lib/utils";
 
@@ -172,14 +173,11 @@ export function AddLeadsWizard({
   open,
   onClose,
   initialSource,
-  initialEntry,
 }: {
   open: boolean;
   onClose: () => void;
   /** Jumps straight to that source's data-entry screen (step 2) instead of the source picker — used by toolbar quick-add shortcuts. */
   initialSource?: SourceId | null;
-  /** Phase 2 — pre-fills the manual-entry form (assistant "open_lead_form" UI action). Nothing is saved until the user imports. */
-  initialEntry?: Partial<ManualEntry> | null;
 }) {
   const router = useRouter();
   const { confirm } = useFeedback();
@@ -199,18 +197,6 @@ export function AddLeadsWizard({
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Phase 2 — assistant "open_lead_form" pre-fill: jump to Manual Entry with
-  // the provided details (name/email/company/title/phone). Not saved until the
-  // user imports, so this never mutates data by itself.
-  useEffect(() => {
-    if (open && initialEntry && Object.keys(initialEntry).length) {
-      setSource("manual");
-      setStep(2);
-      setEntries([{ ...newEntry(), ...initialEntry, id: `e${++_mid}` }]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
   // Buy leads (real prospects via Bright Data, or AI samples as fallback)
   const [buy, setBuy] = useState({
     industry: "", role: "", locations: [] as string[], count: 10,
@@ -224,7 +210,7 @@ export function AddLeadsWizard({
 
   // Import
   const [pending, start] = useTransition();
-  const [summary, setSummary] = useState<{ imported: number; skipped: number; duplicates: number } | null>(null);
+  const [summary, setSummary] = useState<{ imported: number; skipped: number; duplicates: number; leadsRemaining?: number } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
   // LinkedIn (Unipile) connection state
@@ -512,9 +498,34 @@ export function AddLeadsWizard({
     }
 
     start(async () => {
+      // Buy Leads draws from the plan's monthly lead-discovery balance — check
+      // before inserting, same "check before you spend" pattern as AI credits.
+      if (isBuy && payload.length) {
+        if (!(await canAffordLeads(payload.length))) {
+          setImportError("You don't have enough leads remaining on your plan this cycle. Upgrade your plan or wait for renewal.");
+          return;
+        }
+      }
+
       const res = await bulkInsertLeads(payload, { defaultSource: sourceLabel });
       if (res.error) { setImportError(res.error); return; }
-      setSummary({ imported: res.inserted, skipped, duplicates: res.duplicates });
+
+      let leadsRemaining: number | undefined;
+      if (isBuy && res.inserted > 0) {
+        // Best-effort post-insert deduction — the leads are already in the
+        // CRM, so a deduction failure here should never hide that from the
+        // user (same philosophy as chargeCredits() for AI features).
+        try {
+          const deductRes = await deductLeads(res.inserted, { source: "buy_leads" });
+          if (!deductRes.ok) console.error("[buy-leads/credits] deduct failed:", deductRes.error);
+          else leadsRemaining = deductRes.remaining;
+        } catch (err) {
+          console.error("[buy-leads/credits] deduct threw:", err);
+        }
+        notifyCreditsChanged();
+      }
+
+      setSummary({ imported: res.inserted, skipped, duplicates: res.duplicates, leadsRemaining });
       setStep(4);
       router.refresh();
     });
@@ -654,8 +665,12 @@ export function AddLeadsWizard({
               <div className="h-14 w-14 mx-auto rounded-full bg-emerald-50 flex items-center justify-center mb-4">
                 <CheckCircle2 className="h-7 w-7 text-emerald-600" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900">Import complete</h3>
-              <p className="text-sm text-slate-500 mt-1">Your leads have been added to the workspace.</p>
+              <h3 className="text-lg font-semibold text-slate-900">{isBuy ? "Leads purchased successfully" : "Import complete"}</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                {isBuy
+                  ? `${summary.imported} lead${summary.imported === 1 ? "" : "s"} added${summary.leadsRemaining != null ? ` — ${summary.leadsRemaining.toLocaleString()} remaining this cycle` : ""}.`
+                  : "Your leads have been added to the workspace."}
+              </p>
               <div className="grid grid-cols-3 gap-3 mt-6 max-w-md mx-auto">
                 <div className="p-3 bg-emerald-50 rounded-lg"><p className="text-2xl font-bold text-emerald-700">{summary.imported}</p><p className="text-xs text-emerald-600 mt-1">Imported</p></div>
                 <div className="p-3 bg-amber-50 rounded-lg"><p className="text-2xl font-bold text-amber-700">{summary.duplicates}</p><p className="text-xs text-amber-600 mt-1">Duplicates</p></div>

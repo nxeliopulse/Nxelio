@@ -267,8 +267,9 @@ export function NewsletterBuilder({
       if (!result.ok) {
         setError(result.error || "Send failed");
       } else {
-        const msg = `Sent to ${result.sent} of ${result.total} recipients${result.failed ? ` (${result.failed} failed)` : ""}${result.redirectedMessage ? ` — ${result.redirectedMessage}` : ""}`;
+        const msg = `Bulk email sent successfully — ${result.sent} of ${result.total} recipients${result.failed ? ` (${result.failed} failed)` : ""}${result.redirectedMessage ? ` — ${result.redirectedMessage}` : ""}. ${(result.total ?? 0) * 3} credits used.`;
         setSuccess(msg);
+        notifyCreditsChanged();
         setShowSendModal(false);
         setTimeout(() => router.push("/newsletters"), 2500);
       }

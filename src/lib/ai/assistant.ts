@@ -1,24 +1,14 @@
 "use server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
-import {
-  scanPrompt, validateToolPermission, rateLimit,
-  detectSecrets, type AiCallerContext, type AiRoleName,
-} from "@/lib/ai/security";
-import {
-  auditToolExecuted, auditToolApproved, auditToolDenied, auditInjectionBlocked,
-  auditInjectionSanitized, auditSecretMasked, auditRateLimited,
-} from "@/lib/ai/audit";
-import { ToolError } from "@/lib/ai/executor/errors";
-import { ToolExecutor } from "@/lib/ai/executor/executor";
-import { ExecutionTimeline } from "@/lib/ai/executor/timeline";
-import { StreamingManager } from "@/lib/ai/executor/streaming";
-import { createRegistry } from "@/lib/ai/registry/registry";
-import type { TimelineStep } from "@/lib/ai/registry/types";
-import { assistantTools, DELETE_TOOLS, WRITE_TOOLS, summarizeAction } from "@/lib/ai/tools";
-import type { UiActionCall } from "@/lib/ui-actions/registry";
-import { getUiActionDef } from "@/lib/ui-actions/registry";
-import { decomposeIntent } from "@/lib/ai/planner/planner";
-import { executePlan, resolveRef, type ToolRunner } from "@/lib/ai/planner/executor";
+import { createClient } from "@/lib/supabase/server";
+import { createLead, getLeads, updateLead, deleteLead } from "@/lib/queries/leads";
+import { createCampaign, getCampaigns, getCampaignStats, updateCampaign, deleteCampaign } from "@/lib/queries/campaigns";
+import { createSegment, getSegments, deleteSegment } from "@/lib/queries/segments";
+import { flatRulesToTree } from "@/lib/segments";
+import { createEmailTemplate, getEmailTemplates, deleteEmailTemplate } from "@/lib/queries/templates";
+import { getNewsletters, deleteNewsletter } from "@/lib/queries/newsletters";
+import { sendNewsletter } from "@/lib/email/newsletter-actions";
+import { getUsers } from "@/lib/queries/users";
+import { sendLeadEmail } from "@/lib/email/actions";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 import { resolveAiConfig } from "@/lib/ai/provider";
@@ -40,51 +30,253 @@ export interface AssistantResult {
   reply: string;
   actions: string[]; // log of executed (read-only auto + approved) work
   proposal?: ProposedAction[]; // pending writes awaiting admin approval
-  /** Phase 2 — a UI action (navigate / open pre-filled form) the client executes. */
-  uiAction?: UiActionCall;
   /** Fixed set of valid answers for the pending question (e.g. wizard select fields) — the UI
    *  renders these as clickable options instead of expecting free text. */
   choices?: string[];
   error?: string;
-  /** Phase 1 — execution artifacts. Additive; the chat UI ignores them. */
-  timeline?: TimelineStep[];
-  transcript?: string[];
-}
-
-/**
- * Resolves the caller's role + per-user nav overrides for the AI permission
- * layer. Reads from the admin client so a restrictive RLS policy can't mask
- * the caller's own role row (same pattern as requireSuperAdmin). FAIL CLOSED:
- * any error → null role → every tool denied.
- */
-async function resolveCallerContext(userId: string): Promise<AiCallerContext> {
-  try {
-    const admin = createAdminClient();
-    const { data: profile } = await admin
-      .from("users")
-      .select("role_id, nav_access")
-      .eq("user_id", userId)
-      .single();
-    const roleName: AiRoleName | null =
-      profile?.role_id === 1 ? "Super Admin"
-      : profile?.role_id === 2 ? "Marketing Admin"
-      : profile?.role_id === 3 ? "Sales Admin"
-      : null;
-    return { roleId: profile?.role_id ?? null, roleName, navAccess: profile?.nav_access ?? null };
-  } catch {
-    return { roleId: null, roleName: null, navAccess: null };
-  }
 }
 
 // ---------------------------------------------------------------------------
-// Phase 1 — registry + executor. Tool definitions/handlers now live in
-// src/lib/ai/tools/index.ts; the registry is the single source of truth and
-// the executor is the single execution path (validation, permission check,
-// retry, health, timeline, streaming, rollback hooks). Descriptions sent to
-// the model are byte-identical to the pre-Phase-1 inline TOOLS array.
+// Tool definitions
 // ---------------------------------------------------------------------------
-const registry = createRegistry(assistantTools);
-const executor = new ToolExecutor(registry);
+const TOOLS = [
+  // ---------- READ (auto-executed) ----------
+  {
+    type: "function",
+    function: {
+      name: "get_workspace_stats",
+      description: "Live workspace numbers: total/hot/converted leads and campaign stats.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_users",
+      description: "List the workspace team: each member's name, email, role, status, and per-tab permission overrides. Use for any question about admins/users/roles/permissions.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_leads",
+      description: "Search leads. Returns up to 10 matches with id, name, email, company, status, score.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Matched against name, email, company" },
+          status: { type: "string", enum: ["New", "Warm", "Hot", "Scored", "Converted"] },
+          industry: { type: "string" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_campaigns",
+      description: "List campaigns with id, name, status, sent count.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_segments",
+      description: "List audience segments with id, name, type, status.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_templates",
+      description: "List email templates with id, name, subject.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_newsletters",
+      description: "List newsletters with id, title, status (Draft/Sent/etc.), recipients and sent count.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  // ---------- WRITE (requires admin approval — READ/CREATE/EDIT only, no deletes) ----------
+  {
+    type: "function",
+    function: {
+      name: "create_lead",
+      description: "[Needs approval] Create a lead. Requires a name or company, plus an email, website, or LinkedIn URL.",
+      parameters: {
+        type: "object",
+        properties: {
+          full_name: { type: "string" }, email: { type: "string" }, company_name: { type: "string" },
+          industry: { type: "string" }, interest_area: { type: "string" }, website_url: { type: "string" },
+          linkedin: { type: "string" }, phone: { type: "string" }, twitter_handle: { type: "string" },
+          job_title: { type: "string" }, company_size: { type: "string" }, seniority: { type: "string" },
+          street_address: { type: "string" }, city: { type: "string" }, state: { type: "string" },
+          country: { type: "string" }, postal_code: { type: "string" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_lead",
+      description: "[Needs approval] Update fields on a lead. Use search_leads first to get lead_id, and pass display = the lead's name.",
+      parameters: {
+        type: "object",
+        properties: {
+          lead_id: { type: "string" },
+          display: { type: "string", description: "Lead's name for the approval card" },
+          status: { type: "string", enum: ["New", "Warm", "Hot", "Scored", "Converted"] },
+          full_name: { type: "string" }, email: { type: "string" }, company_name: { type: "string" },
+          industry: { type: "string" }, interest_area: { type: "string" }, phone: { type: "string" },
+        },
+        required: ["lead_id", "display"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_campaign",
+      description: "[Needs approval] Create an email campaign (saved as Draft).",
+      parameters: {
+        type: "object",
+        properties: {
+          campaign_name: { type: "string" },
+          subject: { type: "string" },
+          body: { type: "string" },
+        },
+        required: ["campaign_name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_campaign",
+      description: "[Needs approval] Update a campaign's name/subject/content/status. Use list_campaigns first; pass display = campaign name.",
+      parameters: {
+        type: "object",
+        properties: {
+          campaign_id: { type: "string" },
+          display: { type: "string" },
+          campaign_name: { type: "string" },
+          subject: { type: "string" },
+          content: { type: "string" },
+          status: { type: "string", enum: ["Draft", "Active", "Paused", "Completed"] },
+        },
+        required: ["campaign_id", "display"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_segment",
+      description: "[Needs approval] Create an audience segment with simple rules.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          description: { type: "string" },
+          rules: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                field: { type: "string", enum: ["industry", "interest_area", "status", "lead_score", "source"] },
+                operator: { type: "string", enum: ["equals", "contains", "greater_than", "less_than"] },
+                value: { type: "string" },
+              },
+              required: ["field", "operator", "value"],
+            },
+          },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_email_template",
+      description: "[Needs approval] Save a reusable email template. Supports {{firstName}}, {{companyName}} variables.",
+      parameters: {
+        type: "object",
+        properties: { template_name: { type: "string" }, subject: { type: "string" }, body: { type: "string" } },
+        required: ["template_name", "subject", "body"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_email_to_lead",
+      description: "[Needs approval] Send a real email to a lead. Use search_leads first; pass display = lead's name. The admin sees the recipient/subject before it sends.",
+      parameters: {
+        type: "object",
+        properties: {
+          lead_id: { type: "string" },
+          display: { type: "string" },
+          subject: { type: "string" },
+          body: { type: "string" },
+        },
+        required: ["lead_id", "display", "subject", "body"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_newsletter",
+      description: "[Needs approval] Send a newsletter to its subscribed audience now. Use list_newsletters first; pass display = newsletter title.",
+      parameters: {
+        type: "object",
+        properties: { newsletter_id: { type: "string" }, display: { type: "string" } },
+        required: ["newsletter_id", "display"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_contact_email",
+      description: "[Needs approval] Email the Nxelio team at hello@nxelio.ai on the user's behalf. Use this ONLY when the user asks a pricing/plan/billing question that isn't covered by the pricing knowledge in your instructions, or when they explicitly ask to be connected with support/sales. Summarize their question or request clearly in the email body — never invent an answer instead of using this.",
+      parameters: {
+        type: "object",
+        properties: {
+          subject: { type: "string", description: "Short subject line summarizing the request" },
+          body: { type: "string", description: "The message to send — summarize the user's question or request in their own words" },
+        },
+        required: ["subject", "body"],
+      },
+    },
+  },
+];
+
+const WRITE_TOOLS = new Set([
+  "create_lead", "update_lead",
+  "create_campaign", "update_campaign",
+  "create_segment",
+  "create_email_template",
+  "send_email_to_lead",
+  "send_newsletter",
+  "send_contact_email",
+]);
+
+const DELETE_TOOLS = new Set([
+  "delete_lead", "delete_campaign", "delete_segment",
+  "delete_template", "delete_newsletter",
+]);
 
 const OFF_TOPIC_FALLBACK_MESSAGE = "I'm here to help you with this application and its features. Please ask questions related to the system.";
 
@@ -202,10 +394,62 @@ async function buildSystemPrompt(): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// Read-tool execution now lives in the registry handlers (tools/index.ts) and
-// runs through the executor — the executor preserves the exact behavior:
-// reads return JSON strings the model parses, with errors embedded.
+// Read-tool execution (auto). All queries run under the caller's session — RLS
+// keeps everything workspace-scoped.
 // ---------------------------------------------------------------------------
+async function executeReadTool(name: string, args: Record<string, unknown>): Promise<string> {
+  try {
+    switch (name) {
+      case "get_workspace_stats": {
+        const [leads, campaigns] = await Promise.all([getLeads(), getCampaignStats()]);
+        return JSON.stringify({
+          total_leads: leads.length,
+          hot_leads: leads.filter((l) => l.status === "Hot").length,
+          converted_leads: leads.filter((l) => l.status === "Converted").length,
+          campaigns,
+        });
+      }
+      case "list_users": {
+        const users = await getUsers();
+        return JSON.stringify(users.map((u) => ({
+          name: u.full_name, email: u.email, role: u.role_name, status: u.status,
+          permission_overrides: u.nav_access && Object.keys(u.nav_access).length ? u.nav_access : "role defaults",
+        })));
+      }
+      case "search_leads": {
+        const leads = await getLeads();
+        const q = String(args.query || "").toLowerCase();
+        const matches = leads.filter((l) => {
+          const text = `${l.full_name || ""} ${l.email || ""} ${l.company_name || ""}`.toLowerCase();
+          return (!q || text.includes(q))
+            && (!args.status || l.status === args.status)
+            && (!args.industry || (l.industry || "").toLowerCase() === String(args.industry).toLowerCase());
+        }).slice(0, 10).map((l) => ({ id: l.id, name: l.full_name, email: l.email, company: l.company_name, status: l.status, score: l.lead_score }));
+        return JSON.stringify({ count: matches.length, leads: matches });
+      }
+      case "list_campaigns": {
+        const cs = await getCampaigns();
+        return JSON.stringify(cs.map((c) => ({ id: c.id, name: c.campaign_name, status: c.status, sent: c.sent_count })));
+      }
+      case "list_segments": {
+        const ss = await getSegments();
+        return JSON.stringify(ss.map((s) => ({ id: s.id, name: s.segment_name, type: s.segment_type, status: s.status, contacts: s.contacts })));
+      }
+      case "list_templates": {
+        const ts = await getEmailTemplates();
+        return JSON.stringify(ts.map((t) => ({ id: t.id, name: t.template_name, subject: t.subject })));
+      }
+      case "list_newsletters": {
+        const ns = await getNewsletters();
+        return JSON.stringify(ns.map((n) => ({ id: n.id, title: n.title, status: n.status, recipients: n.recipient_count, sent: n.sent_count })));
+      }
+      default:
+        return JSON.stringify({ error: `Unknown read tool ${name}` });
+    }
+  } catch (err) {
+    return JSON.stringify({ error: err instanceof Error ? err.message : "Tool failed" });
+  }
+}
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -489,11 +733,198 @@ function runLeadCreationWizard(history: AssistantMessage[]): AssistantResult | n
   return { reply: buildWizardSummary(updated), actions: [] };
 }
 
-// ---------------------------------------------------------------------------
-// Write-tool execution — registry handlers (tools/index.ts) via the executor,
-// ONLY called from approveAssistantActions after the admin clicked Approve.
-// ---------------------------------------------------------------------------
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Auto-resolves a lead reference to a real database UUID — the model may pass
+ * a name ("Mani"/"Tamilmani"), an email, or a truncated/remembered id instead
+ * of the full UUID from search_leads. Tries, in order: exact id, id prefix,
+ * exact name, exact email (against either the raw id arg or the display
+ * name), partial name match either direction. Returns null if nothing matches
+ * so the caller can report "not found" rather than silently acting on the
+ * wrong lead.
+ */
+async function resolveLeadId(rawId: string, display?: string): Promise<string | null> {
+  if (UUID_RE.test(rawId)) return rawId;
+  const all = await getLeads();
+  const searchTerm = (display || rawId).toLowerCase();
+  const found =
+    all.find((l) => l.id.startsWith(rawId)) ||
+    all.find((l) => l.full_name?.toLowerCase() === searchTerm) ||
+    all.find((l) => l.email?.toLowerCase() === rawId.toLowerCase()) ||
+    all.find((l) => l.email?.toLowerCase() === searchTerm) ||
+    all.find((l) => l.full_name?.toLowerCase().includes(searchTerm)) ||
+    all.find((l) => searchTerm.includes(l.full_name?.toLowerCase() || ""));
+  return found?.id ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Write-tool execution — ONLY called from approveAssistantActions after the
+// admin clicked Approve in the UI.
+// ---------------------------------------------------------------------------
+async function executeWriteTool(name: string, args: Record<string, unknown>, requesterEmail?: string | null): Promise<{ ok: boolean; detail: string }> {
+  switch (name) {
+    case "create_lead": {
+      // Trim first so whitespace-only values (e.g. "   ") are treated as absent, not present.
+      const fullName = typeof args.full_name === "string" ? args.full_name.trim() : "";
+      const companyName = typeof args.company_name === "string" ? args.company_name.trim() : "";
+      const email = typeof args.email === "string" ? args.email.trim() : "";
+      const websiteUrl = typeof args.website_url === "string" ? args.website_url.trim() : "";
+      const linkedin = typeof args.linkedin === "string" ? args.linkedin.trim() : "";
+
+      if (!(fullName || companyName) || !(email || websiteUrl || linkedin)) {
+        return { ok: false, detail: "Lead needs a name/company AND an email, website, or LinkedIn URL." };
+      }
+      // Catches hallucinated/placeholder values (e.g. "person's email") that are non-empty
+      // strings but not real emails — reject rather than silently saving garbage data.
+      if (email && !EMAIL_PATTERN.test(email)) {
+        return { ok: false, detail: `"${email}" doesn't look like a valid email address — please provide a real one.` };
+      }
+      const lead = await createLead({
+        full_name: fullName || null, email: email || null,
+        company_name: companyName || null, industry: (args.industry as string)?.trim() || null,
+        interest_area: (args.interest_area as string)?.trim() || null, website_url: websiteUrl || null,
+        linkedin: linkedin || null, phone: (args.phone as string)?.trim() || null,
+        twitter_handle: (args.twitter_handle as string)?.trim() || null,
+        job_title: (args.job_title as string)?.trim() || null,
+        company_size: (args.company_size as string)?.trim() || null,
+        seniority: (args.seniority as string)?.trim() || null,
+        street_address: (args.street_address as string)?.trim() || null,
+        city: (args.city as string)?.trim() || null,
+        state: (args.state as string)?.trim() || null,
+        country: (args.country as string)?.trim() || null,
+        postal_code: (args.postal_code as string)?.trim() || null,
+        source: "AI Assistant", status: "New",
+      });
+      return { ok: true, detail: `Created lead ${fullName || companyName} (id ${String(lead.id).slice(0, 8)}...)` };
+    }
+    case "update_lead": {
+      const fields: Record<string, unknown> = {};
+      for (const k of ["status", "full_name", "email", "company_name", "industry", "interest_area", "phone"]) {
+        if (args[k] !== undefined) fields[k] = args[k];
+      }
+      if (!Object.keys(fields).length) return { ok: false, detail: "No fields to update." };
+      const leadId = await resolveLeadId(String(args.lead_id), args.display ? String(args.display) : undefined);
+      if (!leadId) return { ok: false, detail: `Lead "${args.display || args.lead_id}" not found in active leads list.` };
+      await updateLead(leadId, fields);
+      return { ok: true, detail: `Updated ${args.display}: ${Object.entries(fields).map(([k, v]) => `${k} -> ${v}`).join(", ")}` };
+    }
+    case "delete_lead":
+      await deleteLead(String(args.lead_id));
+      return { ok: true, detail: `Deleted lead ${args.display}` };
+    case "create_campaign": {
+      const c = await createCampaign({
+        campaign_name: String(args.campaign_name),
+        subject: args.subject ? String(args.subject) : null,
+        content: args.body ? String(args.body) : null,
+      });
+      return { ok: true, detail: `Created draft campaign "${args.campaign_name}" (id ${String(c?.id).slice(0, 8)}...)` };
+    }
+    case "update_campaign": {
+      const fields: Record<string, unknown> = {};
+      for (const k of ["campaign_name", "subject", "content", "status"]) {
+        if (args[k] !== undefined) fields[k] = args[k];
+      }
+      if (!Object.keys(fields).length) return { ok: false, detail: "No fields to update." };
+      // Resolve partial/truncated IDs the AI may have remembered from earlier messages
+      let campaignId = String(args.campaign_id);
+      if (campaignId.length < 36) {
+        const all = await getCampaigns();
+        const found = all.find((c) => c.id.startsWith(campaignId)) || all.find((c) => c.campaign_name === String(args.display || ""));
+        if (!found) return { ok: false, detail: `Campaign "${args.display}" not found. Please use list_campaigns to confirm the ID.` };
+        campaignId = found.id;
+      }
+      await updateCampaign(campaignId, fields);
+      return { ok: true, detail: `Updated campaign ${args.display}: ${Object.keys(fields).join(", ")}` };
+    }
+    case "delete_campaign":
+      await deleteCampaign(String(args.campaign_id));
+      return { ok: true, detail: `Deleted campaign ${args.display}` };
+    case "create_segment": {
+      const rules = Array.isArray(args.rules)
+        ? (args.rules as Array<{ field: string; operator: string; value: string }>).map((r) => ({
+            field: r.field, operator: r.operator, value: r.value,
+          }))
+        : [];
+      await createSegment(String(args.name), String(args.description || ""), "Dynamic", flatRulesToTree(rules, "AND"));
+      return { ok: true, detail: `Created segment "${args.name}" with ${rules.length} rule${rules.length === 1 ? "" : "s"}` };
+    }
+    case "delete_segment":
+      await deleteSegment(String(args.segment_id));
+      return { ok: true, detail: `Deleted segment ${args.display}` };
+    case "create_email_template":
+      await createEmailTemplate({ template_name: String(args.template_name), subject: String(args.subject), body: String(args.body) });
+      return { ok: true, detail: `Saved template "${args.template_name}"` };
+    case "delete_template":
+      await deleteEmailTemplate(String(args.template_id));
+      return { ok: true, detail: `Deleted template ${args.display}` };
+    case "send_email_to_lead": {
+      const leadId = await resolveLeadId(String(args.lead_id), args.display ? String(args.display) : undefined);
+      if (!leadId) return { ok: false, detail: `Lead "${args.display || args.lead_id}" not found in active leads list.` };
+      const res = await sendLeadEmail(leadId, String(args.subject), String(args.body));
+      if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
+      return { ok: true, detail: `Sent "${args.subject}" to ${args.display}` };
+    }
+    case "delete_newsletter":
+      await deleteNewsletter(String(args.newsletter_id));
+      return { ok: true, detail: `Deleted newsletter ${args.display}` };
+    case "send_newsletter": {
+      const res = await sendNewsletter(String(args.newsletter_id));
+      if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
+      return { ok: true, detail: `Sent newsletter ${args.display} to ${res.sent ?? 0} recipient${res.sent === 1 ? "" : "s"}${res.redirectedMessage ? ` (${res.redirectedMessage})` : ""}` };
+    }
+    case "send_contact_email": {
+      const { sendEmail } = await import("@/lib/email/resend");
+      const from = requesterEmail || "an Nxelio user";
+      const res = await sendEmail({
+        to: "hello@nxelio.ai",
+        subject: `[AI Assistant] ${args.subject}`,
+        text: `Message from ${from} via the in-app AI Assistant:\n\n${args.body}`,
+        replyTo: requesterEmail || undefined,
+      });
+      if (!res.ok) return { ok: false, detail: res.error || "Send failed" };
+      return { ok: true, detail: `Emailed hello@nxelio.ai: "${args.subject}"` };
+    }
+    default:
+      return { ok: false, detail: `Unknown write tool ${name}` };
+  }
+}
+
+/** Short human summary for the approval card. */
+function summarizeAction(name: string, args: Record<string, unknown>): string {
+  switch (name) {
+    case "create_lead": {
+      const name = args.full_name || args.company_name || "(no name provided)";
+      const extras = [
+        "email", "company_name", "industry", "interest_area", "phone", "website_url", "linkedin",
+        "twitter_handle", "job_title", "company_size", "seniority",
+        "street_address", "city", "state", "country", "postal_code",
+      ]
+        .filter((k) => k !== (args.full_name ? "full_name" : "company_name") && args[k])
+        .map((k) => `${k.replace(/_/g, " ")}: ${args[k]}`)
+        .join(", ");
+      return `Create lead ${name}${extras ? ` — ${extras}` : ""}`;
+    }
+    case "update_lead": {
+      const changes = ["status", "full_name", "email", "company_name", "industry", "interest_area", "phone"]
+        .filter((k) => args[k] !== undefined).map((k) => `${k} -> ${args[k]}`).join(", ");
+      return `Update lead ${args.display}: ${changes || "no changes"}`;
+    }
+    case "delete_lead": return `Delete lead ${args.display}`;
+    case "create_campaign": return `Create draft campaign "${args.campaign_name}"`;
+    case "update_campaign": return `Update campaign ${args.display}`;
+    case "delete_campaign": return `Delete campaign ${args.display}`;
+    case "create_segment": return `Create segment "${args.name}"`;
+    case "delete_segment": return `Delete segment ${args.display}`;
+    case "create_email_template": return `Save template "${args.template_name}"`;
+    case "delete_template": return `Delete template ${args.display}`;
+    case "send_email_to_lead": return `Send email to ${args.display} — "${args.subject}"`;
+    case "delete_newsletter": return `Delete newsletter ${args.display}`;
+    case "send_newsletter": return `Send newsletter ${args.display} to its subscribed audience`;
+    case "send_contact_email": return `Email hello@nxelio.ai — "${args.subject}"`;
+    default: return name;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Rate-limit-aware completion call: retries 429/5xx with backoff instead of
@@ -579,107 +1010,6 @@ function isOffTopic(history: AssistantMessage[]): boolean {
 // ---------------------------------------------------------------------------
 // Main entry
 // ---------------------------------------------------------------------------
-/**
- * Phase 3 M1 — Intent Planner hook. Runs BEFORE the LLM (deterministic, like
- * the lead wizard): decompose the user's goal into a plan, execute the read
- * steps immediately through the real Phase 1 executor, then batch the write
- * steps into ONE approval card. Per-row refs ("$search.rows[N].id") expand to
- * one proposed action per found lead. Returns null when no intent matches, so
- * the normal LLM path runs untouched.
- */
-async function runIntentPlanner(
-  history: AssistantMessage[],
-  callerCtx: AiCallerContext,
-  timeline: ExecutionTimeline,
-  stream: StreamingManager,
-  actions: string[],
-  chargeOnce: () => Promise<void>,
-): Promise<AssistantResult | null> {
-  const lastUser = [...history].reverse().find((m) => m.role === "user");
-  if (!lastUser) return null;
-  const plan = decomposeIntent(lastUser.content);
-  if (!plan) return null;
-
-  const readSteps = plan.steps.filter((s) => !s.requires_approval);
-  const writeSteps = plan.steps.filter((s) => s.requires_approval);
-
-  // Wire the tested engine to the real executor (permission re-check,
-  // validation, timeline + streaming). Reads never throw — failures become
-  // failed steps whose dependents get skipped.
-  const run: ToolRunner = async (tool, args) => {
-    try {
-      const result = await executor.execute(tool, args, callerCtx, { timeline, stream });
-      let data: unknown = result.detail;
-      try { data = JSON.parse(result.detail); } catch { /* keep raw string */ }
-      // search_leads returns { count, leads } — alias rows so planner $refs
-      // ($search.rows[i].…) and depRows shape checks resolve.
-      if (data && typeof data === "object") {
-        const o = data as Record<string, unknown>;
-        if (Array.isArray(o.leads) && !Array.isArray(o.rows)) o.rows = o.leads;
-      }
-      return { ok: true, data };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  };
-
-  const exec = readSteps.length ? await executePlan({ ...plan, steps: readSteps }, run) : null;
-
-  const results = new Map<string, unknown>();
-  for (const ex of exec?.steps ?? []) {
-    if (ex.status === "success") results.set(ex.step.id, ex.result);
-  }
-  const statusLines = (exec?.steps ?? []).map((ex) =>
-    `${ex.status === "success" ? "✓" : ex.status === "failed" ? "✗" : "–"} ${ex.step.label}`
-  );
-  const statusText = statusLines.join(" · ");
-
-  // Write steps: skip when a dependency failed, skip when its row source came
-  // back empty, expand per-row refs into one proposed action per found lead.
-  const proposals: ProposedAction[] = [];
-  for (const ws of writeSteps) {
-    if ((ws.depends_on ?? []).some((d) => !results.has(d))) continue;
-    const depRows = (ws.depends_on ?? []).map((d) => results.get(d)).find((r) => Array.isArray((r as { rows?: unknown })?.rows));
-    const rows = depRows ? ((depRows as { rows: unknown[] }).rows ?? []) : null;
-    if (rows !== null && rows.length === 0) continue;
-    // Only steps whose args reference the row list expand one action per row —
-    // e.g. create_segment with static rules must stay a single proposal.
-    const usesRows = Object.values(ws.args ?? {}).some((v) => typeof v === "string" && /\$[\w-]+\.rows\[/.test(v));
-    const indices: (number | null)[] = !usesRows ? [null] : (rows === null ? [null] : rows.map((_, i) => i));
-    for (const idx of indices) {
-      const args: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(ws.args ?? {})) {
-        const raw = idx !== null && typeof v === "string" ? v.replace(/\[\d+\]/g, `[${idx}]`) : v;
-        args[k] = resolveRef(raw, results);
-      }
-      proposals.push({ tool: ws.tool, args, summary: summarizeAction(ws.tool, args) });
-    }
-  }
-
-  if (proposals.length) {
-    await chargeOnce();
-    const intro = proposals.length === 1
-      ? `I'm ready: ${statusText} — approve below to proceed.`
-      : `I'm ready to make ${proposals.length} changes: ${statusText} — approve below to proceed.`;
-    timeline.add("Waiting for approval", "running");
-    stream.begin("approval", "Waiting for approval");
-    return { reply: intro, actions, proposal: proposals, timeline: timeline.toJSON(), transcript: [...stream.transcript] };
-  }
-
-  if (exec && !exec.ok) {
-    return { reply: `I couldn't complete that — ${statusText}`, actions, timeline: timeline.toJSON(), transcript: [...stream.transcript] };
-  }
-
-  const search = exec?.steps.find((s) => s.step.tool === "search_leads");
-  const rows = (search?.result as { rows?: unknown[] } | undefined)?.rows;
-  const found = rows ? (rows.length === 1 ? "1 lead" : `${rows.length} leads`) : null;
-  const reply = found
-    ? `Found ${found}${statusText ? ` (${statusText})` : ""}.`
-    : `Done${statusText ? ` — ${statusText}` : ""}.`;
-  await chargeOnce();
-  return { reply, actions, timeline: timeline.toJSON(), transcript: [...stream.transcript] };
-}
-
 export async function runAssistant(history: AssistantMessage[]): Promise<AssistantResult> {
   const { apiKey, baseUrl, model, provider } = await resolveAiConfig();
   if (!apiKey) return { reply: "", actions: [], error: `AI isn't enabled on this environment. An admin needs to add the ${provider === "groq" ? "GROQ_API_KEY" : "OPENAI_API_KEY"} environment variable to the deployment (or switch providers in the Super Admin panel), then redeploy.` };
@@ -687,33 +1017,6 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { reply: "", actions: [], error: "Not authenticated." };
-
-  // ---- Security layer: rate limit (per user) ------------------------------
-  const rl = rateLimit(user.id, "assistant");
-  if (!rl.allowed) {
-    await auditRateLimited("assistant");
-    return { reply: "", actions: [], error: "You're sending messages too quickly — please wait a moment and try again." };
-  }
-
-  // ---- Security layer: caller role context for tool permissions -----------
-  const callerCtx = await resolveCallerContext(user.id);
-
-  // ---- Security layer: prompt-injection / jailbreak scan ------------------
-  // Scan the latest user message. Blocked → refuse without calling the model.
-  // Sanitized → strip the offending text and continue with the cleaned copy.
-  const lastUserIdx = history.map((m) => m.role).lastIndexOf("user");
-  let llmHistory = history;
-  if (lastUserIdx >= 0) {
-    const scan = scanPrompt(history[lastUserIdx].content);
-    if (scan.blocked) {
-      await auditInjectionBlocked(scan.flags);
-      return { reply: "I can't help with that request.", actions: [] };
-    }
-    if (scan.sanitized) {
-      await auditInjectionSanitized(scan.flags);
-      llmHistory = history.map((m, i) => (i === lastUserIdx ? { ...m, content: scan.safeText } : m));
-    }
-  }
 
   // Deterministic lead-creation wizard — runs before the LLM/off-topic/credit checks
   // entirely, since it never calls the model and shouldn't cost a credit or be
@@ -742,14 +1045,8 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
     }
   }
 
-  const trimmed = llmHistory.slice(-16);
+  const trimmed = history.slice(-16);
   const systemPrompt = await buildSystemPrompt();
-
-  // ---- Security layer: only expose tools the caller's role may use ---------
-  // The registry projects the schema filtered by validateToolPermission — the
-  // model can't propose a tool that isn't in the list. Execution-time
-  // validation inside the executor (below) is the second line of defense.
-  const tools = registry.toOpenAiTools(callerCtx);
 
   interface ToolCall { id: string; type: "function"; function: { name: string; arguments: string } }
   type ApiMessage =
@@ -763,17 +1060,6 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
   ];
 
   const actions: string[] = [];
-
-  // Phase 2 — a UI action (navigate / open pre-filled form) captured during the
-  // loop and attached to the final reply for the chat widget to render.
-  let uiAction: UiActionCall | null = null;
-
-  // Phase 1 — per-request execution artifacts (timeline + streaming transcript).
-  // finish() attaches them to every result without changing the UI contract.
-  const timeline = new ExecutionTimeline();
-  const stream = new StreamingManager();
-  const finish = (r: AssistantResult): AssistantResult =>
-    ({ ...r, timeline: timeline.toJSON(), transcript: [...stream.transcript] });
 
   // Some Groq/Llama models embed function calls as text instead of using tool_calls.
   // Pattern: <function(name)\nJSON</function>
@@ -794,16 +1080,9 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
     return text.replace(/<function[(=]\w+\)?>\s*[\s\S]*?<\/function>/g, "").trim();
   }
 
-  // Phase 3 M1 — deterministic intent planner (after the wizard/security
-  // gates, before the LLM loop): multi-step goals become read steps executed
-  // now + one approval card of writes. Matches only known intents; everything
-  // else flows to the LLM below.
-  const plannerResult = await runIntentPlanner(llmHistory, callerCtx, timeline, stream, actions, chargeOnce);
-  if (plannerResult) return plannerResult;
-
   for (let turn = 0; turn < 6; turn++) {
     const res = await chatCompletion(apiKey, baseUrl, {
-      model, messages, tools, tool_choice: "auto",
+      model, messages, tools: TOOLS, tool_choice: "auto",
       parallel_tool_calls: false, temperature: 0.4, max_tokens: 1500,
     });
 
@@ -816,15 +1095,11 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
       const friendly = res.status === 429
         ? "The AI provider is busy — please try again in a moment."
         : `AI error (${res.status}): ${detail || "unknown error"}`;
-      timeline.failOpenSteps();
-      return finish({ reply: "", actions, error: friendly });
+      return { reply: "", actions, error: friendly };
     }
 
     const msg = (res.data as { choices?: { message?: { content?: string; tool_calls?: ToolCall[] } }[] }).choices?.[0]?.message;
-    if (!msg) {
-      timeline.failOpenSteps();
-      return finish({ reply: "", actions, error: "Empty AI response. Please try again." });
-    }
+    if (!msg) return { reply: "", actions, error: "Empty AI response. Please try again." };
 
     // Prefer proper tool_calls; fall back to embedded Llama-style function tags in text
     const properCalls = msg.tool_calls ?? [];
@@ -838,17 +1113,8 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
     if (toolCalls.length) {
       const writes: ProposedAction[] = [];
       const reads: ToolCall[] = [];
-      const userText = llmHistory.filter((m) => m.role === "user").map((m) => m.content).join(" ");
+      const userText = history.filter((m) => m.role === "user").map((m) => m.content).join(" ");
       for (const tc of toolCalls) {
-        // ---- Security layer: execution-time permission check ----------------
-        // Defense in depth: the tool list was already filtered above, but an
-        // embedded (Llama-style) call could still name any tool — verify each
-        // call against the caller's role + nav overrides before doing anything.
-        const perm = validateToolPermission(tc.function.name, callerCtx);
-        if (!perm.allowed) {
-          await auditToolDenied(tc.function.name, perm.reason || "denied");
-          continue;
-        }
         let parsed: Record<string, unknown> = {};
         try { parsed = JSON.parse(tc.function.arguments || "{}"); } catch { /* empty */ }
         if (DELETE_TOOLS.has(tc.function.name)) {
@@ -874,10 +1140,10 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
       });
       if (invalidCreateLead) {
         await chargeOnce();
-        return finish({
+        return {
           reply: "I don't have a verified way to reach this person yet — could you share their real email, website, or LinkedIn URL? I won't guess one.",
           actions,
-        });
+        };
       }
 
       if (writes.length) {
@@ -888,11 +1154,7 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
                 : "I'm ready to make this change — approve it below to proceed.")
             : `I'm ready to make ${writes.length} changes — approve them below to proceed.`);
         await chargeOnce();
-        // The approval step stays "running" — it closes when the admin approves
-        // (executed in approveAssistantActions) or dismisses the card.
-        timeline.add("Waiting for approval", "running");
-        stream.begin("approval", "Waiting for approval");
-        return finish({ reply: intro, actions, proposal: writes });
+        return { reply: intro, actions, proposal: writes };
       }
 
       // For proper tool_calls use original content; for embedded calls use stripped content
@@ -900,50 +1162,18 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
       for (const tc of reads) {
         let parsed: Record<string, unknown> = {};
         try { parsed = JSON.parse(tc.function.arguments || "{}"); } catch { /* empty */ }
-        // Phase 1 — execution runs through the executor: validation, permission
-        // re-check, health, timeline + streaming steps. Reads never throw; the
-        // wrap below preserves the old "error embedded in the JSON the model
-        // sees" behavior for exotic cases (e.g. an embedded call to a tool
-        // that isn't registered).
-        let detail: string;
-        try {
-          const result = await executor.execute(tc.function.name, parsed, callerCtx, { timeline, stream });
-          detail = result.detail;
-        } catch (err) {
-          detail = JSON.stringify({ error: err instanceof Error ? err.message : "Tool failed" });
-        }
-        // Phase 2 — intercept ui_action results: the handler validated the
-        // emission against the registry; surface the first valid action to the
-        // chat widget. Invalid emissions get an error result the model sees.
-        if (tc.function.name === "ui_action") {
-          try {
-            const parsedDetail = JSON.parse(detail) as { ok?: boolean; action?: UiActionCall; error?: string };
-            if (parsedDetail.ok && parsedDetail.action && !uiAction) {
-              uiAction = parsedDetail.action;
-              await auditToolExecuted("ui_action", { action_id: uiAction.id });
-              messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ ok: true, emitted: uiAction.id }) });
-              continue;
-            }
-          } catch { /* fall through to the default tool-result push */ }
-        }
-        // ---- Security layer: audit every read-tool execution ----------------
-        await auditToolExecuted(tc.function.name, parsed);
-        messages.push({ role: "tool", tool_call_id: tc.id, content: detail });
+        const result = await executeReadTool(tc.function.name, parsed);
+        messages.push({ role: "tool", tool_call_id: tc.id, content: result });
       }
       continue;
     }
 
     await chargeOnce();
-    // ---- Security layer: mask secrets before the reply reaches the user -----
-    const rawReply = msg.content || "Done.";
-    const { flags: secretFlags, masked } = detectSecrets(rawReply);
-    if (secretFlags.length) await auditSecretMasked(secretFlags);
-    return finish({ reply: masked, actions, ...(uiAction ? { uiAction } : {}) });
+    return { reply: msg.content || "Done.", actions };
   }
 
   await chargeOnce();
-  timeline.failOpenSteps();
-  return finish({ reply: "I hit my action limit for one request — ask me to continue.", actions, ...(uiAction ? { uiAction } : {}) });
+  return { reply: "I hit my action limit for one request — ask me to continue.", actions };
 }
 
 // ---------------------------------------------------------------------------
@@ -951,31 +1181,13 @@ export async function runAssistant(history: AssistantMessage[]): Promise<Assista
 // ---------------------------------------------------------------------------
 export async function approveAssistantActions(
   proposal: ProposedAction[]
-): Promise<{ ok: boolean; results: string[]; errors: string[]; timeline?: TimelineStep[]; transcript?: string[]; uiAction?: UiActionCall }> {
+): Promise<{ ok: boolean; results: string[]; errors: string[] }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, results: [], errors: ["Not authenticated."] };
 
-  // ---- Security layer: re-validate permissions AT APPROVAL TIME ------------
-  // The proposal was validated when it was generated, but the approver's role
-  // or nav overrides may have changed since then — never trust a stale check.
-  const callerCtx = await resolveCallerContext(user.id);
-
   const results: string[] = [];
   const errors: string[] = [];
-
-  // Phase 2 — after a lead is actually created (approval granted), navigate the
-  // user to the Prospects page so they can see the result. Synthesized from the
-  // registry, so the label/route can never drift from the whitelisted actions.
-  let leadCreated = false;
-
-  // Phase 1 — per-request artifacts. Undo hooks recorded during execution are
-  // dropped when the request finishes (the capability stays available for
-  // future multi-step workflows; auto-rollback on partial failure would be a
-  // behavior change).
-  const timeline = new ExecutionTimeline();
-  const stream = new StreamingManager();
-  const executedIds: string[] = [];
 
   for (const action of proposal.slice(0, 10)) {
     if (DELETE_TOOLS.has(action.tool)) {
@@ -986,46 +1198,14 @@ export async function approveAssistantActions(
       errors.push(`Blocked unknown action "${action.tool}".`);
       continue;
     }
-    const perm = validateToolPermission(action.tool, callerCtx);
-    if (!perm.allowed) {
-      await auditToolDenied(action.tool, perm.reason || "denied");
-      errors.push(perm.reason || "Permission denied.");
-      continue;
-    }
     try {
-      const r = await executor.execute(action.tool, action.args || {}, callerCtx, {
-        requesterEmail: user.email,
-        timeline,
-        stream,
-        onRecord: (rec) => {
-          if (rec.status === "success") executedIds.push(rec.executionId);
-        },
-      });
-      results.push(r.detail);
-      if (action.tool === "create_lead") leadCreated = true;
-      await auditToolApproved(action.tool, action.args || {}, r.detail);
+      const r = await executeWriteTool(action.tool, action.args || {}, user.email);
+      if (r.ok) results.push(r.detail);
+      else errors.push(r.detail);
     } catch (err) {
-      // ToolError messages are already user-safe and match the old
-      // executeWriteTool detail texts — push them verbatim.
-      errors.push(
-        err instanceof ToolError
-          ? err.message
-          : `${action.summary}: ${err instanceof Error ? err.message : "failed"}`
-      );
+      errors.push(`${action.summary}: ${err instanceof Error ? err.message : "failed"}`);
     }
   }
 
-  // Hooks were only ever meant to be undoable within the request that created
-  // them — this approval flow completes successfully without needing them.
-  for (const id of executedIds) executor.rollbacks.clear(id);
-
-  const navDef = leadCreated ? getUiActionDef("navigate_leads") : null;
-  return {
-    ok: errors.length === 0,
-    results,
-    errors,
-    timeline: timeline.toJSON(),
-    transcript: [...stream.transcript],
-    ...(navDef ? { uiAction: { id: navDef.id, label: navDef.name } satisfies UiActionCall } : {}),
-  };
+  return { ok: errors.length === 0, results, errors };
 }

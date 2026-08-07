@@ -5,8 +5,12 @@ import { substituteMergeTags } from "./merge-tags";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
+import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 import { revalidatePath } from "next/cache";
 import type { NewsletterBlock, NewsletterContent, NewsletterRow } from "@/lib/queries/newsletters";
+
+/** Credits charged per recipient for sending a newsletter (Bulk Email Campaign). */
+const CREDITS_PER_NEWSLETTER_LEAD = 3;
 
 /**
  * Renders newsletter content blocks into a polished HTML email.
@@ -170,6 +174,13 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
   const { data: leads } = await query;
   if (!leads || !leads.length) return { ok: false, error: "No subscribed recipients with email addresses" };
 
+  // AI-credit gate: a Bulk Email Campaign costs credits per recipient, same
+  // "check before you spend" pattern used for AI features and sequence
+  // campaigns — canAfford() also covers the subscription-expired case.
+  if (!(await canAfford(CREDITS_PER_NEWSLETTER_LEAD * leads.length))) {
+    return { ok: false, error: `You don't have enough AI credits to send this newsletter to ${leads.length} recipient${leads.length === 1 ? "" : "s"} (${CREDITS_PER_NEWSLETTER_LEAD} credits/lead). Upgrade your plan or wait for your next cycle.` };
+  }
+
   // 3. Mark newsletter as Sending
   await supabase.from("newsletters").update({
     status: "Sending",
@@ -249,6 +260,16 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
     open_count: 0,
     click_count: 0,
   }).eq("id", n.id);
+
+  // Best-effort post-send deduction — the emails have already gone out, so a
+  // deduction failure here should never hide that from the caller (same
+  // philosophy as chargeCredits() in ai/actions.ts).
+  try {
+    const res = await deductCredits("newsletter_send", CREDITS_PER_NEWSLETTER_LEAD * leads.length, { metadata: { newsletterId: n.id } });
+    if (!res.ok) console.error("[newsletter-send/credits] deduct failed:", res.error);
+  } catch (err) {
+    console.error("[newsletter-send/credits] deduct threw:", err);
+  }
 
   revalidatePath("/newsletters");
   revalidatePath(`/newsletters/builder`);

@@ -1,8 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { resolveAiConfig } from "@/lib/ai/provider";
-import { rateLimit, scanPrompt, maskSensitiveData } from "@/lib/ai/security";
-import { auditRateLimited, auditInjectionBlocked, auditInjectionSanitized } from "@/lib/ai/audit";
 
 export interface SupportMessage {
   role: "user" | "assistant";
@@ -96,37 +94,10 @@ export async function runSupport(history: SupportMessage[]): Promise<SupportResu
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { reply: "", error: "Please sign in to use support." };
 
-  // ---- Security layer: rate limit (per user) ------------------------------
-  const rl = rateLimit(user.id, "support");
-  if (!rl.allowed) {
-    await auditRateLimited("support");
-    return { reply: "You're asking too quickly — please wait a moment and try again.", links: [{ label: "Open Help center", href: "/help" }] };
-  }
-
-  // ---- Security layer: prompt-injection scan + secret masking -------------
-  // Same enforcement as the assistant: user messages are scanned before the
-  // LLM call (blocked → refusal, sanitized → stripped), replies are masked.
-  const safeMessages: { role: string; content: string }[] = [];
-  let refused = false;
-  for (const m of history.slice(-10)) {
-    if (m.role !== "user") {
-      safeMessages.push({ role: m.role, content: m.content });
-      continue;
-    }
-    const scan = scanPrompt(m.content);
-    if (scan.blocked) {
-      refused = true;
-      await auditInjectionBlocked(scan.flags);
-      break;
-    }
-    if (scan.sanitized) await auditInjectionSanitized(scan.flags);
-    safeMessages.push({ role: "user", content: scan.safeText });
-  }
-  if (refused) {
-    return { reply: "I can't help with that — but I'm happy to help with anything about using Nxelio Nurture.", links: [{ label: "Open Help center", href: "/help" }] };
-  }
-
-  const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...safeMessages];
+  const messages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...history.slice(-10).map((m) => ({ role: m.role, content: m.content })),
+  ];
 
   const res = await call(apiKey, baseUrl, model, messages);
   if (!res.ok) {
@@ -143,8 +114,8 @@ export async function runSupport(history: SupportMessage[]): Promise<SupportResu
     const links = Array.isArray(parsed.links)
       ? parsed.links.filter((l) => l && typeof l.href === "string" && l.href.startsWith("/")).slice(0, 3)
       : undefined;
-    return { reply: maskSensitiveData(parsed.answer?.trim() || "I'm not sure how to help with that — try rephrasing, or open the Help center."), links };
+    return { reply: parsed.answer?.trim() || "I'm not sure how to help with that — try rephrasing, or open the Help center.", links };
   } catch {
-    return { reply: maskSensitiveData(res.content.trim() || "I'm here to help with using Nxelio Nurture. What would you like to do?") };
+    return { reply: res.content.trim() || "I'm here to help with using Nxelio Nurture. What would you like to do?" };
   }
 }

@@ -1,5 +1,5 @@
 import { ShieldAlert } from "lucide-react";
-import { getSubscription, getPlans } from "@/lib/queries/subscriptions";
+import { getSubscription, getPlans, getCreditHistory } from "@/lib/queries/subscriptions";
 import { getPromotionHistory } from "@/lib/queries/promotions";
 import { createClient } from "@/lib/supabase/server";
 import { navAdminItems, isNavItemAllowed } from "@/lib/nav-config";
@@ -31,7 +31,7 @@ export default async function BillingPage() {
     );
   }
 
-  const [sub, plans, leadsRes, sentRes, promotionHistory] = await Promise.all([
+  const [sub, plans, leadsRes, sentRes, promotionHistory, leadPurchaseHistory] = await Promise.all([
     getSubscription(),
     getPlans(),
     supabase.from("leads").select("id", { count: "exact", head: true }),
@@ -40,6 +40,7 @@ export default async function BillingPage() {
       .select("id", { count: "exact", head: true })
       .eq("direction", "outbound"),
     getPromotionHistory(),
+    getCreditHistory(50, "leads"),
   ]);
 
   return (
@@ -49,6 +50,7 @@ export default async function BillingPage() {
       leadsCount={leadsRes.count ?? 0}
       sentCount={sentRes.count ?? 0}
       promotionHistory={promotionHistory}
+      leadPurchaseHistory={leadPurchaseHistory}
     />
   );
 }

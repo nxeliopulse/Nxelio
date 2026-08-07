@@ -9,7 +9,6 @@ import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import { FeedbackProvider } from "@/components/ui/feedback";
 import { NoMailboxBanner } from "@/components/layout/no-mailbox-banner";
 import { AssistantProvider } from "@/components/layout/assistant-context";
-import { UiActionProvider } from "@/components/layout/ui-action-provider";
 import { TourProvider } from "@/components/tour/tour-context";
 import { CURRENT_VERSIONS } from "@/components/tour/tour-registry";
 import { markTourSeen } from "@/lib/queries/tour";
@@ -32,8 +31,7 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
   const [assistantExpanded, setAssistantExpanded] = useState(false);
   return (
     <AssistantProvider toggle={() => setAssistantOpen((v) => !v)}>
-      <UiActionProvider>
-        <TourProvider onTourEnd={(pageKey) => { markTourSeen(pageKey, CURRENT_VERSIONS[pageKey] ?? "1").catch(() => {}); }}>
+      <TourProvider onTourEnd={(pageKey) => { markTourSeen(pageKey, CURRENT_VERSIONS[pageKey] ?? "1").catch(() => {}); }}>
         <div className="flex h-screen overflow-hidden bg-[linear-gradient(to_right,var(--sidebar-bg),var(--topbar-bg))]">
           <Sidebar role={userRole} navAccess={navAccess} />
           <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} role={userRole} navAccess={navAccess} />
@@ -54,8 +52,7 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
           {/* Renders as a flex column on desktop — the content area shrinks to share the window */}
           <AssistantWidget open={assistantOpen} onClose={() => setAssistantOpen(false)} onExpandChange={setAssistantExpanded} />
         </div>
-        </TourProvider>
-      </UiActionProvider>
+      </TourProvider>
     </AssistantProvider>
   );
 }

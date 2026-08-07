@@ -3,14 +3,13 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Search, Plus, Trash2, ChevronDown, ChevronRight, Users2, Mail, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
+  Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  Pencil, RefreshCw, User, Link2, Download, FileText, FileSpreadsheet, Upload, X
+  Pencil, RefreshCw, User, Link2, Download, FileText, FileSpreadsheet, Upload
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
@@ -27,35 +26,30 @@ export interface OwnerOption {
   role: string;
 }
 
-// "index" (Row #) is the only truly fixed, always-shown column now — Name and
-// Action are toggleable too (see COLUMNS below), matching the reference design.
-type ColKey = "name" | "phone" | "email" | "tags" | "location" | "rating" | "contact" | "status" | "owner" | "action" | "created_at";
+// "index" (Row #) is a fixed, always-shown column — like leads-table.tsx's own Row #
+// column, it is NOT part of the Manage Columns toggle system below.
+type ColKey = "phone" | "tags" | "location" | "rating" | "contact" | "status" | "owner" | "created_at";
 
 interface ColumnDef { key: ColKey; label: string; defaultOn: boolean }
 
 // Per-column header sort — click any sortable column's arrow to sort by it, click
 // again to flip direction (same mechanism as leads-table.tsx's toggleColumnSort).
-// "tags"/"rating" are real columns (contacts.tags, contacts.rating — see 0091/0092
-// migrations), so they're sortable like Accounts' own Tags/Rating columns. "email"
-// mirrors "contact"'s existing c.email sort. "contact" (icon buttons) and "action"
-// (kebab menu) stay excluded — not comparable data, same as leads-table.tsx
-// excludes its own icon-only columns.
-type SortKey = "name" | "phone" | "email" | "tags" | "location" | "rating" | "contact" | "status" | "owner" | "created_at";
+// "name" isn't a ColKey (it's a fixed, always-shown column, not part of the Manage
+// Columns toggle system) but is still a valid sort target, so this is its own type
+// rather than reusing ColKey. "tags"/"rating" are now real columns (contacts.tags,
+// contacts.rating — see 0091/0092 migrations), so they're sortable like Accounts'
+// own Tags/Rating columns. "contact" (icon buttons) stays excluded — not comparable
+// data, same as leads-table.tsx excludes its own icon-only columns.
+type SortKey = "name" | "phone" | "tags" | "location" | "rating" | "contact" | "status" | "owner" | "created_at";
 
-// Order and set match the reference Manage Columns screenshot (Name, Phone, Email,
-// Tags, Location, Rating, Owner, Contact, Status, Action); "Created Date" is kept
-// at the end too since it was already a working column here — additive, not removed.
 const COLUMNS: ColumnDef[] = [
-  { key: "name", label: "Name", defaultOn: true },
   { key: "phone", label: "Phone", defaultOn: true },
-  { key: "email", label: "Email", defaultOn: true },
   { key: "tags", label: "Tags", defaultOn: true },
   { key: "location", label: "Location", defaultOn: true },
   { key: "rating", label: "Rating", defaultOn: true },
-  { key: "owner", label: "Owner", defaultOn: true },
   { key: "contact", label: "Contact", defaultOn: true },
   { key: "status", label: "Status", defaultOn: true },
-  { key: "action", label: "Action", defaultOn: true },
+  { key: "owner", label: "Owner", defaultOn: true },
   { key: "created_at", label: "Created Date", defaultOn: true },
 ];
 
@@ -113,61 +107,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [activeDateRange, setActiveDateRange] = useState("Last 30 Days");
-
-  // Multi-section Filter panel state — replaces the old single-select statusFilter.
-  // Within a section, checking multiple values is OR; across sections with at least
-  // one checked value, it's AND (see `filtered` below for the combined logic).
-  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedOwners, setSelectedOwners] = useState<string[]>([]);
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [selectedRatings, setSelectedRatings] = useState<number[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<("active" | "inactive")[]>([]);
-  const [nameSearch, setNameSearch] = useState("");
-  const [namesShown, setNamesShown] = useState(10);
-  const [ownerSearch, setOwnerSearch] = useState("");
-  const [ownersShown, setOwnersShown] = useState(5);
-
-  // Header stat cards double as quick filters — clicking one narrows the table to
-  // that exact stat (clicking the active card again, or "Total contacts", resets).
-  const [statFilter, setStatFilter] = useState<"all" | "linked" | "unassigned" | "with_email">("all");
-  const [openFilterSections, setOpenFilterSections] = useState<Record<"name" | "tags" | "owner" | "location" | "rating" | "status", boolean>>({
-    name: true,
-    tags: false,
-    owner: false,
-    location: false,
-    rating: false,
-    status: false,
-  });
-
-  const hasActiveFilters =
-    selectedContactIds.length > 0 ||
-    selectedTags.length > 0 ||
-    selectedOwners.length > 0 ||
-    selectedLocations.length > 0 ||
-    selectedRatings.length > 0 ||
-    selectedStatuses.length > 0;
-
-  function resetFilterPanel() {
-    setSelectedContactIds([]);
-    setSelectedTags([]);
-    setSelectedOwners([]);
-    setSelectedLocations([]);
-    setSelectedRatings([]);
-    setSelectedStatuses([]);
-    setNameSearch("");
-    setNamesShown(10);
-    setOwnerSearch("");
-    setOwnersShown(5);
-  }
-
-  function toggleFilterSection(key: "name" | "tags" | "owner" | "location" | "rating" | "status") {
-    setOpenFilterSections((s) => ({ ...s, [key]: !s[key] }));
-  }
-
-  function toggleInArray<T>(arr: T[], value: T): T[] {
-    return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
-  }
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
   const [showCols, setShowCols] = useState(false);
@@ -216,68 +156,13 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
   const visibleCols = COLUMNS.filter((c) => cols[c.key]);
   const scoped = accountFilterId ? contacts.filter((c) => c.account_id === accountFilterId) : contacts;
 
-  // Options for the Filter panel's checkbox lists — distinct values derived from the
-  // full `contacts` prop (real columns only: tags/rating are real columns per the
-  // 0091/0092 migrations, not the removed hashCode-based mock).
-  const distinctTags = Array.from(
-    new Set(
-      contacts.flatMap((c) => (c.tags || "").split(",").map((t) => t.trim()).filter(Boolean))
-    )
-  ).sort((a, b) => a.localeCompare(b));
-  const distinctLocations = Array.from(
-    new Set(contacts.map((c) => c.mailing_country).filter((v): v is string => Boolean(v)))
-  ).sort((a, b) => a.localeCompare(b));
-  const distinctRatings = Array.from(
-    new Set(contacts.map((c) => c.rating).filter((v): v is number => v != null))
-  ).sort((a, b) => a - b);
-
-  // Name section of the Filter panel — live search + "Load More" paging, entirely
-  // client-side over the already-loaded `contacts` array (no new query needed).
-  const filteredNameList = contacts.filter((c) =>
-    `${c.first_name} ${c.last_name}`.toLowerCase().includes(nameSearch.trim().toLowerCase())
-  );
-  const visibleNameList = filteredNameList.slice(0, namesShown);
-
-  // Owner section of the Filter panel — same live search + "Load More" paging as
-  // Name, since a workspace's owner/user list can also run long.
-  const filteredOwnerList = owners.filter((o) => o.name.toLowerCase().includes(ownerSearch.trim().toLowerCase()));
-  const visibleOwnerList = filteredOwnerList.slice(0, ownersShown);
-
   // Apply filters
   const filtered = scoped.filter((c) => {
     const q = search.toLowerCase();
-
-    // Header stat card quick filter — same real fields the cards' own counts use.
-    if (statFilter === "linked" && !c.account_id) return false;
-    if (statFilter === "unassigned" && c.account_id) return false;
-    if (statFilter === "with_email" && !c.email) return false;
-
-    // Filter panel: Name (specific contacts) — checking one or more names restricts
-    // the table to ONLY those contacts.
-    if (selectedContactIds.length > 0 && !selectedContactIds.includes(c.id)) return false;
-
-    // Filter panel: Tags — OR within the section (contact matches if ANY of its own
-    // tags is checked).
-    if (selectedTags.length > 0) {
-      const rowTags = (c.tags || "").split(",").map((t) => t.trim()).filter(Boolean);
-      if (!rowTags.some((t) => selectedTags.includes(t))) return false;
-    }
-
-    // Filter panel: Owner
-    if (selectedOwners.length > 0 && !selectedOwners.includes(c.contact_owner || "")) return false;
-
-    // Filter panel: Location
-    if (selectedLocations.length > 0 && !selectedLocations.includes(c.mailing_country || "")) return false;
-
-    // Filter panel: Rating
-    if (selectedRatings.length > 0 && (c.rating == null || !selectedRatings.includes(c.rating))) return false;
-
-    // Filter panel: Status — same email_opt_out derivation as the rest of the table
-    // (true -> inactive, false -> active), not a new status concept.
-    if (selectedStatuses.length > 0) {
-      const status = c.email_opt_out ? "inactive" : "active";
-      if (!selectedStatuses.includes(status)) return false;
-    }
+    
+    // Status Filter
+    const status = c.email_opt_out ? "inactive" : "active";
+    if (statusFilter !== "all" && status !== statusFilter) return false;
 
     // Search query
     if (!q) return true;
@@ -297,7 +182,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
     switch (key) {
       case "name": return `${c.first_name} ${c.last_name}`.trim();
       case "phone": return c.phone || "";
-      case "email": return c.email || "";
       case "tags": return c.tags || "";
       case "location": return c.mailing_country || "";
       case "contact": return c.email || "";
@@ -433,49 +317,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
     }
   }
 
-  /** One collapsible checkbox-list section inside the Filter panel (Tags / Owner /
-   *  Location / Rating / Status) — collapsed by default, toggled via its label; the
-   *  chevron rotates from ">" to a downward "v" when open. Within a section, checking
-   *  multiple values is OR (handled by the caller's `onToggle`/selected-values logic
-   *  feeding into `filtered` above); this helper only renders the UI shell. */
-  function renderFilterSection<T extends string | number>(
-    key: "tags" | "owner" | "location" | "rating" | "status",
-    label: string,
-    options: { value: T; label: string }[],
-    selectedValues: T[],
-    onToggle: (value: T) => void
-  ) {
-    const isOpen = openFilterSections[key];
-    return (
-      <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-        <button
-          type="button"
-          onClick={() => toggleFilterSection(key)}
-          className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600"
-        >
-          <span>{label}</span>
-          <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", isOpen && "rotate-90")} />
-        </button>
-        {isOpen && (
-          <div className="mt-2 max-h-36 overflow-y-auto space-y-1 pr-1">
-            {options.length === 0 && <p className="text-slate-400 dark:text-slate-500 py-1 text-xs">No options available.</p>}
-            {options.map((opt) => (
-              <label key={String(opt.value)} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedValues.includes(opt.value)}
-                  onChange={() => onToggle(opt.value)}
-                  className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="truncate text-slate-700 dark:text-slate-600 font-medium">{opt.label}</span>
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-[1600px] mx-auto w-full px-4 sm:px-6 pb-10 text-slate-800 dark:text-slate-700">
       
@@ -554,29 +395,15 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        {(
-          [
-            { key: "all" as const, label: "Total contacts", value: scoped.length, icon: Users2, accent: "bg-amber-500" },
-            { key: "linked" as const, label: "Linked to account", value: scoped.filter((c) => c.account_id).length, icon: Link2, accent: "bg-blue-500" },
-            { key: "unassigned" as const, label: "Unassigned", value: scoped.filter((c) => !c.account_id).length, icon: User, accent: "bg-rose-500" },
-            { key: "with_email" as const, label: "With email", value: scoped.filter((c) => c.email).length, icon: Mail, accent: "bg-emerald-500" },
-          ]
-        ).map((s) => {
+        {[
+          { label: "Total contacts", value: scoped.length, icon: Users2, accent: "bg-amber-500" },
+          { label: "Linked to account", value: scoped.filter((c) => c.account_id).length, icon: Link2, accent: "bg-blue-500" },
+          { label: "Unassigned", value: scoped.filter((c) => !c.account_id).length, icon: User, accent: "bg-rose-500" },
+          { label: "With email", value: scoped.filter((c) => c.email).length, icon: Mail, accent: "bg-emerald-500" },
+        ].map((s) => {
           const Icon = s.icon;
-          const isActive = statFilter === s.key;
           return (
-            <Card
-              key={s.label}
-              onClick={() => {
-                const next = s.key === "all" || isActive ? "all" : s.key;
-                setStatFilter(next);
-                toast(next === "all" ? "Showing all contacts" : `Filtering by "${s.label}"`, "info");
-              }}
-              className={cn(
-                "p-4 sm:p-5 flex items-center gap-3 cursor-pointer transition-shadow hover:shadow-md",
-                isActive && "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-950 ring-blue-500"
-              )}
-            >
+            <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
               <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
                 <Icon className="h-5 w-5" />
               </span>
@@ -710,207 +537,41 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
             <span>Add Contacts</span>
           </Button>
 
-          {/* Filter Dropdown — multi-section panel (Name / Tags / Owner / Location /
-              Rating / Status). Mirrors leads-table.tsx's own hasActiveFilters
-              ring+dot treatment on the trigger button for visual consistency. */}
+          {/* Filter Dropdown */}
           <div className="relative">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
-              className={cn(
-                "h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs",
-                hasActiveFilters && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
-              )}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
             >
               <Filter className="h-3.5 w-3.5 text-slate-500" />
               <span>Filter</span>
               <ChevronDown className="h-3 w-3 text-slate-450" />
-              {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
             </Button>
             {filterDropdownOpen && (
-              <div className="absolute right-0 mt-1.5 w-80 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg z-50 text-xs flex flex-col max-h-[36rem]">
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
-                  <span className="inline-flex items-center gap-1.5 font-bold text-slate-900 dark:text-white text-sm">
-                    <Filter className="h-3.5 w-3.5 text-slate-500" /> Filter
-                  </span>
+              <div className="absolute right-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                <p className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filter Status</p>
+                {[
+                  { key: "all", label: "All Contacts" },
+                  { key: "active", label: "Active" },
+                  { key: "inactive", label: "Inactive" }
+                ].map((opt) => (
                   <button
-                    type="button"
-                    onClick={() => setFilterDropdownOpen(false)}
-                    className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
-                    title="Close"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Sections */}
-                <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
-                  {/* Name — collapsible like the other sections, but open by default;
-                      live search + checkbox list. */}
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => toggleFilterSection("name")}
-                      className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600 mb-2"
-                    >
-                      <span>Name</span>
-                      <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", openFilterSections.name && "rotate-90")} />
-                    </button>
-                    {openFilterSections.name && (
-                      <>
-                        <Input
-                          leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
-                          placeholder="Search names"
-                          value={nameSearch}
-                          onChange={(e) => { setNameSearch(e.target.value); setNamesShown(10); }}
-                          className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs mb-2"
-                        />
-                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                          {visibleNameList.length === 0 && (
-                            <p className="text-slate-400 dark:text-slate-500 py-1.5 text-center">No contacts found.</p>
-                          )}
-                          {visibleNameList.map((c) => {
-                            const fullName = `${c.first_name} ${c.last_name}`.trim();
-                            const checked = selectedContactIds.includes(c.id);
-                            return (
-                              <label key={c.id} className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => setSelectedContactIds((s) => toggleInArray(s, c.id))}
-                                  className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
-                                />
-                                {c.photo_url ? (
-                                  // eslint-disable-next-line @next/next/no-img-element -- external Supabase storage URL, not a static asset
-                                  <img src={c.photo_url} alt="" className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
-                                ) : (
-                                  <span className={cn("h-6 w-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0", avatarColor(fullName))}>
-                                    {initials(c)}
-                                  </span>
-                                )}
-                                <span className="truncate text-slate-700 dark:text-slate-600 font-medium">{fullName}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                        {filteredNameList.length > namesShown && (
-                          <button
-                            type="button"
-                            onClick={() => setNamesShown((n) => n + 10)}
-                            className="mt-1.5 text-blue-600 dark:text-blue-400 hover:underline font-semibold"
-                          >
-                            Load More
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {renderFilterSection(
-                    "tags",
-                    "Tags",
-                    distinctTags.map((t) => ({ value: t, label: t })),
-                    selectedTags,
-                    (v) => setSelectedTags((s) => toggleInArray(s, v))
-                  )}
-                  {/* Owner — like Name, this can run long (every workspace user), so it
-                      gets its own live search + "Load More" instead of the plain
-                      checkbox list the other sections use. */}
-                  <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleFilterSection("owner")}
-                      className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600"
-                    >
-                      <span>Owner</span>
-                      <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", openFilterSections.owner && "rotate-90")} />
-                    </button>
-                    {openFilterSections.owner && (
-                      <div className="mt-2">
-                        <Input
-                          leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
-                          placeholder="Search"
-                          value={ownerSearch}
-                          onChange={(e) => { setOwnerSearch(e.target.value); setOwnersShown(5); }}
-                          className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs mb-2"
-                        />
-                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                          {visibleOwnerList.length === 0 && (
-                            <p className="text-slate-400 dark:text-slate-500 py-1.5 text-center">No owners found.</p>
-                          )}
-                          {visibleOwnerList.map((o) => (
-                            <label key={o.id} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedOwners.includes(o.id)}
-                                onChange={() => setSelectedOwners((s) => toggleInArray(s, o.id))}
-                                className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
-                              />
-                              <span className="truncate text-slate-700 dark:text-slate-600 font-medium">{o.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                        {filteredOwnerList.length > ownersShown && (
-                          <button
-                            type="button"
-                            onClick={() => setOwnersShown((n) => n + 5)}
-                            className="mt-1.5 text-blue-600 dark:text-blue-400 hover:underline font-semibold"
-                          >
-                            Load More
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {renderFilterSection(
-                    "location",
-                    "Location",
-                    distinctLocations.map((l) => ({ value: l, label: l })),
-                    selectedLocations,
-                    (v) => setSelectedLocations((s) => toggleInArray(s, v))
-                  )}
-                  {renderFilterSection(
-                    "rating",
-                    "Rating",
-                    distinctRatings.map((r) => ({ value: r, label: `${r} Star${r === 1 ? "" : "s"}` })),
-                    selectedRatings,
-                    (v) => setSelectedRatings((s) => toggleInArray(s, v))
-                  )}
-                  {renderFilterSection(
-                    "status",
-                    "Status",
-                    [
-                      { value: "active" as const, label: "Active" },
-                      { value: "inactive" as const, label: "Inactive" },
-                    ],
-                    selectedStatuses,
-                    (v) => setSelectedStatuses((s) => toggleInArray(s, v))
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetFilterPanel}
-                    className="h-8 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-                  >
-                    Reset
-                  </Button>
-                  <Button
-                    size="sm"
+                    key={opt.key}
                     onClick={() => {
+                      setStatusFilter(opt.key as "all" | "active" | "inactive");
                       setFilterDropdownOpen(false);
-                      toast("Filters applied", "success");
+                      toast(`Filtering by status: ${opt.label}`, "info");
                     }}
-                    className="h-8 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+                    className={cn(
+                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                      statusFilter === opt.key ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/15" : "text-slate-700 dark:text-slate-600"
+                    )}
                   >
-                    Filter
-                  </Button>
-                </div>
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -981,19 +642,12 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                   </DataTableTh>
                   {/* Row # — fixed, always shown, not part of the Manage Columns toggle system (matches leads-table.tsx) */}
                   <DataTableTh className="w-10 px-3 py-2.5">#</DataTableTh>
-                  {cols.name && (
-                    <DataTableTh className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1">Name{renderSortIcon("name", "Name")}</span>
-                    </DataTableTh>
-                  )}
+                  <DataTableTh className="px-3 py-2.5">
+                    <span className="inline-flex items-center gap-1">Name{renderSortIcon("name", "Name")}</span>
+                  </DataTableTh>
                   {cols.phone && (
                     <DataTableTh className="px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Phone{renderSortIcon("phone", "Phone")}</span>
-                    </DataTableTh>
-                  )}
-                  {cols.email && (
-                    <DataTableTh className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1">Email{renderSortIcon("email", "Email")}</span>
                     </DataTableTh>
                   )}
                   {cols.tags && (
@@ -1033,12 +687,12 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                       <span className="inline-flex items-center gap-1">Created Date{renderSortIcon("created_at", "Created Date")}</span>
                     </DataTableTh>
                   )}
-                  {cols.action && <DataTableTh className="w-12 px-3 py-2.5 text-center">Action</DataTableTh>}
+                  <DataTableTh className="w-12 px-3 py-2.5 text-center">Action</DataTableTh>
                 </tr>
               </DataTableHead>
               <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paged.length === 0 && (
-                  <DataTableEmpty colSpan={visibleCols.length + 2}>
+                  <DataTableEmpty colSpan={visibleCols.length + 4}>
                     No contacts found matching the filters. Click <strong>Add Contacts</strong> to create one.
                   </DataTableEmpty>
                 )}
@@ -1084,32 +738,30 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                       </td>
 
                       {/* Name with star & Avatar details */}
-                      {cols.name && (
-                        <DataTableTd className="px-3 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={(e) => toggleStar(c.id, e)}
-                              className="p-1 rounded-md text-slate-350 hover:text-amber-500 transition-colors"
-                            >
-                              <Star className={cn("h-4 w-4", isStarred ? "fill-amber-500 text-amber-500" : "text-slate-400")} />
-                            </button>
-
-                            <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 shadow-2xs", avatarColor(`${c.first_name} ${c.last_name}`))}>
-                              {initials(c)}
-                            </div>
-
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 dark:text-white truncate whitespace-nowrap mb-0.5 leading-none group-hover:text-blue-500">
-                                {c.first_name} {c.last_name}
-                              </p>
-                              <p className="text-[10px] text-slate-400 font-medium truncate leading-none">
-                                {c.job_title || "Facility Manager"}
-                              </p>
-                            </div>
+                      <DataTableTd className="px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => toggleStar(c.id, e)}
+                            className="p-1 rounded-md text-slate-350 hover:text-amber-500 transition-colors"
+                          >
+                            <Star className={cn("h-4 w-4", isStarred ? "fill-amber-500 text-amber-500" : "text-slate-400")} />
+                          </button>
+                          
+                          <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 shadow-2xs", avatarColor(`${c.first_name} ${c.last_name}`))}>
+                            {initials(c)}
                           </div>
-                        </DataTableTd>
-                      )}
+                          
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 dark:text-white truncate whitespace-nowrap mb-0.5 leading-none group-hover:text-blue-500">
+                              {c.first_name} {c.last_name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-medium truncate leading-none">
+                              {c.job_title || "Facility Manager"}
+                            </p>
+                          </div>
+                        </div>
+                      </DataTableTd>
 
                       {/* Phone Column */}
                       {cols.phone && (
@@ -1124,17 +776,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                             >
                               <Plus className="h-3 w-3" /> Add phone
                             </button>
-                          )}
-                        </td>
-                      )}
-
-                      {/* Email Column */}
-                      {cols.email && (
-                        <td className="px-3 py-2.5 whitespace-nowrap font-medium">
-                          {c.email ? (
-                            <span className="text-slate-500 dark:text-slate-500">{c.email}</span>
-                          ) : (
-                            <span className="text-slate-300 dark:text-slate-700">—</span>
                           )}
                         </td>
                       )}
@@ -1261,20 +902,18 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                       )}
 
                       {/* Action Menu Column */}
-                      {cols.action && (
-                        <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={(e) => {
-                              const r = e.currentTarget.getBoundingClientRect();
-                              setRowMenu({ id: c.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) });
-                            }}
-                            title="Row actions"
-                            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
-                          >
-                            <MoreVertical className="h-4 w-4 text-slate-400" />
-                          </button>
-                        </td>
-                      )}
+                      <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => {
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setRowMenu({ id: c.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) });
+                          }}
+                          title="Row actions"
+                          className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
+                        >
+                          <MoreVertical className="h-4 w-4 text-slate-400" />
+                        </button>
+                      </td>
 
                     </DataTableRow>
                   );
@@ -1447,14 +1086,14 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
       {showCols && colsPos && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowCols(false)} />
-          <div className="fixed z-50 w-64 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-2" style={{ top: colsPos.top, right: colsPos.right }}>
+          <div className="fixed z-50 w-60 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-2" style={{ top: colsPos.top, right: colsPos.right }}>
             <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
             <div className="max-h-80 overflow-y-auto">
               {COLUMNS.map((c) => (
-                <div key={c.key} className="flex items-center justify-between gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-slate-700 dark:text-slate-600 font-semibold">
+                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm text-slate-700 dark:text-slate-600 font-semibold">
+                  <input type="checkbox" checked={cols[c.key]} onChange={() => toggleCol(c.key)} className="rounded border-slate-350 text-blue-600 focus:ring-blue-500" />
                   <span>{c.label}</span>
-                  <Switch checked={cols[c.key]} onChange={() => toggleCol(c.key)} aria-label={`Toggle ${c.label} column`} />
-                </div>
+                </label>
               ))}
             </div>
           </div>

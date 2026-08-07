@@ -6,7 +6,7 @@ import {
   Check, X, Sparkles, CreditCard, Users2, Send,
   Zap, Crown, Rocket, Lock, AlertTriangle, Clock,
   TrendingUp, ExternalLink, Loader2, PartyPopper,
-  Search, Reply, Target, Ticket, Gift,
+  Search, Reply, Target, Ticket, Gift, ShoppingCart,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ const PLAN_DESC: Record<string, string> = {
 
 const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
   basic: [
-    { label: "200 AI credits / mo",      included: true  },
+    { label: "400 AI credits / mo",      included: true  },
     { label: "Bring your own leads (CSV)", included: true  },
     { label: "AI enrichment + scoring",  included: true  },
     { label: "Email + LinkedIn outreach",included: true  },
@@ -64,14 +64,14 @@ const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
   ],
   starter: [
     { label: "Everything in Basic",      included: true  },
-    { label: "700 AI credits / mo",      included: true  },
+    { label: "1,400 AI credits / mo",    included: true  },
     { label: "Automated lead discovery", included: true  },
     { label: "1,000 AI-discovered leads / mo", included: true  },
     { label: "Priority support",         included: false },
   ],
   pro: [
     { label: "Everything in Starter",    included: true  },
-    { label: "1,500 AI credits / mo",    included: true  },
+    { label: "2,400 AI credits / mo",    included: true  },
     { label: "2,000 AI-discovered leads / mo", included: true  },
     { label: "Priority support",         included: true  },
   ],
@@ -90,12 +90,23 @@ const STATUS_LABEL: Record<string, string> = {
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
+interface LeadPurchaseHistoryEntry {
+  id: string;
+  operation_type: string;
+  credits_delta: number;
+  resource_type: "credits" | "leads";
+  status: string;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
 interface Props {
   subscription: SubscriptionWithPlan | null;
   plans: SubscriptionPlan[];
   leadsCount: number;
   sentCount: number;
   promotionHistory: PromotionHistoryEntry[];
+  leadPurchaseHistory?: LeadPurchaseHistoryEntry[];
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -134,7 +145,7 @@ function CheckoutSuccessWatcher({
   return null;
 }
 
-export function BillingView({ subscription: sub, plans, leadsCount, sentCount, promotionHistory }: Props) {
+export function BillingView({ subscription: sub, plans, leadsCount, sentCount, promotionHistory, leadPurchaseHistory = [] }: Props) {
   const router = useRouter();
   const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -593,6 +604,32 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                 <div className="flex items-center gap-3 flex-wrap shrink-0">
                   {r.bonus_credits_granted > 0 && <span className="text-xs text-blue-600">+{r.bonus_credits_granted} credits</span>}
                   {r.bonus_leads_granted > 0 && <span className="text-xs text-emerald-600">+{r.bonus_leads_granted} leads</span>}
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
+                    {r.status}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {/* ── Lead purchase history ────────────────────────────── */}
+      {leadPurchaseHistory.length > 0 && (
+        <Card className="p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <ShoppingCart className="h-5 w-5 text-emerald-500" />
+            <h3 className="font-semibold text-slate-900">Lead purchase history</h3>
+          </div>
+          <ul className="space-y-2">
+            {leadPurchaseHistory.map((r) => (
+              <li key={r.id} className="flex items-center justify-between flex-wrap gap-2 text-sm rounded-lg bg-slate-50 px-4 py-2.5">
+                <div className="min-w-0">
+                  <span className="font-semibold text-slate-800 capitalize">{r.operation_type.replace(/_/g, " ")}</span>
+                  <span className="text-slate-500 ml-2">{new Date(r.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap shrink-0">
+                  <span className="text-xs font-semibold text-emerald-600">{Math.abs(r.credits_delta).toLocaleString()} leads</span>
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
                     {r.status}
                   </span>

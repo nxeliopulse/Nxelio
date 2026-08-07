@@ -45,7 +45,7 @@ export interface GeneratedEmail {
 }
 
 export async function generateEmailSequence(goal: string, audience?: string): Promise<GeneratedEmail[]> {
-  await assertCredits(3);
+  await assertCredits();
   const system = `You are an expert B2B sales copywriter. You write concise, personalized cold email sequences that get replies. Use merge tags like {{firstName}}, {{companyName}}, and {{industry}} where personalization helps. Keep each email under 120 words. Return ONLY valid JSON.`;
 
   const prompt = `Write a 3-step cold email sequence for this campaign goal: "${goal}"${audience ? `\nTarget audience: ${audience}` : ""}
@@ -60,7 +60,7 @@ Return JSON in exactly this shape:
 }`;
 
   const result = await aiJson<{ emails: GeneratedEmail[] }>({ system, prompt, temperature: 0.8 });
-  await chargeCredits("email_sequence_generation", 3);
+  await chargeCredits("email_sequence_generation", 1);
   return result.emails || [];
 }
 
@@ -170,7 +170,7 @@ export interface AiCompanyIntel {
 }
 
 export async function generateCompanyIntel(leadId: string): Promise<AiCompanyIntel> {
-  await assertCredits(3);
+  await assertCredits();
   const lead = await getLeadById(leadId);
   if (!lead) throw new Error("Lead not found");
 
@@ -189,7 +189,7 @@ Return JSON:
 }`;
 
   const result = await aiJson<AiCompanyIntel>({ system, prompt, temperature: 0.6 });
-  await chargeCredits("company_intel", 3, { leadId });
+  await chargeCredits("company_intel", 1, { leadId });
   return result;
 }
 
@@ -206,7 +206,7 @@ export interface AiContact {
 }
 
 export async function generateContactIntel(leadId: string): Promise<AiContact[]> {
-  await assertCredits(3);
+  await assertCredits();
   const lead = await getLeadById(leadId);
   if (!lead) throw new Error("Lead not found");
 
@@ -222,7 +222,7 @@ Return JSON:
 }`;
 
   const result = await aiJson<{ contacts: AiContact[] }>({ system, prompt, temperature: 0.6 });
-  await chargeCredits("contact_intel", 3, { leadId });
+  await chargeCredits("contact_intel", 1, { leadId });
   return result.contacts || [];
 }
 
@@ -230,7 +230,7 @@ Return JSON:
 // AI Outreach Sequence — personalized to a specific lead
 // ============================================================================
 export async function generateLeadOutreach(leadId: string): Promise<GeneratedEmail[]> {
-  await assertCredits(2);
+  await assertCredits();
   const lead = await getLeadById(leadId);
   if (!lead) throw new Error("Lead not found");
 
@@ -254,7 +254,7 @@ Return JSON:
 }`;
 
   const result = await aiJson<{ emails: GeneratedEmail[] }>({ system, prompt, temperature: 0.8 });
-  await chargeCredits("lead_outreach_generation", 2, { leadId });
+  await chargeCredits("lead_outreach_generation", 1, { leadId });
   return result.emails || [];
 }
 
@@ -338,7 +338,7 @@ export interface AiNewsletterResult {
 }
 
 export async function generateNewsletter(goal: string, audience?: string): Promise<AiNewsletterResult> {
-  await assertCredits(2);
+  await assertCredits();
   const system = `You are an expert newsletter designer and copywriter. You write engaging, valuable newsletter content AND lay it out using colorful, visually rich blocks — never a plain wall of text. Structure every newsletter as a mix of block types, matching the tone and color palette to the subject (e.g. a WhatsApp/messaging newsletter should read like a tech product update: punchy, modern, green/blue accents; a finance newsletter should feel trustworthy: navy/gold accents). Return ONLY valid JSON.`;
 
   const prompt = `Write a colorful, visually rich newsletter for this goal: "${goal}"${audience ? `\nTarget audience: ${audience}` : ""}
@@ -377,7 +377,7 @@ Use 8-12 blocks total, and include AT LEAST one "banner" and at least two "secti
     }
     return b;
   });
-  await chargeCredits("newsletter_generation", 2);
+  await chargeCredits("newsletter_generation", 1);
   return result;
 }
 
@@ -385,13 +385,13 @@ Use 8-12 blocks total, and include AT LEAST one "banner" and at least two "secti
 // Single email regeneration / improvement
 // ============================================================================
 export async function improveEmail(currentBody: string, instruction: string): Promise<string> {
-  await assertCredits(2);
+  await assertCredits();
   const result = await aiChat({
     system: "You are an expert sales copywriter. Rewrite the email per the instruction. Keep merge tags like {{firstName}}. Return only the rewritten email body, no preamble.",
     prompt: `Current email:\n${currentBody}\n\nInstruction: ${instruction}`,
     temperature: 0.7,
   });
-  await chargeCredits("email_improvement", 2);
+  await chargeCredits("email_improvement", 1);
   return result;
 }
 
@@ -452,7 +452,7 @@ function sanitizeRuleNode(node: unknown): RuleNode | null {
 }
 
 export async function generateSegmentRules(prompt: string): Promise<SegmentRuleGenerationResult> {
-  await assertCredits(2);
+  await assertCredits();
 
   // A live field catalog — real fields, real operators, and real vocabulary
   // (picklist / distinct values already on leads) — so the model is grounded
@@ -520,7 +520,7 @@ Return JSON in exactly this shape:
     prompt: `Convert this into a rule tree: "${prompt}"`,
     temperature: 0.3,
   });
-  await chargeCredits("segment_rule_generation", 2);
+  await chargeCredits("segment_rule_generation", 1);
 
   // Step 1 — structural sanitize: the model may ONLY reference real
   // fields/operators. This never trusts a value yet, just the shape.

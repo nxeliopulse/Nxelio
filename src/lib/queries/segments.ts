@@ -82,8 +82,8 @@ export async function createSegment(name: string, description: string, type: str
     .single();
   if (error) throw error;
 
+  // Evaluate the rules now so the segment actually has members.
   await materializeSegmentMembers(segment.id);
-  try { await createSegmentVersion(segment.id, rule, "Initial version"); } catch {}
 
   revalidatePath("/segments");
   await logAudit({ action: "segment.created", entityType: "segment", entityId: segment.id, entityLabel: segment.segment_name });
@@ -103,7 +103,6 @@ export async function updateSegment(id: string, name: string, description: strin
   if (error) throw error;
 
   await materializeSegmentMembers(id);
-  try { await createSegmentVersion(id, rule); } catch {}
 
   revalidatePath("/segments");
   await logAudit({ action: "segment.updated", entityType: "segment", entityId: id, entityLabel: name });
@@ -329,79 +328,4 @@ export async function exportSegmentCsv(segmentId: string): Promise<{ filename: s
   const csv = [header, ...rows].join("\n");
   const filename = segmentName.toLowerCase().replace(/\s+/g, "-") + ".csv";
   return { filename, csv };
-}
-
-export interface SegmentVersionRow {
-  id: string;
-  segment_id: string;
-  version_number: number;
-  rule_json: Group;
-  version_label: string | null;
-  created_at: string;
-}
-
-export interface SegmentShareRow {
-  id: string;
-  segment_id: string;
-  grantee_type: "user" | "team";
-  grantee_id: string;
-  permission_level: "view" | "edit";
-  created_at: string;
-}
-
-export async function getSegmentVersions(segmentId: string): Promise<SegmentVersionRow[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("segment_versions")
-    .select("*")
-    .eq("segment_id", segmentId)
-    .order("version_number", { ascending: false });
-  return (data || []) as SegmentVersionRow[];
-}
-
-export async function createSegmentVersion(segmentId: string, rule: Group, label?: string): Promise<SegmentVersionRow> {
-  const supabase = await createClient();
-  const { data: existing } = await supabase
-    .from("segment_versions")
-    .select("version_number")
-    .eq("segment_id", segmentId)
-    .order("version_number", { ascending: false })
-    .limit(1);
-
-  const nextVer = (existing?.[0]?.version_number ?? 0) + 1;
-  const { data, error } = await supabase
-    .from("segment_versions")
-    .insert({
-      segment_id: segmentId,
-      version_number: nextVer,
-      rule_json: rule as unknown as Record<string, unknown>,
-      version_label: label || `Version ${nextVer}`,
-    })
-    .select("*")
-    .single();
-
-  if (error) throw error;
-  return data as SegmentVersionRow;
-}
-
-export async function getSegmentShares(segmentId: string): Promise<SegmentShareRow[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("segment_shares")
-    .select("*")
-    .eq("segment_id", segmentId);
-  return (data || []) as SegmentShareRow[];
-}
-
-export async function saveSegmentShare(segmentId: string, granteeType: "user" | "team", granteeId: string, permissionLevel: "view" | "edit"): Promise<void> {
-  const supabase = await createClient();
-  await supabase.from("segment_shares").upsert(
-    { segment_id: segmentId, grantee_type: granteeType, grantee_id: granteeId, permission_level: permissionLevel },
-    { onConflict: "segment_id,grantee_type,grantee_id" }
-  );
-}
-
-export async function removeSegmentShare(shareId: string): Promise<void> {
-  const supabase = await createClient();
-  await supabase.from("segment_shares").delete().eq("id", shareId);
 }

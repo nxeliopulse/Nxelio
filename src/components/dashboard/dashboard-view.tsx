@@ -6,7 +6,7 @@ import {
   ArrowRight, Landmark, Briefcase, Activity, Sparkles,
   TrendingUp, TrendingDown, Wallet, CreditCard, Users, Trophy,
   MoreVertical, FileText, Check, Laptop, Globe, Smartphone, Shirt, Home,
-  Search, Settings, Bell, ArrowUpRight, User
+  Search, Settings, Bell, ArrowUpRight, User, Target, Crown,
 } from "lucide-react";
 import {
   Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis
@@ -74,6 +74,18 @@ interface OnboardingStatus {
   userName: string;
 }
 
+interface UsageHistoryEntry {
+  id: string;
+  operation_type: string;
+  credits_delta: number;
+  resource_type: "credits" | "leads";
+  status: string;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+const PLAN_NAME: Record<string, string> = { basic: "Basic", starter: "Starter", pro: "Pro" };
+
 export function DashboardView({
   stats,
   userName = "User",
@@ -81,7 +93,8 @@ export function DashboardView({
   recentDeals = [],
   collaborators = [],
   meetings = [],
-  credits = { used: 0, total: 1500, planId: "free", status: "trialing", trialEndsAt: null },
+  credits = { used: 0, total: 400, planId: "basic", status: "trialing", trialEndsAt: null, leadsRemaining: 0, leadsTotal: 0 },
+  usageHistory = [],
   teamPerformance = [],
 }: {
   stats: DashboardStats;
@@ -91,6 +104,7 @@ export function DashboardView({
   collaborators?: { name: string }[];
   meetings?: MeetingRow[];
   credits?: AiCreditsUsage;
+  usageHistory?: UsageHistoryEntry[];
   teamPerformance?: { name: string; dealsCount: number; wonValue: number }[];
 }) {
   const router = useRouter();
@@ -346,6 +360,97 @@ export function DashboardView({
           </Card>
         </div>
 
+      </div>
+
+      {/* Plan & Usage Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex flex-col justify-between min-h-[130px]">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/20 text-indigo-500 flex items-center justify-center flex-shrink-0">
+                <Crown className="h-4 w-4" />
+              </div>
+              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Plan</span>
+            </div>
+            <div className="mt-3">
+              <h2 className="text-xl font-black text-slate-950 dark:text-white tracking-tight capitalize">{PLAN_NAME[credits.planId] || credits.planId}</h2>
+              <p className="text-[10px] text-slate-400 mt-1 capitalize">{credits.status}</p>
+            </div>
+          </Card>
+          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex flex-col justify-between min-h-[130px]">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/20 text-blue-500 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">AI Credits</span>
+            </div>
+            <div className="mt-3">
+              <h2 className="text-xl font-black text-slate-950 dark:text-white tracking-tight">{(credits.total - credits.used).toLocaleString()}<span className="text-xs font-medium text-slate-400"> / {credits.total.toLocaleString()}</span></h2>
+              <p className="text-[10px] text-slate-400 mt-1">{credits.used.toLocaleString()} used this cycle</p>
+            </div>
+          </Card>
+          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex flex-col justify-between min-h-[130px]">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 flex items-center justify-center flex-shrink-0">
+                <Target className="h-4 w-4" />
+              </div>
+              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Leads</span>
+            </div>
+            <div className="mt-3">
+              {credits.leadsTotal > 0 ? (
+                <>
+                  <h2 className="text-xl font-black text-slate-950 dark:text-white tracking-tight">{credits.leadsRemaining.toLocaleString()}<span className="text-xs font-medium text-slate-400"> / {credits.leadsTotal.toLocaleString()}</span></h2>
+                  <p className="text-[10px] text-slate-400 mt-1">remaining this cycle</p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-black text-slate-950 dark:text-white tracking-tight">—</h2>
+                  <p className="text-[10px] text-slate-400 mt-1">Not on this plan</p>
+                </>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Credit & Lead Usage History */}
+        <div className="lg:col-span-8 flex">
+          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-xs w-full">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+              <div>
+                <h5 className="text-base font-bold text-slate-900 dark:text-white">Usage history</h5>
+                <p className="text-xs text-slate-400 mt-0.5">Recent credit & lead activity</p>
+              </div>
+              <button
+                onClick={() => router.push("/billing")}
+                className="p-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500"
+              >
+                <ArrowUpRight className="h-4 w-4" />
+              </button>
+            </div>
+            {usageHistory.length === 0 ? (
+              <p className="text-sm text-slate-400 py-6 text-center">No credit or lead activity yet.</p>
+            ) : (
+              <ul className="space-y-1 max-h-[220px] overflow-y-auto">
+                {usageHistory.slice(0, 8).map((entry) => (
+                  <li key={entry.id} className="flex items-center justify-between gap-3 text-sm py-2 px-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {entry.resource_type === "leads"
+                        ? <Target className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                        : <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />}
+                      <span className="text-slate-700 dark:text-slate-300 truncate capitalize">{entry.operation_type.replace(/_/g, " ")}</span>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className={cn("text-xs font-semibold", entry.credits_delta < 0 ? "text-red-500" : "text-emerald-600")}>
+                        {entry.credits_delta > 0 ? "+" : ""}{entry.credits_delta.toLocaleString()} {entry.resource_type}
+                      </span>
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">{new Date(entry.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
       </div>
 
       {/* Bottom Section Layout */}

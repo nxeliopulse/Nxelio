@@ -15,6 +15,7 @@ import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, Dat
 import { useFeedback } from "@/components/ui/feedback";
 import { setCampaignStatus, updateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { sendCampaign } from "@/lib/email/campaign-send";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { SequenceFlow, type FlowStep } from "@/components/campaigns/sequence-flow";
 import { FlowCanvas } from "@/components/campaigns/flow-canvas";
@@ -156,7 +157,9 @@ export function CampaignDetailView({
     try {
       const res = await sendCampaign(campaign.id);
       if (res.ok) {
-        toast(`Sent ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.deferred ? `, ${res.deferred} queued for tomorrow (daily limit reached)` : ""}${res.simulated ? " (simulated)" : ""}.`, "success");
+        const chargedLeads = res.sent + res.failed + res.skipped + (res.deferred ?? 0);
+        toast(`Campaign sent successfully — ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.deferred ? `, ${res.deferred} queued for tomorrow (daily limit reached)` : ""}${res.simulated ? " (simulated)" : ""}. ${chargedLeads * 2} credits used.`, "success");
+        notifyCreditsChanged();
         router.refresh();
       }
       else toast(res.error || "No emails were sent.", "error");
