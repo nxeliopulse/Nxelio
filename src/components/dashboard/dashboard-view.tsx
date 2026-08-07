@@ -370,7 +370,7 @@ export function DashboardView({
         <div className="lg:col-span-4 flex flex-col gap-6">
           
           {/* Pending Confirmation Card */}
-          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex items-center gap-4 min-h-[110px]">
+          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex items-center gap-4 flex-1">
             <div className="h-10 w-10 rounded-xl bg-orange-50 dark:bg-orange-950/20 text-orange-500 flex items-center justify-center flex-shrink-0">
               <CheckCircle2 className="h-5 w-5" />
             </div>
@@ -385,7 +385,7 @@ export function DashboardView({
           </Card>
 
           {/* Upcoming Meetings Card */}
-          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex items-center gap-4 min-h-[110px]">
+          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex items-center gap-4 flex-1">
             <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-500 flex items-center justify-center flex-shrink-0">
               <Users className="h-5 w-5" />
             </div>

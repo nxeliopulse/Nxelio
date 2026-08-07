@@ -263,24 +263,6 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             </div>
           )}
 
-          {/* Leads Widget — only for plans with a discovery allowance */}
-          {canViewBilling && !collapsed && credits && credits.leadsTotal > 0 && (
-            <div className="bg-white/15 rounded-2xl p-4 text-white overflow-hidden ring-1 ring-white/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Target className="h-4.5 w-4.5 flex-shrink-0" />
-                <p className="font-bold text-base tracking-tight">Leads</p>
-              </div>
-              <p className="text-sm font-medium text-white/90 mb-2.5 whitespace-nowrap">
-                {(credits.leadsTotal - credits.leadsRemaining).toLocaleString()} / {credits.leadsTotal.toLocaleString()} used
-              </p>
-              <div className="h-2 bg-white/25 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-white rounded-full transition-all"
-                  style={{ width: `${Math.min(100, Math.round(((credits.leadsTotal - credits.leadsRemaining) / credits.leadsTotal) * 100))}%` }}
-                />
-              </div>
-            </div>
-          )}
 
           {/* Help & support */}
           {collapsed ? (
