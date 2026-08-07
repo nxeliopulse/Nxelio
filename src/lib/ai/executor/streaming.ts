@@ -41,7 +41,9 @@ export class StreamingManager {
 
   private finish(status: "done" | "failed", label?: string): void {
     if (!this.last) return;
-    this.emit(this.last.phase, label ?? this.last.label, status);
+    const current = this.last;
+    this.last = null;
+    this.emit(current.phase, label ?? current.label, status);
   }
 
   private emit(phase: ProgressPhase, label: string, status: TimelineStatus): void {

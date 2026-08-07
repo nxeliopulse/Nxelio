@@ -163,7 +163,7 @@ export function AssistantWidget({
   onClose?: () => void;
   onExpandChange?: (expanded: boolean) => void;
 }) {
-  const { suggestions: ctxSuggestions } = useAssistant();
+  const { suggestions: ctxSuggestions, pageContext } = useAssistant();
   const activeSuggestions = ctxSuggestions.length > 0 ? ctxSuggestions : STATIC_SUGGESTIONS;
 
   const [view, setView] = useState<"chat" | "history" | "bookmarks">("chat");
@@ -315,7 +315,7 @@ export function AssistantWidget({
     setChat(nextChat);
     start(async () => {
       const history: AssistantMessage[] = nextChat.map(({ role, content }) => ({ role, content }));
-      const res = await runAssistant(history);
+      const res = await runAssistant(history, pageContext);
       if (res.error) { setChat((c) => [...c, { role: "assistant", content: res.error!, error: true }]); return; }
       const finalChat: ChatItem[] = [...nextChat, {
         role: "assistant", content: res.reply, actions: res.actions,

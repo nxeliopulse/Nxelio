@@ -22,6 +22,8 @@ import type { Plan, PlanStep } from "@/lib/ai/planner/types";
 export interface PlannerContext {
   /** Tool ids that are allowed as write steps (need approval). */
   writeTools?: string[];
+  /** Registered tool ids. Unknown tools make a plan invalid. */
+  knownTools?: ReadonlySet<string>;
 }
 
 /** Write tools in this app — their steps never auto-retry and batch into the approval card. */
@@ -33,12 +35,26 @@ function extractField(goal: string, key: string): string | undefined {
   return m?.[1]?.trim();
 }
 
-/** Registry-style arg validation — the plan executor revalidates via the real registry. */
-function makeSteps(steps: PlanStep[]): PlanStep[] {
-  return steps.map((s) => ({ ...s, requires_approval: s.requires_approval ?? WRITE_TOOLS.has(s.tool) }));
+function stripUndefined(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripUndefined);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, child]) => child !== undefined)
+        .map(([key, child]) => [key, stripUndefined(child)])
+    );
+  }
+  return value;
 }
 
-const STATUSES = ["new", "qualified", "hot", "converted"] as const;
+/** Registry-style arg normalization — the plan executor revalidates via the real registry. */
+function makeSteps(steps: PlanStep[]): PlanStep[] {
+  return steps.map((s) => ({
+    ...s,
+    args: s.args ? stripUndefined(s.args) as Record<string, unknown> : undefined,
+    requires_approval: s.requires_approval ?? WRITE_TOOLS.has(s.tool),
+  }));
+}
 
 /**
  * W1 — "send a follow-up email to my new/qualified leads"
@@ -137,12 +153,20 @@ function segmentNewLeads(goal: string): Plan | null {
 const MATCHERS = [nurtureEmail, segmentNewLeads];
 
 /** Decompose a goal into a Plan, or null when no intent matches. */
-export function decomposeIntent(goal: string): Plan | null {
+export function decomposeIntent(goal: string, context: PlannerContext = {}): Plan | null {
   const trimmed = goal.trim();
   if (!trimmed) return null;
   for (const m of MATCHERS) {
     const plan = m(trimmed);
-    if (plan) return plan;
+    if (plan) {
+      const writeTools = new Set(context.writeTools ?? WRITE_TOOLS);
+      const steps = plan.steps.map((step) => ({
+        ...step,
+        requires_approval: step.requires_approval ?? writeTools.has(step.tool),
+      }));
+      if (context.knownTools && steps.some((step) => !context.knownTools?.has(step.tool))) return null;
+      return { ...plan, steps };
+    }
   }
   return null;
 }

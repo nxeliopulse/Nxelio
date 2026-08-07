@@ -112,8 +112,9 @@ export class ToolRegistry {
    * Schema projection for the model call — only tools the caller may use.
    * The security layer is still re-checked at execution time (fail closed).
    */
-  toOpenAiTools(ctx: AiCallerContext): OpenAiToolSchema[] {
+  toOpenAiTools(ctx: AiCallerContext, toolIds?: ReadonlySet<string>): OpenAiToolSchema[] {
     return this.list()
+      .filter((t) => !toolIds || toolIds.has(t.id))
       .filter((t) => validateToolPermission(t.id, ctx).allowed)
       .map(toOpenAiSchema);
   }

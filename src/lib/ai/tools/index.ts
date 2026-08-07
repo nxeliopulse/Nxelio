@@ -34,6 +34,14 @@ import { sendNewsletter } from "@/lib/email/newsletter-actions";
 import { getUsers } from "@/lib/queries/users";
 import { sendLeadEmail } from "@/lib/email/actions";
 import { UI_ACTIONS, resolveUiAction } from "@/lib/ui-actions/registry";
+import {
+  deleteWorkspaceMemory,
+  listWorkspaceMemory,
+  upsertWorkspaceMemory,
+  type AiMemoryCategory,
+  type AiMemoryScope,
+} from "@/lib/queries/ai-memory";
+import { listProactiveAlerts } from "@/lib/queries/proactive-ai";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -255,9 +263,106 @@ const list_newsletters = def({
     }),
 });
 
+const get_workspace_memory = def({
+  id: "get_workspace_memory",
+  name: "Search Workspace Memory",
+  description: "Read saved workspace and personal preferences such as tone, branding, workflows, templates, and audiences. Never use it to retrieve secrets.",
+  whenToUse: "When the user asks what the workspace remembers or when saved preferences would improve an answer.",
+  whenNotToUse: "For live CRM records or credentials.",
+  category: "memory",
+  mode: "read",
+  approvalRequired: false,
+  requiredPermissions: TOOL_DOMAINS.get_workspace_memory,
+  params: [{ key: "query", type: "string", description: "Optional word or phrase to search", required: false }],
+  progressLabel: "Reading saved preferences…",
+  handler: async (args) =>
+    readResult(async () => JSON.stringify(await listWorkspaceMemory(typeof args.query === "string" ? args.query : ""))),
+});
+
+const get_proactive_alerts = def({
+  id: "get_proactive_alerts",
+  name: "Get Proactive Alerts",
+  description: "Read active AI-generated workspace risks and recommendations, such as low campaign engagement, inactive leads, stalled pipeline, overdue follow-ups, low credits, or billing reminders.",
+  whenToUse: "When the user asks what needs attention, what risks exist, or what the assistant recommends next.",
+  whenNotToUse: "For live record searches or when no proactive review is requested.",
+  category: "proactive",
+  mode: "read",
+  approvalRequired: false,
+  requiredPermissions: TOOL_DOMAINS.get_proactive_alerts,
+  params: [],
+  progressLabel: "Checking workspace risks…",
+  handler: async () =>
+    readResult(async () => JSON.stringify(await listProactiveAlerts())),
+});
+
 // ---------------------------------------------------------------------------
 // WRITE handlers (approval-gated — executed only after the admin approves)
 // ---------------------------------------------------------------------------
+const MEMORY_CATEGORIES: AiMemoryCategory[] = [
+  "preference", "tone", "branding", "workflow", "template", "audience", "context", "custom",
+];
+const MEMORY_SCOPES: AiMemoryScope[] = ["workspace", "user"];
+
+const remember_workspace_memory = def({
+  id: "remember_workspace_memory",
+  name: "Remember Workspace Preference",
+  description: "[Needs approval] Save a safe workspace or personal preference for future assistant conversations. Never save passwords, tokens, API keys, private keys, or other secrets.",
+  whenToUse: "When the user explicitly asks the assistant to remember a preference, tone, branding rule, workflow, template, audience, or recent context.",
+  whenNotToUse: "When the value contains a secret or when the user has not asked to save it.",
+  category: "memory",
+  mode: "write",
+  approvalRequired: true,
+  requiredPermissions: TOOL_DOMAINS.remember_workspace_memory,
+  params: [
+    { key: "key", type: "string", description: "Short stable memory name", required: true },
+    { key: "value", type: "string", description: "Preference to save; never include secrets", required: true },
+    { key: "scope", type: "string", enum: [...MEMORY_SCOPES], description: "workspace for shared preferences, user for private preferences", required: true },
+    { key: "category", type: "string", enum: [...MEMORY_CATEGORIES], description: "Memory category", required: true },
+    { key: "expires_in_days", type: "number", description: "Optional number of days before this memory expires", required: false },
+  ],
+  progressLabel: "Saving preference…",
+  summarize: (args) => `Remember ${args.scope || "workspace"} preference "${args.key}"`,
+  handler: async (args) => {
+    const expiresInDays = args.expires_in_days === undefined ? undefined : Number(args.expires_in_days);
+    if (expiresInDays !== undefined && (!Number.isFinite(expiresInDays) || expiresInDays <= 0 || expiresInDays > 3650)) {
+      throw ToolError.validation("Memory expiration must be between 1 and 3650 days.");
+    }
+    const result = await upsertWorkspaceMemory({
+      key: String(args.key || ""),
+      value: String(args.value || ""),
+      scope: String(args.scope || "") as AiMemoryScope,
+      category: String(args.category || "") as AiMemoryCategory,
+      expiresAt: expiresInDays === undefined ? null : new Date(Date.now() + expiresInDays * 86_400_000).toISOString(),
+      source: "assistant",
+    });
+    if (!result.ok) throw ToolError.validation(result.error || "Could not save memory.");
+    return { ok: true, detail: `Saved ${args.scope} memory "${args.key}".` };
+  },
+});
+
+const forget_workspace_memory = def({
+  id: "forget_workspace_memory",
+  name: "Forget Workspace Preference",
+  description: "[Needs approval] Remove a saved workspace or personal preference by its exact key. This only removes AI memory, not CRM records.",
+  whenToUse: "When the user explicitly asks the assistant to forget or remove a saved preference.",
+  whenNotToUse: "For deleting leads, campaigns, or other CRM data.",
+  category: "memory",
+  mode: "write",
+  approvalRequired: true,
+  requiredPermissions: TOOL_DOMAINS.forget_workspace_memory,
+  params: [
+    { key: "key", type: "string", description: "Exact saved memory key", required: true },
+    { key: "scope", type: "string", enum: [...MEMORY_SCOPES], description: "workspace or user", required: true },
+  ],
+  progressLabel: "Removing saved preference…",
+  summarize: (args) => `Forget ${args.scope || "workspace"} preference "${args.key}"`,
+  handler: async (args) => {
+    const result = await deleteWorkspaceMemory({ key: String(args.key || ""), scope: String(args.scope || "") as AiMemoryScope });
+    if (!result.ok) throw ToolError.validation(result.error || "Could not remove memory.");
+    return { ok: true, detail: `Forgot ${args.scope} memory "${args.key}".` };
+  },
+});
+
 const create_lead = def({
   id: "create_lead",
   name: "Create Lead",
@@ -729,12 +834,15 @@ export const assistantTools: ToolDefinition[] = [
   // Reads (auto-executed)
   get_workspace_stats, list_users, search_leads,
   list_campaigns, list_segments, list_templates, list_newsletters,
+  get_workspace_memory,
+  get_proactive_alerts,
   ui_action,
   // Writes (approval-gated)
   create_lead, update_lead,
   create_campaign, update_campaign,
   create_segment, create_email_template,
   send_email_to_lead, send_newsletter, send_contact_email,
+  remember_workspace_memory, forget_workspace_memory,
 ];
 
 /** Write tool ids — executed only after the admin approves. */

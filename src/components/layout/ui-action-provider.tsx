@@ -74,6 +74,12 @@ export function UiActionProvider({ children }: { children: ReactNode }) {
         setPendingFilters({ id: def.id, params: action.params ?? {} });
         return true;
       }
+      if (def.kind === "button" && def.button === "refresh_current_page") {
+        // This is the only button action currently exposed. It refreshes
+        // server-rendered data and cannot submit or mutate a form.
+        router.refresh();
+        return true;
+      }
       return false;
     },
     [router]

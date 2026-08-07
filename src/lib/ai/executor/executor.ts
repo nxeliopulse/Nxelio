@@ -97,7 +97,11 @@ export class ToolExecutor {
       const args = throwIfInvalid(tool, rawArgs);
 
       // 3. Handler run with read-only auto-retry.
-      const ctx: ToolExecutionContext = { callerCtx, executionId };
+      const ctx: ToolExecutionContext = {
+        callerCtx,
+        requesterEmail: opts.requesterEmail,
+        executionId,
+      };
       const result = await this.runWithRetry(tool, args, ctx, record);
 
       // 4. Record success.

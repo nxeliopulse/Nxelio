@@ -5,15 +5,18 @@ import { getAiCreditsUsage } from "@/lib/queries/credits";
 import { getMeetings } from "@/lib/queries/meetings";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
+import { buildAiDashboardSummary } from "@/lib/ai/dashboard-insights";
+import { listProactiveAlerts } from "@/lib/queries/proactive-ai";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const [stats, { data: onboardingData, completed: essentialsDone }, users, credits, meetings] = await Promise.all([
+  const [stats, { data: onboardingData, completed: essentialsDone }, users, credits, meetings, proactiveAlerts] = await Promise.all([
     getDashboardStats(),
     getOnboarding(),
     getUsers(),
     getAiCreditsUsage(),
     getMeetings(),
+    listProactiveAlerts(),
   ]);
 
   const { count: outreachCount } = await supabase
@@ -54,6 +57,7 @@ export default async function DashboardPage() {
       collaborators={collaborators}
       meetings={meetings}
       credits={credits}
+      aiSummary={buildAiDashboardSummary(stats, proactiveAlerts)}
     />
   );
 }

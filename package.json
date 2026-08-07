@@ -7,7 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:ai-builder": "npx tsx scripts/test-ai-builder-resolver.mjs"
+    "test:ai-builder": "npx tsx scripts/test-ai-builder-resolver.mjs",
+    "test:ai-planner": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-intent-planner.mjs",
+    "test:ai-agents": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-ai-agents.mjs",
+    "test:ai-memory": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-ai-memory.mjs",
+    "test:ai-proactive": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-proactive-ai.mjs",
+    "test:ai-dashboard": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-ai-dashboard.mjs",
+    "test:ai-contextual": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-ai-contextual.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

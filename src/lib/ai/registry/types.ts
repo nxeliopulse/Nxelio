@@ -22,6 +22,8 @@ export type ToolCategory =
   | "templates"   // reusable email templates
   | "newsletters" // newsletters
   | "communication" // sending emails / contacting the team
+  | "memory" // persistent workspace and user preferences
+  | "proactive" // proactive risk signals and recommendations
   | "ui"; // Phase 2 — UI actions (navigate / open pre-filled forms)
 
 export type ParamType = "string" | "number" | "boolean" | "object" | "array";

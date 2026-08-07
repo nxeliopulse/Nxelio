@@ -14,7 +14,7 @@
  * ============================================================================
  */
 
-export type UiActionKind = "navigate" | "modal" | "filter";
+export type UiActionKind = "navigate" | "modal" | "filter" | "button";
 
 export interface UiActionParam {
   key: string;
@@ -38,6 +38,8 @@ export interface UiActionDef {
   modal?: string;
   /** modal: page that owns this modal — provider navigates there before opening. */
   page?: string;
+  /** button: a named, safe client-side operation. Never a raw DOM selector. */
+  button?: "refresh_current_page";
   params: UiActionParam[];
 }
 
@@ -63,6 +65,19 @@ export const UI_ACTIONS: UiActionDef[] = [
   { id: "navigate_users", name: "Go to Administration", description: "Open the user administration page.", kind: "navigate", target: "/users", params: [] },
   { id: "navigate_settings", name: "Go to Settings", description: "Open the settings page.", kind: "navigate", target: "/settings", params: [] },
   { id: "navigate_capture_form", name: "Go to Capture Form", description: "Open the lead capture form page.", kind: "navigate", target: "/capture-form", params: [] },
+
+  // ---- Safe button actions -------------------------------------------------
+  // Button actions are semantic operations, not arbitrary DOM clicks. This
+  // keeps the client-side controller whitelisted and prevents the model from
+  // targeting hidden or destructive controls.
+  {
+    id: "refresh_current_page",
+    name: "Refresh this page",
+    description: "Refresh the current page's server data without changing any records.",
+    kind: "button",
+    button: "refresh_current_page",
+    params: [],
+  },
 
   // ---- Modals / flows -------------------------------------------------------
   {

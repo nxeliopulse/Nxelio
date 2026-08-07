@@ -190,6 +190,10 @@ export const TOOL_DOMAINS: Record<string, { href: string; roles: AiRoleName[] }>
   send_email_to_lead: { href: "/leads", roles: ["Super Admin", "Sales Admin"] },
   send_newsletter: { href: "/newsletters", roles: ["Super Admin", "Marketing Admin"] },
   send_contact_email: { href: "/settings", roles: ["Super Admin", "Sales Admin", "Marketing Admin"] },
+  get_workspace_memory: { href: "/settings", roles: ["Super Admin", "Sales Admin", "Marketing Admin"] },
+  remember_workspace_memory: { href: "/settings", roles: ["Super Admin", "Sales Admin", "Marketing Admin"] },
+  forget_workspace_memory: { href: "/settings", roles: ["Super Admin", "Sales Admin", "Marketing Admin"] },
+  get_proactive_alerts: { href: "/dashboard", roles: ["Super Admin", "Sales Admin", "Marketing Admin"] },
   // UI actions (Phase 2) — navigation/modals only; nothing mutates until the
   // user clicks Save in the real UI, so every role may emit them.
   ui_action: { href: "/dashboard", roles: ["Super Admin", "Sales Admin", "Marketing Admin"] },

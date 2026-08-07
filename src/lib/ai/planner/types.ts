@@ -13,7 +13,7 @@
  * ============================================================================
  */
 
-export type StepStatus = "pending" | "running" | "success" | "failed" | "skipped";
+export type StepStatus = "pending" | "running" | "success" | "failed" | "skipped" | "awaiting_approval";
 
 export interface PlanStep {
   /** Unique id within the plan (also the $ref target). */
@@ -55,8 +55,15 @@ export interface PlanExecution {
   ok: boolean;
   /** Steps that failed and blocked the rest. */
   failed: StepExecution[];
+  /** Write steps held until an explicit approval is supplied. */
+  awaitingApproval: StepExecution[];
   startedAt: number;
   finishedAt: number;
+}
+
+export interface PlanValidationResult {
+  ok: boolean;
+  errors: string[];
 }
 
 /** Matches a user goal → a Plan (deterministic; returns null when unmatched). */
