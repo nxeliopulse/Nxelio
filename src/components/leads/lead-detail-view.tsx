@@ -110,7 +110,7 @@ export function LeadDetailView({
   const [findEmailOpen, setFindEmailOpen] = useState(false);
 
   // Tab controls & state
-  const [activeTab, setActiveTab] = useState<"activities" | "notes" | "calls" | "files" | "email">("activities");
+  const [activeTab, setActiveTab] = useState<"activities" | "notes" | "calls" | "email">("activities");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
@@ -641,9 +641,8 @@ export function LeadDetailView({
               <nav className="flex space-x-6 overflow-x-auto" aria-label="Tabs">
                 {[
                   { id: "activities", label: "Activities", icon: ClockDaysIcon },
-                  { id: "notes", label: "Notes", icon: FileTextIcon },
+                  { id: "notes", label: "Notes & Files", icon: FileTextIcon },
                   { id: "calls", label: "Calls", icon: PhoneIcon },
-                  { id: "files", label: "Files", icon: FileIcon },
                   { id: "email", label: "Email", icon: MailIcon }
                 ].map((tab) => {
                   const Icon = tab.icon;
@@ -651,7 +650,7 @@ export function LeadDetailView({
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id as "activities" | "notes" | "calls" | "files" | "email")}
+                      onClick={() => setActiveTab(tab.id as "activities" | "notes" | "calls" | "email")}
                       className={cn(
                         "flex items-center gap-1.5 py-3 px-1 border-b-2 text-xs font-semibold whitespace-nowrap transition-colors focus:outline-none",
                         isActive
@@ -880,65 +879,7 @@ export function LeadDetailView({
                 </div>
               )}
 
-              {/* TAB 4: FILES */}
-              {activeTab === "files" && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
-                    <h5 className="font-bold text-slate-800 dark:text-slate-700 text-xs">Files & Attachments</h5>
-                    <button
-                      onClick={() => {
-                        // Files here are just notes with an attachment (see the filter
-                        // below) — there's no separate upload endpoint, so "Add file"
-                        // jumps to the Notes tab's real attach-file picker instead of
-                        // doing nothing.
-                        setActiveTab("notes");
-                        setTimeout(() => fileRef.current?.click(), 0);
-                      }}
-                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
-                    >
-                      <Plus className="h-3 w-3" /> Add file
-                    </button>
-                  </div>
-
-                  {/* Extract files from notes */}
-                  <div className="space-y-3">
-                    {notes.filter(n => n.file_url).length === 0 ? (
-                      <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
-                        <Paperclip className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                        <p className="text-xs text-slate-400 italic">No files attached yet.</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Attach documents or spreadsheets when creating notes.</p>
-                      </div>
-                    ) : (
-                      notes.filter(n => n.file_url).map((n) => (
-                        <div key={n.id} className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs flex items-center justify-between">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="h-8 w-8 bg-sky-50 dark:bg-sky-950/20 text-sky-600 dark:text-sky-400 rounded flex items-center justify-center flex-shrink-0">
-                              <FileIcon className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <a href={n.file_url!} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-slate-800 dark:text-slate-700 hover:underline truncate block">
-                                {n.file_name || "Attached file"}
-                              </a>
-                              <p className="text-[9px] text-slate-400 mt-0.5">Uploaded by {n.author_name || "Unknown"} on {formatDate(n.created_at)}</p>
-                            </div>
-                          </div>
-                          <a
-                            href={n.file_url!}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1 text-slate-400 hover:text-blue-600"
-                            title="Download file"
-                          >
-                            <FileDown className="h-4 w-4" />
-                          </a>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 5: EMAIL */}
+              {/* TAB 4: EMAIL */}
               {activeTab === "email" && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
@@ -1040,10 +981,6 @@ function FileTextIcon(props: React.ComponentProps<typeof FileDown>) {
 
 function PhoneIcon(props: React.ComponentProps<typeof Phone>) {
   return <Phone {...props} />;
-}
-
-function FileIcon(props: React.ComponentProps<typeof FileDown>) {
-  return <FileDown {...props} />;
 }
 
 function MailIcon(props: React.ComponentProps<typeof Mail>) {

@@ -27,6 +27,7 @@ import type { InboxConversation } from "@/lib/queries/inbox";
 import { LeadsTable } from "@/components/leads/leads-table";
 import type { LeadRow } from "@/lib/queries/leads";
 import type { LeadEngagementRow } from "@/lib/email/campaign-stats";
+import { getEnrollments, getEnrollmentCounts, type CampaignEnrollmentRow, type EnrollmentStatus } from "@/lib/campaigns/enrollment";
 
 /** "Jul 2, 3:45 PM" — used in the activity table so opens/sends are traceable to a moment, not just a rate. */
 function fmtDateTime(iso: string | null): string {
@@ -70,7 +71,7 @@ function serializeStep(s: FlowStep): string {
   return `${header}\n${s.body || ""}`;
 }
 
-const TABS = ["Audience", "Sequence", "Analytics", "Inbox", "Settings"] as const;
+const TABS = ["Audience", "Enrollments", "Sequence", "Analytics", "Inbox", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
 export function CampaignDetailView({
@@ -101,6 +102,14 @@ export function CampaignDetailView({
     const t = setInterval(() => router.refresh(), 15000);
     return () => clearInterval(t);
   }, [status, router]);
+
+  // Phase 4I — enrollment counts for the Matched→Eligible→Enrolled→Completed
+  // reconciliation strip. Fetched once per campaign; the Enrollment Monitor
+  // tab is the live/detailed view, this is just the summary.
+  const [enrollmentCounts, setEnrollmentCounts] = useState<Record<EnrollmentStatus, number> | null>(null);
+  useEffect(() => {
+    getEnrollmentCounts(campaign.id).then(setEnrollmentCounts).catch(() => {});
+  }, [campaign.id]);
 
   // Editable sequence steps (parsed from saved content) + inline node editor
   const [steps, setSteps] = useState<FlowStep[]>(() => parseSequence(campaign.content));
@@ -257,6 +266,13 @@ export function CampaignDetailView({
         </div>
       )}
 
+      {/* Enrollments (Phase 4H) — one row per campaign_enrollments record;
+          "who's in this campaign and where are they", not reconstructed
+          after the fact from inbox_messages. */}
+      {tab === "Enrollments" && (
+        <EnrollmentMonitor campaignId={campaign.id} audienceLeads={audienceLeads} />
+      )}
+
       {/* Sequence */}
       {tab === "Sequence" && (
         <div>
@@ -317,6 +333,36 @@ export function CampaignDetailView({
               ))}
             </div>
           </Card>
+
+          {/* Phase 4I — enrollment reconciliation: Matched → Eligible → Enrolled
+              → Completed, numbers pulled from campaign_enrollments so they
+              always agree with the Enrollment Monitor tab. */}
+          {enrollmentCounts && (
+            <Card className="p-5">
+              <p className="text-sm font-medium text-slate-500 mb-3">Enrollment reconciliation</p>
+              <div className="flex items-center gap-1.5">
+                {(() => {
+                  const enrolledTotal = Object.values(enrollmentCounts).reduce((a, b) => a + b, 0);
+                  const activeLike = enrollmentCounts.active + enrollmentCounts.scheduled + enrollmentCounts.pending_review + enrollmentCounts.paused;
+                  const bars = [
+                    { label: "Enrolled", value: enrolledTotal, color: "bg-blue-500" },
+                    { label: "Active", value: activeLike, color: "bg-indigo-500" },
+                    { label: "Completed", value: enrollmentCounts.completed, color: "bg-emerald-500" },
+                    { label: "Suppressed", value: enrollmentCounts.suppressed, color: "bg-amber-500" },
+                    { label: "Exited", value: enrollmentCounts.exited, color: "bg-red-500" },
+                  ];
+                  return bars.map((s) => (
+                    <div key={s.label} className="flex-1 min-w-0">
+                      <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div className={cn("h-full rounded-full", s.color)} style={{ width: `${enrolledTotal > 0 ? Math.min(100, (s.value / enrolledTotal) * 100) : 0}%` }} />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1.5">{s.label} <span className="font-semibold text-slate-700">{s.value.toLocaleString()}</span></p>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </Card>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
@@ -507,6 +553,103 @@ export function CampaignDetailView({
           <Button onClick={saveStep} disabled={pending}>{pending ? "Saving…" : "Save step"}</Button>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+const ENROLLMENT_STATUS_VARIANT: Record<EnrollmentStatus, "success" | "warning" | "danger" | "blue" | "default"> = {
+  pending_review: "warning", scheduled: "blue", active: "success", paused: "warning",
+  completed: "success", exited: "default", suppressed: "danger", failed: "danger", cancelled: "default",
+};
+
+/** Phase 4H — Enrollment Monitor. One row per campaign_enrollments record,
+ *  joined in-memory against the audience leads already fetched for this page
+ *  (no second lead query). Search / status filter / sort, all client-side —
+ *  campaigns run at a scale where this stays fast without a server round-trip
+ *  per keystroke. */
+function EnrollmentMonitor({ campaignId, audienceLeads }: { campaignId: string; audienceLeads: LeadRow[] }) {
+  const [rows, setRows] = useState<CampaignEnrollmentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | EnrollmentStatus>("all");
+  const [sortNewestFirst, setSortNewestFirst] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getEnrollments(campaignId).then((r) => { if (!cancelled) { setRows(r); setLoading(false); } }).catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [campaignId]);
+
+  const leadById = useMemo(() => new Map(audienceLeads.map((l) => [l.id, l])), [audienceLeads]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows
+      .filter((r) => statusFilter === "all" || r.status === statusFilter)
+      .filter((r) => {
+        if (!q) return true;
+        const lead = leadById.get(r.lead_id);
+        return (lead?.full_name || "").toLowerCase().includes(q) || (lead?.company_name || "").toLowerCase().includes(q) || (lead?.email || "").toLowerCase().includes(q);
+      })
+      .sort((a, b) => sortNewestFirst
+        ? new Date(b.entered_at).getTime() - new Date(a.entered_at).getTime()
+        : new Date(a.entered_at).getTime() - new Date(b.entered_at).getTime());
+  }, [rows, search, statusFilter, leadById, sortNewestFirst]);
+
+  const statusCounts = useMemo(() => {
+    const counts = new Map<EnrollmentStatus, number>();
+    for (const r of rows) counts.set(r.status, (counts.get(r.status) || 0) + 1);
+    return counts;
+  }, [rows]);
+
+  if (loading) return <Card className="p-10 text-center text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /> Loading enrollments…</Card>;
+  if (rows.length === 0) return <Card className="p-10 text-center text-sm text-slate-500">No enrollments yet — launch this campaign to enroll its audience.</Card>;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, company, or email…" className="max-w-xs" />
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | EnrollmentStatus)} className="max-w-[180px]">
+          <option value="all">All statuses ({rows.length})</option>
+          {(Object.keys(ENROLLMENT_STATUS_VARIANT) as EnrollmentStatus[]).filter((s) => statusCounts.get(s)).map((s) => (
+            <option key={s} value={s}>{s.replace(/_/g, " ")} ({statusCounts.get(s)})</option>
+          ))}
+        </Select>
+        <Button variant="outline" size="sm" onClick={() => setSortNewestFirst((v) => !v)}>
+          <Clock className="h-3.5 w-3.5" /> {sortNewestFirst ? "Newest" : "Oldest"} first
+        </Button>
+      </div>
+
+      <DataTable>
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableTh>Prospect</DataTableTh>
+            <DataTableTh>Current step</DataTableTh>
+            <DataTableTh>Next action</DataTableTh>
+            <DataTableTh>Status</DataTableTh>
+            <DataTableTh>Entered</DataTableTh>
+            <DataTableTh>Exit reason</DataTableTh>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody className="divide-y divide-slate-100">
+          {filtered.map((r) => {
+            const lead = leadById.get(r.lead_id);
+            return (
+              <DataTableRow key={r.id}>
+                <DataTableTd>
+                  <p className="font-medium text-slate-900">{lead?.full_name || "Unknown"}</p>
+                  <p className="text-xs text-slate-500">{lead?.company_name || lead?.email || "—"}</p>
+                </DataTableTd>
+                <DataTableTd className="text-slate-600">Step {r.current_step}</DataTableTd>
+                <DataTableTd className="text-slate-500 text-xs">{r.next_execution_at ? fmtDateTime(r.next_execution_at) : "—"}</DataTableTd>
+                <DataTableTd><Badge variant={ENROLLMENT_STATUS_VARIANT[r.status]}>{r.status.replace(/_/g, " ")}</Badge></DataTableTd>
+                <DataTableTd className="text-slate-500 text-xs">{fmtDateTime(r.entered_at)}</DataTableTd>
+                <DataTableTd className="text-slate-500 text-xs">{r.exit_reason || "—"}</DataTableTd>
+              </DataTableRow>
+            );
+          })}
+        </DataTableBody>
+      </DataTable>
     </div>
   );
 }

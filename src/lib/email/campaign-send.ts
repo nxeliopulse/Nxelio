@@ -9,6 +9,8 @@ import { parseCampaignSteps, sendCampaignStepToLead, scheduleCampaignFollowups, 
 import { consumeSendQuota } from "@/lib/outreach/send-quota";
 import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 import { revalidatePath } from "next/cache";
+import { isSuppressed } from "@/lib/segments";
+import { createEnrollments, advanceEnrollmentStep, completeEnrollment } from "@/lib/campaigns/enrollment";
 
 const MAX_PER_SEND = 300;
 /** Credits charged per lead for launching a (sequence) campaign send. */
@@ -50,21 +52,33 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
   // Resolve audience (segment members, or all workspace leads). Email sequences
   // need an email; LinkedIn-first sequences need a LinkedIn URL.
   const reqCol = step1.channel === "linkedin" ? "linkedin" : "email";
-  let leads: StepLead[] = [];
+  let matchedLeads: StepLead[] = [];
   if (campaign.segment_id) {
     const { data: members } = await supabase.from("segment_members").select("lead_id").eq("segment_id", campaign.segment_id);
     const ids = (members || []).map((m) => m.lead_id).filter(Boolean);
     if (ids.length) {
       const { data } = await supabase.from("leads").select(AUDIENCE_COLS).in("id", ids).not(reqCol, "is", null).neq(reqCol, "");
-      leads = (data as unknown as StepLead[]) || [];
+      matchedLeads = (data as unknown as StepLead[]) || [];
     }
   } else {
     const { data } = await supabase.from("leads").select(AUDIENCE_COLS).not(reqCol, "is", null).neq(reqCol, "");
-    leads = (data as unknown as StepLead[]) || [];
+    matchedLeads = (data as unknown as StepLead[]) || [];
   }
 
-  if (leads.length === 0) {
+  if (matchedLeads.length === 0) {
     return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: `No recipients with a ${reqCol === "email" ? "email address" : "LinkedIn URL"} in this audience.` };
+  }
+
+  // Eligibility Service (Phase 4B) — one enrollment record per matched lead
+  // (suppressed/already-active ones land as non-"active" so they're visible
+  // in the Enrollment Monitor with a real reason, never silently dropped),
+  // then only the real ELIGIBLE subset actually gets sent to below. This is
+  // the fix for campaign sends never having rechecked suppression before.
+  await createEnrollments(campaignId, campaign.segment_id ?? null, matchedLeads);
+  const leads = matchedLeads.filter((l) => !isSuppressed(l));
+
+  if (leads.length === 0) {
+    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: `All ${matchedLeads.length} matched leads are suppressed (unsubscribed, do-not-contact, or bounced).` };
   }
 
   const profile = await getCurrentUserProfile().catch(() => null);
@@ -105,6 +119,9 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
     if (hasFollowups) {
       await scheduleCampaignFollowups(supabase, { campaignId, workspaceId, leadId: lead.id, steps, launchMs });
       scheduled += steps.length - 1;
+      await advanceEnrollmentStep(campaignId, lead.id, 1, new Date(launchMs + steps[1].delayMin * 60_000).toISOString());
+    } else {
+      await completeEnrollment(campaignId, lead.id);
     }
   }
 
