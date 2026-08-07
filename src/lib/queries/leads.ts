@@ -53,6 +53,10 @@ export interface LeadRow {
   converted_account_id: string | null;
   converted_contact_id: string | null;
   converted_opportunity_id: string | null;
+  /** Suppression flags (Phase 1 segmentation) — checked via isSuppressed() before every send. */
+  email_opt_out: boolean | null;
+  do_not_contact: boolean | null;
+  email_bounced: boolean | null;
 }
 
 /** Splits "Jane Doe" into { first: "Jane", last: "Doe" } — same convention used
