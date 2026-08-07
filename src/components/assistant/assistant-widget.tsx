@@ -5,7 +5,7 @@ import {
   ArrowLeft, Trash2, MessageSquare, Sparkles, Bell, Maximize2, Minimize2,
   Paperclip, Bookmark, BookmarkCheck, AtSign, Bot, ShieldAlert, Mic, MicOff,
   LayoutDashboard, Users, BarChart2, Settings, Inbox, Mail,
-  FileText, Layers, Newspaper, Zap, ChevronRight,
+  FileText, Layers, Newspaper, Zap, ChevronRight, MousePointerClick,
 } from "lucide-react";
 import { runAssistant, approveAssistantActions, type AssistantMessage, type ProposedAction } from "@/lib/ai/assistant";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
@@ -16,6 +16,8 @@ import {
 import { formatRelative, cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useAssistant } from "@/components/layout/assistant-context";
+import { useUiActions } from "@/components/layout/ui-action-provider";
+import type { UiActionCall } from "@/lib/ui-actions/registry";
 
 interface ChatItem extends AssistantMessage {
   actions?: string[];
@@ -24,6 +26,9 @@ interface ChatItem extends AssistantMessage {
   proposalStatus?: "pending" | "processing" | "approved" | "failed" | "rejected";
   /** Fixed set of valid answers for this question — rendered as clickable options instead of free text. */
   choices?: string[];
+  /** Phase 2 — UI action card (navigate / open pre-filled form). */
+  uiAction?: UiActionCall;
+  uiStatus?: "pending" | "processing" | "done" | "failed";
 }
 
 // Minimal ambient types for the (still non-standard, vendor-prefixed) Web Speech API —
@@ -316,6 +321,7 @@ export function AssistantWidget({
         role: "assistant", content: res.reply, actions: res.actions,
         ...(res.proposal?.length ? { proposal: res.proposal, proposalStatus: "pending" as const } : {}),
         ...(res.choices?.length ? { choices: res.choices } : {}),
+        ...(res.uiAction ? { uiAction: res.uiAction, uiStatus: "pending" as const } : {}),
       }];
       setChat(finalChat); persist(finalChat);
       notifyCreditsChanged();
@@ -335,11 +341,37 @@ export function AssistantWidget({
       const lines = [...res.results.map((r) => `✓ ${r}`), ...res.errors.map((e) => `✗ ${e}`)].join("\n");
       const finalStatus: ChatItem["proposalStatus"] = res.ok ? "approved" : "failed";
       const settledChat = processingChat.map((m, i) => i === index ? { ...m, proposalStatus: finalStatus } : m);
+      // Successful lead creation returns a navigate_leads UI action; surface it
+      // as a card and execute it automatically so the user lands on the
+      // Prospects page and can see the new lead.
+      const nav = res.uiAction;
       const followUp: ChatItem = res.ok
-        ? { role: "assistant", content: lines || "Approved — done.", actions: [] }
+        ? { role: "assistant", content: lines || "Approved — done.", actions: [], ...(nav ? { uiAction: nav, uiStatus: "processing" as const } : {}) }
         : { role: "assistant", content: lines || "Some actions failed.", error: res.results.length === 0 };
       const next = [...settledChat, followUp];
       setChat(next); persist(next);
+      if (nav) {
+        executeUiAction(nav).then((ok) => {
+          setChat((cur) => {
+            const last = cur.length - 1;
+            return cur.map((m, i) => (i === last && m.uiAction ? { ...m, uiStatus: (ok ? "done" : "failed") as ChatItem["uiStatus"] } : m));
+          });
+        });
+      }
+    });
+  }
+
+  const { executeUiAction } = useUiActions();
+
+  function runUiAction(index: number) {
+    const item = chat[index];
+    if (!item?.uiAction || item.uiStatus !== "pending" || pending) return;
+    const action = item.uiAction;
+    const running = chat.map((m, i) => i === index ? { ...m, uiStatus: "processing" as const } : m);
+    setChat(running);
+    executeUiAction(action).then((ok) => {
+      const settled = running.map((m, i) => i === index ? { ...m, uiStatus: (ok ? "done" : "failed") as ChatItem["uiStatus"] } : m);
+      setChat(settled); persist(settled);
     });
   }
 
@@ -721,6 +753,37 @@ export function AssistantWidget({
                               ) : (
                                 <p className={cn("text-xs font-semibold", m.proposalStatus === "approved" ? "text-emerald-500" : "text-red-500")}>
                                   {m.proposalStatus === "approved" ? "✓ Approved" : m.proposalStatus === "failed" ? "✗ Failed — see message below" : "✗ Rejected"}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {m.uiAction && (
+                            <div className="mt-3 rounded-xl p-3 border" style={{ background: T.approvalBg, borderColor: T.approvalBorder }}>
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <MousePointerClick className="h-3.5 w-3.5" style={{ color: PRIMARY }} />
+                                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: PRIMARY }}>UI Action</p>
+                              </div>
+                              <p className="text-xs mb-2" style={{ color: T.approvalText }}>{m.uiAction.label}</p>
+                              <p className="text-[11px] mb-2 opacity-70" style={{ color: T.textSecondary }}>
+                                Opens this for you — nothing is saved until you confirm in the page.
+                              </p>
+                              {m.uiStatus === "pending" ? (
+                                <button
+                                  onClick={() => runUiAction(i)}
+                                  disabled={pending}
+                                  className="w-full rounded-lg text-white text-xs font-semibold py-1.5 transition-opacity disabled:opacity-50 hover:opacity-90"
+                                  style={{ background: `linear-gradient(135deg, ${PRIMARY}, ${PURPLE})` }}
+                                >
+                                  Show me
+                                </button>
+                              ) : m.uiStatus === "processing" ? (
+                                <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                                  <Loader2 className="h-3 w-3 animate-spin" /> Opening…
+                                </p>
+                              ) : (
+                                <p className={cn("text-xs font-semibold", m.uiStatus === "done" ? "text-emerald-500" : "text-red-500")}>
+                                  {m.uiStatus === "done" ? "✓ Opened" : "✗ Couldn't open — try the sidebar"}
                                 </p>
                               )}
                             </div>
