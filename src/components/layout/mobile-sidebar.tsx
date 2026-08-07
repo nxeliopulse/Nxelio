@@ -215,7 +215,7 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
 
           {/* Trial expired notice — only rendered when the real trial end date has passed */}
           {trialExpired && (
-            <div className="rounded-xl bg-rose-50 border border-rose-200 p-4">
+            <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <p className="font-bold text-slate-900 text-sm">Free trial</p>

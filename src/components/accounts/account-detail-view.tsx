@@ -382,7 +382,7 @@ export function AccountDetailView({
               <div className="space-y-2">
                 {contacts.map((c) => (
                   <Link key={c.id} href={`/contacts/${c.id}`} className="flex items-center gap-2.5 group p-2 -mx-2 rounded-lg hover:bg-slate-50 dark:hover:bg-[var(--muted)]">
-                    <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0">
+                    <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-[var(--muted)] flex items-center justify-center text-slate-500 dark:text-slate-400 flex-shrink-0">
                       <Users2 className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">

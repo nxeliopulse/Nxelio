@@ -185,7 +185,7 @@ export function HelpView() {
       </Card>
 
       {/* Replay the guided product tour */}
-      <Card className="p-5 mb-8 flex items-center justify-between gap-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
+      <Card className="p-5 mb-8 flex items-center justify-between gap-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border-blue-100 dark:border-blue-900/40">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
             <PlayCircle className="h-5 w-5" />
@@ -261,7 +261,7 @@ export function HelpView() {
 
       {/* Contact + Documentation */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <Card className="p-6 lg:col-span-1 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
+        <Card className="p-6 lg:col-span-1 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border-blue-100 dark:border-blue-900/40">
           <div className="h-10 w-10 rounded-lg bg-blue-600 text-white flex items-center justify-center mb-3">
             <Mail className="h-5 w-5" />
           </div>

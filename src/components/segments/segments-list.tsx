@@ -31,7 +31,6 @@ import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { PageHeader } from "@/components/ui/page-header";
 import { Modal } from "@/components/ui/modal";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
@@ -217,11 +216,40 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
   ];
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6">
-      <PageHeader
-        title="Audience Segments"
-        description="Organize leads into targeted groups for personalized campaigns and workflows"
-      />
+    <div className="max-w-[1600px] mx-auto">
+      {/* Page header — title + breadcrumb, matching the Prospects screen */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Audience Segments
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
+            <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-600">Home</Link>
+            <span className="mx-1">›</span>
+            <span className="text-slate-700 dark:text-slate-600 font-medium">Segments</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              toast("Refreshing segments...", "info");
+              router.refresh();
+              setTimeout(() => window.location.reload(), 100);
+            }}
+            title="Refresh"
+            className="rounded-xl h-8 w-8"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          <Link href="/segments/builder">
+            <Button size="sm" className="rounded-xl gap-1.5 font-semibold h-8 text-xs px-3">
+              <Plus className="h-3.5 w-3.5" /> Create Segment
+            </Button>
+          </Link>
+        </div>
+      </div>
 
       {/* Metrics Summary Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -399,27 +427,6 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
               </button>
             </div>
 
-            {/* Refresh Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                toast("Refreshing segments...", "info");
-                router.refresh();
-                setTimeout(() => window.location.reload(), 100);
-              }}
-              className="h-9 w-9 p-0 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-              title="Refresh"
-            >
-              <RefreshCw className="h-4 w-4 text-slate-500" />
-            </Button>
-
-            {/* Create Segment Button inside toolbar */}
-            <Link href="/segments/builder">
-              <Button className="rounded-xl font-bold px-4 py-2 text-xs sm:text-sm gap-2">
-                <Plus className="h-4 w-4" /> Create Segment
-              </Button>
-            </Link>
           </div>
         </div>
 

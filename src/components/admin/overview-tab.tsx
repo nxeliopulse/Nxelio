@@ -515,10 +515,10 @@ export function OverviewTab({
                       {healthLabel}
                     </span>
                   </DataTableTd>
-                  <DataTableTd className="text-slate-900 dark:text-slate-300 text-right tabular-nums font-bold">
+                  <DataTableTd className="text-slate-900 dark:text-slate-600 text-right tabular-nums font-bold">
                     {c.leadCount.toLocaleString()}
                   </DataTableTd>
-                  <DataTableTd className="text-slate-900 dark:text-slate-300 text-right tabular-nums font-bold">
+                  <DataTableTd className="text-slate-900 dark:text-slate-600 text-right tabular-nums font-bold">
                     {c.campaignsSent.toLocaleString()}
                   </DataTableTd>
                   <DataTableTd className="text-right">

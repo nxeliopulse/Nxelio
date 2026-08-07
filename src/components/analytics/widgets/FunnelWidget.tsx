@@ -146,7 +146,7 @@ export function FunnelWidget({ config, data }: WidgetProps) {
 
               return (
                 <tr key={i} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/10">
-                  <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">{row.label}</td>
+                  <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-700">{row.label}</td>
                   <td className="py-2.5 px-3 font-black text-slate-900 dark:text-white text-right">{fmt(row.value)}</td>
                   <td className="py-2.5 px-3 text-right text-emerald-600 dark:text-emerald-400 font-bold">
                     {isFirst ? "100%" : `${stageConv}%`}

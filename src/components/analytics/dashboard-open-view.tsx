@@ -99,7 +99,7 @@ export function DashboardOpenView({ dashboard, resolvedWidgets }: { dashboard: D
                   onClick={() => setSwitcherOpen(false)}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800",
-                    d.id === dashboard.id ? "font-semibold text-[var(--primary)]" : "text-slate-600 dark:text-slate-300"
+                    d.id === dashboard.id ? "font-semibold text-[var(--primary)]" : "text-slate-600 dark:text-slate-600"
                   )}
                 >
                   <LayoutDashboard className="h-3.5 w-3.5 flex-shrink-0" />

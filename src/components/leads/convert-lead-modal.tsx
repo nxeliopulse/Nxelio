@@ -47,7 +47,7 @@ function ChoiceCard({ selected, onClick, icon, title, subtitle, subtitleColor = 
       <span className={cn("h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center mr-1", selected ? "border-[#18A7B8]" : "border-slate-300")}>
         {selected && <span className="h-2 w-2 rounded-full bg-[#18A7B8]" />}
       </span>
-      <span className={cn("h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0 mr-1.5", selected ? "bg-[#18A7B8]/15 text-[#18A7B8]" : "bg-slate-100 dark:bg-slate-800 text-slate-500")}>
+      <span className={cn("h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0 mr-1.5", selected ? "bg-[#18A7B8]/15 text-[#18A7B8]" : "bg-slate-100 dark:bg-[var(--muted)] text-slate-500 dark:text-slate-400")}>
         {icon}
       </span>
       <span className="min-w-0 flex-1">

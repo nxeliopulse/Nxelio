@@ -25,7 +25,7 @@ export function QuadrantWidget({ result, xLabel, yLabel }: { result: QuadrantRes
               const p = payload[0].payload as { label: string; x: number; y: number };
               return (
                 <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-md text-xs">
-                  <p className="font-bold text-slate-700 dark:text-slate-300 mb-1">{p.label}</p>
+                  <p className="font-bold text-slate-700 dark:text-slate-600 mb-1">{p.label}</p>
                   <p className="text-slate-500">
                     {xLabel ?? "X"}: {fmt(p.x)} · {yLabel ?? "Y"}: {fmt(p.y)}
                   </p>

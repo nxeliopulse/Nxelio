@@ -61,7 +61,7 @@ function WelcomeBanner() {
           </p>
         </div>
       </div>
-      <button onClick={() => setVisible(false)} className="text-slate-600 hover:text-slate-300 transition-colors">
+      <button onClick={() => setVisible(false)} className="text-slate-600 hover:text-slate-300 dark:hover:text-slate-700 transition-colors">
         <X className="h-4 w-4" />
       </button>
     </div>
@@ -308,7 +308,7 @@ export function DashboardView({
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total deals</span>
               <button 
                 onClick={() => router.push("/opportunities")} 
-                className="p-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500"
+                className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-slate-400"
               >
                 <ArrowUpRight className="h-4 w-4" />
               </button>
@@ -332,7 +332,7 @@ export function DashboardView({
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total prospects</span>
               <button 
                 onClick={() => router.push("/leads")} 
-                className="p-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500"
+                className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-slate-400"
               >
                 <ArrowUpRight className="h-4 w-4" />
               </button>
@@ -356,7 +356,7 @@ export function DashboardView({
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pipeline value</span>
               <button 
                 onClick={() => router.push("/opportunities")} 
-                className="p-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500"
+                className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-slate-400"
               >
                 <ArrowUpRight className="h-4 w-4" />
               </button>
@@ -386,7 +386,7 @@ export function DashboardView({
               </div>
 
               <div className="flex items-center gap-3">
-                <ul className="flex items-center gap-1 bg-slate-50 dark:bg-slate-900 border dark:border-slate-800 rounded-xl p-1 text-[10px] font-bold">
+                <ul className="flex items-center gap-1 bg-slate-50 dark:bg-[var(--muted)] border dark:border-slate-800 rounded-xl p-1 text-[10px] font-bold">
                   {["weekly", "monthly", "yearly"].map((t) => (
                     <li key={t}>
                       <button
@@ -406,7 +406,7 @@ export function DashboardView({
 
                 <button 
                   onClick={() => router.push("/analytics")}
-                  className="p-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500"
+                  className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full text-slate-500 dark:text-slate-400"
                 >
                   <ArrowUpRight className="h-4 w-4" />
                 </button>
@@ -479,7 +479,7 @@ export function DashboardView({
 
               <button 
                 onClick={() => router.push("/leads")}
-                className="p-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500"
+                className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full text-slate-500 dark:text-slate-400"
               >
                 <ArrowUpRight className="h-4 w-4" />
               </button>

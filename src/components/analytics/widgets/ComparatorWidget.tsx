@@ -43,7 +43,7 @@ export function ComparatorWidget({ config, result }: { config: WidgetConfig; res
           return (
             <div key={idx} className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{row.label}</span>
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-700">{row.label}</span>
                 {trend !== null && (
                   <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${trend >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                     {trend >= 0 ? "+" : ""}{trend}%
@@ -56,7 +56,7 @@ export function ComparatorWidget({ config, result }: { config: WidgetConfig; res
                   <span className="w-16 flex-shrink-0 text-[10px] text-slate-400 font-bold uppercase truncate">{result.periodLabels[0]}</span>
                   <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-800 rounded-md overflow-hidden relative">
                     <div className={`h-full ${barColorClass} rounded-md transition-all`} style={{ width: `${currentPct}%` }} />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-700 dark:text-slate-300">
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-700 dark:text-slate-600">
                       {fmt(row.current)}
                     </span>
                   </div>
@@ -66,7 +66,7 @@ export function ComparatorWidget({ config, result }: { config: WidgetConfig; res
                   <span className="w-16 flex-shrink-0 text-[10px] text-slate-400 font-bold uppercase truncate">{result.periodLabels[1]}</span>
                   <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-800 rounded-md overflow-hidden relative">
                     <div className={`h-full ${barColorClass} opacity-60 rounded-md transition-all`} style={{ width: `${previousPct}%` }} />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-700 dark:text-slate-300">
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-700 dark:text-slate-600">
                       {fmt(row.previous)}
                     </span>
                   </div>
@@ -91,7 +91,7 @@ export function ComparatorWidget({ config, result }: { config: WidgetConfig; res
                   <div className="h-7 w-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <Award className="h-4 w-4" />
                   </div>
-                  <h5 className="text-sm font-bold text-slate-700 dark:text-slate-300">{row.label}</h5>
+                  <h5 className="text-sm font-bold text-slate-700 dark:text-slate-600">{row.label}</h5>
                 </div>
                 <div className="grid grid-cols-2 gap-3 py-1 border-t border-b border-slate-50 dark:border-slate-800/60 my-2">
                   <div>

@@ -23,7 +23,10 @@ export function ConnectAccountModal({ open, onClose }: { open: boolean; onClose:
     // browsers block window.open() called after an await, since by then it's
     // no longer considered a direct result of user interaction. We navigate
     // this already-open tab to the real URL once the request resolves.
-    const tab = window.open("", "_blank", "noopener");
+    // IMPORTANT: no "noopener" here — that flag makes window.open() always
+    // return null (by spec), which silently defeated this whole workaround
+    // (the blank tab opened but nothing ever told it where to go).
+    const tab = window.open("", "_blank");
     try {
       const res = await connectOutreachAccount("email", "/settings?section=email");
       if (res.ok && res.url) {

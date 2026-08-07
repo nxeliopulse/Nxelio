@@ -19,7 +19,7 @@ export function ScatterSystem({ points }: { points: { x: number; y: number; z: n
               const p = payload[0].payload as { name: string; x: number; y: number; z: number };
               return (
                 <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-md text-xs">
-                  <p className="font-bold text-slate-700 dark:text-slate-300 mb-1">{p.name}</p>
+                  <p className="font-bold text-slate-700 dark:text-slate-600 mb-1">{p.name}</p>
                   <p className="text-slate-500">Open {p.x}% · Reply {p.y}% · Sent {p.z}</p>
                 </div>
               );

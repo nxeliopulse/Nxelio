@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -27,7 +27,7 @@ import { ContactDocumentsCard } from "@/components/contacts/contact-documents-ca
 import { ContactEmailCard } from "@/components/contacts/contact-email-card";
 import { ComposeEmailModal } from "@/components/contacts/compose-email-modal";
 import type { OwnerOption } from "@/components/contacts/contacts-table";
-import { createContactNote, type ContactNoteRow } from "@/lib/queries/contact-notes";
+import { type ContactNoteRow } from "@/lib/queries/contact-notes";
 import type { MeetingRow } from "@/lib/queries/meetings";
 import type { ContactTaskRow } from "@/lib/queries/contact-tasks";
 import type { ContactCallRow } from "@/lib/queries/contact-calls";
@@ -78,7 +78,6 @@ export function ContactDetailView({
   const [isStarred, setIsStarred] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("activities");
   const [activitySort, setActivitySort] = useState<"newest" | "oldest">("newest");
-  const attachRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
@@ -97,21 +96,6 @@ export function ContactDetailView({
       localStorage.setItem(STARRED_KEY, JSON.stringify(next));
       setIsStarred(!isStarred);
     } catch { /* ignore */ }
-  }
-
-  async function handleQuickAttach(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    const formData = new FormData();
-    formData.set("file", file);
-    const res = await createContactNote(contact.id, formData);
-    if (res.ok) {
-      toast("File attached — see it in Notes.", "success");
-      router.refresh();
-    } else {
-      toast(res.error || "Couldn't attach file.", "error");
-    }
   }
 
   function handleShare() {
@@ -319,9 +303,8 @@ export function ContactDetailView({
             >
               <MessageCircle className="h-4 w-4" />
             </a>
-            <input ref={attachRef} type="file" className="hidden" onChange={handleQuickAttach} />
-            <button onClick={() => attachRef.current?.click()} title="Attach a file" className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-[var(--muted)]">
-              <Paperclip className="h-4 w-4" />
+            <button onClick={() => setEditOpen(true)} title="Edit contact" className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-[var(--muted)]">
+              <Pencil className="h-4 w-4" />
             </button>
             <div className="relative">
               <Button variant="outline" size="icon" onClick={() => setMenuOpen((v) => !v)} className="rounded-lg h-8 w-8">
@@ -331,9 +314,6 @@ export function ContactDetailView({
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                   <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg text-xs dark:bg-slate-900 dark:border-slate-800">
-                    <button onClick={() => { setMenuOpen(false); setEditOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-600 dark:hover:bg-[var(--muted)]">
-                      <Pencil className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" /> Edit Record
-                    </button>
                     <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
                       <Trash2 className="h-3.5 w-3.5" /> Delete Record
                     </button>
@@ -403,7 +383,7 @@ export function ContactDetailView({
             </div>
             {contact.account ? (
               <Link href={`/accounts/${contact.account.id}`} className="flex items-center gap-2.5 group">
-                <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0 overflow-hidden">
+                <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-[var(--muted)] flex items-center justify-center text-slate-500 dark:text-slate-400 flex-shrink-0 overflow-hidden">
                   {contact.account.website ? (
                     // eslint-disable-next-line @next/next/no-img-element -- third-party favicon URL, not a static asset
                     <img src={`https://www.google.com/s2/favicons?domain=${contact.account.website.replace(/^https?:\/\//, "")}&sz=64`} alt="" className="h-5 w-5" />
@@ -434,7 +414,7 @@ export function ContactDetailView({
                   target="_blank"
                   rel="noopener noreferrer"
                   title={value ? `${label}: ${value}` : `No ${label}`}
-                  className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white flex-shrink-0", value ? bg : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-default")}
+                  className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white flex-shrink-0", value ? bg : "bg-slate-200 dark:bg-[var(--muted)] text-slate-400 dark:text-slate-400 cursor-default")}
                 >
                   <Icon className="h-3.5 w-3.5" />
                 </a>

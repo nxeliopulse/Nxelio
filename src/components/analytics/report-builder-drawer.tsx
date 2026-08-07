@@ -298,7 +298,7 @@ export function ReportBuilderDrawer({
               <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Metrics to compare</label>
               <div className="space-y-1.5 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 max-h-40 overflow-y-auto">
                 {metricPresets.map((p) => (
-                  <label key={p.label} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                  <label key={p.label} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-600">
                     <input
                       type="checkbox"
                       checked={comparatorMetricLabels.includes(p.label)}

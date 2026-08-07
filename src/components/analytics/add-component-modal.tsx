@@ -91,7 +91,7 @@ export function AddComponentModal({
             <button
               key={r.id}
               onClick={() => handleAttachExisting(r)}
-              className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/40 text-sm font-medium text-slate-700 dark:text-slate-300"
+              className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-900/40 text-sm font-medium text-slate-700 dark:text-slate-600"
             >
               {r.name}
               <span className="ml-2 text-xs text-slate-400">{r.dataSource} · {r.chartType}</span>
@@ -116,7 +116,7 @@ export function AddComponentModal({
             }`}
           >
             <span className="text-slate-500">{ct.icon}</span>
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{ct.label}</span>
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-600">{ct.label}</span>
             {!ct.working && <span className="absolute top-1.5 right-2 text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">Soon</span>}
           </button>
         ))}
@@ -127,7 +127,7 @@ export function AddComponentModal({
           <span className="text-slate-500">
             <FolderOpen className="h-5 w-5" />
           </span>
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Pick from gallery</span>
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-600">Pick from gallery</span>
         </button>
       </div>
     </Modal>

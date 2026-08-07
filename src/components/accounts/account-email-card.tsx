@@ -63,7 +63,7 @@ export function AccountEmailCard({
 
       {emails.length === 0 ? (
         <Card className="p-6 text-center border-slate-100 dark:border-slate-800/80 shadow-none bg-slate-50/20 dark:bg-[var(--muted)]">
-          <Mail className="h-8 w-8 text-slate-300 mx-auto mb-2.5" />
+          <Mail className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-2.5" />
           <h6 className="text-xs font-bold text-slate-800 dark:text-slate-700 mb-1">Interact with this account</h6>
           <p className="text-[11px] text-slate-500 dark:text-slate-500 max-w-sm mx-auto mb-3">
             Draft and send a real email, or reply to what you&apos;ve already sent.

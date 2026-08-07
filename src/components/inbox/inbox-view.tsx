@@ -302,7 +302,7 @@ export function InboxView({ conversations, embedded = false, campaignId }: Inbox
                   <li
                     key={c.id}
                     onClick={() => handleSelect(c)}
-                    className={`p-3 cursor-pointer transition-colors ${active?.id === c.id ? "bg-blue-50/80 border-l-2 border-blue-600" : "hover:bg-slate-50"}`}
+                    className={`p-3 cursor-pointer transition-colors ${active?.id === c.id ? "bg-blue-50/80 dark:bg-blue-950/30 border-l-2 border-blue-600" : "hover:bg-slate-50 dark:hover:bg-[var(--muted)]"}`}
                   >
                     <div className="flex items-start gap-2.5">
                       <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-xs">

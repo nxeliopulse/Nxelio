@@ -1662,7 +1662,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                     {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}
                     {c.label}
                   </span>
-                  <span title="Always shown first — position is fixed" className="text-slate-300"><Lock className="h-3 w-3" /></span>
+                  <span title="Always shown first — position is fixed" className="text-slate-300 dark:text-slate-600"><Lock className="h-3 w-3" /></span>
                 </div>
               ))}
               <div className="my-1 border-t border-slate-100" />

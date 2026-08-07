@@ -99,7 +99,7 @@ export function SegmentHistoryModal({
                           key={key}
                           className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400"
                         >
-                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                          <span className="font-medium text-slate-700 dark:text-slate-600">
                             {key}:
                           </span>
                           <span>{String(value)}</span>
