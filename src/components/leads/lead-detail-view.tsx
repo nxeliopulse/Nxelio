@@ -20,8 +20,6 @@ import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import type { LeadRow } from "@/lib/queries/leads";
 import { updateLead } from "@/lib/queries/leads";
-import { getPicklistValues } from "@/lib/queries/picklists";
-import { PICKLIST_FALLBACK_VALUES } from "@/lib/picklists";
 import { STAGE_LABELS, type OpportunityRow } from "@/lib/opportunities";
 import type { MeetingRow } from "@/lib/queries/meetings";
 import type { LeadHistory } from "@/lib/queries/lead-detail";
@@ -115,23 +113,6 @@ export function LeadDetailView({
   const [activeTab, setActiveTab] = useState<"activities" | "notes" | "calls" | "files" | "email">("activities");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-
-  // M2 — status values come from the Administration lead_status picklist so
-  // admin-added statuses appear here. "Win"/"Lost" are always kept (they gate
-  // the Convert / Create Account flows and the pipeline stepper even though
-  // they aren't part of the default picklist).
-  const [statusOptions, setStatusOptions] = useState<string[]>(PICKLIST_FALLBACK_VALUES.lead_status);
-  useEffect(() => {
-    getPicklistValues("lead_status")
-      .then((vals) => {
-        const merged = [...vals];
-        for (const extra of ["Win", "Lost"]) {
-          if (!merged.includes(extra)) merged.push(extra);
-        }
-        setStatusOptions(merged);
-      })
-      .catch(() => {});
-  }, []);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [priority, setPriority] = useState<string>("High");
 
@@ -447,7 +428,7 @@ export function LeadDetailView({
 
               {statusDropdownOpen && (
                 <div className="absolute right-0 mt-1.5 w-36 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                  {statusOptions.map((st) => (
+                  {["New", "Contacted", "Qualified", "Nurturing", "Win", "Converted", "Lost"].map((st) => (
                     <button
                       key={st}
                       onClick={() => handleStatusUpdate(st)}

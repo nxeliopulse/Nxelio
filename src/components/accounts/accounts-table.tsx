@@ -3,15 +3,13 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Search, Plus, Trash2, ChevronDown, ChevronRight, Building2, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
+  Search, Plus, Trash2, ChevronDown, Building2, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, Globe, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  Pencil, RefreshCw, Download, FileText, FileSpreadsheet, Upload, X,
-  CheckCircle2, Target, UserCheck, XCircle
+  Pencil, RefreshCw, Download, FileText, FileSpreadsheet, Upload
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
@@ -21,20 +19,19 @@ import { EditAccountModal, type AccountOwnerOption } from "@/components/accounts
 import { AddAccountsWizard } from "@/components/accounts/add-accounts-wizard";
 import { deleteAccount, bulkDeleteAccounts, type AccountRow } from "@/lib/queries/accounts";
 
-// "index" (Row #) is the only fixed, always-shown column now — Name and Action are
-// toggleable too (see COLUMNS below), matching the Contacts reference design.
-type ColKey = "name" | "phone" | "tags" | "location" | "rating" | "contact" | "type" | "owner" | "created_at" | "action";
+// "index" (Row #) is NOT part of this list — like leads-table.tsx's own Row #
+// column, it's always shown and fixed in position, never toggleable.
+type ColKey = "phone" | "tags" | "location" | "rating" | "contact" | "type" | "owner" | "created_at";
 
 interface ColumnDef { key: ColKey; label: string; defaultOn: boolean }
 
-// Every column with real comparable data is sortable — every ColKey except "contact"
-// (icon-only quick-action buttons) and "action" (kebab menu), neither of which is real,
-// comparable data. Matches leads-table.tsx's own pattern of excluding non-sortable
-// columns (its Row # column and any icon-only columns).
-type SortKey = Exclude<ColKey, "contact" | "action">;
+// Every column with real comparable data is sortable — "name" (the fixed, always-shown
+// Name column, so it's not part of ColKey/COLUMNS) plus every ColKey except "contact"
+// (icon-only quick-action buttons, not real data). Matches leads-table.tsx's own pattern
+// of excluding non-sortable columns (its Row # column and any icon-only columns).
+type SortKey = "name" | Exclude<ColKey, "contact">;
 
 const COLUMNS: ColumnDef[] = [
-  { key: "name", label: "Name", defaultOn: true },
   { key: "phone", label: "Phone", defaultOn: true },
   { key: "tags", label: "Tags", defaultOn: true },
   { key: "location", label: "Location", defaultOn: true },
@@ -43,7 +40,6 @@ const COLUMNS: ColumnDef[] = [
   { key: "type", label: "Type", defaultOn: true },
   { key: "owner", label: "Owner", defaultOn: true },
   { key: "created_at", label: "Created Date", defaultOn: true },
-  { key: "action", label: "Action", defaultOn: true },
 ];
 
 const DEFAULT_COLS = COLUMNS.reduce((acc, c) => { acc[c.key] = c.defaultOn; return acc; }, {} as Record<ColKey, boolean>);
@@ -123,62 +119,18 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
   const [activeDateRange, setActiveDateRange] = useState("Last 30 Days");
   const [ratingFilter, setRatingFilter] = useState<"all" | "Hot" | "Warm" | "Cold">("all");
 
-  // Consolidated Filter panel state — replaces the old separate Status/Industry/Owner/
-  // Region toolbar dropdowns plus the "More Filters" (Rating/Type) dropdown. Status/
-  // Industry/Account Type/Rating/Location keep their original, already-working
-  // single-select "all" | value state (just re-skinned as checkbox-look panel
-  // sections below) — only Name (new) and Owner (was single-select) become true
-  // multi-select checkbox lists, matching Contacts' own Name/Owner sections.
+  // Toolbar filter dropdowns — Status/Industries/Owners/Regions ("all" = no filter
+  // applied). Account Type joins Rating inside "More Filters" rather than getting
+  // its own toolbar slot, to keep the primary row matching the reference exactly.
   const [statusFilter, setStatusFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("all");
   const [regionFilter, setRegionFilter] = useState("all");
   const [accountTypeFilter, setAccountTypeFilter] = useState("all");
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
-  const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
-  const [nameSearch, setNameSearch] = useState("");
-  const [namesShown, setNamesShown] = useState(10);
-  const [ownerSearch, setOwnerSearch] = useState("");
-  const [ownersShown, setOwnersShown] = useState(5);
-  const [openFilterSections, setOpenFilterSections] = useState<Record<"name" | "owner" | "status" | "industry" | "accountType" | "rating" | "location", boolean>>({
-    name: true,
-    owner: false,
-    status: false,
-    industry: false,
-    accountType: false,
-    rating: false,
-    location: false,
-  });
-
-  const hasActiveFilters =
-    selectedAccountIds.length > 0 ||
-    selectedOwnerIds.length > 0 ||
-    statusFilter !== "all" ||
-    industryFilter !== "all" ||
-    accountTypeFilter !== "all" ||
-    ratingFilter !== "all" ||
-    regionFilter !== "all";
-
-  function resetFilterPanel() {
-    setSelectedAccountIds([]);
-    setSelectedOwnerIds([]);
-    setStatusFilter("all");
-    setIndustryFilter("all");
-    setAccountTypeFilter("all");
-    setRatingFilter("all");
-    setRegionFilter("all");
-    setNameSearch("");
-    setNamesShown(10);
-    setOwnerSearch("");
-    setOwnersShown(5);
-  }
-
-  function toggleFilterSection(key: "name" | "owner" | "status" | "industry" | "accountType" | "rating" | "location") {
-    setOpenFilterSections((s) => ({ ...s, [key]: !s[key] }));
-  }
-
-  function toggleInArray<T>(arr: T[], value: T): T[] {
-    return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
-  }
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [industryDropdownOpen, setIndustryDropdownOpen] = useState(false);
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
+  const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
 
   const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
   const [showCols, setShowCols] = useState(false);
@@ -233,30 +185,14 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
     new Set(accounts.map((a) => a.billing_country).filter((c): c is string => Boolean(c)))
   ).sort((a, b) => a.localeCompare(b));
 
-  // Name section of the Filter panel — live search + "Load More" paging, entirely
-  // client-side over the already-loaded `accounts` array (no new query needed).
-  const filteredNameList = accounts.filter((a) => a.account_name.toLowerCase().includes(nameSearch.trim().toLowerCase()));
-  const visibleNameList = filteredNameList.slice(0, namesShown);
-
-  // Owner section of the Filter panel — same live search + "Load More" paging as
-  // Name, since a workspace's owner/user list can also run long.
-  const filteredOwnerList = owners.filter((o) => o.name.toLowerCase().includes(ownerSearch.trim().toLowerCase()));
-  const visibleOwnerList = filteredOwnerList.slice(0, ownersShown);
-
   // Apply filters
   const filtered = accounts.filter((a) => {
     const q = search.toLowerCase();
 
-    // Filter panel: Name (specific accounts) — checking one or more names restricts
-    // the table to ONLY those accounts.
-    if (selectedAccountIds.length > 0 && !selectedAccountIds.includes(a.id)) return false;
-
-    // Filter panel: Owner — multi-select, OR within the section.
-    if (selectedOwnerIds.length > 0 && !selectedOwnerIds.includes(a.account_owner || "")) return false;
-
     if (ratingFilter !== "all" && a.rating !== ratingFilter) return false;
     if (statusFilter !== "all" && a.account_status !== statusFilter) return false;
     if (industryFilter !== "all" && a.industry !== industryFilter) return false;
+    if (ownerFilter !== "all" && a.account_owner !== ownerFilter) return false;
     if (regionFilter !== "all" && a.billing_country !== regionFilter) return false;
     if (accountTypeFilter !== "all" && a.account_type !== accountTypeFilter) return false;
 
@@ -378,17 +314,6 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   }
 
-  /** First-letter-of-each-word initials for an account name (up to two words) — same
-   *  pattern as contacts-table.tsx's own `initials()` helper. Used only by the Filter
-   *  panel's Name section avatars; the table/grid views keep their existing
-   *  single-letter avatar treatment untouched. */
-  function accountInitials(name: string): string {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return "?";
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-
   // Named "Sort By" presets — each is just a shortcut that sets sortKey/sortDir to a
   // specific value, so choosing one here and clicking a column's header arrow always
   // agree on what "currently sorted" means (same state, no parallel sort mechanism).
@@ -428,54 +353,6 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
           <ArrowUpDown className="h-3 w-3 text-slate-400" />
         )}
       </button>
-    );
-  }
-
-  /** One collapsible checkbox-list section inside the Filter panel (Status / Industry /
-   *  Account Type / Rating / Location) — collapsed by default, toggled via its label.
-   *  Unlike Name/Owner, these keep the ALREADY-WORKING single-select "all" | value
-   *  state (statusFilter, industryFilter, accountTypeFilter, ratingFilter,
-   *  regionFilter): checking an option selects only that value (deselecting any
-   *  previous one in the section); checking the already-selected option clears it
-   *  back to "all". This only changes presentation, not what each filter matches. */
-  function renderSingleSelectSection(
-    key: "status" | "industry" | "accountType" | "rating" | "location",
-    label: string,
-    options: { value: string; label: string }[],
-    selectedValue: string,
-    onSelect: (value: string) => void
-  ) {
-    const isOpen = openFilterSections[key];
-    return (
-      <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-        <button
-          type="button"
-          onClick={() => toggleFilterSection(key)}
-          className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600"
-        >
-          <span>{label}</span>
-          <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", isOpen && "rotate-90")} />
-        </button>
-        {isOpen && (
-          <div className="mt-2 max-h-36 overflow-y-auto space-y-1 pr-1">
-            {options.length === 0 && <p className="text-slate-400 dark:text-slate-500 py-1 text-xs">No options available.</p>}
-            {options.map((opt) => {
-              const checked = selectedValue === opt.value;
-              return (
-                <label key={opt.value} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => onSelect(checked ? "all" : opt.value)}
-                    className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="truncate text-slate-700 dark:text-slate-600 font-medium">{opt.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </div>
     );
   }
 
@@ -570,67 +447,26 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
           if (previous === 0) return current > 0 ? 100 : 0;
           return Math.round(((current - previous) / previous) * 100);
         };
-        // Each card (besides Total) maps directly onto ONE of the Filter panel's own
-        // statusFilter/accountTypeFilter state variables — clicking it sets that same
-        // state, so the stat cards are just quick shortcuts onto filters that already
-        // exist, not a parallel filtering mechanism. Active/Prospect/Inactive are
-        // status values; Customer is an account-type value.
-        const cards: { label: string; value: number; pct: number; kind: "total" | "status" | "type"; filterValue?: string; icon: typeof Building2; accent: string }[] = [
-          { label: "Total Accounts", value: accounts.length, pct: pctChange(() => true), kind: "total", icon: Building2, accent: "bg-amber-500" },
-          { label: "Active Accounts", value: accounts.filter((a) => a.account_status === "Active").length, pct: pctChange((a) => a.account_status === "Active"), kind: "status", filterValue: "Active", icon: CheckCircle2, accent: "bg-emerald-500" },
-          { label: "Prospect Accounts", value: accounts.filter((a) => a.account_status === "Prospect").length, pct: pctChange((a) => a.account_status === "Prospect"), kind: "status", filterValue: "Prospect", icon: Target, accent: "bg-blue-500" },
-          { label: "Customer Accounts", value: accounts.filter((a) => a.account_type === "Customer").length, pct: pctChange((a) => a.account_type === "Customer"), kind: "type", filterValue: "Customer", icon: UserCheck, accent: "bg-violet-500" },
-          { label: "Inactive Accounts", value: accounts.filter((a) => a.account_status === "Inactive").length, pct: pctChange((a) => a.account_status === "Inactive"), kind: "status", filterValue: "Inactive", icon: XCircle, accent: "bg-rose-500" },
+        const cards = [
+          { label: "Total Accounts", value: accounts.length, pct: pctChange(() => true) },
+          { label: "Active Accounts", value: accounts.filter((a) => a.account_status === "Active").length, pct: pctChange((a) => a.account_status === "Active") },
+          { label: "Prospect Accounts", value: accounts.filter((a) => a.account_status === "Prospect").length, pct: pctChange((a) => a.account_status === "Prospect") },
+          { label: "Customer Accounts", value: accounts.filter((a) => a.account_type === "Customer").length, pct: pctChange((a) => a.account_type === "Customer") },
+          { label: "Inactive Accounts", value: accounts.filter((a) => a.account_status === "Inactive").length, pct: pctChange((a) => a.account_status === "Inactive") },
         ];
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
-            {cards.map((s) => {
-              const isActive = s.kind === "total"
-                ? statusFilter === "all" && accountTypeFilter === "all"
-                : s.kind === "status"
-                ? statusFilter === s.filterValue
-                : accountTypeFilter === s.filterValue;
-              const Icon = s.icon;
-              return (
-                <Card
-                  key={s.label}
-                  onClick={() => {
-                    if (s.kind === "total") {
-                      setStatusFilter("all");
-                      setAccountTypeFilter("all");
-                      toast("Showing all accounts", "info");
-                      return;
-                    }
-                    if (s.kind === "status") {
-                      const next = statusFilter === s.filterValue ? "all" : (s.filterValue as string);
-                      setStatusFilter(next);
-                      toast(next === "all" ? "Showing all accounts" : `Filtering by "${s.label}"`, "info");
-                      return;
-                    }
-                    const next = accountTypeFilter === s.filterValue ? "all" : (s.filterValue as string);
-                    setAccountTypeFilter(next);
-                    toast(next === "all" ? "Showing all accounts" : `Filtering by "${s.label}"`, "info");
-                  }}
-                  className={cn(
-                    "p-4 sm:p-5 flex items-center gap-3 cursor-pointer transition-shadow hover:shadow-md",
-                    isActive && "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-950 ring-blue-500"
-                  )}
-                >
-                  <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
-                    <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value.toLocaleString()}</p>
-                    <p className={cn("text-[10px] font-semibold mt-0.5 flex items-center gap-0.5", s.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                      {s.pct >= 0 ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />}
-                      {Math.abs(s.pct)}% vs last 30 days
-                    </p>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+          <Card className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800 mb-5 overflow-hidden">
+            {cards.map((s) => (
+              <div key={s.label} className="p-4 sm:p-5 min-w-0">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
+                <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">{s.value.toLocaleString()}</p>
+                <p className={cn("text-[11px] font-semibold mt-1 flex items-center gap-0.5", s.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                  {s.pct >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                  {Math.abs(s.pct)}% vs last 30 days
+                </p>
+              </div>
+            ))}
+          </Card>
         );
       })()}
 
@@ -647,6 +483,155 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs"
             />
+          </div>
+
+          {/* Status Filter */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <span>{statusFilter === "all" ? "All Status" : statusFilter}</span>
+              <ChevronDown className="h-3 w-3 text-slate-450" />
+            </Button>
+            {statusDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setStatusDropdownOpen(false)} />
+                <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  {["all", ...STATUS_OPTIONS].map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => { setStatusFilter(opt); setStatusDropdownOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        statusFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {opt === "all" ? "All Status" : opt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Industry Filter */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIndustryDropdownOpen(!industryDropdownOpen)}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <span>{industryFilter === "all" ? "All Industries" : industryFilter}</span>
+              <ChevronDown className="h-3 w-3 text-slate-450" />
+            </Button>
+            {industryDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIndustryDropdownOpen(false)} />
+                <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  {["all", ...INDUSTRY_OPTIONS].map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => { setIndustryFilter(opt); setIndustryDropdownOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        industryFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {opt === "all" ? "All Industries" : opt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Owner Filter */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <span>{ownerFilter === "all" ? "All Owners" : (owners.find((o) => o.id === ownerFilter)?.name ?? "Unknown owner")}</span>
+              <ChevronDown className="h-3 w-3 text-slate-450" />
+            </Button>
+            {ownerDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setOwnerDropdownOpen(false)} />
+                <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  <button
+                    onClick={() => { setOwnerFilter("all"); setOwnerDropdownOpen(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                      ownerFilter === "all" ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                    )}
+                  >
+                    All Owners
+                  </button>
+                  {owners.map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => { setOwnerFilter(o.id); setOwnerDropdownOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        ownerFilter === o.id ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {o.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Region Filter — options derived from real billing_country values present in the data */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+            >
+              <span>{regionFilter === "all" ? "All Regions" : regionFilter}</span>
+              <ChevronDown className="h-3 w-3 text-slate-450" />
+            </Button>
+            {regionDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setRegionDropdownOpen(false)} />
+                <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  <button
+                    onClick={() => { setRegionFilter("all"); setRegionDropdownOpen(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                      regionFilter === "all" ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                    )}
+                  >
+                    All Regions
+                  </button>
+                  {REGION_OPTIONS.length === 0 && (
+                    <p className="px-4 py-2 text-slate-400">No regions yet</p>
+                  )}
+                  {REGION_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => { setRegionFilter(opt); setRegionDropdownOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        regionFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Count Chip — matches leads-table.tsx's bordered icon+count pill */}
@@ -737,213 +722,65 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
             <span>Add Account</span>
           </Button>
 
-          {/* Filter Dropdown — one consolidated multi-section panel (Name / Owner /
-              Status / Industry / Account Type / Rating / Location), replacing the old
-              separate Status/Industry/Owner/Region toolbar dropdowns and "More Filters"
-              (Rating/Type) dropdown. Mirrors contacts-table.tsx's own hasActiveFilters
-              ring+dot treatment on the trigger button for visual consistency. */}
+          {/* More Filters — Rating + Account Type, the two filter dimensions that don't
+              have their own dedicated toolbar dropdown (Status/Industry/Owner/Region do) */}
           <div className="relative">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
-              className={cn(
-                "h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs",
-                hasActiveFilters && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
-              )}
+              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
             >
               <Filter className="h-3.5 w-3.5 text-slate-500" />
-              <span>Filter</span>
+              <span>More Filters</span>
+              {(ratingFilter !== "all" || accountTypeFilter !== "all") && (
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
+              )}
               <ChevronDown className="h-3 w-3 text-slate-450" />
-              {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
             </Button>
             {filterDropdownOpen && (
-              <div className="absolute right-0 mt-1.5 w-80 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg z-50 text-xs flex flex-col max-h-[36rem]">
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
-                  <span className="inline-flex items-center gap-1.5 font-bold text-slate-900 dark:text-white text-sm">
-                    <Filter className="h-3.5 w-3.5 text-slate-500" /> Filter
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setFilterDropdownOpen(false)}
-                    className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
-                    title="Close"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Sections */}
-                <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
-                  {/* Name — collapsible like the other sections, but open by default;
-                      live search + checkbox list. */}
-                  <div>
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setFilterDropdownOpen(false)} />
+                <div className="absolute right-0 mt-1.5 w-48 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  <p className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rating</p>
+                  {[
+                    { key: "all", label: "All Ratings" },
+                    { key: "Hot", label: "Hot" },
+                    { key: "Warm", label: "Warm" },
+                    { key: "Cold", label: "Cold" }
+                  ].map((opt) => (
                     <button
-                      type="button"
-                      onClick={() => toggleFilterSection("name")}
-                      className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600 mb-2"
+                      key={opt.key}
+                      onClick={() => {
+                        setRatingFilter(opt.key as "all" | "Hot" | "Warm" | "Cold");
+                        toast(`Filtering by rating: ${opt.label}`, "info");
+                      }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        ratingFilter === opt.key ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
                     >
-                      <span>Name</span>
-                      <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", openFilterSections.name && "rotate-90")} />
+                      {opt.label}
                     </button>
-                    {openFilterSections.name && (
-                      <>
-                        <Input
-                          leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
-                          placeholder="Search accounts"
-                          value={nameSearch}
-                          onChange={(e) => { setNameSearch(e.target.value); setNamesShown(10); }}
-                          className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs mb-2"
-                        />
-                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                          {visibleNameList.length === 0 && (
-                            <p className="text-slate-400 dark:text-slate-500 py-1.5 text-center">No accounts found.</p>
-                          )}
-                          {visibleNameList.map((a) => {
-                            const checked = selectedAccountIds.includes(a.id);
-                            return (
-                              <label key={a.id} className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => setSelectedAccountIds((s) => toggleInArray(s, a.id))}
-                                  className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className={cn("h-6 w-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0", avatarColor(a.account_name))}>
-                                  {accountInitials(a.account_name)}
-                                </span>
-                                <span className="truncate text-slate-700 dark:text-slate-600 font-medium">{a.account_name}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                        {filteredNameList.length > namesShown && (
-                          <button
-                            type="button"
-                            onClick={() => setNamesShown((n) => n + 10)}
-                            className="mt-1.5 text-blue-600 dark:text-blue-400 hover:underline font-semibold"
-                          >
-                            Load More
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Owner — like Name, this can run long (every workspace user), so it
-                      gets its own live search + "Load More" instead of a plain
-                      single-select list. */}
-                  <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                  ))}
+                  <p className="px-3 py-1.5 mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 dark:border-slate-800 pt-2">Account Type</p>
+                  {["all", ...ACCOUNT_TYPE_OPTIONS].map((opt) => (
                     <button
-                      type="button"
-                      onClick={() => toggleFilterSection("owner")}
-                      className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600"
+                      key={opt}
+                      onClick={() => {
+                        setAccountTypeFilter(opt);
+                        toast(`Filtering by account type: ${opt === "all" ? "All Types" : opt}`, "info");
+                      }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                        accountTypeFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                      )}
                     >
-                      <span>Owner</span>
-                      <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", openFilterSections.owner && "rotate-90")} />
+                      {opt === "all" ? "All Types" : opt}
                     </button>
-                    {openFilterSections.owner && (
-                      <div className="mt-2">
-                        <Input
-                          leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
-                          placeholder="Search"
-                          value={ownerSearch}
-                          onChange={(e) => { setOwnerSearch(e.target.value); setOwnersShown(5); }}
-                          className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs mb-2"
-                        />
-                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                          {visibleOwnerList.length === 0 && (
-                            <p className="text-slate-400 dark:text-slate-500 py-1.5 text-center">No owners found.</p>
-                          )}
-                          {visibleOwnerList.map((o) => (
-                            <label key={o.id} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedOwnerIds.includes(o.id)}
-                                onChange={() => setSelectedOwnerIds((s) => toggleInArray(s, o.id))}
-                                className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
-                              />
-                              <span className="truncate text-slate-700 dark:text-slate-600 font-medium">{o.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                        {filteredOwnerList.length > ownersShown && (
-                          <button
-                            type="button"
-                            onClick={() => setOwnersShown((n) => n + 5)}
-                            className="mt-1.5 text-blue-600 dark:text-blue-400 hover:underline font-semibold"
-                          >
-                            Load More
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {renderSingleSelectSection(
-                    "status",
-                    "Status",
-                    STATUS_OPTIONS.map((s) => ({ value: s, label: s })),
-                    statusFilter,
-                    setStatusFilter
-                  )}
-                  {renderSingleSelectSection(
-                    "industry",
-                    "Industry",
-                    INDUSTRY_OPTIONS.map((i) => ({ value: i, label: i })),
-                    industryFilter,
-                    setIndustryFilter
-                  )}
-                  {renderSingleSelectSection(
-                    "accountType",
-                    "Account Type",
-                    ACCOUNT_TYPE_OPTIONS.map((t) => ({ value: t, label: t })),
-                    accountTypeFilter,
-                    setAccountTypeFilter
-                  )}
-                  {renderSingleSelectSection(
-                    "rating",
-                    "Rating",
-                    [
-                      { value: "Hot", label: "Hot" },
-                      { value: "Warm", label: "Warm" },
-                      { value: "Cold", label: "Cold" },
-                    ],
-                    ratingFilter,
-                    (v) => setRatingFilter(v as "all" | "Hot" | "Warm" | "Cold")
-                  )}
-                  {renderSingleSelectSection(
-                    "location",
-                    "Location",
-                    REGION_OPTIONS.map((r) => ({ value: r, label: r })),
-                    regionFilter,
-                    setRegionFilter
-                  )}
+                  ))}
                 </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetFilterPanel}
-                    className="h-8 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-                  >
-                    Reset
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setFilterDropdownOpen(false);
-                      toast("Filters applied", "success");
-                    }}
-                    className="h-8 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    Filter
-                  </Button>
-                </div>
-              </div>
+              </>
             )}
           </div>
 
@@ -1003,11 +840,9 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                   </DataTableTh>
                   {/* Row # — always shown, fixed position, not part of the Manage Columns toggle (matches leads-table.tsx) */}
                   <DataTableTh className="w-10 px-3 py-2.5">#</DataTableTh>
-                  {cols.name && (
-                    <DataTableTh className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1">Name{renderSortButton("name")}</span>
-                    </DataTableTh>
-                  )}
+                  <DataTableTh className="px-3 py-2.5">
+                    <span className="inline-flex items-center gap-1">Name{renderSortButton("name")}</span>
+                  </DataTableTh>
                   {cols.phone && (
                     <DataTableTh className="px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Phone{renderSortButton("phone")}</span>
@@ -1044,12 +879,12 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                       <span className="inline-flex items-center gap-1">Created Date{renderSortButton("created_at")}</span>
                     </DataTableTh>
                   )}
-                  {cols.action && <DataTableTh className="w-12 px-3 py-2.5 text-center">Action</DataTableTh>}
+                  <DataTableTh className="w-12 px-3 py-2.5 text-center">Action</DataTableTh>
                 </tr>
               </DataTableHead>
               <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paged.length === 0 && (
-                  <DataTableEmpty colSpan={visibleCols.length + 2}>
+                  <DataTableEmpty colSpan={visibleCols.length + 4}>
                     No accounts found matching the filters. Click <strong>Add Account</strong> to create one.
                   </DataTableEmpty>
                 )}
@@ -1086,32 +921,30 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                       </DataTableTd>
 
                       {/* Name with star & Avatar details */}
-                      {cols.name && (
-                        <DataTableTd className="px-3 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={(e) => toggleStar(a.id, e)}
-                              className="p-1 rounded-md text-slate-350 hover:text-amber-500 transition-colors"
-                            >
-                              <Star className={cn("h-4 w-4", isStarred ? "fill-amber-500 text-amber-500" : "text-slate-400")} />
-                            </button>
+                      <DataTableTd className="px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => toggleStar(a.id, e)}
+                            className="p-1 rounded-md text-slate-350 hover:text-amber-500 transition-colors"
+                          >
+                            <Star className={cn("h-4 w-4", isStarred ? "fill-amber-500 text-amber-500" : "text-slate-400")} />
+                          </button>
 
-                            <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 shadow-2xs", avatarColor(a.account_name))}>
-                              {a.account_name.trim()[0]?.toUpperCase() || "?"}
-                            </div>
-
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 dark:text-white truncate whitespace-nowrap mb-0.5 leading-none group-hover:text-blue-500">
-                                {a.account_name}
-                              </p>
-                              <p className="text-[10px] text-slate-400 font-medium truncate leading-none">
-                                {a.industry || "—"}
-                              </p>
-                            </div>
+                          <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 shadow-2xs", avatarColor(a.account_name))}>
+                            {a.account_name.trim()[0]?.toUpperCase() || "?"}
                           </div>
-                        </DataTableTd>
-                      )}
+
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 dark:text-white truncate whitespace-nowrap mb-0.5 leading-none group-hover:text-blue-500">
+                              {a.account_name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-medium truncate leading-none">
+                              {a.industry || "—"}
+                            </p>
+                          </div>
+                        </div>
+                      </DataTableTd>
 
                       {/* Phone Column — matches leads-table.tsx's "+ Add phone" quick-fill treatment */}
                       {cols.phone && (
@@ -1261,20 +1094,18 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                       )}
 
                       {/* Action Menu Column */}
-                      {cols.action && (
-                        <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={(e) => {
-                              const r = e.currentTarget.getBoundingClientRect();
-                              setRowMenu({ id: a.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) });
-                            }}
-                            title="Row actions"
-                            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
-                          >
-                            <MoreVertical className="h-4 w-4 text-slate-400" />
-                          </button>
-                        </td>
-                      )}
+                      <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => {
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setRowMenu({ id: a.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) });
+                          }}
+                          title="Row actions"
+                          className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
+                        >
+                          <MoreVertical className="h-4 w-4 text-slate-400" />
+                        </button>
+                      </td>
 
                     </DataTableRow>
                   );
@@ -1438,10 +1269,10 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
             <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Show columns</p>
             <div className="max-h-80 overflow-y-auto">
               {COLUMNS.map((c) => (
-                <div key={c.key} className="flex items-center justify-between gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-slate-700 dark:text-slate-600 font-semibold">
+                <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm text-slate-700 dark:text-slate-600 font-semibold">
+                  <input type="checkbox" checked={cols[c.key]} onChange={() => toggleCol(c.key)} className="rounded border-slate-350 text-blue-600 focus:ring-blue-500" />
                   <span>{c.label}</span>
-                  <Switch checked={cols[c.key]} onChange={() => toggleCol(c.key)} aria-label={`Toggle ${c.label} column`} />
-                </div>
+                </label>
               ))}
             </div>
           </div>

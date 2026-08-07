@@ -6,7 +6,7 @@ import {
   ArrowRight, Landmark, Briefcase, Activity, Sparkles,
   TrendingUp, TrendingDown, Wallet, CreditCard, Users, Trophy,
   MoreVertical, FileText, Check, Laptop, Globe, Smartphone, Shirt, Home,
-  Search, Settings, Bell, ArrowUpRight, User
+  Search, Settings, Bell, ArrowUpRight, User, Target, Crown,
 } from "lucide-react";
 import {
   Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis
@@ -75,6 +75,18 @@ interface OnboardingStatus {
   userName: string;
 }
 
+interface UsageHistoryEntry {
+  id: string;
+  operation_type: string;
+  credits_delta: number;
+  resource_type: "credits" | "leads";
+  status: string;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+const PLAN_NAME: Record<string, string> = { basic: "Basic", starter: "Starter", pro: "Pro" };
+
 export function DashboardView({
   stats,
   userName = "User",
@@ -82,7 +94,8 @@ export function DashboardView({
   recentDeals = [],
   collaborators = [],
   meetings = [],
-  credits = { used: 0, total: 1500, planId: "free", status: "trialing", trialEndsAt: null },
+  credits = { used: 0, total: 400, planId: "basic", status: "trialing", trialEndsAt: null, leadsRemaining: 0, leadsTotal: 0 },
+  usageHistory = [],
   teamPerformance = [],
   aiSummary,
 }: {
@@ -93,6 +106,7 @@ export function DashboardView({
   collaborators?: { name: string }[];
   meetings?: MeetingRow[];
   credits?: AiCreditsUsage;
+  usageHistory?: UsageHistoryEntry[];
   teamPerformance?: { name: string; dealsCount: number; wonValue: number }[];
   aiSummary: AiDashboardSummary;
 }) {
@@ -415,6 +429,7 @@ export function DashboardView({
 
       </div>
 
+
       {/* Bottom Section Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -422,7 +437,7 @@ export function DashboardView({
         <div className="lg:col-span-4 flex flex-col gap-6">
           
           {/* Pending Confirmation Card */}
-          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex items-center gap-4 min-h-[110px]">
+          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex items-center gap-4 flex-1">
             <div className="h-10 w-10 rounded-xl bg-orange-50 dark:bg-orange-950/20 text-orange-500 flex items-center justify-center flex-shrink-0">
               <CheckCircle2 className="h-5 w-5" />
             </div>
@@ -437,7 +452,7 @@ export function DashboardView({
           </Card>
 
           {/* Upcoming Meetings Card */}
-          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex items-center gap-4 min-h-[110px]">
+          <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex items-center gap-4 flex-1">
             <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-500 flex items-center justify-center flex-shrink-0">
               <Users className="h-5 w-5" />
             </div>

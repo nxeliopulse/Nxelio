@@ -7,9 +7,12 @@ import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { parseCampaignSteps, sendCampaignStepToLead, scheduleCampaignFollowups, fromNameForWorkspace, AUDIENCE_COLS, type StepLead } from "@/lib/email/campaign-scheduler";
 import { consumeSendQuota } from "@/lib/outreach/send-quota";
+import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 import { revalidatePath } from "next/cache";
 
 const MAX_PER_SEND = 300;
+/** Credits charged per lead for launching a (sequence) campaign send. */
+const CREDITS_PER_CAMPAIGN_LEAD = 2;
 
 export interface CampaignSendResult {
   ok: boolean;
@@ -78,6 +81,16 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
   // 0070). No limit configured for this channel → allowedNow === batch.length,
   // i.e. today's existing unthrottled behavior, unchanged.
   const batch = leads.slice(0, MAX_PER_SEND);
+
+  // AI-credit gate: sending a campaign costs credits per lead, same "check
+  // before you spend" pattern as ai/actions.ts. Checked (and status-gated,
+  // since canAfford already returns false for a non-active/trialing
+  // subscription) before consuming today's send quota, so a blocked send
+  // never burns quota it never actually used.
+  if (!(await canAfford(CREDITS_PER_CAMPAIGN_LEAD * batch.length))) {
+    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: `You don't have enough AI credits to send this campaign to ${batch.length} lead${batch.length === 1 ? "" : "s"} (${CREDITS_PER_CAMPAIGN_LEAD} credits/lead). Upgrade your plan or wait for your next cycle.` };
+  }
+
   const allowedNow = await consumeSendQuota(supabase, workspaceId, step1.channel, batch.length);
   const sendNow = batch.slice(0, allowedNow);
   const deferToday = batch.slice(allowedNow);
@@ -114,6 +127,16 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
         scheduled += steps.length - 1;
       }
     }
+  }
+
+  // Best-effort post-launch deduction — mirrors chargeCredits() in
+  // ai/actions.ts: the emails have already gone out (or are queued), so a
+  // deduction failure here should never hide that from the caller.
+  try {
+    const res = await deductCredits("campaign_send", CREDITS_PER_CAMPAIGN_LEAD * batch.length, { campaignId });
+    if (!res.ok) console.error("[campaign-send/credits] deduct failed:", res.error);
+  } catch (err) {
+    console.error("[campaign-send/credits] deduct threw:", err);
   }
 
   await supabase.from("campaigns").update({

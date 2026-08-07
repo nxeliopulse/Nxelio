@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { X, Sparkles, HelpCircle, ChevronDown, AlertTriangle } from "lucide-react";
+import { X, Sparkles, Target, HelpCircle, ChevronDown, AlertTriangle } from "lucide-react";
 import { getAiCreditsUsage, type AiCreditsUsage } from "@/lib/queries/credits";
 import { onCreditsChanged } from "@/lib/credits-refresh";
 import { Logo } from "@/components/brand/logo";
@@ -206,6 +206,7 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
             </div>
             <Link href="/billing" onClick={onClose} className="text-xs font-semibold text-white/90 hover:text-white underline-offset-2 hover:underline inline-block">Upgrade plan →</Link>
           </div>
+
 
           <Link href="/help" onClick={onClose} className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">
             <HelpCircle className="h-4.5 w-4.5 text-slate-400" />

@@ -29,6 +29,7 @@ interface UnifiedRow {
   approvalStatus: string | null; // email campaigns only — sequences aren't in scope for this lifecycle
   leads: number | null;
   sent: number;
+  openRate?: number;
   replyRate: number;
   bounceRate: number | null;
   ownerId: string | null;
@@ -126,7 +127,7 @@ export function CampaignsView({
   usePageTour("campaigns", CAMPAIGNS_TOUR_STEPS);
   const [pending, start] = useTransition();
   const [search, setSearch] = useState("");
-  const [activeOnly, setActiveOnly] = useState(false);
+  const [cardFilter, setCardFilter] = useState<"all" | "active" | "sent" | "opened" | "replied">("all");
   const [approvalFilter, setApprovalFilter] = useState("All");
   const [openId, setOpenId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -149,9 +150,9 @@ export function CampaignsView({
     setTypeFilter((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   }
   function resetFilters() {
-    setSearch(""); setActiveOnly(false); setApprovalFilter("All"); setTypeFilter([]); setDateFrom(""); setDateTo("");
+    setSearch(""); setCardFilter("all"); setApprovalFilter("All"); setTypeFilter([]); setDateFrom(""); setDateTo("");
   }
-  const activeFilterCount = (search ? 1 : 0) + (activeOnly ? 1 : 0) + (approvalFilter !== "All" ? 1 : 0) + (typeFilter.length > 0 ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
+  const activeFilterCount = (search ? 1 : 0) + (cardFilter !== "all" ? 1 : 0) + (approvalFilter !== "All" ? 1 : 0) + (typeFilter.length > 0 ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
   const [visibleCols, setVisibleCols] = useState({
     status: true,
     leads: true,
@@ -224,6 +225,7 @@ export function CampaignsView({
       approvalStatus: c.approval_status,
       leads: c.segment_id ? (segmentContacts.get(c.segment_id) ?? 0) : totalLeads,
       sent: c.sent_count || 0,
+      openRate: Number(c.open_rate || 0),
       replyRate: Number(c.reply_rate || 0),
       bounceRate: Number(c.bounce_rate || 0),
       ownerId: c.created_by,
@@ -240,6 +242,7 @@ export function CampaignsView({
       approvalStatus: null,
       leads: s.enrolled_count || 0,
       sent: s.sent_count || 0,
+      openRate: 0,
       replyRate: s.sent_count ? Math.round((s.reply_count / s.sent_count) * 1000) / 10 : 0,
       bounceRate: null,
       ownerId: s.created_by,
@@ -252,12 +255,18 @@ export function CampaignsView({
   const filtered = rows
     .filter((r) => {
       const matchSearch = !search || r.name.toLowerCase().includes(search.toLowerCase());
-      const matchActive = !activeOnly || r.status === "Active";
+      
+      let matchCard = true;
+      if (cardFilter === "active") matchCard = r.status === "Active";
+      else if (cardFilter === "sent") matchCard = r.sent > 0;
+      else if (cardFilter === "opened") matchCard = (r.openRate ?? 0) > 0;
+      else if (cardFilter === "replied") matchCard = r.replyRate > 0;
+
       const matchApproval = approvalFilter === "All" || r.approvalStatus === approvalFilter;
       const matchDateFrom = !dateFrom || r.updatedAt >= dateFrom;
       const matchDateTo = !dateTo || r.updatedAt <= `${dateTo}T23:59:59.999Z`;
       const matchType = typeFilter.length === 0 || typeFilter.includes(r.channelLabel);
-      return matchSearch && matchActive && matchApproval && matchDateFrom && matchDateTo && matchType;
+      return matchSearch && matchCard && matchApproval && matchDateFrom && matchDateTo && matchType;
     })
     .sort((a, b) => {
       let cmp: number;
@@ -364,10 +373,10 @@ export function CampaignsView({
   }
 
   const statCards = [
-    { label: "Active campaigns", value: cStats.active + sStats.active, icon: Megaphone, accent: "bg-amber-500" },
-    { label: "Messages sent", value: (cStats.totalSent + sStats.sent).toLocaleString(), icon: Send, accent: "bg-blue-500" },
-    { label: "Avg. open rate", value: `${cStats.avgOpen}%`, icon: Eye, accent: "bg-rose-500" },
-    { label: "Avg. reply rate", value: `${cStats.avgReply || sStats.replyRate}%`, icon: MessageSquare, accent: "bg-emerald-500" },
+    { label: "Active campaigns", value: cStats.active + sStats.active, icon: Megaphone, accent: "bg-amber-500", key: "active", ring: "ring-amber-500", bg: "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]" },
+    { label: "Messages sent", value: (cStats.totalSent + sStats.sent).toLocaleString(), icon: Send, accent: "bg-blue-500", key: "sent", ring: "ring-blue-500", bg: "bg-blue-500/[0.04] dark:bg-blue-500/[0.08]" },
+    { label: "Avg. open rate", value: `${cStats.avgOpen}%`, icon: Eye, accent: "bg-rose-500", key: "opened", ring: "ring-rose-500", bg: "bg-rose-500/[0.04] dark:bg-rose-500/[0.08]" },
+    { label: "Avg. reply rate", value: `${cStats.avgReply || sStats.replyRate}%`, icon: MessageSquare, accent: "bg-emerald-500", key: "replied", ring: "ring-emerald-500", bg: "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" },
   ];
 
   return (
@@ -388,9 +397,21 @@ export function CampaignsView({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {statCards.map((s) => {
           const Icon = s.icon;
+          const clickable = !!s.key;
+          const active = clickable && cardFilter === s.key;
           return (
-            <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
-              <span className={`h-11 w-11 rounded-full ${s.accent} text-white flex items-center justify-center flex-shrink-0`}>
+            <Card
+              key={s.label}
+              onClick={clickable ? () => { setCardFilter((prev) => prev === s.key ? "all" : (s.key as any)); } : undefined}
+              className={cn(
+                "p-4 sm:p-5 flex items-center gap-3",
+                clickable && "cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                active
+                  ? `ring-2 ${s.ring} ${s.bg} border-transparent shadow-xs`
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              )}
+            >
+              <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
                 <Icon className="h-5 w-5" />
               </span>
               <div className="min-w-0">
@@ -420,20 +441,41 @@ export function CampaignsView({
             {/* Badged Count Button */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-600">
               <Megaphone className="h-3.5 w-3.5 text-slate-500" />
-              <span>{filtered.length} Campaigns</span>
+              <span>
+                {filtered.length}{" "}
+                {cardFilter === "active"
+                  ? "Active Campaign"
+                  : cardFilter === "sent"
+                  ? "Sent Campaign"
+                  : cardFilter === "opened"
+                  ? "Opened Campaign"
+                  : cardFilter === "replied"
+                  ? "Replied Campaign"
+                  : "Campaign"}
+                {filtered.length === 1 ? "" : "s"}
+              </span>
+              {cardFilter !== "all" && (
+                <button
+                  onClick={() => setCardFilter("all")}
+                  title="Clear filter"
+                  className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
 
             {/* Active only filter button */}
             <button
-              onClick={() => setActiveOnly((v) => !v)}
+              onClick={() => setCardFilter((prev) => prev === "active" ? "all" : "active")}
               className={cn(
                 "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all h-9 shadow-sm",
-                activeOnly
+                cardFilter === "active"
                   ? "bg-slate-900 text-white border-transparent dark:bg-slate-100 dark:text-slate-900"
                   : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-600 dark:border-slate-800"
               )}
             >
-              {activeOnly ? "✓ Active Only" : "Active Only"}
+              {cardFilter === "active" ? "✓ Active Only" : "Active Only"}
             </button>
 
             {/* Approval stages select dropdown */}
@@ -546,8 +588,8 @@ export function CampaignsView({
                       <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-600 cursor-pointer select-none mb-2">
                         <input
                           type="checkbox"
-                          checked={activeOnly}
-                          onChange={(e) => setActiveOnly(e.target.checked)}
+                          checked={cardFilter === "active"}
+                          onChange={(e) => setCardFilter(e.target.checked ? "active" : "all")}
                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
                         Active only

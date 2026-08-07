@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getAiCreditsUsage, type AiCreditsUsage } from "@/lib/queries/credits";
 import { onCreditsChanged } from "@/lib/credits-refresh";
-import { Sparkles, HelpCircle, PanelLeftClose, PanelLeftOpen, ChevronDown, AlertTriangle } from "lucide-react";
+import { Sparkles, Target, HelpCircle, PanelLeftClose, PanelLeftOpen, ChevronDown, AlertTriangle } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 import { navMainItems, navAdminItems, sidebarAdminItems, filterNavByRoleAndOverrides, isNavItemAllowed } from "@/lib/nav-config";
@@ -262,6 +262,7 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
               </Link>
             </div>
           )}
+
 
           {/* Help & support */}
           {collapsed ? (

@@ -152,8 +152,11 @@ export async function brightDataSearchPeople(criteria: {
   const locPart = locs.length > 1 ? `(${locs.map((l) => `"${l}"`).join(" OR ")})` : locs[0] || "";
   const seniorityFilter = criteria.seniority && criteria.seniority !== "Any" ? criteria.seniority : undefined;
   const seniorityPart = seniorityFilter ? SENIORITY_QUERY_TERMS[seniorityFilter] || "" : "";
-  const sizePart = criteria.companySize && criteria.companySize !== "Any" ? `"${criteria.companySize} employees"` : "";
-  const query = `site:linkedin.com/in ${terms} ${seniorityPart} ${locPart} ${sizePart}`.replace(/\s+/g, " ").trim();
+  // Company size is intentionally NOT added to the query: LinkedIn search-result
+  // snippets never contain a literal "X-Y employees" phrase, so requiring it as
+  // a quoted AND-term collapses recall to near-zero for no real filtering benefit
+  // (there's no per-prospect headcount signal to verify against anyway).
+  const query = `site:linkedin.com/in ${terms} ${seniorityPart} ${locPart}`.replace(/\s+/g, " ").trim();
   const displayLocation = locs.join(", ");
 
   const prospects: BrightDataProspect[] = [];

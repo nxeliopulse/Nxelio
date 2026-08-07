@@ -11,9 +11,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
 import { getPicklistValues } from "@/lib/queries/picklists";
-import { PICKLIST_FALLBACK_VALUES } from "@/lib/picklists";
-import { AddLeadsWizard, type SourceId } from "@/components/leads/add-leads-wizard";
-import { useUiActions } from "@/components/layout/ui-action-provider";
+import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
@@ -99,13 +97,8 @@ function StatusPill({ status }: { status: string }) {
     Hot: "bg-rose-500 dark:bg-rose-600",
     Scored: "bg-violet-500 dark:bg-violet-600",
   };
-  // Deterministic color for statuses added later via Administration — same
-  // hash-palette approach as logoColor, so every render keeps the same color.
-  const palette = ["bg-slate-500", "bg-cyan-600", "bg-fuchsia-600", "bg-orange-600", "bg-lime-600", "bg-teal-600", "bg-purple-600", "bg-red-500"];
-  let hash = 0;
-  for (let i = 0; i < status.length; i++) hash = (hash * 31 + status.charCodeAt(i)) >>> 0;
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white whitespace-nowrap", styles[status] || palette[hash % palette.length])}>
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white whitespace-nowrap", styles[status] || "bg-slate-400 dark:bg-slate-600")}>
       {status}
     </span>
   );
@@ -143,78 +136,29 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   const [search, setSearch] = useState(initialSearch ?? "");
   const [industryFilter, setIndustryFilter] = useState("");
   const [interestFilter, setInterestFilter] = useState("");
-  // M2 — exact-status filter driven by the Administration lead_status picklist
-  // ("" = all). Admin-added statuses appear here automatically.
-  const [statusFilter, setStatusFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showWizard, setShowWizard] = useState(false);
-  const [wizardPrefill, setWizardPrefill] = useState<Record<string, string> | null>(null);
-  // M2 — assistant "open_lead_import" UI action: which import screen to open.
-  const [wizardSource, setWizardSource] = useState<SourceId | null>(null);
-  const ALL_SOURCE_IDS: SourceId[] = ["linkedin-search", "linkedin-post", "youtube", "manual", "buy", "csv"];
-  // Phase 2 — assistant "open_lead_form" UI action: open the Add Leads wizard
-  // pre-filled with the assistant's details. Nothing is saved until the user
-  // imports, so this never mutates data on its own.
-  const { pendingModal, clearPendingModal, pendingFilters, clearPendingFilters } = useUiActions();
-  useEffect(() => {
-    if (pendingModal?.id === "lead_wizard") {
-      const p = pendingModal.params;
-      setWizardPrefill({
-        name: String(p.name ?? ""),
-        email: String(p.email ?? ""),
-        company: String(p.company ?? ""),
-        title: String(p.job_title ?? ""),
-        phone: String(p.phone ?? ""),
-      });
-      // M2 — "open_lead_import": jump straight to a data-entry screen
-      // (e.g. csv) instead of the source picker; validated against the
-      // wizard's known sources so the assistant can't invent one.
-      const src = String(p.source ?? "");
-      setWizardSource(ALL_SOURCE_IDS.includes(src as SourceId) ? (src as SourceId) : null);
-      setShowWizard(true);
-      clearPendingModal();
-    }
-  }, [pendingModal, clearPendingModal]);
-  // M2 — "apply_lead_filters": apply assistant-chosen status/industry/interest
-  // filters to the table. Values are validated client-side; unknown ones are
-  // ignored (the table simply shows the current data unfiltered).
-  useEffect(() => {
-    if (pendingFilters?.id === "apply_lead_filters") {
-      const p = pendingFilters.params;
-      const quick = String(p.quick ?? "");
-      if (quick === "all" || (["new", "qualified", "hot", "followup", "converted"] as string[]).includes(quick)) {
-        setQuickFilter(quick as QuickFilter);
-      }
-      // Exact status from the Administration picklist (any admin-added value).
-      setStatusFilter(String(p.status ?? ""));
-      setIndustryFilter(String(p.industry ?? ""));
-      setInterestFilter(String(p.interest ?? ""));
-      clearPendingFilters();
-    }
-  }, [pendingFilters, clearPendingFilters]);
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"list" | "grid">("list");
 
   const [industries, setIndustries] = useState(FALLBACK_INDUSTRIES);
   const [interestAreas, setInterestAreas] = useState(FALLBACK_INTEREST_AREAS);
-  // M2 — lead statuses come from the Administration picklist so admin-added
-  // statuses show up in the filter dropdown (and detail views) immediately.
-  const [statuses, setStatuses] = useState<string[]>(PICKLIST_FALLBACK_VALUES.lead_status);
   useEffect(() => {
     getPicklistValues("lead_industry").then(setIndustries).catch(() => {});
     getPicklistValues("lead_interest_area").then(setInterestAreas).catch(() => {});
-    getPicklistValues("lead_status").then(setStatuses).catch(() => {});
   }, []);
 
   // Quick status/score filters — a row of pill shortcuts above the table.
   // "Needs Follow-up" is a chosen proxy (no dedicated field exists): a lead
   // that's been Contacted or is in Nurturing, i.e. worked but not yet resolved.
-  // "scored" and "converted" back the header stat cards' "AI scored"/"Converted"
-  // shortcuts — same real conditions getLeadStats() uses server-side (lead_score > 0,
-  // status === "Converted") so the quick-filter and the stat card never disagree.
-  type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup" | "scored" | "converted";
+  type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup";
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const [cardFilter, setCardFilter] = useState<"all" | "hot" | "scored" | "converted">("all");
+  const handleCardFilterChange = (newFilter: "all" | "hot" | "scored" | "converted") => {
+    setCardFilter(newFilter);
+    setPage(0);
+  };
 
   // Missing-data quick actions — inline instead of a bare "—".
   const [editingLead, setEditingLead] = useState<LeadRow | null>(null);
@@ -343,7 +287,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   // Industry/interest filters — opened as a popover next to the count chip.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersPos, setFiltersPos] = useState<{ top: number; left: number } | null>(null);
-  const hasActiveFilters = Boolean(industryFilter || interestFilter || statusFilter || quickFilter !== "all");
+  const hasActiveFilters = Boolean(industryFilter || interestFilter || quickFilter !== "all");
   function openFiltersPopover(e: React.MouseEvent<HTMLButtonElement>) {
     const r = e.currentTarget.getBoundingClientRect();
     setFiltersPos({ top: r.bottom + 6, left: r.left });
@@ -501,7 +445,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       (l.website_url?.toLowerCase().includes(q) ?? false);
     const matchIndustry = !industryFilter || l.industry === industryFilter;
     const matchInterest = !interestFilter || l.interest_area === interestFilter;
-    const matchStatus = !statusFilter || l.status === statusFilter;
 
     // Compare by local calendar day (not exact instant) so "From X to Y" matches
     // what the user actually sees in the Created Date column, regardless of the
@@ -520,7 +463,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       return getColumnText(k, l).toLowerCase().includes(raw.toLowerCase());
     });
 
-    return matchSearch && matchStatus && matchIndustry && matchInterest && matchDateFrom && matchDateTo && matchColumns;
+    return matchSearch && matchIndustry && matchInterest && matchDateFrom && matchDateTo && matchColumns;
   });
 
   function matchesQuickFilter(l: LeadRow, f: QuickFilter): boolean {
@@ -529,8 +472,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       case "qualified": return l.status === "Qualified";
       case "hot": return scoreLevel(l.lead_score).label === "Hot";
       case "followup": return l.status === "Contacted" || l.status === "Nurturing";
-      case "scored": return l.lead_score > 0;
-      case "converted": return l.status === "Converted";
       default: return true;
     }
   }
@@ -541,11 +482,16 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     qualified: baseFiltered.filter((l) => matchesQuickFilter(l, "qualified")).length,
     hot: baseFiltered.filter((l) => matchesQuickFilter(l, "hot")).length,
     followup: baseFiltered.filter((l) => matchesQuickFilter(l, "followup")).length,
-    scored: baseFiltered.filter((l) => matchesQuickFilter(l, "scored")).length,
-    converted: baseFiltered.filter((l) => matchesQuickFilter(l, "converted")).length,
   };
 
-  const filtered = baseFiltered.filter((l) => matchesQuickFilter(l, quickFilter));
+  const filtered = baseFiltered
+    .filter((l) => matchesQuickFilter(l, quickFilter))
+    .filter((l) => {
+      if (cardFilter === "hot") return l.status === "Hot";
+      if (cardFilter === "scored") return l.lead_score > 0;
+      if (cardFilter === "converted") return l.status === "Converted";
+      return true;
+    });
 
   const sorted = [...filtered].sort((a, b) => {
     if (!sortKey) return 0;
@@ -1037,39 +983,23 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
       {stats && (
         <div data-tour-id="leads-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          {(
-            // "Total prospects" resets every filter this page has — same reset the
-            // Filters popover's own "Clear filters" link performs (setQuickFilter("all")
-            // + clearing industry/interest). The other three are shortcuts onto the
-            // existing quickFilter state, exactly like the Sort/Filter dropdown's own
-            // options — clicking again toggles back to "all".
-            [
-              { label: "Total prospects", value: stats.total, icon: Users2, accent: "bg-amber-500", filterValue: "all" as const },
-              { label: "Hot prospects", value: stats.hot, icon: Flame, accent: "bg-rose-500", filterValue: "hot" as const },
-              { label: "AI scored", value: stats.scored, icon: Sparkles, accent: "bg-blue-500", filterValue: "scored" as const },
-              { label: "Converted", value: stats.converted, icon: CheckCircle2, accent: "bg-emerald-500", filterValue: "converted" as const },
-            ]
-          ).map((s) => {
+          {[
+            { label: "Total prospects", value: stats.total, icon: Users2, accent: "bg-amber-500", key: "all", ring: "ring-amber-500", bg: "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]" },
+            { label: "Hot prospects", value: stats.hot, icon: Flame, accent: "bg-rose-500", key: "hot", ring: "ring-rose-500", bg: "bg-rose-500/[0.04] dark:bg-rose-500/[0.08]" },
+            { label: "AI scored", value: stats.scored, icon: Sparkles, accent: "bg-blue-500", key: "scored", ring: "ring-blue-500", bg: "bg-blue-500/[0.04] dark:bg-blue-500/[0.08]" },
+            { label: "Converted", value: stats.converted, icon: CheckCircle2, accent: "bg-emerald-500", key: "converted", ring: "ring-emerald-500", bg: "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" },
+          ].map((s) => {
             const Icon = s.icon;
-            const isActive = s.filterValue === "all" ? !hasActiveFilters : quickFilter === s.filterValue;
+            const active = cardFilter === s.key;
             return (
               <Card
                 key={s.label}
-                onClick={() => {
-                  if (s.filterValue === "all") {
-                    setQuickFilter("all");
-                    setIndustryFilter("");
-                    setInterestFilter("");
-                    toast("Showing all prospects", "info");
-                    return;
-                  }
-                  const next = quickFilter === s.filterValue ? "all" : s.filterValue;
-                  setQuickFilter(next);
-                  toast(next === "all" ? "Showing all prospects" : `Filtering by "${s.label}"`, "info");
-                }}
+                onClick={() => handleCardFilterChange(s.key as any)}
                 className={cn(
-                  "p-4 sm:p-5 flex items-center gap-3 cursor-pointer transition-shadow hover:shadow-md",
-                  isActive && "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-950 ring-blue-500"
+                  "p-4 sm:p-5 flex items-center gap-3 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                  active
+                    ? `ring-2 ${s.ring} ${s.bg} border-transparent shadow-xs`
+                    : "bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800"
                 )}
               >
                 <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
@@ -1084,32 +1014,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           })}
         </div>
       )}
-
-      {/* Quick status/score filters — pill shortcuts above the table (also
-          driven by the assistant's apply_lead_filters action). */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-3">
-        {([
-          { id: "all", label: `All (${quickFilterCounts.all})` },
-          { id: "new", label: `New (${quickFilterCounts.new})` },
-          { id: "qualified", label: `Qualified (${quickFilterCounts.qualified})` },
-          { id: "hot", label: `Hot Prospects (${quickFilterCounts.hot})` },
-          { id: "followup", label: `Needs Follow-up (${quickFilterCounts.followup})` },
-          { id: "converted", label: `Converted (${quickFilterCounts.converted})` },
-        ] as { id: QuickFilter; label: string }[]).map((q) => (
-          <button
-            key={q.id}
-            onClick={() => setQuickFilter(q.id)}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors",
-              quickFilter === q.id
-                ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-blue-300 hover:text-slate-900 dark:hover:text-slate-200"
-            )}
-          >
-            {q.label}
-          </button>
-        ))}
-      </div>
 
       {campaignFilter && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
@@ -1149,9 +1053,28 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             </div>
 
             {/* Count Chip */}
-            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
               <Users2 className="h-3.5 w-3.5 text-slate-400" />
-              <span>{filtered.length} Prospect{filtered.length === 1 ? "" : "s"}</span>
+              <span>
+                {filtered.length}{" "}
+                {cardFilter === "hot"
+                  ? "Hot Prospect"
+                  : cardFilter === "scored"
+                  ? "AI Scored Prospect"
+                  : cardFilter === "converted"
+                  ? "Converted Prospect"
+                  : "Prospect"}
+                {filtered.length === 1 ? "" : "s"}
+              </span>
+              {cardFilter !== "all" && (
+                <button
+                  onClick={() => handleCardFilterChange("all")}
+                  title="Clear filter"
+                  className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
 
             {/* Date Range Button */}
@@ -1581,7 +1504,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         </div>
       </Card>
 
-      <AddLeadsWizard open={showWizard} onClose={() => { setShowWizard(false); setWizardSource(null); }} initialEntry={wizardPrefill} initialSource={wizardSource} />
+      <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
 
       {editingLead && (
         <EditLeadModal open={Boolean(editingLead)} onClose={() => setEditingLead(null)} lead={editingLead} />
@@ -1799,11 +1722,12 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
-              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">All statuses</option>
-                {statuses.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
+              <Select value={quickFilter} onChange={(e) => setQuickFilter(e.target.value as QuickFilter)}>
+                <option value="all">All ({quickFilterCounts.all})</option>
+                <option value="new">New ({quickFilterCounts.new})</option>
+                <option value="qualified">Qualified ({quickFilterCounts.qualified})</option>
+                <option value="hot">Hot Prospects ({quickFilterCounts.hot})</option>
+                <option value="followup">Needs Follow-up ({quickFilterCounts.followup})</option>
               </Select>
             </div>
             <div>

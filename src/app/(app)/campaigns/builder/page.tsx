@@ -19,6 +19,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import { createCampaign, updateCampaign, type CampaignRow } from "@/lib/queries/campaigns";
 import { sendCampaign } from "@/lib/email/campaign-send";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { submitForReview, getApprovalHistory, type ApprovalLogEntry } from "@/lib/queries/campaign-approval";
 import { approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { getSegments, getSegmentMemberLeads } from "@/lib/queries/segments";
@@ -451,7 +452,9 @@ export default function CampaignBuilderPage() {
         setDirty(false);
         const res = await sendCampaign(saved.id);
         if (res.ok) {
-          toast(`Launched — ${res.sent} email${res.sent === 1 ? "" : "s"} sent${res.simulated ? " (simulated — no email provider live)" : ""}.`, "success");
+          const chargedLeads = res.sent + res.failed + res.skipped + (res.deferred ?? 0);
+          toast(`Campaign sent successfully — ${res.sent} email${res.sent === 1 ? "" : "s"} sent${res.simulated ? " (simulated — no email provider live)" : ""}. ${chargedLeads * 2} credits used.`, "success");
+          notifyCreditsChanged();
           router.push("/campaigns");
         } else {
           setError(res.error || "Saved, but no emails were sent.");
