@@ -152,7 +152,10 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   // Quick status/score filters — a row of pill shortcuts above the table.
   // "Needs Follow-up" is a chosen proxy (no dedicated field exists): a lead
   // that's been Contacted or is in Nurturing, i.e. worked but not yet resolved.
-  type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup";
+  // "scored" and "converted" back the header stat cards' "AI scored"/"Converted"
+  // shortcuts — same real conditions getLeadStats() uses server-side (lead_score > 0,
+  // status === "Converted") so the quick-filter and the stat card never disagree.
+  type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup" | "scored" | "converted";
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
 
   // Missing-data quick actions — inline instead of a bare "—".
@@ -468,6 +471,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       case "qualified": return l.status === "Qualified";
       case "hot": return scoreLevel(l.lead_score).label === "Hot";
       case "followup": return l.status === "Contacted" || l.status === "Nurturing";
+      case "scored": return l.lead_score > 0;
+      case "converted": return l.status === "Converted";
       default: return true;
     }
   }
@@ -478,6 +483,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     qualified: baseFiltered.filter((l) => matchesQuickFilter(l, "qualified")).length,
     hot: baseFiltered.filter((l) => matchesQuickFilter(l, "hot")).length,
     followup: baseFiltered.filter((l) => matchesQuickFilter(l, "followup")).length,
+    scored: baseFiltered.filter((l) => matchesQuickFilter(l, "scored")).length,
+    converted: baseFiltered.filter((l) => matchesQuickFilter(l, "converted")).length,
   };
 
   const filtered = baseFiltered.filter((l) => matchesQuickFilter(l, quickFilter));
@@ -991,15 +998,41 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
       {stats && (
         <div data-tour-id="leads-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          {[
-            { label: "Total prospects", value: stats.total, icon: Users2, accent: "bg-amber-500" },
-            { label: "Hot prospects", value: stats.hot, icon: Flame, accent: "bg-rose-500" },
-            { label: "AI scored", value: stats.scored, icon: Sparkles, accent: "bg-blue-500" },
-            { label: "Converted", value: stats.converted, icon: CheckCircle2, accent: "bg-emerald-500" },
-          ].map((s) => {
+          {(
+            // "Total prospects" resets every filter this page has — same reset the
+            // Filters popover's own "Clear filters" link performs (setQuickFilter("all")
+            // + clearing industry/interest). The other three are shortcuts onto the
+            // existing quickFilter state, exactly like the Sort/Filter dropdown's own
+            // options — clicking again toggles back to "all".
+            [
+              { label: "Total prospects", value: stats.total, icon: Users2, accent: "bg-amber-500", filterValue: "all" as const },
+              { label: "Hot prospects", value: stats.hot, icon: Flame, accent: "bg-rose-500", filterValue: "hot" as const },
+              { label: "AI scored", value: stats.scored, icon: Sparkles, accent: "bg-blue-500", filterValue: "scored" as const },
+              { label: "Converted", value: stats.converted, icon: CheckCircle2, accent: "bg-emerald-500", filterValue: "converted" as const },
+            ]
+          ).map((s) => {
             const Icon = s.icon;
+            const isActive = s.filterValue === "all" ? !hasActiveFilters : quickFilter === s.filterValue;
             return (
-              <Card key={s.label} className="p-4 sm:p-5 flex items-center gap-3">
+              <Card
+                key={s.label}
+                onClick={() => {
+                  if (s.filterValue === "all") {
+                    setQuickFilter("all");
+                    setIndustryFilter("");
+                    setInterestFilter("");
+                    toast("Showing all prospects", "info");
+                    return;
+                  }
+                  const next = quickFilter === s.filterValue ? "all" : s.filterValue;
+                  setQuickFilter(next);
+                  toast(next === "all" ? "Showing all prospects" : `Filtering by "${s.label}"`, "info");
+                }}
+                className={cn(
+                  "p-4 sm:p-5 flex items-center gap-3 cursor-pointer transition-shadow hover:shadow-md",
+                  isActive && "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-950 ring-blue-500"
+                )}
+              >
                 <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
                   <Icon className="h-5 w-5" />
                 </span>

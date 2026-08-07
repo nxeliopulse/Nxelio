@@ -15,7 +15,7 @@ import { Modal } from "@/components/ui/modal";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { moveOpportunityStage, updateOpportunity, deleteOpportunity } from "@/lib/queries/opportunities";
 import {
   OPPORTUNITY_STAGES, STAGE_LABELS,
@@ -93,6 +93,8 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
   const [editing, setEditing] = useState<OpportunityRow | null>(null);
 
   const [search, setSearch] = useState("");
+  // Header stat-tile filter: "closed" covers won+lost together (backs the Win rate tile).
+  const [stageFilter, setStageFilter] = useState<"all" | "open" | "won" | "closed">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [hiddenStages, setHiddenStages] = useState<Set<OpportunityStage>>(new Set());
@@ -150,8 +152,12 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
     const matchFrom = !dateFrom || (!!r.expected_close_date && r.expected_close_date >= dateFrom);
     const matchTo = !dateTo || (!!r.expected_close_date && r.expected_close_date <= dateTo);
     const matchStage = !hiddenStages.has(r.stage);
-    return matchSearch && matchFrom && matchTo && matchStage;
-  }), [rows, search, dateFrom, dateTo, hiddenStages]);
+    const matchStatTile = stageFilter === "all" ? true
+      : stageFilter === "open" ? (r.stage !== "won" && r.stage !== "lost")
+      : stageFilter === "won" ? r.stage === "won"
+      : (r.stage === "won" || r.stage === "lost"); // "closed" — backs the Win rate tile
+    return matchSearch && matchFrom && matchTo && matchStage && matchStatTile;
+  }), [rows, search, dateFrom, dateTo, hiddenStages, stageFilter]);
 
   const sortedRows = useMemo(() => [...filteredRows].sort((a, b) => {
     let cmp: number;
@@ -226,11 +232,13 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
     }
   }
 
-  const tiles = [
-    { label: "Open pipeline", value: money(live.openValue), sub: `${live.openCount} open deal${live.openCount === 1 ? "" : "s"}`, icon: <DollarSign className="h-5 w-5" />, color: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" },
-    { label: "Won revenue", value: money(live.wonValue), sub: `${live.wonCount} won`, icon: <Trophy className="h-5 w-5" />, color: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400" },
-    { label: "Win rate", value: `${live.winRate}%`, sub: `${live.wonCount} won · ${live.lostCount} lost`, icon: <TrendingUp className="h-5 w-5" />, color: "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400" },
-    { label: "Total deals", value: String(rows.length), sub: "in pipeline", icon: <Target className="h-5 w-5" />, color: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400" },
+  const tiles: { key: "open" | "won" | "closed" | "all"; label: string; value: string; sub: string; icon: typeof DollarSign; accent: string }[] = [
+    { key: "open", label: "Open pipeline", value: money(live.openValue), sub: `${live.openCount} open deal${live.openCount === 1 ? "" : "s"}`, icon: DollarSign, accent: "bg-blue-500" },
+    { key: "won", label: "Won revenue", value: money(live.wonValue), sub: `${live.wonCount} won`, icon: Trophy, accent: "bg-emerald-500" },
+    // Win rate is a ratio (won vs. won+lost), not a single natural row subset — clicking it shows
+    // the combined "closed" set (won + lost) so the ratio's own inputs are visible in the table.
+    { key: "closed", label: "Win rate", value: `${live.winRate}%`, sub: `${live.wonCount} won · ${live.lostCount} lost`, icon: TrendingUp, accent: "bg-indigo-500" },
+    { key: "all", label: "Total deals", value: String(rows.length), sub: "in pipeline", icon: Target, accent: "bg-amber-500" },
   ];
 
   return (
@@ -253,19 +261,35 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {tiles.map((t) => (
-          <Card key={t.label} className="p-4 dark:bg-slate-900 dark:border-slate-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-500">{t.label}</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{t.value}</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t.sub}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {tiles.map((t) => {
+          const isActive = stageFilter === t.key;
+          const Icon = t.icon;
+          return (
+            <Card
+              key={t.label}
+              onClick={() => {
+                const next = t.key === "all" || isActive ? "all" : t.key;
+                setStageFilter(next);
+                setPage(0);
+                toast(next === "all" ? "Showing all deals" : `Filtering by "${t.label}"`, "info");
+              }}
+              className={cn(
+                "p-4 sm:p-5 flex items-center gap-3 cursor-pointer transition-shadow hover:shadow-md dark:bg-slate-900 dark:border-slate-800",
+                isActive && "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-950 ring-blue-500"
+              )}
+            >
+              <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", t.accent)}>
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{t.label}</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{t.value}</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{t.sub}</p>
               </div>
-              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${t.color}`}>{t.icon}</div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
       {rows.length === 0 ? (
