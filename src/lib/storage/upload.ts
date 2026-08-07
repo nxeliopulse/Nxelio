@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 const BUCKET = "newsletter-images";
 const AVATAR_BUCKET = "avatars";
+const CONTACT_PHOTO_BUCKET = "avatars";
 
 /**
  * Uploads an image to the newsletter-images bucket and returns its public URL.
@@ -86,6 +87,47 @@ export async function uploadAvatarImage(formData: FormData): Promise<{ ok: boole
     }
 
     const { data: publicUrl } = admin.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+    return { ok: true, url: publicUrl.publicUrl };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Upload failed" };
+  }
+}
+
+/**
+ * Uploads a Contact's profile photo. Unlike uploadAvatarImage, this isn't
+ * keyed to the logged-in user (a new Contact has no id yet at upload time),
+ * so the path is keyed by a random slug instead.
+ */
+export async function uploadContactPhoto(formData: FormData): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    const file = formData.get("file") as File | null;
+    if (!file) return { ok: false, error: "No file provided" };
+    if (file.size > 800 * 1024) return { ok: false, error: "File too large (max 800K)" };
+
+    const allowed = ["image/png", "image/jpeg", "image/jpg", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      return { ok: false, error: "Unsupported file type. Use JPG, GIF, or PNG." };
+    }
+
+    const admin = createAdminClient();
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+    const slug = Math.random().toString(36).slice(2, 10);
+    const path = `contact-${slug}-${Date.now()}.${ext}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    const { error } = await admin.storage.from(CONTACT_PHOTO_BUCKET).upload(path, bytes, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+
+    const { data: publicUrl } = admin.storage.from(CONTACT_PHOTO_BUCKET).getPublicUrl(path);
     return { ok: true, url: publicUrl.publicUrl };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Upload failed" };

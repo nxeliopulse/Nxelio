@@ -37,7 +37,7 @@
      matching the CRMS reference (measured: 5px radius, soft 4px shadow).
      Dark mode overrides --card-shadow below (a light-gray shadow disappears
      on a dark surface, so dark gets a soft dark shadow instead). */
-  --card-radius: 5px;
+  --card-radius: 16px;
   --card-shadow: 0 4px 4px rgba(219,219,219,.35);
   --sidebar-bg: var(--primary);
   --topbar-bg: var(--primary);

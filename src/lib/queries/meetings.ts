@@ -18,6 +18,8 @@ export interface MeetingRow {
   provider: string | null;
   status: "scheduled" | "completed" | "canceled" | string;
   lead_id: string | null;
+  contact_id: string | null;
+  account_id: string | null;
   attendees: MeetingAttendee[];
   recording_url: string | null;
   summary: string | null;
@@ -35,12 +37,14 @@ export interface MeetingInput {
   join_url?: string | null;
   provider?: string | null;
   lead_id?: string | null;
+  contact_id?: string | null;
+  account_id?: string | null;
   attendees?: MeetingAttendee[];
   recording_url?: string | null;
   summary?: string | null;
 }
 
-const SELECT = "id, title, description, start_at, end_at, location, join_url, provider, status, lead_id, attendees, recording_url, summary, created_at, lead:leads(id, full_name, company_name, email)";
+const SELECT = "id, title, description, start_at, end_at, location, join_url, provider, status, lead_id, contact_id, account_id, attendees, recording_url, summary, created_at, lead:leads(id, full_name, company_name, email)";
 
 export async function getMeetings(): Promise<MeetingRow[]> {
   const supabase = await createClient();
@@ -67,6 +71,30 @@ export async function getMeetingsForLead(leadId: string): Promise<MeetingRow[]> 
   return (data as unknown as MeetingRow[]) ?? [];
 }
 
+/** A single contact's meetings, newest-first — for the contact detail page's related list. */
+export async function getMeetingsForContact(contactId: string): Promise<MeetingRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meetings")
+    .select(SELECT)
+    .eq("contact_id", contactId)
+    .order("start_at", { ascending: false });
+  if (error) return [];
+  return (data as unknown as MeetingRow[]) ?? [];
+}
+
+/** A single account's meetings, newest-first — for the account detail page's related list. */
+export async function getMeetingsForAccount(accountId: string): Promise<MeetingRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("meetings")
+    .select(SELECT)
+    .eq("account_id", accountId)
+    .order("start_at", { ascending: false });
+  if (error) return [];
+  return (data as unknown as MeetingRow[]) ?? [];
+}
+
 export async function createMeeting(input: MeetingInput): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const { error } = await supabase.from("meetings").insert({
@@ -78,6 +106,8 @@ export async function createMeeting(input: MeetingInput): Promise<{ ok: boolean;
     join_url: input.join_url ?? null,
     provider: input.provider ?? "manual",
     lead_id: input.lead_id || null,
+    contact_id: input.contact_id || null,
+    account_id: input.account_id || null,
     attendees: input.attendees ?? [],
   });
   if (error) return { ok: false, error: error.message };
@@ -89,7 +119,7 @@ export async function createMeeting(input: MeetingInput): Promise<{ ok: boolean;
 export async function updateMeeting(id: string, input: Partial<MeetingInput> & { status?: string }): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const patch: Record<string, unknown> = {};
-  for (const k of ["title", "description", "start_at", "end_at", "location", "join_url", "provider", "lead_id", "attendees", "recording_url", "summary", "status"] as const) {
+  for (const k of ["title", "description", "start_at", "end_at", "location", "join_url", "provider", "lead_id", "contact_id", "account_id", "attendees", "recording_url", "summary", "status"] as const) {
     if (k in input && input[k as keyof typeof input] !== undefined) patch[k] = input[k as keyof typeof input];
   }
   if (patch.lead_id === "") patch.lead_id = null;
@@ -127,6 +157,8 @@ export async function scheduleMeeting(
     join_url: input.join_url ?? null,
     provider: input.provider ?? "manual",
     lead_id: input.lead_id || null,
+    contact_id: input.contact_id || null,
+    account_id: input.account_id || null,
     attendees: input.attendees ?? [],
   });
   if (error) return { ok: false, error: error.message };

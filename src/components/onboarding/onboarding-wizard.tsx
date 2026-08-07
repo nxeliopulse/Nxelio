@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/brand/logo";
 import { industries as FALLBACK_INDUSTRIES } from "@/lib/mock-data";
 import { saveOnboarding, type OnboardingData, type OnboardingStatus } from "@/lib/queries/onboarding";
 import { getPicklistValues } from "@/lib/queries/picklists";
@@ -269,12 +270,11 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
 
   return (
     <div>
-      {/* Account identity strip — shown on every step (not just step 1's profile
-          fields) so someone signed into more than one Nxelio account can tell
-          which one they're setting up without having to guess. */}
-      {status.profile && (
-        <div className="flex items-center justify-end gap-2 mb-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white pl-1.5 pr-3.5 py-1.5">
+      {/* Brand logo & Account identity strip inline header */}
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <Logo />
+        {status.profile && (
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white pl-1.5 pr-3.5 py-1.5 flex-shrink-0">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a static asset
               <img src={avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
@@ -289,11 +289,11 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
               <p className="text-[11px] text-slate-400">{status.profile.email}</p>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Header */}
-      <div className="flex items-start gap-3 mb-4">
+      <div className="flex items-start gap-3 mb-2.5">
         {step > 1 && (
           <button onClick={back} aria-label="Back" className="mt-1 h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
@@ -306,7 +306,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
       </div>
 
       {/* Progress */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <div className="flex gap-1.5 flex-1">
           {[1, 2, 3, 4].map((n) => (
             <div key={n} className="h-1.5 flex-1 rounded-full transition-colors bg-slate-200"
@@ -317,7 +317,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-lg p-3 text-sm mb-4"
+        <div className="flex items-start gap-2 rounded-lg p-3 text-sm mb-3"
           style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{error}</span>
         </div>
@@ -325,8 +325,8 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
 
       {/* ── Step 1: Your profile ── */}
       {step === 1 && (
-        <Card className="p-6">
-          <div className="flex items-center gap-2 mb-5">
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-4">
             <User className="h-5 w-5 text-slate-700" />
             <h2 className="font-semibold text-slate-900">Your profile</h2>
           </div>
@@ -388,8 +388,8 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
 
       {/* ── Step 2: Company identity ── */}
       {step === 2 && (
-          <Card className="p-6">
-            <div className="flex items-center gap-2 mb-5">
+          <Card className="p-5">
+            <div className="flex items-center gap-2 mb-4">
               <Building2 className="h-5 w-5 text-slate-700" />
               <h2 className="font-semibold text-slate-900">Company identity</h2>
             </div>
@@ -458,8 +458,8 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
 
       {/* ── Step 3: Sales context ── */}
       {step === 3 && (
-          <Card className="p-6">
-            <div className="flex items-center gap-2 mb-5">
+          <Card className="p-5">
+            <div className="flex items-center gap-2 mb-4">
               <Target className="h-5 w-5 text-slate-700" />
               <h2 className="font-semibold text-slate-900">Sales context</h2>
             </div>
@@ -512,7 +512,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
 
       {/* ── Step 4: Connect inbox (mandatory on first run) ── */}
       {step === 4 && (
-        <Card className="p-6">
+        <Card className="p-5">
           <div className="flex items-start gap-4">
             <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
               style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
@@ -520,11 +520,11 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
             </div>
             <div className="min-w-0">
               <h2 className="font-semibold text-slate-900">Connect your mailbox</h2>
-              <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+              <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
                 Send campaigns from your own Gmail or Outlook inbox for better deliverability and real reply threads.
                 {isEdit && <> You can always do this later in <span className="font-medium text-slate-700">Settings → Connections</span>.</>}
               </p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="mt-3 flex flex-wrap items-center gap-3">
                 {mailboxConnected ? (
                   <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
                     <CheckCircle2 className="h-4 w-4" /> Mailbox connected
@@ -543,7 +543,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
                 )}
               </div>
               {!isEdit && !mailboxConnected && (
-                <p className="text-xs text-slate-400 mt-3">Connect a mailbox to finish setting up your workspace.</p>
+                <p className="text-xs text-slate-400 mt-2">Connect a mailbox to finish setting up your workspace.</p>
               )}
             </div>
           </div>
@@ -552,101 +552,107 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
 
       {/* ── Optional: LinkedIn + Calendar + Zoom (never block Finish — only the mailbox above is mandatory) ── */}
       {step === 4 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                <LinkedInGlyph className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+          <Card className="p-4 flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
+                  <LinkedInGlyph className="h-5 w-5" />
+                </div>
                 <h3 className="font-semibold text-slate-900 text-sm">LinkedIn</h3>
-                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Send connection requests and messages from your own LinkedIn account.</p>
-                <div className="mt-3">
-                  {linkedinConnected ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                      <CheckCircle2 className="h-4 w-4" /> Connected
-                    </span>
-                  ) : (
-                    <>
-                      <Button variant="outline" size="sm" onClick={connectLinkedin} disabled={connectingLinkedin} style={LIGHT_OUTLINE_STYLE}>
-                        {connectingLinkedin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />} Connect LinkedIn
-                      </Button>
-                      {linkedinStarted && (
-                        <p className="text-xs text-slate-500 mt-2">Authorize in the new tab, then come back here.</p>
-                      )}
-                    </>
+              </div>
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Send connection requests and messages from your own LinkedIn account.</p>
+            </div>
+            <div className="mt-3">
+              {linkedinConnected ? (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+                  <CheckCircle2 className="h-4 w-4" /> Connected
+                </span>
+              ) : (
+                <div className="w-full">
+                  <Button variant="outline" size="sm" onClick={connectLinkedin} disabled={connectingLinkedin} style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
+                    {connectingLinkedin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />} Connect LinkedIn
+                  </Button>
+                  {linkedinStarted && (
+                    <p className="text-xs text-slate-500 mt-2">Authorize in the new tab, then come back here.</p>
                   )}
                 </div>
-              </div>
+              )}
             </div>
           </Card>
 
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
+          <Card className="p-4 flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
+                  <Calendar className="h-5 w-5" />
+                </div>
                 <h3 className="font-semibold text-slate-900 text-sm">Calendar</h3>
-                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Sync availability and get real Google Meet links on your meetings.</p>
-                <div className="mt-3">
-                  {calendarConnected ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                      <CheckCircle2 className="h-4 w-4" /> Connected
-                    </span>
-                  ) : calendarProviderStatus.google || calendarProviderStatus.microsoft ? (
-                    <div className="flex flex-wrap gap-2">
-                      {calendarProviderStatus.google && (
-                        <a href="/api/calendar/google/connect?next=/onboarding" target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE}><ExternalLink className="h-3.5 w-3.5" /> Google Calendar</Button>
-                        </a>
-                      )}
-                      {calendarProviderStatus.microsoft && (
-                        <a href="/api/calendar/microsoft/connect?next=/onboarding" target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE}><ExternalLink className="h-3.5 w-3.5" /> Outlook</Button>
-                        </a>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
+              </div>
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Sync availability and get real Google Meet links on your meetings.</p>
+            </div>
+            <div className="mt-3">
+              {calendarConnected ? (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+                  <CheckCircle2 className="h-4 w-4" /> Connected
+                </span>
+              ) : calendarProviderStatus.google || calendarProviderStatus.microsoft ? (
+                <div className="flex flex-col gap-2 w-full">
+                  {calendarProviderStatus.google && (
+                    <a href="/api/calendar/google/connect?next=/onboarding" target="_blank" rel="noopener noreferrer" className="block w-full">
+                      <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
+                        <ExternalLink className="h-3.5 w-3.5" /> Google Calendar
+                      </Button>
+                    </a>
+                  )}
+                  {calendarProviderStatus.microsoft && (
+                    <a href="/api/calendar/microsoft/connect?next=/onboarding" target="_blank" rel="noopener noreferrer" className="block w-full">
+                      <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
+                        <ExternalLink className="h-3.5 w-3.5" /> Outlook
+                      </Button>
+                    </a>
                   )}
                 </div>
-              </div>
+              ) : (
+                <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
+              )}
             </div>
           </Card>
 
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                <Video className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="font-semibold text-slate-900 text-sm">Zoom</h3>
-                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Create real Zoom meeting links directly from your meetings.</p>
-                <div className="mt-3">
-                  {zoomConnected ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                      <CheckCircle2 className="h-4 w-4" /> Connected
-                    </span>
-                  ) : zoomConfigured ? (
-                    <a href="/api/zoom/connect?next=/onboarding" target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE}><ExternalLink className="h-3.5 w-3.5" /> Connect Zoom</Button>
-                    </a>
-                  ) : (
-                    <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
-                  )}
+          <Card className="p-4 flex flex-col justify-between h-full">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
+                  <Video className="h-5 w-5" />
                 </div>
+                <h3 className="font-semibold text-slate-900 text-sm">Zoom</h3>
               </div>
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Create real Zoom meeting links directly from your meetings.</p>
+            </div>
+            <div className="mt-3">
+              {zoomConnected ? (
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+                  <CheckCircle2 className="h-4 w-4" /> Connected
+                </span>
+              ) : zoomConfigured ? (
+                <a href="/api/zoom/connect?next=/onboarding" target="_blank" rel="noopener noreferrer" className="block w-full">
+                  <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
+                    <ExternalLink className="h-3.5 w-3.5" /> Connect Zoom
+                  </Button>
+                </a>
+              ) : (
+                <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
+              )}
             </div>
           </Card>
         </div>
       )}
 
       {/* Footer nav */}
-      <div className="flex items-center justify-between mt-6">
+      <div className="flex items-center justify-between mt-4">
         <div>
           {step > 1 && (
             <Button variant="outline" onClick={back} disabled={saving} style={LIGHT_OUTLINE_STYLE}>
