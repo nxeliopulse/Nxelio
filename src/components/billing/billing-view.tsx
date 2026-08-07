@@ -77,6 +77,19 @@ const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
   ],
 };
 
+// Annual prices — 2 months free (~17% off monthly), rounded to clean values
+const ANNUAL_DISPLAY: Record<string, { monthly: number; yearly: number; savePct: number }> = {
+  basic:   { monthly: 7.50,  yearly: 90.00,   savePct: 17 },
+  starter: { monthly: 49.00, yearly: 588.00,  savePct: 17 },
+  pro:     { monthly: 116.00, yearly: 1392.00, savePct: 17 },
+};
+
+const TOP_UP_PACKS = [
+  { credits: 100,  price_cents: 500,  label: "100 credits",   per: "$0.05 / credit" },
+  { credits: 500,  price_cents: 2000, label: "500 credits",   per: "$0.04 / credit" },
+  { credits: 1500, price_cents: 5000, label: "1,500 credits", per: "$0.033 / credit" },
+];
+
 const STATUS_COLORS: Record<string, string> = {
   trialing: "bg-blue-100 text-blue-700",
   active:   "bg-emerald-100 text-emerald-700",
@@ -150,8 +163,9 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
   const [termsOpen, setTermsOpen] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
-  const currentPlanId = sub?.plan_id ?? "basic";
-  const status        = sub?.status  ?? "trialing";
+  const currentPlanId       = sub?.plan_id          ?? "basic";
+  const currentInterval     = sub?.billing_interval ?? "monthly";
+  const status              = sub?.status           ?? "trialing";
   const credRemaining = sub?.credits_remaining ?? 0;
   const credTotal     = sub?.credits_total     ?? 150;
   const credUsed      = credTotal - credRemaining;
@@ -444,7 +458,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
               >
                 {iv === "monthly" ? "Monthly" : "Annual"}
                 {iv === "annual" && (
-                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Save 20%</span>
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Save 17%</span>
                 )}
               </button>
             ))}
@@ -482,13 +496,29 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {plans.map((plan) => {
-            const Icon      = PLAN_ICONS[plan.id] ?? Zap;
-            const isCurrent = plan.id === currentPlanId;
-            const isPopular = plan.id === "starter";
-            const price     = interval === "monthly" ? fmtCents(plan.monthly_price_cents) : annualMonthly(plan.annual_price_cents);
-            const annualNote = interval === "annual" ? `Billed ${fmtCents(plan.annual_price_cents)}/year` : null;
+            const Icon                 = PLAN_ICONS[plan.id] ?? Zap;
+            const isCurrent            = plan.id === currentPlanId && interval === currentInterval;
+            const isSamePlanDiffInterval = plan.id === currentPlanId && interval !== currentInterval;
+            const isPopular            = plan.id === "starter";
+            const annualData           = ANNUAL_DISPLAY[plan.id];
+            const price = interval === "monthly"
+              ? fmtCents(plan.monthly_price_cents)
+              : annualData ? `$${annualData.monthly.toFixed(2)}` : annualMonthly(plan.annual_price_cents);
+            const annualNote = interval === "annual"
+              ? annualData
+                ? `Billed $${annualData.yearly.toFixed(2)}/year`
+                : `Billed ${fmtCents(plan.annual_price_cents)}/year`
+              : null;
             const isUp      = planOrder[plan.id] > planOrder[currentPlanId];
             const rows      = PLAN_ROWS[plan.id] ?? [];
+
+            const btnLabel = isCurrent
+              ? "Current plan"
+              : isSamePlanDiffInterval
+                ? interval === "annual" ? "Upgrade to Annual" : "Switch to Monthly"
+                : isUp
+                  ? `Upgrade to ${plan.name}`
+                  : `Downgrade to ${plan.name}`;
 
             return (
               <Card key={plan.id} className={`p-6 relative flex flex-col ${isPopular ? "ring-2 ring-blue-600 shadow-xl" : ""} ${isCurrent ? "bg-slate-50/60" : ""}`}>
@@ -511,6 +541,9 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                   </div>
                   <h3 className="font-bold text-lg text-slate-900">{plan.name}</h3>
                   {isCurrent && <Badge className="ml-auto text-xs">Current</Badge>}
+                  {isSamePlanDiffInterval && interval === "annual" && (
+                    <Badge className="ml-auto text-xs bg-emerald-50 text-emerald-700">Save {annualData?.savePct ?? 17}%</Badge>
+                  )}
                 </div>
                 <p className="text-sm text-slate-500 mb-4">{PLAN_DESC[plan.id]}</p>
 
@@ -538,7 +571,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                   onClick={() => isUp && !isCurrent && requestCheckout(plan.id)}
                 >
                   {checkoutPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {isCurrent ? "Current plan" : isUp ? `Upgrade to ${plan.name}` : "Not available"}
+                  {btnLabel}
                 </Button>
               </Card>
             );
