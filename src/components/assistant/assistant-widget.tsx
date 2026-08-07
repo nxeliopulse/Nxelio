@@ -449,11 +449,7 @@ export function AssistantWidget({
   }
 
   const filteredMentions = MENTION_ITEMS.filter((m) => !mentionFilter || m.label.toLowerCase().startsWith(mentionFilter));
-  const panelWidth = expanded ? "sm:w-[calc(100vw-300px)]" : "sm:w-[420px]";
-  // Expanded mode gets a wider right-hand gap (24px vs the collapsed 10px) — the
-  // inner width's subtraction grows to match (320 + 14 extra = 334) so the panel
-  // still fits exactly inside the aside's own box instead of overflowing it.
-  const innerWidth = expanded ? "w-[calc(100vw-334px)]" : "w-[396px]";
+  const panelWidth = expanded ? "sm:flex-1" : "sm:w-[420px]";
 
   return (
     <aside
@@ -473,10 +469,9 @@ export function AssistantWidget({
       {/* Gradient border wrapper */}
       <div
         className={cn(
-          "flex flex-col flex-shrink-0 ml-2.5 mt-2.5 mb-2.5 rounded-2xl overflow-hidden h-[calc(100vh-20px)]",
-          expanded ? "mr-6" : "mr-2.5",
-          "transition-[width,margin] duration-300 ease-in-out",
-          innerWidth,
+          "flex flex-col mt-2.5 mb-2.5 rounded-2xl overflow-hidden h-[calc(100vh-20px)]",
+          expanded ? "ml-2.5 mr-6 flex-1" : "ml-2.5 mr-2.5 flex-shrink-0 w-[396px]",
+          "transition-[width,margin,flex] duration-300 ease-in-out",
           "max-sm:w-[calc(100vw-20px)] max-sm:h-[calc(100%-20px)]"
         )}
         style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, ${PURPLE} 100%)`, padding: expanded ? "4px" : "3px" }}
