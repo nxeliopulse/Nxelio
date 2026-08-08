@@ -27,7 +27,10 @@ interface PromotionRow {
 
 async function currentWorkspaceId(): Promise<string | null> {
   const supabase = await createClient();
-  const { data } = await supabase.from("users").select("workspace_id").single();
+  // Resolve via `subscriptions` (RLS-scoped), matching getSubscription() —
+  // not the separate `users.workspace_id` column, which can be stale for
+  // accounts belonging to more than one workspace.
+  const { data } = await supabase.from("subscriptions").select("workspace_id").maybeSingle();
   return data?.workspace_id ?? null;
 }
 

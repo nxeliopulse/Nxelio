@@ -79,6 +79,25 @@ export async function getCreditHistory(limit = 50, resourceType?: "credits" | "l
 
 // ── Credit / lead deduction ────────────────────────────────────────────────────
 
+/**
+ * Resolves the workspace to charge the SAME way getSubscription() resolves
+ * which workspace to display — RLS-scoped directly on `subscriptions`, not
+ * via the separate `users.workspace_id` column. For any account belonging to
+ * more than one workspace, `users.workspace_id` can be stale (e.g. still
+ * pointing at that user's very first/original workspace), which silently
+ * deducted credits from the wrong workspace's balance while the dashboard
+ * displayed a different, unrelated workspace's balance.
+ */
+async function resolveChargeWorkspaceId(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | null> {
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("workspace_id")
+    .maybeSingle();
+  return sub?.workspace_id ?? null;
+}
+
 export async function deductCredits(
   operationType: string,
   amount = 1,
@@ -86,14 +105,11 @@ export async function deductCredits(
 ): Promise<DeductResult> {
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("workspace_id")
-    .single();
-  if (!profile) return { ok: false, error: "User profile not found" };
+  const workspaceId = await resolveChargeWorkspaceId(supabase);
+  if (!workspaceId) return { ok: false, error: "No subscription found for this workspace" };
 
   const { data, error } = await supabase.rpc("deduct_credits", {
-    p_workspace_id:   profile.workspace_id,
+    p_workspace_id:   workspaceId,
     p_operation_type: operationType,
     p_amount:         amount,
     p_lead_id:        options.leadId     ?? null,
@@ -112,14 +128,11 @@ export async function deductLeads(
 ): Promise<DeductResult> {
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("workspace_id")
-    .single();
-  if (!profile) return { ok: false, error: "User profile not found" };
+  const workspaceId = await resolveChargeWorkspaceId(supabase);
+  if (!workspaceId) return { ok: false, error: "No subscription found for this workspace" };
 
   const { data, error } = await supabase.rpc("deduct_leads", {
-    p_workspace_id: profile.workspace_id,
+    p_workspace_id: workspaceId,
     p_amount:       amount,
     p_metadata:     metadata,
   });
