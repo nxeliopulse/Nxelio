@@ -3,7 +3,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "custom";
-type Size = "sm" | "md" | "lg" | "icon";
+type Size = "sm" | "md" | "lg" | "icon" | "custom";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -24,6 +24,7 @@ const sizes: Record<Size, string> = {
   md: "h-10 px-4 text-sm",
   lg: "h-11 px-6 text-base",
   icon: "h-9 w-9 p-0",
+  custom: "",
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(

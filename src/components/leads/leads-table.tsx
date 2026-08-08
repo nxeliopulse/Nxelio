@@ -256,7 +256,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
   // Selection contextual bar — replaces the toolbar controls while rows are selected.
   const [showOwnerMenu, setShowOwnerMenu] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
   const [segmentName, setSegmentName] = useState("");
   const [segmentDescription, setSegmentDescription] = useState("");
@@ -708,7 +707,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   }
 
   async function handleBulkDelete() {
-    setShowMoreMenu(false);
     const n = selected.length;
     if (!(await confirm({ title: "Delete lead?", message: `Delete ${n} lead${n === 1 ? "" : "s"}? This action cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
     const ids = [...selected];
@@ -1236,10 +1234,10 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         key={c.key}
                         className={cn(
                           "px-3 py-2.5 font-bold whitespace-nowrap",
-                          c.key === "index" && "sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
+                          c.key === "index" && "sticky left-[40px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
                           c.key === "name" && "sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
                         )}
-                        // Sticky offsets below (left-10, left-[88px]) are hardcoded pixel
+                        // Sticky offsets below (left-[40px], left-[88px]) are hardcoded pixel
                         // sums of the checkbox + Row# column widths — fix both header AND
                         // body cell widths for these two columns (inline style, not just a
                         // Tailwind class) so auto table-layout can never resolve a different
@@ -1355,7 +1353,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                     className="group hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <td
-                      className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-2"
+                      className="sticky left-0 z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 transition-colors px-3 py-2"
                       style={{ width: 40, minWidth: 40, maxWidth: 40 }}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -1371,8 +1369,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         key={c.key}
                         className={cn(
                           "px-3 py-2",
-                          c.key === "index" && "sticky left-10 z-10 bg-white group-hover:bg-slate-50 transition-colors",
-                          c.key === "name" && "sticky left-[88px] z-10 bg-white group-hover:bg-slate-50 transition-colors"
+                          c.key === "index" && "sticky left-[40px] z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 transition-colors",
+                          c.key === "name" && "sticky left-[88px] z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 transition-colors"
                         )}
                         style={c.key === "index" ? { width: 48, minWidth: 48, maxWidth: 48 } : undefined}
                         onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
@@ -1921,29 +1919,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                 </>
               )}
             </div>
-            <div className="relative">
-              <button
-                onClick={() => setShowMoreMenu((v) => !v)}
-                className="inline-flex items-center gap-1 rounded-full text-slate-600 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
-              >
-                More <ChevronDown className={cn("h-3 w-3 transition-transform", showMoreMenu && "rotate-180")} />
-              </button>
-              {showMoreMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
-                  <div className="lp-anim-pop origin-bottom-left absolute left-0 bottom-full mb-1 z-50 w-44 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
-                    <button
-                      onClick={handleBulkDelete}
-                      disabled={pending}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 text-left"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-            <span className="h-5 w-px bg-slate-200 dark:bg-slate-800" />
+
             <button
               onClick={() => setSelected([])}
               className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-700 px-2 whitespace-nowrap"

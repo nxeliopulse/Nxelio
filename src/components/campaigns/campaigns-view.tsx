@@ -434,12 +434,12 @@ export function CampaignsView({
                 placeholder="Search..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-9 text-xs rounded-xl"
+                className="h-9 text-xs rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xs focus:ring-1 focus:ring-[var(--primary)]"
               />
             </div>
 
             {/* Badged Count Button */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-600">
+            <div className="inline-flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-850 text-xs font-semibold text-slate-700 dark:text-slate-300 h-9 border border-slate-200 dark:border-slate-800 shadow-2xs">
               <Megaphone className="h-3.5 w-3.5 text-slate-500" />
               <span>
                 {filtered.length}{" "}
@@ -469,10 +469,10 @@ export function CampaignsView({
             <button
               onClick={() => setCardFilter((prev) => prev === "active" ? "all" : "active")}
               className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all h-9 shadow-sm",
+                "inline-flex items-center justify-center gap-1.5 px-3 rounded-xl text-xs font-semibold border transition-all h-9 shadow-2xs select-none",
                 cardFilter === "active"
                   ? "bg-slate-900 text-white border-transparent dark:bg-slate-100 dark:text-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-600 dark:border-slate-800"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-350 dark:border-slate-800"
               )}
             >
               {cardFilter === "active" ? "✓ Active Only" : "Active Only"}
@@ -482,7 +482,7 @@ export function CampaignsView({
             <select
               value={approvalFilter}
               onChange={(e) => setApprovalFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-450 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-350 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9 shadow-2xs"
             >
               <option value="All">All approval stages</option>
               {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -492,7 +492,7 @@ export function CampaignsView({
             <select
               value={`${sortField}:${sortDir}`}
               onChange={(e) => { const [f, d] = e.target.value.split(":"); setSortField(f as SortField); setSortDir(d as "asc" | "desc"); }}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-450 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-350 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9 shadow-2xs"
             >
               <option value="updatedAt:desc">Sort: Newest first</option>
               <option value="updatedAt:asc">Sort: Oldest first</option>
@@ -503,13 +503,13 @@ export function CampaignsView({
             </select>
 
             {/* Date range inputs */}
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <div className="flex items-center gap-1 text-xs text-slate-500">
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
                 max={dateTo || undefined}
-                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-350 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] shadow-2xs"
                 aria-label="Last modified from"
               />
               <span className="text-slate-400">–</span>
@@ -518,14 +518,22 @@ export function CampaignsView({
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
                 min={dateFrom || undefined}
-                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-350 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] shadow-2xs"
                 aria-label="Last modified to"
               />
             </div>
 
             {/* Filter Dropdown */}
             <div className="relative" ref={filterRef}>
-              <Button variant="outline" size="sm" onClick={() => setFilterOpen((v) => !v)} className="h-9 text-xs rounded-xl font-bold border border-slate-200 dark:border-slate-800">
+              <Button
+                variant="outline"
+                size="custom"
+                onClick={() => setFilterOpen((v) => !v)}
+                className={cn(
+                  "h-9 px-3 text-xs rounded-xl font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-[var(--muted)] shadow-2xs flex items-center justify-center gap-1.5",
+                  filterOpen && "bg-slate-50 dark:bg-slate-800"
+                )}
+              >
                 <FilterIcon className="h-4 w-4" /> Filter
                 {activeFilterCount > 0 && (
                   <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
@@ -614,9 +622,12 @@ export function CampaignsView({
               <div className="relative" ref={colsRef}>
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="custom"
                   onClick={() => setColumnsOpen((v) => !v)}
-                  className="h-9 text-xs rounded-xl font-bold border border-slate-200 dark:border-slate-800"
+                  className={cn(
+                    "h-9 px-3 text-xs rounded-xl font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-[var(--muted)] shadow-2xs flex items-center justify-center gap-1.5",
+                    columnsOpen && "bg-slate-50 dark:bg-slate-800"
+                  )}
                 >
                   <Columns3 className="h-4 w-4" /> Manage Columns
                 </Button>
@@ -651,9 +662,12 @@ export function CampaignsView({
             <div className="relative" ref={tplRef}>
               <Button
                 variant="outline"
-                size="sm"
+                size="custom"
                 onClick={() => setTemplatesOpen((v) => !v)}
-                className="h-9 text-xs rounded-xl font-bold border border-slate-200 dark:border-slate-800"
+                className={cn(
+                  "h-9 px-3 text-xs rounded-xl font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-[var(--muted)] shadow-2xs flex items-center justify-center gap-1.5",
+                  templatesOpen && "bg-slate-50 dark:bg-slate-800"
+                )}
               >
                 <LayoutTemplate className="h-4 w-4" /> Templates <ChevronDown className={`h-3.5 w-3.5 transition-transform ${templatesOpen ? "rotate-180" : ""}`} />
               </Button>
@@ -687,9 +701,9 @@ export function CampaignsView({
             {/* Connections */}
             <Button
               variant="outline"
-              size="sm"
+              size="custom"
               onClick={() => setConnectionsOpen(true)}
-              className="h-9 text-xs rounded-xl font-bold border border-slate-200 dark:border-slate-800"
+              className="h-9 px-3 text-xs rounded-xl font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-[var(--muted)] shadow-2xs flex items-center justify-center gap-1.5"
             >
               <Link2 className="h-4 w-4" /> Connections
             </Button>
