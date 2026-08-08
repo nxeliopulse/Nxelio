@@ -95,24 +95,24 @@ export function ProspectScoreTab({ leadId, initialResult }: { leadId: string; in
         </div>
       </Card>
 
-      <Card className="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
+      <Card className="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100 dark:from-blue-950/20 dark:to-indigo-950/20 dark:border-blue-900/30">
         <div className="flex items-start gap-3">
           <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center flex-shrink-0">
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-slate-900 mb-2">AI Insights</h3>
-            <p className="text-sm text-slate-700 leading-relaxed mb-3">{result.insight}</p>
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">AI Insights</h3>
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-3">{result.insight}</p>
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-lg p-3">
+              <div className="bg-white dark:bg-slate-900/50 rounded-lg p-3">
                 <p className="text-xs text-slate-500 mb-1">Outreach Readiness</p>
-                <span className={`font-bold ${result.outreachReadiness === "High" ? "text-emerald-600" : result.outreachReadiness === "Medium" ? "text-amber-600" : "text-slate-600"}`}>
+                <span className={`font-bold ${result.outreachReadiness === "High" ? "text-emerald-600 dark:text-emerald-400" : result.outreachReadiness === "Medium" ? "text-amber-600 dark:text-amber-400" : "text-slate-600 dark:text-slate-400"}`}>
                   {result.outreachReadiness}
                 </span>
               </div>
-              <div className="bg-white rounded-lg p-3">
+              <div className="bg-white dark:bg-slate-900/50 rounded-lg p-3">
                 <p className="text-xs text-slate-500 mb-1">Expected Sales Cycle</p>
-                <span className="font-bold text-slate-900">{result.expectedSalesCycle}</span>
+                <span className="font-bold text-slate-900 dark:text-white">{result.expectedSalesCycle}</span>
               </div>
             </div>
           </div>
