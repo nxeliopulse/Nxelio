@@ -399,7 +399,7 @@ const FieldPalette = memo(function FieldPalette({ onAddAttribute }: { onAddAttri
             <div key={cat.id} className="space-y-1">
               <button
                 onClick={() => toggleCategory(cat.id)}
-                className="w-full flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-300 py-1 hover:text-slate-900 dark:hover:text-white transition-colors"
+                className="w-full flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-600 py-1 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 <span>{cat.label}</span>
                 {isCollapsed ? <ChevronRight className="h-3.5 w-3.5 text-slate-400" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />}
@@ -417,7 +417,7 @@ const FieldPalette = memo(function FieldPalette({ onAddAttribute }: { onAddAttri
                         e.dataTransfer.setData("text/plain", f.key);
                       }}
                       onDragEnd={() => { activeDrag = null; }}
-                      className="group flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 cursor-grab active:cursor-grabbing transition-all select-none"
+                      className="group flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 cursor-grab active:cursor-grabbing transition-all select-none"
                 aria-selected={false}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">

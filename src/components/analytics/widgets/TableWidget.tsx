@@ -29,7 +29,7 @@ export function TableWidget({ config, data }: WidgetProps) {
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
           {data.slice(0, 20).map((row, i) => (
-            <tr key={i} className="text-slate-700 dark:text-slate-300">
+            <tr key={i} className="text-slate-700 dark:text-slate-600">
               {columns.map((c, ci) => (
                 <td key={c.key} className="py-2 px-3">
                   {c.key === "label"

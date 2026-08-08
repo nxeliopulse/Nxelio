@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Search, Plus, Trash2, ChevronDown, Building2, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, Globe, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  Pencil, RefreshCw, Download, FileText, FileSpreadsheet, Upload
+  Pencil, RefreshCw, Download, FileText, FileSpreadsheet, Upload, CheckCircle2, Target, Award, XCircle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -92,7 +92,6 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [nowMs] = useState(() => Date.now());
 
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -433,42 +432,62 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
         </div>
       </div>
 
-      {(() => {
-        // "vs last 30 days" is computed from created_at, which is the only
-        // historical signal we actually have (no snapshot/audit table tracks
-        // status changes over time). For "Total" this is an exact comparison.
-        // For status/type-based counts it's an approximation — an account
-        // could have changed status since it was created — but it's a real,
-        // derived number rather than a fabricated one.
-        const cutoff = nowMs - 30 * 24 * 60 * 60 * 1000;
-        const pctChange = (matches: (a: AccountRow) => boolean) => {
-          const current = accounts.filter(matches).length;
-          const previous = accounts.filter((a) => matches(a) && new Date(a.created_at).getTime() <= cutoff).length;
-          if (previous === 0) return current > 0 ? 100 : 0;
-          return Math.round(((current - previous) / previous) * 100);
-        };
-        const cards = [
-          { label: "Total Accounts", value: accounts.length, pct: pctChange(() => true) },
-          { label: "Active Accounts", value: accounts.filter((a) => a.account_status === "Active").length, pct: pctChange((a) => a.account_status === "Active") },
-          { label: "Prospect Accounts", value: accounts.filter((a) => a.account_status === "Prospect").length, pct: pctChange((a) => a.account_status === "Prospect") },
-          { label: "Customer Accounts", value: accounts.filter((a) => a.account_type === "Customer").length, pct: pctChange((a) => a.account_type === "Customer") },
-          { label: "Inactive Accounts", value: accounts.filter((a) => a.account_status === "Inactive").length, pct: pctChange((a) => a.account_status === "Inactive") },
-        ];
-        return (
-          <Card className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800 mb-5 overflow-hidden">
-            {cards.map((s) => (
-              <div key={s.label} className="p-4 sm:p-5 min-w-0">
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
-                <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">{s.value.toLocaleString()}</p>
-                <p className={cn("text-[11px] font-semibold mt-1 flex items-center gap-0.5", s.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                  {s.pct >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                  {Math.abs(s.pct)}% vs last 30 days
-                </p>
+      {/* Stat cards — clickable colored KPI grid, same pattern as Prospects */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        {(
+          [
+            { label: "Total Accounts", value: accounts.length, icon: Building2, accent: "bg-amber-500", ring: "ring-amber-500", bg: "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]", kind: "all" as const, filterValue: null },
+            { label: "Active Accounts", value: accounts.filter((a) => a.account_status === "Active").length, icon: CheckCircle2, accent: "bg-emerald-500", ring: "ring-emerald-500", bg: "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]", kind: "status" as const, filterValue: "Active" },
+            { label: "Prospect Accounts", value: accounts.filter((a) => a.account_status === "Prospect").length, icon: Target, accent: "bg-blue-500", ring: "ring-blue-500", bg: "bg-blue-500/[0.04] dark:bg-blue-500/[0.08]", kind: "status" as const, filterValue: "Prospect" },
+            { label: "Customer Accounts", value: accounts.filter((a) => a.account_type === "Customer").length, icon: Award, accent: "bg-purple-500", ring: "ring-purple-500", bg: "bg-purple-500/[0.04] dark:bg-purple-500/[0.08]", kind: "type" as const, filterValue: "Customer" },
+            { label: "Inactive Accounts", value: accounts.filter((a) => a.account_status === "Inactive").length, icon: XCircle, accent: "bg-rose-500", ring: "ring-rose-500", bg: "bg-rose-500/[0.04] dark:bg-rose-500/[0.08]", kind: "status" as const, filterValue: "Inactive" },
+          ]
+        ).map((s) => {
+          const Icon = s.icon;
+          const isActive =
+            s.kind === "all" ? statusFilter === "all" && accountTypeFilter === "all"
+            : s.kind === "status" ? statusFilter === s.filterValue
+            : accountTypeFilter === s.filterValue;
+          return (
+            <Card
+              key={s.label}
+              onClick={() => {
+                if (s.kind === "all") {
+                  setStatusFilter("all");
+                  setAccountTypeFilter("all");
+                  toast("Showing all accounts", "info");
+                  return;
+                }
+                if (s.kind === "status") {
+                  const next = statusFilter === s.filterValue ? "all" : (s.filterValue as string);
+                  setStatusFilter(next);
+                  setAccountTypeFilter("all");
+                  toast(next === "all" ? "Showing all accounts" : `Filtering by "${s.label}"`, "info");
+                  return;
+                }
+                const next = accountTypeFilter === s.filterValue ? "all" : (s.filterValue as string);
+                setAccountTypeFilter(next);
+                setStatusFilter("all");
+                toast(next === "all" ? "Showing all accounts" : `Filtering by "${s.label}"`, "info");
+              }}
+              className={cn(
+                "p-4 sm:p-5 flex items-center gap-3 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                isActive
+                  ? `ring-2 ${s.ring} ${s.bg} border-transparent shadow-xs`
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              )}
+            >
+              <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value.toLocaleString()}</p>
               </div>
-            ))}
-          </Card>
-        );
-      })()}
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Redesigned Sub-header / Actions Controls bar */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-3 sm:p-4 rounded-xl shadow-2xs">

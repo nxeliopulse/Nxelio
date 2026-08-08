@@ -25,7 +25,7 @@ export function CohortWidget({ result }: { result: CohortResult }) {
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
           {result.cohorts.map((cohort, ci) => (
             <tr key={cohort}>
-              <td className="py-2 px-3 font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{cohort}</td>
+              <td className="py-2 px-3 font-semibold text-slate-600 dark:text-slate-600 whitespace-nowrap">{cohort}</td>
               <td className="py-2 px-3 text-right font-bold text-slate-900 dark:text-white">{result.cohortSizes[ci]}</td>
               {result.matrix[ci].map((count, bi) => {
                 const t = count / max;

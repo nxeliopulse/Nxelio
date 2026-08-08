@@ -3,7 +3,7 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Search, Plus, Trash2, ChevronDown, Users2, Mail, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
+  Search, Plus, Trash2, ChevronDown, ChevronRight, Users2, Mail, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
   Pencil, RefreshCw, User, Link2, Download, FileText, FileSpreadsheet, Upload, X
 } from "lucide-react";
@@ -107,8 +107,58 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [activeDateRange, setActiveDateRange] = useState("Last 30 Days");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [cardFilter, setCardFilter] = useState<"all" | "linked" | "unassigned" | "email">("all");
+
+  // Multi-section Filter panel state — replaces the old single-select statusFilter.
+  // Within a section, checking multiple values is OR; across sections with at least
+  // one checked value, it's AND (see `filtered` below for the combined logic).
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedOwners, setSelectedOwners] = useState<string[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedRatings, setSelectedRatings] = useState<number[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<("active" | "inactive")[]>([]);
+  const [nameSearch, setNameSearch] = useState("");
+  const [namesShown, setNamesShown] = useState(10);
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const [ownersShown, setOwnersShown] = useState(5);
+  const [openFilterSections, setOpenFilterSections] = useState<Record<"name" | "tags" | "owner" | "location" | "rating" | "status", boolean>>({
+    name: true,
+    tags: false,
+    owner: false,
+    location: false,
+    rating: false,
+    status: false,
+  });
+
+  const hasActiveFilters =
+    selectedContactIds.length > 0 ||
+    selectedTags.length > 0 ||
+    selectedOwners.length > 0 ||
+    selectedLocations.length > 0 ||
+    selectedRatings.length > 0 ||
+    selectedStatuses.length > 0;
+
+  function resetFilterPanel() {
+    setSelectedContactIds([]);
+    setSelectedTags([]);
+    setSelectedOwners([]);
+    setSelectedLocations([]);
+    setSelectedRatings([]);
+    setSelectedStatuses([]);
+    setNameSearch("");
+    setNamesShown(10);
+    setOwnerSearch("");
+    setOwnersShown(5);
+  }
+
+  function toggleFilterSection(key: "name" | "tags" | "owner" | "location" | "rating" | "status") {
+    setOpenFilterSections((s) => ({ ...s, [key]: !s[key] }));
+  }
+
+  function toggleInArray<T>(arr: T[], value: T): T[] {
+    return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+  }
 
   const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
   const [showCols, setShowCols] = useState(false);
@@ -157,18 +207,69 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
   const visibleCols = COLUMNS.filter((c) => cols[c.key]);
   const scoped = accountFilterId ? contacts.filter((c) => c.account_id === accountFilterId) : contacts;
 
+  // Options for the Filter panel's checkbox lists — distinct values derived from the
+  // full `contacts` prop (real columns only: tags/rating are real columns per the
+  // 0091/0092 migrations, not the removed hashCode-based mock).
+  const distinctTags = Array.from(
+    new Set(
+      contacts.flatMap((c) => (c.tags || "").split(",").map((t) => t.trim()).filter(Boolean))
+    )
+  ).sort((a, b) => a.localeCompare(b));
+  const distinctLocations = Array.from(
+    new Set(contacts.map((c) => c.mailing_country).filter((v): v is string => Boolean(v)))
+  ).sort((a, b) => a.localeCompare(b));
+  // Rating is a fixed 1-5 scale (not a free-text field like Tags/Location), so the
+  // filter always offers all 5 points regardless of which ones are currently in use
+  // — same reasoning as Status always offering both Active and Inactive.
+  const RATING_OPTIONS = [5, 4, 3, 2, 1];
+
+  // Name section of the Filter panel — live search + "Load More" paging, entirely
+  // client-side over the already-loaded `contacts` array (no new query needed).
+  const filteredNameList = contacts.filter((c) =>
+    `${c.first_name} ${c.last_name}`.toLowerCase().includes(nameSearch.trim().toLowerCase())
+  );
+  const visibleNameList = filteredNameList.slice(0, namesShown);
+
+  // Owner section of the Filter panel — same live search + "Load More" paging as
+  // Name, since a workspace's owner/user list can also run long.
+  const filteredOwnerList = owners.filter((o) => o.name.toLowerCase().includes(ownerSearch.trim().toLowerCase()));
+  const visibleOwnerList = filteredOwnerList.slice(0, ownersShown);
+
   // Apply filters
   const filtered = scoped.filter((c) => {
     const q = search.toLowerCase();
-    
-    // Status Filter
-    const status = c.email_opt_out ? "inactive" : "active";
-    if (statusFilter !== "all" && status !== statusFilter) return false;
 
     // Card Filter
     if (cardFilter === "linked" && !c.account_id) return false;
     if (cardFilter === "unassigned" && c.account_id) return false;
     if (cardFilter === "email" && !c.email) return false;
+
+    // Filter panel: Name (specific contacts) — checking one or more names restricts
+    // the table to ONLY those contacts.
+    if (selectedContactIds.length > 0 && !selectedContactIds.includes(c.id)) return false;
+
+    // Filter panel: Tags — OR within the section (contact matches if ANY of its own
+    // tags is checked).
+    if (selectedTags.length > 0) {
+      const rowTags = (c.tags || "").split(",").map((t) => t.trim()).filter(Boolean);
+      if (!rowTags.some((t) => selectedTags.includes(t))) return false;
+    }
+
+    // Filter panel: Owner
+    if (selectedOwners.length > 0 && !selectedOwners.includes(c.contact_owner || "")) return false;
+
+    // Filter panel: Location
+    if (selectedLocations.length > 0 && !selectedLocations.includes(c.mailing_country || "")) return false;
+
+    // Filter panel: Rating
+    if (selectedRatings.length > 0 && (c.rating == null || !selectedRatings.includes(c.rating))) return false;
+
+    // Filter panel: Status — same email_opt_out derivation as the rest of the table
+    // (true -> inactive, false -> active), not a new status concept.
+    if (selectedStatuses.length > 0) {
+      const status = c.email_opt_out ? "inactive" : "active";
+      if (!selectedStatuses.includes(status)) return false;
+    }
 
     // Search query
     if (!q) return true;
@@ -323,9 +424,51 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
     }
   }
 
+  /** Shared shell for the Filter panel's plain checkbox-list sections (Tags/Owner
+   *  are handled separately since they need search+load-more; here, checking
+   *  multiple values is OR (handled by the caller's `onToggle`/selected-values logic
+   *  feeding into `filtered` above); this helper only renders the UI shell. */
+  function renderFilterSection<T extends string | number>(
+    key: "tags" | "owner" | "location" | "rating" | "status",
+    label: string,
+    options: { value: T; label: string }[],
+    selectedValues: T[],
+    onToggle: (value: T) => void
+  ) {
+    const isOpen = openFilterSections[key];
+    return (
+      <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+        <button
+          type="button"
+          onClick={() => toggleFilterSection(key)}
+          className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600"
+        >
+          <span>{label}</span>
+          <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", isOpen && "rotate-90")} />
+        </button>
+        {isOpen && (
+          <div className="mt-2 max-h-36 overflow-y-auto space-y-1 pr-1">
+            {options.length === 0 && <p className="text-slate-400 dark:text-slate-500 py-1 text-xs">No options available.</p>}
+            {options.map((opt) => (
+              <label key={String(opt.value)} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedValues.includes(opt.value)}
+                  onChange={() => onToggle(opt.value)}
+                  className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="truncate text-slate-700 dark:text-slate-600 font-medium">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-[1600px] mx-auto w-full px-4 sm:px-6 pb-10 text-slate-800 dark:text-slate-700">
-      
+
       {/* Redesigned Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
@@ -581,35 +724,224 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
               variant="outline"
               size="sm"
               onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
-              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+              className={cn(
+                "h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs",
+                hasActiveFilters && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
+              )}
             >
               <Filter className="h-3.5 w-3.5 text-slate-500" />
               <span>Filter</span>
               <ChevronDown className="h-3 w-3 text-slate-450" />
+              {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
             </Button>
             {filterDropdownOpen && (
-              <div className="absolute right-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                <p className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filter Status</p>
-                {[
-                  { key: "all", label: "All Contacts" },
-                  { key: "active", label: "Active" },
-                  { key: "inactive", label: "Inactive" }
-                ].map((opt) => (
+              <div className="absolute right-0 mt-1.5 w-80 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg z-50 text-xs flex flex-col max-h-[36rem]">
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+                  <span className="inline-flex items-center gap-1.5 font-bold text-slate-900 dark:text-white text-sm">
+                    <Filter className="h-3.5 w-3.5 text-slate-500" /> Filter
+                  </span>
                   <button
-                    key={opt.key}
-                    onClick={() => {
-                      setStatusFilter(opt.key as "all" | "active" | "inactive");
-                      setFilterDropdownOpen(false);
-                      toast(`Filtering by status: ${opt.label}`, "info");
-                    }}
-                    className={cn(
-                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      statusFilter === opt.key ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/15" : "text-slate-700 dark:text-slate-600"
-                    )}
+                    type="button"
+                    onClick={() => setFilterDropdownOpen(false)}
+                    className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+                    title="Close"
                   >
-                    {opt.label}
+                    <X className="h-4 w-4" />
                   </button>
-                ))}
+                </div>
+
+                {/* Sections */}
+                <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3">
+                  {/* Name — collapsible like the other sections, but open by default;
+                      live search + checkbox list. */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => toggleFilterSection("name")}
+                      className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600 mb-2"
+                    >
+                      <span>Name</span>
+                      <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", openFilterSections.name && "rotate-90")} />
+                    </button>
+                    {openFilterSections.name && (
+                      <>
+                        <Input
+                          leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
+                          placeholder="Search names"
+                          value={nameSearch}
+                          onChange={(e) => { setNameSearch(e.target.value); setNamesShown(10); }}
+                          className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs mb-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                          {visibleNameList.length === 0 && (
+                            <p className="text-slate-400 dark:text-slate-500 py-1.5 text-center">No contacts found.</p>
+                          )}
+                          {visibleNameList.map((c) => {
+                            const fullName = `${c.first_name} ${c.last_name}`.trim();
+                            const checked = selectedContactIds.includes(c.id);
+                            return (
+                              <label key={c.id} className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => setSelectedContactIds((s) => toggleInArray(s, c.id))}
+                                  className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
+                                />
+                                {c.photo_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element -- external Supabase storage URL, not a static asset
+                                  <img src={c.photo_url} alt="" className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
+                                ) : (
+                                  <span className={cn("h-6 w-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0", avatarColor(fullName))}>
+                                    {initials(c)}
+                                  </span>
+                                )}
+                                <span className="truncate text-slate-700 dark:text-slate-600 font-medium">{fullName}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {filteredNameList.length > namesShown && (
+                          <button
+                            type="button"
+                            onClick={() => setNamesShown((n) => n + 10)}
+                            className="mt-1.5 text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                          >
+                            Load More
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {renderFilterSection(
+                    "tags",
+                    "Tags",
+                    distinctTags.map((t) => ({ value: t, label: t })),
+                    selectedTags,
+                    (v) => setSelectedTags((s) => toggleInArray(s, v))
+                  )}
+                  {/* Owner — like Name, this can run long (every workspace user), so it
+                      gets its own live search + "Load More" instead of the plain
+                      checkbox list the other sections use. */}
+                  <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleFilterSection("owner")}
+                      className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600"
+                    >
+                      <span>Owner</span>
+                      <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", openFilterSections.owner && "rotate-90")} />
+                    </button>
+                    {openFilterSections.owner && (
+                      <div className="mt-2">
+                        <Input
+                          leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
+                          placeholder="Search"
+                          value={ownerSearch}
+                          onChange={(e) => { setOwnerSearch(e.target.value); setOwnersShown(5); }}
+                          className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs mb-2"
+                        />
+                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                          {visibleOwnerList.length === 0 && (
+                            <p className="text-slate-400 dark:text-slate-500 py-1.5 text-center">No owners found.</p>
+                          )}
+                          {visibleOwnerList.map((o) => (
+                            <label key={o.id} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedOwners.includes(o.id)}
+                                onChange={() => setSelectedOwners((s) => toggleInArray(s, o.id))}
+                                className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="truncate text-slate-700 dark:text-slate-600 font-medium">{o.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {filteredOwnerList.length > ownersShown && (
+                          <button
+                            type="button"
+                            onClick={() => setOwnersShown((n) => n + 5)}
+                            className="mt-1.5 text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                          >
+                            Load More
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {renderFilterSection(
+                    "location",
+                    "Location",
+                    distinctLocations.map((l) => ({ value: l, label: l })),
+                    selectedLocations,
+                    (v) => setSelectedLocations((s) => toggleInArray(s, v))
+                  )}
+                  {/* Rating — shows real star icons (filled amber up to the rating
+                      value, gray for the rest) instead of plain "N Stars" text. */}
+                  <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleFilterSection("rating")}
+                      className="w-full flex items-center justify-between text-left font-bold text-slate-700 dark:text-slate-600"
+                    >
+                      <span>Rating</span>
+                      <ChevronRight className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", openFilterSections.rating && "rotate-90")} />
+                    </button>
+                    {openFilterSections.rating && (
+                      <div className="mt-2 space-y-1 pr-1">
+                        {RATING_OPTIONS.map((r) => (
+                          <label key={r} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedRatings.includes(r)}
+                              onChange={() => setSelectedRatings((s) => toggleInArray(s, r))}
+                              className="rounded border-slate-350 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="flex items-center gap-0.5">
+                              {Array.from({ length: 5 }, (_, i) => (
+                                <Star key={i} className={cn("h-3.5 w-3.5", i < r ? "fill-amber-400 text-amber-400" : "text-slate-300 dark:text-slate-600")} />
+                              ))}
+                            </span>
+                            <span className="text-slate-700 dark:text-slate-600 font-medium">{r.toFixed(1)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {renderFilterSection(
+                    "status",
+                    "Status",
+                    [
+                      { value: "active" as const, label: "Active" },
+                      { value: "inactive" as const, label: "Inactive" },
+                    ],
+                    selectedStatuses,
+                    (v) => setSelectedStatuses((s) => toggleInArray(s, v))
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetFilterPanel}
+                    className="h-8 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setFilterDropdownOpen(false);
+                      toast("Filters applied", "success");
+                    }}
+                    className="h-8 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Filter
+                  </Button>
+                </div>
               </div>
             )}
           </div>

@@ -55,7 +55,7 @@ export function WaterfallWidget({ config, data }: WidgetProps) {
                 const d = payload[0].payload as WaterfallBar;
                 return (
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-md text-xs">
-                    <p className="font-bold text-slate-700 dark:text-slate-300">{d.label}</p>
+                    <p className="font-bold text-slate-700 dark:text-slate-600">{d.label}</p>
                     <p className="text-slate-500">{d.isTotal ? "Total" : d.positive ? "+" : "-"}{formatValue(d.delta, config.unit)}</p>
                     <p className="text-slate-400">Running total: {formatValue(d.end, config.unit)}</p>
                   </div>

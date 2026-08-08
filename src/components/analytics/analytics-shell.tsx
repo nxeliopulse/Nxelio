@@ -47,7 +47,7 @@ export function AnalyticsShell({
                   href={item.href}
                   className={cn(
                     "flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold",
-                    active ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400" : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900/40"
+                    active ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400" : "text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-900/40"
                   )}
                 >
                   <item.icon className="h-4 w-4" />
@@ -57,7 +57,7 @@ export function AnalyticsShell({
             })}
             <button
               onClick={toggle}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900/40"
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-900/40"
             >
               <Sparkles className="h-4 w-4" />
               AI Assistant

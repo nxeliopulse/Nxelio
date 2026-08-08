@@ -34,7 +34,7 @@ export function AnomalyWidget({ config, data }: WidgetProps) {
                 const d = payload[0].payload as (typeof chartData)[number];
                 return (
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-md text-xs">
-                    <p className="font-bold text-slate-700 dark:text-slate-300">{d.label}</p>
+                    <p className="font-bold text-slate-700 dark:text-slate-600">{d.label}</p>
                     <p className="text-slate-500">{fmt(d.value)}{d.isAnomaly && <span className="text-rose-500 font-bold ml-1.5">Outlier</span>}</p>
                   </div>
                 );

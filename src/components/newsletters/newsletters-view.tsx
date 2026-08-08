@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/ui/page-header";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
@@ -77,100 +76,104 @@ export function NewslettersView({ newsletters, stats }: Props) {
     );
   }
 
+  const newsletterStatCards = [
+    { label: "Total Newsletters", value: stats.total, icon: Mail, accent: "bg-cyan-500", filterValue: "All" as const },
+    { label: "Sent Campaigns", value: stats.sent, icon: Send, accent: "bg-emerald-500", filterValue: "Sent" as const },
+    { label: "Avg. Open Rate", value: `${stats.avgOpenRate}%`, icon: Eye, accent: "bg-indigo-500", filterValue: null },
+    { label: "Avg. Click Rate", value: `${stats.avgClickRate}%`, icon: MousePointer, accent: "bg-amber-500", filterValue: null },
+  ];
+
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6">
-      <PageHeader
-        title="Newsletters"
-        description="Send rich content updates, digests, and product announcements to your subscribed leads"
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                toast("Refreshing newsletters...", "info");
-                router.refresh();
-                setTimeout(() => window.location.reload(), 100);
-              }}
-              className="h-10 w-10 p-0 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-              title="Refresh"
-            >
-              <RefreshCw className="h-4 w-4 text-slate-500" />
+    <div className="max-w-[1600px] mx-auto">
+      {/* Page header — title + breadcrumb + actions, matching the Prospects screen */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Newsletters
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
+            <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-600">Home</Link>
+            <span className="mx-1">›</span>
+            <span className="text-slate-700 dark:text-slate-600 font-medium">Newsletters</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              toast("Refreshing newsletters...", "info");
+              router.refresh();
+              setTimeout(() => window.location.reload(), 100);
+            }}
+            className="rounded-xl h-8 w-8"
+            title="Refresh"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          <Link href="/newsletters/builder">
+            <Button size="sm" className="rounded-xl gap-1.5 font-semibold h-8 text-xs px-3">
+              <Plus className="h-3.5 w-3.5" /> New Newsletter
             </Button>
-            <Link href="/newsletters/builder">
-              <Button className="rounded-xl font-bold px-4 py-2.5 gap-2 h-10">
-                <Plus className="h-4 w-4" /> New Newsletter
-              </Button>
-            </Link>
-          </div>
-        }
-      />
+          </Link>
+        </div>
+      </div>
 
-      {/* Top Metric Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Total Newsletters</span>
-            <div className="h-9 w-9 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-[var(--primary)] flex items-center justify-center font-bold">
-              <Mail className="h-4 w-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{stats.total}</p>
-        </Card>
-
-        <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Sent Campaigns</span>
-            <div className="h-9 w-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-              <Send className="h-4 w-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{stats.sent}</p>
-        </Card>
-
-        <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Avg. Open Rate</span>
-            <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
-              <Eye className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <p className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{stats.avgOpenRate}%</p>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-300">
-              Avg
-            </span>
-          </div>
-        </Card>
-
-        <Card className="p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Avg. Click Rate</span>
-            <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
-              <MousePointer className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <p className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{stats.avgClickRate}%</p>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-300">
-              Clicks
-            </span>
-          </div>
-        </Card>
+      {/* Stat cards — clickable colored KPI grid, same pattern as Prospects */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {newsletterStatCards.map((s) => {
+          const Icon = s.icon;
+          const isActive = s.filterValue !== null && statusFilter === s.filterValue;
+          return (
+            <Card
+              key={s.label}
+              onClick={
+                s.filterValue === null
+                  ? undefined
+                  : () => {
+                      const next = statusFilter === s.filterValue ? "All" : s.filterValue;
+                      setStatusFilter(next);
+                      toast(next === "All" ? "Showing all newsletters" : `Filtering by "${s.label}"`, "info");
+                    }
+              }
+              className={cn(
+                "p-4 sm:p-5 flex items-center gap-3 transition-shadow",
+                s.filterValue !== null && "cursor-pointer hover:shadow-md",
+                isActive && "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-950 ring-blue-500"
+              )}
+            >
+              <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value}</p>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Main Table Card */}
       <Card className="overflow-hidden">
         {/* Toolbar with Search and Status Filter Pills */}
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Input
-              leftIcon={<Search className="h-4 w-4 text-slate-400" />}
-              placeholder="Search newsletters by title or subject..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="rounded-xl border-slate-200 dark:border-slate-800"
-            />
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
+            <div className="relative flex-1 max-w-md">
+              <Input
+                leftIcon={<Search className="h-4 w-4 text-slate-400" />}
+                placeholder="Search newsletters by title or subject..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="rounded-xl border-slate-200 dark:border-slate-800"
+              />
+            </div>
+
+            {/* Count Chip */}
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
+              <Mail className="h-3.5 w-3.5 text-slate-400" />
+              <span>{filtered.length} Newsletter{filtered.length === 1 ? "" : "s"}</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 p-1 bg-slate-50 dark:bg-slate-950/60">

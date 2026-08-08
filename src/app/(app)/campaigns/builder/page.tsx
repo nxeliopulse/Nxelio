@@ -24,6 +24,7 @@ import { submitForReview, getApprovalHistory, type ApprovalLogEntry } from "@/li
 import { approvalBadgeVariant } from "@/lib/campaign-approval-ui";
 import { getSegments, getSegmentMemberLeads } from "@/lib/queries/segments";
 import { getLeads, type LeadRow } from "@/lib/queries/leads";
+import { summarizeAudienceEligibility, type AudienceEligibilitySummary } from "@/lib/campaigns/eligibility";
 import { LeadsTable } from "@/components/leads/leads-table";
 import { getOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import { getEmailStatus } from "@/lib/email/actions";
@@ -110,6 +111,9 @@ export default function CampaignBuilderPage() {
   // channels (Email/LinkedIn) are safe to offer for the current audience.
   const [audienceLeads, setAudienceLeads] = useState<LeadRow[]>([]);
   const [audienceLoading, setAudienceLoading] = useState(false);
+  // Phase 4A — Matched / Suppressed / Already Active / Eligible breakdown,
+  // computed via the same Eligibility Service the send path uses.
+  const [eligibilitySummary, setEligibilitySummary] = useState<AudienceEligibilitySummary | null>(null);
 
   // Sequence
   const [tplTab, setTplTab] = useState<"prebuilt" | "custom">("prebuilt");
@@ -239,6 +243,17 @@ export default function CampaignBuilderPage() {
       cancelled = true;
     };
   }, [lists]);
+
+  // Phase 4A — recompute Matched/Suppressed/Already Active/Eligible whenever
+  // the resolved audience changes, via the same Eligibility Service the
+  // send path uses (never a separate ad-hoc count).
+  useEffect(() => {
+    let cancelled = false;
+    summarizeAudienceEligibility(campaign?.id ?? null, audienceLeads).then((s) => {
+      if (!cancelled) setEligibilitySummary(s.matched === 0 ? null : s);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [audienceLeads, campaign?.id]);
 
   /** Opens a full leads table for one list — cached per list so repeat clicks are instant. */
   async function viewList(l: LeadList) {
@@ -555,6 +570,29 @@ export default function CampaignBuilderPage() {
             </Card>
           ) : (
             <div className="space-y-3">
+              {eligibilitySummary && (
+                <Card className="p-4">
+                  <p className="text-xs font-semibold text-slate-500 mb-3">Audience eligibility</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">{eligibilitySummary.matched}</p>
+                      <p className="text-xs text-slate-500">Matched</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-amber-600">{eligibilitySummary.suppressed}</p>
+                      <p className="text-xs text-slate-500">Suppressed</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-500">{eligibilitySummary.alreadyActive}</p>
+                      <p className="text-xs text-slate-500">Already active</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-emerald-600">{eligibilitySummary.eligible}</p>
+                      <p className="text-xs text-slate-500">Eligible</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
               {lists.map((l) => (
                 <Card key={l.id} className="p-4 flex items-center justify-between cursor-pointer hover:border-blue-300 hover:shadow-sm transition-all" onClick={() => viewList(l)}>
                   <div className="flex items-center gap-3">

@@ -8,6 +8,8 @@ import {
   unipileConfigured, unipileResolveProfile, unipileSendInvite, unipileSendLinkedInMessage,
 } from "@/lib/outreach/unipile";
 import { consumeSendQuota } from "@/lib/outreach/send-quota";
+import { isSuppressed } from "@/lib/segments";
+import { exitEnrollmentByLead, advanceEnrollmentStep, completeEnrollment } from "@/lib/campaigns/enrollment";
 
 // Loosely-typed client — both the authenticated and admin clients expose the same query API.
 type Db = SupabaseClient;
@@ -33,9 +35,12 @@ export interface StepLead {
   email: string | null;
   interest_area: string | null;
   linkedin: string | null;
+  email_opt_out: boolean | null;
+  do_not_contact: boolean | null;
+  email_bounced: boolean | null;
 }
 
-export const AUDIENCE_COLS = "id, full_name, company_name, industry, email, interest_area, linkedin";
+export const AUDIENCE_COLS = "id, full_name, company_name, industry, email, interest_area, linkedin, email_opt_out, do_not_contact, email_bounced";
 
 /** Parse a campaign's stored content into ordered steps with their delays. */
 export function parseCampaignSteps(content: string | null, fallbackSubject: string | null): CampaignStep[] {
@@ -327,6 +332,17 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
       continue;
     }
 
+    // Suppression recheck (Phase 4B/4E) — every step must revalidate, never
+    // trust eligibility from launch time. Exits the enrollment with a
+    // structured reason instead of just cancelling the job row.
+    if (isSuppressed(lead)) {
+      await db.from("campaign_jobs").update({ status: "canceled", last_error: "Suppressed", updated_at: nowIso })
+        .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
+      await exitEnrollmentByLead(job.campaign_id, job.lead_id, "suppressed");
+      result.skipped++;
+      continue;
+    }
+
     // Reply-stop: if the lead has replied to this campaign, cancel their remaining steps.
     const { count: replyCount } = await db
       .from("inbox_messages")
@@ -337,6 +353,7 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
     if ((replyCount || 0) > 0) {
       await db.from("campaign_jobs").update({ status: "canceled", last_error: "Lead replied", updated_at: nowIso })
         .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
+      await exitEnrollmentByLead(job.campaign_id, job.lead_id, "replied");
       result.skipped++;
       continue;
     }
@@ -348,6 +365,7 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
       if (domain && repliedDomains.has(domain)) {
         await db.from("campaign_jobs").update({ status: "canceled", last_error: "Colleague replied", updated_at: nowIso })
           .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
+        await exitEnrollmentByLead(job.campaign_id, job.lead_id, "colleague_replied");
         result.skipped++;
         continue;
       }
@@ -379,6 +397,10 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
     if (r.ok) {
       await db.from("campaign_jobs").update({ status: "sent", updated_at: nowIso }).eq("id", job.id);
       await db.from("campaigns").update({ sent_count: (campaign.sent_count || 0) + 1 }).eq("id", job.campaign_id);
+      const { count: remaining } = await db.from("campaign_jobs").select("id", { count: "exact", head: true })
+        .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
+      await advanceEnrollmentStep(job.campaign_id, job.lead_id, Number(job.step_order) || 0, null);
+      if (!remaining) await completeEnrollment(job.campaign_id, job.lead_id);
       result.sent++;
     } else if (r.skipped) {
       await db.from("campaign_jobs").update({ status: "skipped", last_error: r.error, updated_at: nowIso }).eq("id", job.id);

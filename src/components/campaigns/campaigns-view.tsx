@@ -381,19 +381,41 @@ export function CampaignsView({
 
   return (
     <div className="max-w-[1600px] mx-auto">
-      <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
+      {/* Page header — title + breadcrumb, matching the Prospects screen */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 data-tour-id="campaigns-title" className="text-2xl font-bold text-slate-900 tracking-tight">Campaigns</h1>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
-            <span>Home</span>
-            <ChevronRight className="h-3 w-3" />
-            <span className="text-slate-600 font-medium">Campaigns</span>
-          </div>
+          <h1 data-tour-id="campaigns-title" className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Campaigns
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
+            <Link href="/dashboard" className="hover:text-slate-700 dark:hover:text-slate-600">Home</Link>
+            <span className="mx-1">›</span>
+            <span className="text-slate-700 dark:text-slate-600 font-medium">Campaigns</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              toast("Refreshing campaigns...", "info");
+              router.refresh();
+              setTimeout(() => window.location.reload(), 100);
+            }}
+            title="Refresh"
+            className="rounded-xl h-8 w-8"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          <Link href="/campaigns/builder">
+            <Button data-tour-id="campaigns-new" size="sm" className="rounded-xl gap-1.5 font-semibold h-8 text-xs px-3">
+              <Plus className="h-3.5 w-3.5" /> New Campaign
+            </Button>
+          </Link>
         </div>
       </div>
 
+      {/* Stat cards — clickable colored KPI grid, same pattern as Prospects */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {statCards.map((s) => {
           const Icon = s.icon;
@@ -415,8 +437,8 @@ export function CampaignsView({
                 <Icon className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <p className="text-xs text-slate-500 truncate">{s.label}</p>
-                <p className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">{s.value}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value}</p>
               </div>
             </Card>
           );
@@ -439,7 +461,11 @@ export function CampaignsView({
             </div>
 
             {/* Badged Count Button */}
+<<<<<<< HEAD
             <div className="inline-flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-850 text-xs font-semibold text-slate-700 dark:text-slate-300 h-9 border border-slate-200 dark:border-slate-800 shadow-2xs">
+=======
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[var(--muted)] text-xs font-bold text-slate-700 dark:text-slate-600">
+>>>>>>> 637a48a92b1e74ba0b1fe13a4deae16af0520dd2
               <Megaphone className="h-3.5 w-3.5 text-slate-500" />
               <span>
                 {filtered.length}{" "}
@@ -472,7 +498,11 @@ export function CampaignsView({
                 "inline-flex items-center justify-center gap-1.5 px-3 rounded-xl text-xs font-semibold border transition-all h-9 shadow-2xs select-none",
                 cardFilter === "active"
                   ? "bg-slate-900 text-white border-transparent dark:bg-slate-100 dark:text-slate-900"
+<<<<<<< HEAD
                   : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-350 dark:border-slate-800"
+=======
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-[var(--muted)] dark:text-slate-600 dark:border-slate-800"
+>>>>>>> 637a48a92b1e74ba0b1fe13a4deae16af0520dd2
               )}
             >
               {cardFilter === "active" ? "✓ Active Only" : "Active Only"}
@@ -738,27 +768,6 @@ export function CampaignsView({
               </button>
             </div>
 
-            {/* Refresh Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                toast("Refreshing campaigns...", "info");
-                router.refresh();
-                setTimeout(() => window.location.reload(), 100);
-              }}
-              className="h-9 w-9 p-0 rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-              title="Refresh"
-            >
-              <RefreshCw className="h-4 w-4 text-slate-500" />
-            </Button>
-
-            {/* New Campaign Button */}
-            <Link href="/campaigns/builder">
-              <Button data-tour-id="campaigns-new" className="rounded-xl font-bold px-4 py-2 text-xs sm:text-sm gap-2">
-                <Plus className="h-4 w-4" /> New Campaign
-              </Button>
-            </Link>
           </div>
         </div>
 

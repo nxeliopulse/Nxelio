@@ -91,7 +91,7 @@ function DocumentItem({ doc, contactId, ownerName }: { doc: ContactDocumentRow; 
             <p className="text-sm font-bold text-slate-800 dark:text-slate-700 truncate">{doc.title}</p>
           )}
           <div className="flex items-center gap-1.5 mt-1.5">
-            <div className="h-5 w-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0">
+            <div className="h-5 w-5 rounded-full bg-slate-200 dark:bg-[var(--muted)] flex items-center justify-center text-slate-500 dark:text-slate-400 flex-shrink-0">
               <User className="h-3 w-3" />
             </div>
             <span className="text-[11px] text-slate-600 dark:text-slate-500">{ownerName}</span>
