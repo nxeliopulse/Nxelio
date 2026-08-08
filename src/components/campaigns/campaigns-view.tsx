@@ -461,11 +461,7 @@ export function CampaignsView({
             </div>
 
             {/* Badged Count Button */}
-<<<<<<< HEAD
             <div className="inline-flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-850 text-xs font-semibold text-slate-700 dark:text-slate-300 h-9 border border-slate-200 dark:border-slate-800 shadow-2xs">
-=======
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[var(--muted)] text-xs font-bold text-slate-700 dark:text-slate-600">
->>>>>>> 637a48a92b1e74ba0b1fe13a4deae16af0520dd2
               <Megaphone className="h-3.5 w-3.5 text-slate-500" />
               <span>
                 {filtered.length}{" "}
@@ -498,11 +494,7 @@ export function CampaignsView({
                 "inline-flex items-center justify-center gap-1.5 px-3 rounded-xl text-xs font-semibold border transition-all h-9 shadow-2xs select-none",
                 cardFilter === "active"
                   ? "bg-slate-900 text-white border-transparent dark:bg-slate-100 dark:text-slate-900"
-<<<<<<< HEAD
                   : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-350 dark:border-slate-800"
-=======
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-[var(--muted)] dark:text-slate-600 dark:border-slate-800"
->>>>>>> 637a48a92b1e74ba0b1fe13a4deae16af0520dd2
               )}
             >
               {cardFilter === "active" ? "✓ Active Only" : "Active Only"}
