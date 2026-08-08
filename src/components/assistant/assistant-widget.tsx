@@ -502,7 +502,7 @@ export function AssistantWidget({
       <div
         className={cn(
           "flex flex-col mt-2.5 mb-2.5 rounded-2xl overflow-hidden h-[calc(100vh-20px)]",
-          expanded ? "ml-2.5 mr-6 flex-1" : "ml-2.5 mr-2.5 flex-shrink-0 w-[396px]",
+          expanded ? "ml-2.5 mr-2.5 flex-1" : "ml-2.5 mr-2.5 flex-shrink-0 w-[396px]",
           "transition-[width,margin,flex] duration-300 ease-in-out",
           "max-sm:w-[calc(100vw-20px)] max-sm:h-[calc(100%-20px)]"
         )}
