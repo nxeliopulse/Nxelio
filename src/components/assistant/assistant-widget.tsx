@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   X, Send, Loader2, CheckCircle2, AlertCircle, History, SquarePen,
   ArrowLeft, Trash2, MessageSquare, Sparkles, Bell, Maximize2, Minimize2,
@@ -247,6 +248,20 @@ export function AssistantWidget({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Exit full-screen mode when the route or search parameters change.
+  // This allows the main page layout to become visible again and show the selected
+  // item (Prospect, Contact, Campaign) side-by-side with the AI Assistant.
+  useEffect(() => {
+    if (expanded) {
+      setExpanded(false);
+      onExpandChange?.(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
