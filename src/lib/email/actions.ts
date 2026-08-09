@@ -14,6 +14,18 @@ export async function getEmailStatus() {
   return { configured: emailConfigured, domainVerified: emailDomainVerified };
 }
 
+/** Whether any outbound email has ever been sent to this lead (campaign or
+ *  one-off) — drives the "you already emailed this lead" badge on reopen. */
+export async function hasSentEmailToLead(leadId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("inbox_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", leadId)
+    .eq("direction", "outbound");
+  return (count || 0) > 0;
+}
+
 export interface SendLeadEmailResult {
   ok: boolean;
   error?: string;

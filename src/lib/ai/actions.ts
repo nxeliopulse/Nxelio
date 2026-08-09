@@ -229,7 +229,7 @@ Return JSON:
 // ============================================================================
 // AI Outreach Sequence — personalized to a specific lead
 // ============================================================================
-export async function generateLeadOutreach(leadId: string): Promise<GeneratedEmail[]> {
+export async function generateLeadOutreach(leadId: string, instruction?: string): Promise<GeneratedEmail[]> {
   await assertCredits();
   const lead = await getLeadById(leadId);
   if (!lead) throw new Error("Lead not found");
@@ -242,7 +242,7 @@ export async function generateLeadOutreach(leadId: string): Promise<GeneratedEma
 - Industry: ${lead.industry || "unknown"}
 - Interest: ${lead.interest_area || "unknown"}
 - Source: ${lead.source || "unknown"}
-
+${instruction ? `\nThe user gave this specific instruction for what the email(s) should say or focus on — follow it: "${instruction}"\n` : ""}
 Return JSON:
 {
   "emails": [

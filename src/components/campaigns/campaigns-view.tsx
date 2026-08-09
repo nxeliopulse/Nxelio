@@ -41,7 +41,7 @@ interface UnifiedRow {
  *  embed LinkedIn steps as "[li:...]" header markers alongside plain email
  *  steps (see parseCampaignSteps in campaign-scheduler.ts), so a campaign with
  *  both kinds of step is genuinely multichannel, not just "email". */
-function campaignChannelLabel(content: string | null): "Email" | "LinkedIn" | "Multichannel" {
+export function campaignChannelLabel(content: string | null): "Email" | "LinkedIn" | "Multichannel" {
   if (!content || !content.trim()) return "Email";
   const blocks = content.split(/\n+\s*---\s*\n+/);
   let hasLinkedIn = false, hasEmail = false;
@@ -54,7 +54,7 @@ function campaignChannelLabel(content: string | null): "Email" | "LinkedIn" | "M
   return hasLinkedIn ? "LinkedIn" : "Email";
 }
 
-function ChannelBadge({ label }: { label: "Email" | "LinkedIn" | "Multichannel" }) {
+export function ChannelBadge({ label }: { label: "Email" | "LinkedIn" | "Multichannel" }) {
   const variant = label === "LinkedIn" ? "blue" : label === "Multichannel" ? "purple" : "info";
   return <Badge variant={variant}>{label}</Badge>;
 }
@@ -262,7 +262,7 @@ export function CampaignsView({
       else if (cardFilter === "opened") matchCard = (r.openRate ?? 0) > 0;
       else if (cardFilter === "replied") matchCard = r.replyRate > 0;
 
-      const matchApproval = approvalFilter === "All" || r.approvalStatus === approvalFilter;
+      const matchApproval = approvalFilter === "All" ? r.approvalStatus !== "Archived" : r.approvalStatus === approvalFilter;
       const matchDateFrom = !dateFrom || r.updatedAt >= dateFrom;
       const matchDateTo = !dateTo || r.updatedAt <= `${dateTo}T23:59:59.999Z`;
       const matchType = typeFilter.length === 0 || typeFilter.includes(r.channelLabel);

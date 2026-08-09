@@ -17,6 +17,7 @@ import { setCampaignStatus, updateCampaign, type CampaignRow } from "@/lib/queri
 import { sendCampaign } from "@/lib/email/campaign-send";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { approvalBadgeVariant } from "@/lib/campaign-approval-ui";
+import { campaignChannelLabel, ChannelBadge } from "@/components/campaigns/campaigns-view";
 import { SequenceFlow, type FlowStep } from "@/components/campaigns/sequence-flow";
 import { FlowCanvas } from "@/components/campaigns/flow-canvas";
 import { parseDelay, formatDelay, DELAY_UNITS } from "@/lib/sequence-delay";
@@ -24,8 +25,7 @@ import { formatDate, cn } from "@/lib/utils";
 import { InboxView } from "@/components/inbox/inbox-view";
 import { LockedFeature } from "@/components/billing/locked-feature";
 import type { InboxConversation } from "@/lib/queries/inbox";
-import { LeadsTable } from "@/components/leads/leads-table";
-import type { LeadRow } from "@/lib/queries/leads";
+import { createLead, type LeadRow } from "@/lib/queries/leads";
 import type { LeadEngagementRow } from "@/lib/email/campaign-stats";
 import { getEnrollments, getEnrollmentCounts, type CampaignEnrollmentRow, type EnrollmentStatus } from "@/lib/campaigns/enrollment";
 
@@ -75,7 +75,7 @@ const TABS = ["Audience", "Enrollments", "Sequence", "Analytics", "Inbox", "Sett
 type Tab = (typeof TABS)[number];
 
 export function CampaignDetailView({
-  campaign, audience, audienceLabel, pendingJobs = 0, inboxConversations = [], audienceLeads = [], leadActivity = [], replyTrackingEnabled = false,
+  campaign, audience, audienceLabel, pendingJobs = 0, inboxConversations = [], audienceLeads = [], leadActivity = [], replyTrackingEnabled = false, owners = {},
 }: {
   campaign: CampaignRow;
   audience: number;
@@ -85,6 +85,7 @@ export function CampaignDetailView({
   audienceLeads?: LeadRow[];
   leadActivity?: LeadEngagementRow[];
   replyTrackingEnabled?: boolean;
+  owners?: Record<string, string>;
 }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
@@ -170,11 +171,18 @@ export function CampaignDetailView({
     setStatusLocal(next);
     start(async () => { await setCampaignStatus(campaign.id, next); });
   }
+  // Split-and-send (Phase 4A) — `null` means "everyone" (the default); once the
+  // user unchecks anyone in the Audience tab this becomes the explicit subset
+  // to launch to. Only meaningful pre-launch (Draft) — once launched the whole
+  // concept of "who to include" is moot, the audience is already frozen.
+  const [includedLeadIds, setIncludedLeadIds] = useState<Set<string> | null>(null);
   async function handleSendNow() {
-    if (!(await confirm({ title: "Send this campaign?", message: `Send the opener email to everyone in “${audienceLabel}” (${audience.toLocaleString()} prospects).`, confirmLabel: "Send now" }))) return;
+    const includeIds = includedLeadIds ? [...includedLeadIds] : undefined;
+    const launchCount = includeIds ? includeIds.length : audience;
+    if (!(await confirm({ title: "Send this campaign?", message: `Send the opener email to ${includeIds ? `${launchCount.toLocaleString()} selected prospects` : `everyone in “${audienceLabel}” (${audience.toLocaleString()} prospects)`}.`, confirmLabel: "Send now" }))) return;
     setSending(true);
     try {
-      const res = await sendCampaign(campaign.id);
+      const res = await sendCampaign(campaign.id, includeIds);
       if (res.ok) {
         const chargedLeads = res.sent + res.failed + res.skipped + (res.deferred ?? 0);
         toast(`Campaign sent successfully — ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.deferred ? `, ${res.deferred} queued for tomorrow (daily limit reached)` : ""}${res.simulated ? " (simulated)" : ""}. ${chargedLeads * 2} credits used.`, "success");
@@ -208,9 +216,10 @@ export function CampaignDetailView({
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden max-w-md">
               <div className={cn("h-full bg-blue-500 rounded-full transition-all", isActive && "lp-progress-active")} style={{ width: `${progress}%` }} />
             </div>
-            <p className="text-xs text-slate-500 mt-1.5">
-              {sent.toLocaleString()} of {audience.toLocaleString()} sent · {progress}%
-              {isActive && <span className="ml-2 inline-flex items-center gap-1 text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> running</span>}
+            <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-2">
+              <span>{sent.toLocaleString()} of {audience.toLocaleString()} sent · {progress}%</span>
+              <ChannelBadge label={campaignChannelLabel(campaign.content)} />
+              {isActive && <span className="inline-flex items-center gap-1 text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> running</span>}
             </p>
           </div>
 
@@ -224,8 +233,12 @@ export function CampaignDetailView({
             <div className="flex items-center gap-2">
               <Button
                 onClick={handleSendNow}
-                disabled={pending || sending || status === "Paused" || status === "Completed"}
-                title={status === "Paused" || status === "Completed" ? `This campaign is ${status.toLowerCase()} — reactivate it to launch.` : undefined}
+                disabled={pending || sending || status !== "Draft" && status !== "Scheduled"}
+                title={
+                  status === "Active" ? "This campaign has already launched — its audience is locked to who was enrolled at launch."
+                  : status === "Paused" || status === "Completed" ? `This campaign is ${status.toLowerCase()} — reactivate it to launch.`
+                  : undefined
+                }
               >
                 {sending
                   ? <><Loader2 className="h-4 w-4 animate-spin" /> Launching…</>
@@ -262,16 +275,20 @@ export function CampaignDetailView({
       </div>
 
       {/* Audience — the actual leads this campaign targets, not just a count.
-          LeadsTable already has its own "Add Leads" button + empty state, so we
-          don't duplicate a second "Add leads" control at the page level. */}
+          Read-only here on purpose (Phase 4): editing a lead's own fields
+          happens on its full Lead Details page, not inline in a campaign. */}
       {tab === "Audience" && (
-        <div>
-          <div className="mb-3">
-            <h2 className="font-semibold text-slate-900">{audienceLabel}</h2>
-            <p className="text-xs text-slate-500">{audienceLeads.length.toLocaleString()} of {audience.toLocaleString()} prospects shown below</p>
-          </div>
-          <LeadsTable leads={audienceLeads} />
-        </div>
+        <CampaignAudienceTable
+          campaignId={campaign.id}
+          segmentId={campaign.segment_id}
+          audienceLabel={audienceLabel}
+          audience={audience}
+          leads={audienceLeads}
+          owners={owners}
+          selectable={status === "Draft"}
+          includedLeadIds={includedLeadIds}
+          onIncludedLeadIdsChange={setIncludedLeadIds}
+        />
       )}
 
       {/* Enrollments (Phase 4H) — one row per campaign_enrollments record;
@@ -477,13 +494,24 @@ export function CampaignDetailView({
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
               <Select
                 value={status}
-                disabled={status === "Completed"}
-                title={status === "Completed" ? "A completed campaign's status can't be changed." : undefined}
+                disabled={status === "Completed" || status === "Draft"}
+                title={
+                  status === "Completed" ? "A completed campaign's status can't be changed."
+                  : status === "Draft" ? "Use the Launch button to move this campaign out of Draft."
+                  : undefined
+                }
                 onChange={(e) => { setStatusLocal(e.target.value); start(async () => { await setCampaignStatus(campaign.id, e.target.value); }); }}
               >
-                <option>Draft</option><option>Active</option><option>Paused</option><option>Completed</option>
+                <option>Draft</option>
+                <option>Active</option>
+                <option>Paused</option>
+                {/* Active/Paused may only move between each other from here — Completed is
+                    set automatically when the sequence finishes, and Draft is a one-way
+                    starting state, never something to revert back into. */}
+                <option disabled={status === "Active" || status === "Paused"}>Completed</option>
               </Select>
               {status === "Completed" && <p className="text-xs text-slate-400 mt-1">This campaign is completed — its status is locked.</p>}
+              {status === "Draft" && <p className="text-xs text-slate-400 mt-1">This campaign hasn&apos;t launched yet — use the Launch button above.</p>}
             </div>
           </Card>
         </div>
@@ -565,6 +593,136 @@ export function CampaignDetailView({
         <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setEditIndex(null)}>Cancel</Button>
           <Button onClick={saveStep} disabled={pending}>{pending ? "Saving…" : "Save step"}</Button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/** Phase 4 — read-only campaign audience table + "Add prospect". Clicking a
+ *  row navigates to the lead's full detail page (that's where field editing
+ *  actually happens); this table never edits/deletes a lead in place. */
+function CampaignAudienceTable({
+  campaignId, segmentId, audienceLabel, audience, leads, owners,
+  selectable = false, includedLeadIds, onIncludedLeadIdsChange,
+}: {
+  campaignId: string;
+  segmentId: string | null;
+  audienceLabel: string;
+  audience: number;
+  leads: LeadRow[];
+  owners: Record<string, string>;
+  /** Draft-only (Phase 4A split-and-send): show per-row checkboxes to choose
+   *  who this launch actually includes. */
+  selectable?: boolean;
+  includedLeadIds?: Set<string> | null;
+  onIncludedLeadIdsChange?: (ids: Set<string> | null) => void;
+}) {
+  const router = useRouter();
+  const { toast } = useFeedback();
+  const [pending, start] = useTransition();
+  const [addOpen, setAddOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [companyName, setCompanyName] = useState("");
+
+  // null = "everyone" (default) — only materialize the explicit Set once the
+  // user actually deselects someone.
+  const isIncluded = (id: string) => !includedLeadIds || includedLeadIds.has(id);
+  function toggleIncluded(id: string) {
+    if (!onIncludedLeadIdsChange) return;
+    const base = includedLeadIds ?? new Set(leads.map((l) => l.id));
+    const next = new Set(base);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    onIncludedLeadIdsChange(next.size === leads.length ? null : next);
+  }
+
+  function handleAdd() {
+    if (!name.trim() || !email.trim()) return;
+    start(async () => {
+      try {
+        const lead = await createLead({ full_name: name.trim(), email: email.trim(), company_name: companyName.trim() || null });
+        const { addProspectToCampaign } = await import("@/lib/campaigns/enrollment");
+        const { convertedSegmentToStatic } = await addProspectToCampaign(campaignId, segmentId, lead);
+        if (convertedSegmentToStatic) toast(`"${audienceLabel}" was a dynamic segment — converted it to static so this manually added prospect isn't removed on the next refresh.`, "info");
+        toast("Prospect added to this campaign.", "success");
+        setAddOpen(false);
+        setName(""); setEmail(""); setCompanyName("");
+        router.refresh();
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Couldn't add prospect.", "error");
+      }
+    });
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="font-semibold text-slate-900">{audienceLabel}</h2>
+          <p className="text-xs text-slate-500">
+            {leads.length.toLocaleString()} of {audience.toLocaleString()} prospects shown below
+            {selectable && includedLeadIds && ` · ${includedLeadIds.size.toLocaleString()} selected to launch to`}
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setAddOpen(true)}>Add prospect</Button>
+      </div>
+
+      {selectable && (
+        <p className="text-xs text-slate-500 mb-2">Uncheck anyone you don&apos;t want this launch to include — everyone&apos;s included by default.</p>
+      )}
+
+      {leads.length === 0 ? (
+        <Card className="p-10 text-center text-sm text-slate-500">No prospects in this audience yet.</Card>
+      ) : (
+        <DataTable>
+          <DataTableHead>
+            <DataTableRow>
+              {selectable && <DataTableTh className="w-8" />}
+              <DataTableTh>Name</DataTableTh>
+              <DataTableTh>Company</DataTableTh>
+              <DataTableTh>Email</DataTableTh>
+              <DataTableTh>Owner</DataTableTh>
+              <DataTableTh>Status</DataTableTh>
+            </DataTableRow>
+          </DataTableHead>
+          <DataTableBody className="divide-y divide-slate-100">
+            {leads.map((l) => (
+              <DataTableRow key={l.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/leads/${l.id}`)}>
+                {selectable && (
+                  <DataTableTd onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={isIncluded(l.id)} onChange={() => toggleIncluded(l.id)} className="rounded border-slate-300" />
+                  </DataTableTd>
+                )}
+                <DataTableTd className="font-medium text-slate-900">{l.full_name || "—"}</DataTableTd>
+                <DataTableTd className="text-slate-600">{l.company_name || "—"}</DataTableTd>
+                <DataTableTd className="text-slate-600">{l.email || "—"}</DataTableTd>
+                <DataTableTd className="text-slate-500">{l.owner_id ? owners[l.owner_id] || "—" : "Unassigned"}</DataTableTd>
+                <DataTableTd><Badge variant="default">{l.status}</Badge></DataTableTd>
+              </DataTableRow>
+            ))}
+          </DataTableBody>
+        </DataTable>
+      )}
+
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add prospect" description="Adds a new lead directly to this campaign's audience.">
+        <div className="p-5 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Name</label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@company.com" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Company (optional)</label>
+            <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Acme Inc" />
+          </div>
+        </div>
+        <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+          <Button onClick={handleAdd} disabled={pending || !name.trim() || !email.trim()}>{pending ? "Adding…" : "Add prospect"}</Button>
         </div>
       </Modal>
     </div>

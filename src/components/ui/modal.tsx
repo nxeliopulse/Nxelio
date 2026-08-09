@@ -10,6 +10,10 @@ interface ModalProps {
   description?: string;
   children: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  /** "side" slides in from the right edge instead of the centered dialog —
+   *  for lighter, single-purpose forms (compose/reply) rather than a full
+   *  page-blocking dialog. */
+  variant?: "center" | "side";
 }
 
 const sizes = {
@@ -19,8 +23,29 @@ const sizes = {
   xl: "max-w-5xl",
 };
 
-export function Modal({ open, onClose, title, description, children, size = "md" }: ModalProps) {
+export function Modal({ open, onClose, title, description, children, size = "md", variant = "center" }: ModalProps) {
   if (!open) return null;
+  if (variant === "side") {
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="lp-anim-fade fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+        <div className={cn("lp-anim-slide-in relative bg-white h-full w-full shadow-2xl overflow-hidden flex flex-col", sizes[size])}>
+          {(title || description) && (
+            <div className="p-5 border-b border-slate-100 flex items-start justify-between flex-shrink-0">
+              <div>
+                {title && <h2 className="font-semibold text-lg text-slate-900">{title}</h2>}
+                {description && <p className="text-sm text-slate-500 mt-1">{description}</p>}
+              </div>
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-700 rounded-md p-1">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          )}
+          <div className="overflow-auto flex-1">{children}</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="lp-anim-fade fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
