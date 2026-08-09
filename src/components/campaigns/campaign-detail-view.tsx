@@ -133,7 +133,12 @@ export function CampaignDetailView({
     });
   }, [leadActivity, activityFilter]);
 
+  // Sequence content is locked once launched (Phase 4) — the audience already
+  // received (or is scheduled for) whatever was live at launch time, so
+  // editing it afterward would silently diverge from what people actually got.
+  const contentLocked = status !== "Draft";
   function openStep(i: number) {
+    if (contentLocked) return;
     setEditIndex(i);
     setDraft({ ...steps[i] });
   }
@@ -193,6 +198,11 @@ export function CampaignDetailView({
         const chargedLeads = res.sent + res.failed + res.skipped + (res.deferred ?? 0);
         toast(`Campaign sent successfully — ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.deferred ? `, ${res.deferred} queued for tomorrow (daily limit reached)` : ""}${res.simulated ? " (simulated)" : ""}. ${chargedLeads * 2} credits used.`, "success");
         notifyCreditsChanged();
+        // The Launch button/Status dropdown read local `status` state, which
+        // router.refresh() alone doesn't update (it re-renders server data but
+        // this component's own useState isn't re-initialized) — set it directly
+        // so the UI reflects "launched" immediately, not just after a manual reload.
+        setStatusLocal("Active");
         router.refresh();
       }
       else toast(res.error || "No emails were sent.", "error");
@@ -313,7 +323,11 @@ export function CampaignDetailView({
           <h2 className="font-semibold text-slate-900 mb-3">Email sequence</h2>
           {steps.length > 0 ? (
             <>
-              <p className="text-xs text-slate-500 mb-2">Tip: click any email node to edit it. Drag to pan, Ctrl/Cmd + scroll (or the +/− buttons) to zoom.</p>
+              <p className="text-xs text-slate-500 mb-2">
+                {contentLocked
+                  ? "This campaign has launched — its sequence content is locked and can no longer be edited."
+                  : "Tip: click any email node to edit it. Drag to pan, Ctrl/Cmd + scroll (or the +/− buttons) to zoom."}
+              </p>
               <FlowCanvas>
                 <SequenceFlow steps={steps} onStepClick={openStep} />
               </FlowCanvas>
@@ -511,12 +525,12 @@ export function CampaignDetailView({
                 }
                 onChange={(e) => { setStatusLocal(e.target.value); start(async () => { await setCampaignStatus(campaign.id, e.target.value); }); }}
               >
-                <option>Draft</option>
+                {/* Active/Paused may only move between each other from here — Draft is a
+                    one-way starting state (never something to revert back into once
+                    launched) and Completed is set automatically when the sequence finishes. */}
+                <option disabled={status === "Active" || status === "Paused"}>Draft</option>
                 <option>Active</option>
                 <option>Paused</option>
-                {/* Active/Paused may only move between each other from here — Completed is
-                    set automatically when the sequence finishes, and Draft is a one-way
-                    starting state, never something to revert back into. */}
                 <option disabled={status === "Active" || status === "Paused"}>Completed</option>
               </Select>
               {status === "Completed" && <p className="text-xs text-slate-400 mt-1">This campaign is completed — its status is locked.</p>}
