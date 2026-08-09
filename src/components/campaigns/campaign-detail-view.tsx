@@ -233,13 +233,17 @@ export function CampaignDetailView({
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                role="switch" aria-checked={isActive} aria-label={isActive ? "Pause campaign" : "Activate campaign"}
-                onClick={toggleStatus} disabled={pending}
-                className={cn("relative h-6 w-11 rounded-full transition-colors flex-shrink-0", isActive ? "bg-blue-600" : "bg-slate-300")}
-              >
-                <span className={cn("absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", isActive ? "translate-x-5" : "translate-x-0")} />
-              </button>
+              {status === "Completed" ? (
+                <Badge variant="success" className="text-xs">Completed</Badge>
+              ) : (
+                <button
+                  role="switch" aria-checked={isActive} aria-label={isActive ? "Pause campaign" : "Activate campaign"}
+                  onClick={toggleStatus} disabled={pending}
+                  className={cn("relative h-6 w-11 rounded-full transition-colors flex-shrink-0", isActive ? "bg-blue-600" : "bg-slate-300")}
+                >
+                  <span className={cn("absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", isActive ? "translate-x-5" : "translate-x-0")} />
+                </button>
+              )}
               <span className="text-xs text-slate-400">{formatDate(campaign.updated_at)}</span>
             </div>
           </div>
@@ -471,9 +475,15 @@ export function CampaignDetailView({
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-              <Select value={status} onChange={(e) => { setStatusLocal(e.target.value); start(async () => { await setCampaignStatus(campaign.id, e.target.value); }); }}>
+              <Select
+                value={status}
+                disabled={status === "Completed"}
+                title={status === "Completed" ? "A completed campaign's status can't be changed." : undefined}
+                onChange={(e) => { setStatusLocal(e.target.value); start(async () => { await setCampaignStatus(campaign.id, e.target.value); }); }}
+              >
                 <option>Draft</option><option>Active</option><option>Paused</option><option>Completed</option>
               </Select>
+              {status === "Completed" && <p className="text-xs text-slate-400 mt-1">This campaign is completed — its status is locked.</p>}
             </div>
           </Card>
         </div>
