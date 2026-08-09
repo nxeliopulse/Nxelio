@@ -151,19 +151,20 @@ export async function advanceEnrollmentStep(campaignId: string, leadId: string, 
     .eq("lead_id", leadId);
 }
 
-/** Adds a manually-created prospect to a campaign's audience (Phase 4 detail-
- *  page "Add prospect") — deliberate, explicit growth, distinct from the
- *  automatic-segment-refresh growth that's blocked elsewhere. If the campaign
- *  is segment-based and that segment is Dynamic, converts it to Static first:
- *  a Dynamic segment's membership gets silently overwritten by its rule on
- *  the next refresh, which would erase a manually-added member — Static
- *  segments don't have that hazard. Returns whether that conversion happened
- *  so the caller can toast it. */
-export async function addProspectToCampaign(
+/** Adds prospects to a campaign's audience (Phase 4 "Add prospects" drawer) —
+ *  deliberate, explicit growth, distinct from the automatic-segment-refresh
+ *  growth that's blocked elsewhere. If the campaign is segment-based and that
+ *  segment is Dynamic, converts it to Static first: a Dynamic segment's
+ *  membership gets silently overwritten by its rule on the next refresh,
+ *  which would erase a manually-added member — Static segments don't have
+ *  that hazard. Returns whether that conversion happened so the caller can
+ *  toast it, and how many were actually new (vs. already enrolled). */
+export async function addProspectsToCampaign(
   campaignId: string,
   segmentId: string | null,
-  lead: EnrollableLead
-): Promise<{ convertedSegmentToStatic: boolean }> {
+  leads: EnrollableLead[]
+): Promise<{ convertedSegmentToStatic: boolean; created: number; skipped: number }> {
+  if (!leads.length) return { convertedSegmentToStatic: false, created: 0, skipped: 0 };
   const supabase = await createClient();
   let convertedSegmentToStatic = false;
 
@@ -173,12 +174,15 @@ export async function addProspectToCampaign(
       await supabase.from("segments").update({ segment_type: "Static", rule_json: null }).eq("id", segmentId);
       convertedSegmentToStatic = true;
     }
-    await supabase.from("segment_members").upsert({ segment_id: segmentId, lead_id: lead.id }, { onConflict: "segment_id,lead_id" });
+    await supabase.from("segment_members").upsert(
+      leads.map((l) => ({ segment_id: segmentId, lead_id: l.id })),
+      { onConflict: "segment_id,lead_id" }
+    );
   }
 
-  await createEnrollments(campaignId, segmentId, [lead]);
+  const { created, skipped } = await createEnrollments(campaignId, segmentId, leads);
   revalidatePath("/campaigns");
-  return { convertedSegmentToStatic };
+  return { convertedSegmentToStatic, created, skipped };
 }
 
 export async function completeEnrollment(campaignId: string, leadId: string): Promise<void> {

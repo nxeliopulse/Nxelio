@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getCampaignById, getCampaignPendingCount } from "@/lib/queries/campaigns";
+import { getCampaignById, getCampaignPendingCount, getCampaigns } from "@/lib/queries/campaigns";
 import { getSegments, getSegmentMemberLeads } from "@/lib/queries/segments";
 import { getLeads, getLeadStats, type LeadRow } from "@/lib/queries/leads";
 import { getUsers } from "@/lib/queries/users";
@@ -11,7 +11,7 @@ import { CampaignDetailView } from "@/components/campaigns/campaign-detail-view"
 
 export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [campaign, segments, leadStats, pending, inboxConversations, allLeads, leadActivity, replyTrackingEnabled, users, enrolledLeads] = await Promise.all([
+  const [campaign, segments, leadStats, pending, inboxConversations, allLeads, leadActivity, replyTrackingEnabled, users, enrolledLeads, allCampaigns] = await Promise.all([
     getCampaignById(id),
     getSegments(),
     getLeadStats(),
@@ -22,6 +22,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     hasFeature("reply_tracking"),
     getUsers(),
     getEnrolledLeads<LeadRow>(id),
+    getCampaigns(),
   ]);
   if (!campaign) notFound();
 
@@ -47,6 +48,9 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       leadActivity={leadActivity}
       replyTrackingEnabled={replyTrackingEnabled}
       owners={owners}
+      segments={segments}
+      campaigns={allCampaigns}
+      leadStatsTotal={leadStats.total}
     />
   );
 }

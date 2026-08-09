@@ -62,7 +62,7 @@ type ManualEntry = {
   streetAddress: string; city: string; state: string; country: string; postalCode: string;
 };
 
-type CsvRow = {
+export type CsvRow = {
   full_name: string | null;
   email: string | null;
   phone: string | null;
@@ -126,7 +126,7 @@ function splitCsvLine(line: string): string[] {
   return out.map((s) => s.trim());
 }
 
-function parseCsv(text: string): CsvRow[] {
+export function parseCsv(text: string): CsvRow[] {
   const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter((l) => l.trim());
   if (!lines.length) return [];
   const headers = splitCsvLine(lines[0]).map((h) => CSV_HEADER_MAP[h.toLowerCase().trim()] ?? null);
@@ -1087,7 +1087,7 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
 
 // ============================================================================
 // Buy Leads — real LinkedIn prospects via Bright Data (AI samples as fallback)
-type BuyState = {
+export type BuyState = {
   industry: string; role: string; locations: string[]; count: number;
   companySize: string; seniority: string; requireVerifiedEmail: boolean; includePhoneAndSocial: boolean;
 };
@@ -1096,7 +1096,7 @@ type BuyState = {
 // values load in — "Any" is a client-only sentinel for this filter UI, never stored.
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
-function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, maxCount }: {
+export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, maxCount }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;

@@ -25,9 +25,11 @@ import { formatDate, cn } from "@/lib/utils";
 import { InboxView } from "@/components/inbox/inbox-view";
 import { LockedFeature } from "@/components/billing/locked-feature";
 import type { InboxConversation } from "@/lib/queries/inbox";
-import { createLead, type LeadRow } from "@/lib/queries/leads";
+import type { LeadRow } from "@/lib/queries/leads";
 import type { LeadEngagementRow } from "@/lib/email/campaign-stats";
 import { getEnrollments, getEnrollmentCounts, type CampaignEnrollmentRow, type EnrollmentStatus } from "@/lib/campaigns/enrollment";
+import { AddProspectsDrawer } from "@/components/campaigns/add-prospects-drawer";
+import type { SegmentRow } from "@/lib/queries/segments";
 
 /** "Jul 2, 3:45 PM" — used in the activity table so opens/sends are traceable to a moment, not just a rate. */
 function fmtDateTime(iso: string | null): string {
@@ -76,6 +78,7 @@ type Tab = (typeof TABS)[number];
 
 export function CampaignDetailView({
   campaign, audience, audienceLabel, pendingJobs = 0, inboxConversations = [], audienceLeads = [], leadActivity = [], replyTrackingEnabled = false, owners = {},
+  segments = [], campaigns = [], leadStatsTotal = 0,
 }: {
   campaign: CampaignRow;
   audience: number;
@@ -86,6 +89,9 @@ export function CampaignDetailView({
   leadActivity?: LeadEngagementRow[];
   replyTrackingEnabled?: boolean;
   owners?: Record<string, string>;
+  segments?: (SegmentRow & { contacts: number })[];
+  campaigns?: CampaignRow[];
+  leadStatsTotal?: number;
 }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
@@ -288,6 +294,9 @@ export function CampaignDetailView({
           selectable={status === "Draft"}
           includedLeadIds={includedLeadIds}
           onIncludedLeadIdsChange={setIncludedLeadIds}
+          segments={segments}
+          campaigns={campaigns}
+          leadStatsTotal={leadStatsTotal}
         />
       )}
 
@@ -605,6 +614,7 @@ export function CampaignDetailView({
 function CampaignAudienceTable({
   campaignId, segmentId, audienceLabel, audience, leads, owners,
   selectable = false, includedLeadIds, onIncludedLeadIdsChange,
+  segments, campaigns, leadStatsTotal,
 }: {
   campaignId: string;
   segmentId: string | null;
@@ -617,14 +627,12 @@ function CampaignAudienceTable({
   selectable?: boolean;
   includedLeadIds?: Set<string> | null;
   onIncludedLeadIdsChange?: (ids: Set<string> | null) => void;
+  segments: (SegmentRow & { contacts: number })[];
+  campaigns: CampaignRow[];
+  leadStatsTotal: number;
 }) {
   const router = useRouter();
-  const { toast } = useFeedback();
-  const [pending, start] = useTransition();
   const [addOpen, setAddOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [companyName, setCompanyName] = useState("");
 
   // null = "everyone" (default) — only materialize the explicit Set once the
   // user actually deselects someone.
@@ -637,24 +645,6 @@ function CampaignAudienceTable({
     onIncludedLeadIdsChange(next.size === leads.length ? null : next);
   }
 
-  function handleAdd() {
-    if (!name.trim() || !email.trim()) return;
-    start(async () => {
-      try {
-        const lead = await createLead({ full_name: name.trim(), email: email.trim(), company_name: companyName.trim() || null });
-        const { addProspectToCampaign } = await import("@/lib/campaigns/enrollment");
-        const { convertedSegmentToStatic } = await addProspectToCampaign(campaignId, segmentId, lead);
-        if (convertedSegmentToStatic) toast(`"${audienceLabel}" was a dynamic segment — converted it to static so this manually added prospect isn't removed on the next refresh.`, "info");
-        toast("Prospect added to this campaign.", "success");
-        setAddOpen(false);
-        setName(""); setEmail(""); setCompanyName("");
-        router.refresh();
-      } catch (err) {
-        toast(err instanceof Error ? err.message : "Couldn't add prospect.", "error");
-      }
-    });
-  }
-
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -665,7 +655,7 @@ function CampaignAudienceTable({
             {selectable && includedLeadIds && ` · ${includedLeadIds.size.toLocaleString()} selected to launch to`}
           </p>
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)}>Add prospect</Button>
+        <Button size="sm" onClick={() => setAddOpen(true)}>Add prospects</Button>
       </div>
 
       {selectable && (
@@ -705,26 +695,16 @@ function CampaignAudienceTable({
         </DataTable>
       )}
 
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add prospect" description="Adds a new lead directly to this campaign's audience.">
-        <div className="p-5 space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Name</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@company.com" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Company (optional)</label>
-            <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Acme Inc" />
-          </div>
-        </div>
-        <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-          <Button onClick={handleAdd} disabled={pending || !name.trim() || !email.trim()}>{pending ? "Adding…" : "Add prospect"}</Button>
-        </div>
-      </Modal>
+      <AddProspectsDrawer
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        campaignId={campaignId}
+        segmentId={segmentId}
+        audienceLabel={audienceLabel}
+        segments={segments}
+        campaigns={campaigns}
+        leadStatsTotal={leadStatsTotal}
+      />
     </div>
   );
 }
