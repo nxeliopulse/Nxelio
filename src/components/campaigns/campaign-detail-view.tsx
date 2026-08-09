@@ -222,10 +222,14 @@ export function CampaignDetailView({
 
           <div className="flex items-center gap-3 lg:flex-col lg:items-end lg:gap-2">
             <div className="flex items-center gap-2">
-              <Button onClick={handleSendNow} disabled={pending || sending}>
+              <Button
+                onClick={handleSendNow}
+                disabled={pending || sending || status === "Paused" || status === "Completed"}
+                title={status === "Paused" || status === "Completed" ? `This campaign is ${status.toLowerCase()} — reactivate it to launch.` : undefined}
+              >
                 {sending
-                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>
-                  : <><Send className="h-4 w-4" /> Send now</>}
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Launching…</>
+                  : <><Send className="h-4 w-4" /> Launch</>}
               </Button>
             </div>
             <div className="flex items-center gap-2">
