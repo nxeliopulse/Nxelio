@@ -6,6 +6,7 @@ import { archiveImportedLeads, markArchivedLeadsDeleted } from "@/lib/queries/le
 import { revalidatePath } from "next/cache";
 import { scoreLeadWithAi, isAiConfigured, type AiScoreResult } from "@/lib/ai/actions";
 import { mapWithConcurrency } from "@/lib/utils";
+import { isSuperAdmin } from "@/lib/queries/auth-guards";
 
 export interface LeadRow {
   id: string;
@@ -57,7 +58,20 @@ export interface LeadRow {
   email_opt_out: boolean | null;
   do_not_contact: boolean | null;
   email_bounced: boolean | null;
+  /** Which of email/phone/linkedin/industry have already been edited once and are now Super-Admin-only. */
+  locked_fields: Record<string, boolean> | null;
+  tags: string[] | null;
+  projects: string[] | null;
+  priority: "High" | "Medium" | "Low" | null;
 }
+
+/**
+ * Fields that lock themselves the first time they're edited — only a Super
+ * Admin can change them after that. Not exported: a "use server" file may
+ * only export async functions, and nothing outside this file needs the list
+ * itself (the UI checks `lead.locked_fields` directly by field name).
+ */
+const SELF_LOCKING_FIELDS = ["email", "phone", "linkedin", "industry"] as const;
 
 /** Splits "Jane Doe" into { first: "Jane", last: "Doe" } — same convention used
  *  across the app (e.g. email-guess.ts) for deriving first/last from a full name. */
@@ -129,11 +143,94 @@ export async function createLead(payload: Partial<LeadRow>) {
 
 export async function updateLead(id: string, payload: Partial<LeadRow>) {
   const supabase = await createClient();
-  const { error } = await supabase.from("leads").update(payload).eq("id", id);
+
+  const touchedLockable = SELF_LOCKING_FIELDS.filter((f) =>
+    Object.prototype.hasOwnProperty.call(payload, f)
+  );
+
+  let finalPayload: Partial<LeadRow> = payload;
+
+  if (touchedLockable.length) {
+    const { data: current } = await supabase
+      .from("leads")
+      .select("email, phone, linkedin, industry, locked_fields")
+      .eq("id", id)
+      .single();
+    const locked = (current?.locked_fields as Record<string, boolean> | null) ?? {};
+    const admin = await isSuperAdmin();
+
+    const blocked: string[] = [];
+    const newlyLocked: string[] = [];
+
+    for (const field of touchedLockable) {
+      const currentVal = current?.[field] ?? null;
+      const newVal = payload[field] ?? null;
+      if (newVal === currentVal) continue; // no real change — nothing to lock or block
+
+      if (locked[field] && !admin) {
+        blocked.push(field);
+      } else {
+        newlyLocked.push(field);
+      }
+    }
+
+    // Never silently drop a locked edit — the UI should already prevent this
+    // (the field is disabled), so reaching here means it was bypassed; fail
+    // loudly rather than save some fields and quietly skip others.
+    if (blocked.length) {
+      throw new Error(`${blocked.join(", ")} ${blocked.length === 1 ? "is" : "are"} locked and can only be changed by a Super Admin.`);
+    }
+
+    if (newlyLocked.length) {
+      const updatedLocked = { ...locked };
+      for (const f of newlyLocked) updatedLocked[f] = true;
+      finalPayload = { ...payload, locked_fields: updatedLocked };
+    }
+  }
+
+  const { error } = await supabase.from("leads").update(finalPayload).eq("id", id);
   if (error) throw error;
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
   await logAudit({ action: "lead.updated", entityType: "lead", entityId: id, metadata: payload as Record<string, unknown> });
+}
+
+/**
+ * Status changes are tracked separately from updateLead() because they
+ * require a reason from the user — recorded both in the workspace-wide
+ * audit log (lead.status_changed) and as a visible entry in the lead's own
+ * Activities timeline (STATUS_CHANGED), so anyone opening the lead can see
+ * why its status moved without digging into admin-only logs.
+ */
+export async function updateLeadStatus(id: string, newStatus: string, reason: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: current } = await supabase.from("leads").select("status, full_name, company_name, email").eq("id", id).single();
+  const fromStatus = current?.status ?? null;
+
+  const { error } = await supabase.from("leads").update({ status: newStatus }).eq("id", id);
+  if (error) throw error;
+
+  const { data: actor } = user
+    ? await supabase.from("users").select("full_name, email").eq("user_id", user.id).single()
+    : { data: null };
+  const changedByName = actor?.full_name || actor?.email || null;
+
+  await supabase.from("lead_activities").insert({
+    lead_id: id,
+    activity_type: "STATUS_CHANGED",
+    metadata: { from_status: fromStatus, to_status: newStatus, reason: reason.trim(), changed_by: changedByName },
+  });
+
+  revalidatePath("/leads");
+  revalidatePath(`/leads/${id}`);
+  await logAudit({
+    action: "lead.status_changed",
+    entityType: "lead",
+    entityId: id,
+    entityLabel: current?.full_name || current?.company_name || current?.email || undefined,
+    metadata: { from: fromStatus, to: newStatus, reason: reason.trim() },
+  });
 }
 
 export async function deleteLead(id: string) {

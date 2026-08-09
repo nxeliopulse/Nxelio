@@ -264,11 +264,14 @@ export function AddLeadsWizard({
       if (mainEl) {
         const originalOverflow = mainEl.style.overflow;
         const originalOverflowY = mainEl.style.overflowY;
+        const originalScrollTop = mainEl.scrollTop;
         mainEl.style.overflow = "hidden";
         mainEl.style.overflowY = "hidden";
+        mainEl.scrollTop = 0;
         return () => {
           mainEl.style.overflow = originalOverflow;
           mainEl.style.overflowY = originalOverflowY;
+          mainEl.scrollTop = originalScrollTop;
         };
       }
     }

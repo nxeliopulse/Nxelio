@@ -19,7 +19,7 @@ import { ConvertLeadModal } from "@/components/leads/convert-lead-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import type { LeadRow } from "@/lib/queries/leads";
-import { updateLead } from "@/lib/queries/leads";
+import { updateLead, updateLeadStatus } from "@/lib/queries/leads";
 import { STAGE_LABELS, type OpportunityRow } from "@/lib/opportunities";
 import type { MeetingRow } from "@/lib/queries/meetings";
 import type { LeadHistory } from "@/lib/queries/lead-detail";
@@ -29,6 +29,12 @@ import { formatDate, formatDateTime, cn } from "@/lib/utils";
 
 function money(n: number): string {
   return "$" + Math.round(n).toLocaleString("en-US");
+}
+
+/** Two-letter avatar initials from a name, "—" if there's no name to show. */
+function initialsFor(name: string | null | undefined): string {
+  if (!name) return "—";
+  return name.split(" ").filter(Boolean).map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
 export interface Activity {
@@ -52,7 +58,18 @@ const activityMeta: Record<string, { label: string; color: string; icon: LucideI
   CONSULTATION_REQUESTED: { label: "Requested consultation", color: "bg-pink-500", icon: Calendar },
   LEAD_SCORE_UPDATED: { label: "AI Score updated", color: "bg-indigo-500", icon: Target },
   LEAD_CREATED: { label: "Contact record created", color: "bg-slate-400", icon: Users },
+  STATUS_CHANGED: { label: "Status changed", color: "bg-indigo-500", icon: HistoryIcon },
 };
+
+/** STATUS_CHANGED carries who/what/why in metadata — build a readable label from it instead of the static one above. */
+function statusChangeLabel(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  const from = typeof metadata.from_status === "string" ? metadata.from_status : "—";
+  const to = typeof metadata.to_status === "string" ? metadata.to_status : "—";
+  const reason = typeof metadata.reason === "string" ? metadata.reason : "";
+  const by = typeof metadata.changed_by === "string" ? metadata.changed_by : null;
+  return `Status changed from ${from} to ${to}${by ? ` by ${by}` : ""}${reason ? ` — "${reason}"` : ""}`;
+}
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -88,7 +105,7 @@ export function LeadDetailView({
   embedded?: boolean;
 }) {
   const router = useRouter();
-  const { confirm, toast } = useFeedback();
+  const { confirm, toast, prompt } = useFeedback();
 
   // Local sync for interactive status updates
   const [lead, setLead] = useState<LeadRow>(initialLead);
@@ -114,7 +131,63 @@ export function LeadDetailView({
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
-  const [priority, setPriority] = useState<string>("High");
+  // Priority/Tags/Projects — persisted on the lead row itself (see
+  // 0117_lead_tags_priority_projects.sql). Previously these were fake:
+  // Priority reset to "High" on every reload, Tags/Projects always showed
+  // the same two hardcoded labels regardless of the lead.
+  async function handlePriorityChange(newPriority: "High" | "Medium" | "Low") {
+    try {
+      await updateLead(lead.id, { priority: newPriority });
+      setLead((l) => ({ ...l, priority: newPriority }));
+      toast(`Priority set to ${newPriority}.`, "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't update priority.", "error");
+    }
+  }
+
+  async function handleAddTag() {
+    const tag = await prompt({ title: "Add a tag", label: "Tag", placeholder: "e.g. VIP", confirmLabel: "Add", required: true });
+    if (!tag) return;
+    const next = [...new Set([...(lead.tags || []), tag.trim()])];
+    try {
+      await updateLead(lead.id, { tags: next });
+      setLead((l) => ({ ...l, tags: next }));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't add tag.", "error");
+    }
+  }
+
+  async function handleRemoveTag(tag: string) {
+    const next = (lead.tags || []).filter((t) => t !== tag);
+    try {
+      await updateLead(lead.id, { tags: next });
+      setLead((l) => ({ ...l, tags: next }));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't remove tag.", "error");
+    }
+  }
+
+  async function handleAddProject() {
+    const project = await prompt({ title: "Add a project", label: "Project", placeholder: "e.g. Q3 Expansion", confirmLabel: "Add", required: true });
+    if (!project) return;
+    const next = [...new Set([...(lead.projects || []), project.trim()])];
+    try {
+      await updateLead(lead.id, { projects: next });
+      setLead((l) => ({ ...l, projects: next }));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't add project.", "error");
+    }
+  }
+
+  async function handleRemoveProject(project: string) {
+    const next = (lead.projects || []).filter((p) => p !== project);
+    try {
+      await updateLead(lead.id, { projects: next });
+      setLead((l) => ({ ...l, projects: next }));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't remove project.", "error");
+    }
+  }
 
   // Notes state
   const [noteBody, setNoteBody] = useState("");
@@ -134,18 +207,30 @@ export function LeadDetailView({
     .slice(0, 2)
     .toUpperCase();
 
-  // Update lead status
+  // Locks manual Status edits while this lead is part of a currently
+  // Running/Active campaign, so nobody contradicts what a live send
+  // sequence is doing to it mid-flight.
+  const statusLocked = campaigns.some((c) => c.status === "Active");
+
+  // Update lead status — requires a reason, logged with who made the change.
   const handleStatusUpdate = async (newStatus: string) => {
+    if (statusLocked) return;
+    setStatusDropdownOpen(false);
+    if (newStatus === lead.status) return;
+    const reason = await prompt({
+      title: `Change status to "${newStatus}"?`,
+      message: "Add a short reason for this change — it's saved to this lead's activity history.",
+      label: "Reason",
+      placeholder: "e.g. Replied to outreach and asked for a demo",
+      confirmLabel: "Update status",
+      required: true,
+    });
+    if (reason === null) return; // canceled
     try {
-      await updateLead(lead.id, { status: newStatus });
+      await updateLeadStatus(lead.id, newStatus, reason);
       setLead((l) => ({ ...l, status: newStatus }));
-      if (newStatus === "Converted") {
-        setConverted(true);
-      } else {
-        setConverted(false);
-      }
+      setConverted(newStatus === "Converted");
       toast(`Status updated to ${newStatus}.`, "success");
-      setStatusDropdownOpen(false);
       router.refresh();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Couldn't update status.", "error");
@@ -206,8 +291,10 @@ export function LeadDetailView({
   const timeline = [
     ...activities.map((a) => {
       const meta = activityMeta[a.activity_type] || { label: a.activity_type, color: "bg-slate-400", icon: Users };
+      const label = a.activity_type === "STATUS_CHANGED" ? (statusChangeLabel(a.metadata) ?? meta.label) : meta.label;
       return {
         ...meta,
+        label,
         time: relativeTime(a.created_at),
         iso: a.created_at,
         timeFormatted: new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -419,14 +506,21 @@ export function LeadDetailView({
 
             <div className="relative">
               <button
-                onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-                className="py-1 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                onClick={() => !statusLocked && setStatusDropdownOpen(!statusDropdownOpen)}
+                disabled={statusLocked}
+                title={statusLocked ? "This lead is part of a running campaign — status is locked until it finishes or is paused." : undefined}
+                className={cn(
+                  "py-1 px-3 text-xs rounded-md font-semibold flex items-center gap-1 shadow-sm transition-colors",
+                  statusLocked
+                    ? "bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                )}
               >
-                <ThumbsUp className="h-3.5 w-3.5 flex-shrink-0" /> {lead.status || "Status"}{" "}
-                <ChevronDown className="h-3 w-3 text-emerald-100 flex-shrink-0" />
+                {statusLocked ? <Lock className="h-3.5 w-3.5 flex-shrink-0" /> : <ThumbsUp className="h-3.5 w-3.5 flex-shrink-0" />} {lead.status || "Status"}{" "}
+                {!statusLocked && <ChevronDown className="h-3 w-3 text-emerald-100 flex-shrink-0" />}
               </button>
 
-              {statusDropdownOpen && (
+              {statusDropdownOpen && !statusLocked && (
                 <div className="absolute right-0 mt-1.5 w-36 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
                   {["New", "Contacted", "Qualified", "Nurturing", "Win", "Converted", "Lost"].map((st) => (
                     <button
@@ -514,39 +608,45 @@ export function LeadDetailView({
               )}
             </div>
 
-            {/* Owner Section */}
+            {/* Owner Section — real owner from leads.owner_id (auto-set to the
+                creating user by trg_set_lead_owner), resolved via getLeadHistory(). */}
             <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-3 tracking-wide">Owner</h6>
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
               <div className="flex items-center">
                 <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-bold mr-2">
-                  SV
+                  {initialsFor(history?.createdByName)}
                 </div>
                 <div className="text-xs">
-                  <p className="text-slate-800 dark:text-slate-700 font-semibold">Steve Vaughan</p>
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold">{history?.createdByName || "Unassigned"}</p>
                 </div>
               </div>
             </div>
 
             {/* Tags Section */}
             <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-2 tracking-wide">Tags</h6>
-            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3 flex flex-wrap gap-1.5">
-              <Badge variant="success" className="text-[10px] py-0.5 px-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20 rounded font-medium">
-                Collab
-              </Badge>
-              <Badge variant="warning" className="text-[10px] py-0.5 px-2 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/20 rounded font-medium">
-                VIP
-              </Badge>
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3 flex flex-wrap items-center gap-1.5">
+              {(lead.tags || []).map((tag) => (
+                <Badge key={tag} variant="success" className="text-[10px] py-0.5 pl-2 pr-1 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/20 rounded font-medium flex items-center gap-1">
+                  {tag}
+                  <button onClick={() => handleRemoveTag(tag)} className="hover:text-emerald-900 dark:hover:text-emerald-200" aria-label={`Remove ${tag} tag`}>
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </Badge>
+              ))}
+              <button
+                onClick={handleAddTag}
+                className="inline-flex items-center gap-0.5 text-[10px] py-0.5 px-2 rounded border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 hover:border-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium"
+              >
+                <Plus className="h-2.5 w-2.5" /> Add tag
+              </button>
             </div>
 
             {/* Priority Section */}
             <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-2 tracking-wide">Priority</h6>
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
               <select
-                value={priority}
-                onChange={(e) => {
-                  setPriority(e.target.value);
-                  toast(`Priority set to ${e.target.value}.`, "success");
-                }}
+                value={lead.priority || "Medium"}
+                onChange={(e) => handlePriorityChange(e.target.value as "High" | "Medium" | "Low")}
                 className="w-full text-xs rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 focus:ring-1 focus:ring-blue-500 font-medium"
               >
                 <option value="High">High</option>
@@ -557,13 +657,21 @@ export function LeadDetailView({
 
             {/* Projects Section */}
             <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-2 tracking-wide">Projects</h6>
-            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3 flex flex-wrap gap-1.5">
-              <span className="text-[10px] py-0.5 px-2 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-600 border border-slate-200 dark:border-slate-800 rounded font-semibold">
-                Devops Design
-              </span>
-              <span className="text-[10px] py-0.5 px-2 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-600 border border-slate-200 dark:border-slate-800 rounded font-semibold">
-                Margrate Design
-              </span>
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3 flex flex-wrap items-center gap-1.5">
+              {(lead.projects || []).map((project) => (
+                <span key={project} className="text-[10px] py-0.5 pl-2 pr-1 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-600 border border-slate-200 dark:border-slate-800 rounded font-semibold flex items-center gap-1">
+                  {project}
+                  <button onClick={() => handleRemoveProject(project)} className="hover:text-slate-900 dark:hover:text-slate-300" aria-label={`Remove ${project} project`}>
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              ))}
+              <button
+                onClick={handleAddProject}
+                className="inline-flex items-center gap-0.5 text-[10px] py-0.5 px-2 rounded border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 hover:border-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium"
+              >
+                <Plus className="h-2.5 w-2.5" /> Add project
+              </button>
             </div>
 
             {/* Last Modified Auditing */}
@@ -578,10 +686,10 @@ export function LeadDetailView({
                 <p className="text-slate-500 dark:text-slate-500 font-medium">Modified By</p>
                 <div className="flex items-center">
                   <div className="h-5 w-5 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 flex items-center justify-center text-[9px] font-bold mr-1">
-                    DR
+                    {initialsFor(history?.lastModifiedByName)}
                   </div>
                   <p className="text-slate-800 dark:text-slate-700 font-semibold">
-                    {history?.lastModifiedByName || "Darlee Robertson"}
+                    {history?.lastModifiedByName || "Unassigned"}
                   </p>
                 </div>
               </div>

@@ -9,6 +9,7 @@ import {
 } from "@/lib/queries/platform-overview";
 import { getVendorSubscriptions } from "@/lib/queries/platform-vendor-subscriptions";
 import { getAiProviderStatus } from "@/lib/queries/ai-provider-settings";
+import { getEmailPromoCodes } from "@/lib/queries/admin-promo-codes";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 
 export default async function AdminPage() {
@@ -23,6 +24,7 @@ export default async function AdminPage() {
     aiProviderStatus,
     trendData,
     attentionWorkspaces,
+    promoCodes,
   ] = await Promise.all([
     getPlatformOverviewStats(),
     getHotCustomers(),
@@ -32,6 +34,7 @@ export default async function AdminPage() {
     getAiProviderStatus(),
     getPlatformOverviewTrend(),
     getWorkspacesNeedingAttention(),
+    getEmailPromoCodes(),
   ]);
 
   return (
@@ -44,6 +47,7 @@ export default async function AdminPage() {
       aiProviderStatus={aiProviderStatus}
       trendData={trendData}
       attentionWorkspaces={attentionWorkspaces}
+      promoCodes={promoCodes}
     />
   );
 }

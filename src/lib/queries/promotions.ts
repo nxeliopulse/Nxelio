@@ -23,6 +23,7 @@ interface PromotionRow {
   valid_from: string;
   valid_until: string | null;
   is_active: boolean;
+  restricted_email: string | null;
 }
 
 async function currentWorkspaceId(): Promise<string | null> {
@@ -56,6 +57,13 @@ export async function previewPromoCode(code: string, planId: PlanId): Promise<Pr
   const now = Date.now();
   if (new Date(promo.valid_from).getTime() > now) return { ok: false, error: "This code isn't active yet" };
   if (promo.valid_until && new Date(promo.valid_until).getTime() < now) return { ok: false, error: "This code has expired" };
+
+  if (promo.restricted_email) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email || user.email.toLowerCase() !== promo.restricted_email.toLowerCase()) {
+      return { ok: false, error: "This code is not valid for your account" };
+    }
+  }
 
   if (promo.applicable_plans?.length && !promo.applicable_plans.includes(planId)) {
     return { ok: false, error: "This code is not valid for the selected plan" };
@@ -98,10 +106,12 @@ export async function startPromoRedemption(
   planId: PlanId
 ): Promise<PromoValidationResult> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const { data, error } = await supabase.rpc("redeem_promotion_start", {
     p_workspace_id: workspaceId,
     p_code: code,
     p_plan_id: planId,
+    p_email: user?.email ?? null,
   });
   if (error) return { ok: false, error: error.message };
   const result = data as {

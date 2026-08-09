@@ -1,13 +1,15 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { X, User, Save } from "lucide-react";
+import { Lock, X, User, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
-import { updateLead, type LeadRow } from "@/lib/queries/leads";
+import { updateLead, updateLeadStatus, type LeadRow } from "@/lib/queries/leads";
 import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
 import { getPicklistValues } from "@/lib/queries/picklists";
+import { useLeadInActiveCampaign } from "@/lib/leads/use-lead-in-active-campaign";
+import { isSuperAdmin } from "@/lib/queries/auth-guards";
 
 const FALLBACK_STATUSES = ["New", "Contacted", "Qualified", "Nurturing"];
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
@@ -15,7 +17,12 @@ const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Indi
 
 export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose: () => void; lead: LeadRow }) {
   const router = useRouter();
-  const { toast } = useFeedback();
+  const { toast, prompt } = useFeedback();
+  const statusLocked = useLeadInActiveCampaign(lead.id);
+  const [amSuperAdmin, setAmSuperAdmin] = useState(false);
+  useEffect(() => { isSuperAdmin().then(setAmSuperAdmin).catch(() => {}); }, []);
+  const lockedFields = lead.locked_fields ?? {};
+  const fieldLocked = (field: string) => Boolean(lockedFields[field]) && !amSuperAdmin;
   const [form, setForm] = useState({
     full_name: lead.full_name || "",
     company_name: lead.company_name || "",
@@ -67,6 +74,23 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
       setError("At least one of Email, Website, or LinkedIn is required.");
       return;
     }
+    // Status changes need a reason, logged separately from the rest of the
+    // form — collect it before touching anything, so canceling here aborts
+    // the whole save rather than silently dropping just the status change.
+    const statusChanged = form.status !== lead.status;
+    let statusReason: string | null = null;
+    if (statusChanged) {
+      statusReason = await prompt({
+        title: `Change status to "${form.status}"?`,
+        message: "Add a short reason for this change — it's saved to this lead's activity history.",
+        label: "Reason",
+        placeholder: "e.g. Replied to outreach and asked for a demo",
+        confirmLabel: "Update status",
+        required: true,
+      });
+      if (statusReason === null) return; // canceled — abort the whole save
+    }
+
     setError(null);
     setSaving(true);
     try {
@@ -79,7 +103,6 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
         linkedin: form.linkedin.trim() || null,
         industry: form.industry || null,
         interest_area: form.interest_area || null,
-        status: form.status,
         job_title: form.job_title.trim() || null,
         seniority: form.seniority || null,
         company_size: form.company_size || null,
@@ -91,6 +114,9 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
         postal_code: form.postal_code.trim() || null,
         message: form.message.trim() || null,
       });
+      if (statusChanged && statusReason) {
+        await updateLeadStatus(lead.id, form.status, statusReason);
+      }
       toast("Lead updated successfully.", "success");
       onClose();
       router.refresh();
@@ -145,27 +171,55 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
               <input className={fieldStyle} value={form.company_name} onChange={(e) => set("company_name", e.target.value)} placeholder="Company Name" />
             </div>
             <div>
-              <label className={labelStyle}>Email</label>
-              <input type="email" className={fieldStyle} value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@example.com" />
+              <label className={labelStyle}>
+                Email {fieldLocked("email") && <Lock className="inline h-3 w-3 text-slate-400 ml-1" />}
+              </label>
+              <input
+                type="email" className={fieldStyle} value={form.email} onChange={(e) => set("email", e.target.value)}
+                placeholder="email@example.com" disabled={fieldLocked("email")}
+                title={fieldLocked("email") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}
+              />
+              {fieldLocked("email") && <p className="text-[11px] text-slate-400 mt-1">Locked — only a Super Admin can edit this.</p>}
             </div>
             <div>
-              <label className={labelStyle}>Phone</label>
-              <input className={fieldStyle} value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="Phone number" />
+              <label className={labelStyle}>
+                Phone {fieldLocked("phone") && <Lock className="inline h-3 w-3 text-slate-400 ml-1" />}
+              </label>
+              <input
+                className={fieldStyle} value={form.phone} onChange={(e) => set("phone", e.target.value)}
+                placeholder="Phone number" disabled={fieldLocked("phone")}
+                title={fieldLocked("phone") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}
+              />
+              {fieldLocked("phone") && <p className="text-[11px] text-slate-400 mt-1">Locked — only a Super Admin can edit this.</p>}
             </div>
             <div>
               <label className={labelStyle}>Website</label>
               <input className={fieldStyle} value={form.website_url} onChange={(e) => set("website_url", e.target.value)} placeholder="https://example.com" />
             </div>
             <div>
-              <label className={labelStyle}>LinkedIn</label>
-              <input className={fieldStyle} value={form.linkedin} onChange={(e) => set("linkedin", e.target.value)} placeholder="LinkedIn Profile URL" />
+              <label className={labelStyle}>
+                LinkedIn {fieldLocked("linkedin") && <Lock className="inline h-3 w-3 text-slate-400 ml-1" />}
+              </label>
+              <input
+                className={fieldStyle} value={form.linkedin} onChange={(e) => set("linkedin", e.target.value)}
+                placeholder="LinkedIn Profile URL" disabled={fieldLocked("linkedin")}
+                title={fieldLocked("linkedin") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}
+              />
+              {fieldLocked("linkedin") && <p className="text-[11px] text-slate-400 mt-1">Locked — only a Super Admin can edit this.</p>}
             </div>
             <div>
-              <label className={labelStyle}>Industry</label>
-              <Select className={fieldStyle} value={form.industry} onChange={(e) => set("industry", e.target.value)}>
+              <label className={labelStyle}>
+                Industry {fieldLocked("industry") && <Lock className="inline h-3 w-3 text-slate-400 ml-1" />}
+              </label>
+              <Select
+                className={fieldStyle} value={form.industry} onChange={(e) => set("industry", e.target.value)}
+                disabled={fieldLocked("industry")}
+                title={fieldLocked("industry") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}
+              >
                 <option value="">— Choose Industry —</option>
                 {industries.map((i) => <option key={i} value={i}>{i}</option>)}
               </Select>
+              {fieldLocked("industry") && <p className="text-[11px] text-slate-400 mt-1">Locked — only a Super Admin can edit this.</p>}
             </div>
             <div>
               <label className={labelStyle}>Interest Area</label>
@@ -176,11 +230,20 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
             </div>
             <div>
               <label className={labelStyle}>Status</label>
-              <Select className={fieldStyle} value={form.status} onChange={(e) => set("status", e.target.value)}>
+              <Select
+                className={fieldStyle}
+                value={form.status}
+                onChange={(e) => set("status", e.target.value)}
+                disabled={statusLocked}
+                title={statusLocked ? "This lead is part of a running campaign — status is locked until it finishes or is paused." : undefined}
+              >
                 {(statuses.includes(form.status) ? statuses : [...statuses, form.status]).map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </Select>
+              {statusLocked && (
+                <p className="text-xs text-amber-600 mt-1">Locked — this lead is part of a running campaign.</p>
+              )}
             </div>
             <div>
               <label className={labelStyle}>Job Title</label>

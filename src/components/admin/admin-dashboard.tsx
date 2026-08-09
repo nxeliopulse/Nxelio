@@ -1,13 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon } from "lucide-react";
+import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket } from "lucide-react";
 import { platformAdminSignOut } from "@/lib/queries/platform-admin";
 import { OverviewTab } from "@/components/admin/overview-tab";
 import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
 import { AdminLeadArchiveView } from "@/components/admin/lead-archive-view";
 import { VendorSubscriptionsTab } from "@/components/admin/vendor-subscriptions-tab";
 import { AiProviderTab } from "@/components/admin/ai-provider-tab";
+import { PromoCodesTab } from "@/components/admin/promo-codes-tab";
 import type {
   PlatformOverviewStats,
   HotCustomerRow,
@@ -18,11 +19,13 @@ import type {
 import type { LeadArchiveRow } from "@/lib/queries/lead-import-archive";
 import type { VendorSubscriptionRow } from "@/lib/queries/platform-vendor-subscriptions";
 import type { AiProviderStatus } from "@/lib/queries/ai-provider-settings";
+import type { EmailPromoCodeRow } from "@/lib/queries/admin-promo-codes";
 import { LogoMark } from "@/components/brand/logo";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "subscriptions", label: "Subscriptions", icon: CreditCard },
+  { id: "promo-codes", label: "Promo Codes", icon: Ticket },
   { id: "leads", label: "Leads Archive", icon: Archive },
   { id: "vendors", label: "Our Vendor Subscriptions", icon: Plug },
   { id: "ai-provider", label: "AI Provider", icon: Sparkles },
@@ -37,6 +40,7 @@ export function AdminDashboard({
   aiProviderStatus,
   trendData,
   attentionWorkspaces,
+  promoCodes,
 }: {
   stats: PlatformOverviewStats;
   hotCustomers: HotCustomerRow[];
@@ -46,6 +50,7 @@ export function AdminDashboard({
   aiProviderStatus: AiProviderStatus;
   trendData: PlatformOverviewTrendPoint[];
   attentionWorkspaces: WorkspaceAttentionItem[];
+  promoCodes: EmailPromoCodeRow[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
@@ -157,6 +162,7 @@ export function AdminDashboard({
           />
         )}
         {tab === "subscriptions" && <SubscriptionsTab rows={subscriptions} />}
+        {tab === "promo-codes" && <PromoCodesTab initialCodes={promoCodes} />}
         {tab === "leads" && <AdminLeadArchiveView rows={leadArchive} />}
         {tab === "vendors" && <VendorSubscriptionsTab rows={vendorSubscriptions} />}
         {tab === "ai-provider" && <AiProviderTab status={aiProviderStatus} />}
