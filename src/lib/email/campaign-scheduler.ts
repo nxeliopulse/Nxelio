@@ -9,7 +9,7 @@ import {
 } from "@/lib/outreach/unipile";
 import { consumeSendQuota } from "@/lib/outreach/send-quota";
 import { isSuppressed } from "@/lib/segments";
-import { exitEnrollmentByLead, advanceEnrollmentStep, completeEnrollment } from "@/lib/campaigns/enrollment";
+import { exitEnrollmentByLead, advanceEnrollmentStep, completeEnrollment, checkAndCompleteCampaign } from "@/lib/campaigns/enrollment";
 
 // Loosely-typed client — both the authenticated and admin clients expose the same query API.
 type Db = SupabaseClient;
@@ -346,6 +346,7 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
       await db.from("campaign_jobs").update({ status: "canceled", last_error: "Suppressed", updated_at: nowIso })
         .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
       await exitEnrollmentByLead(job.campaign_id, job.lead_id, "suppressed");
+      await checkAndCompleteCampaign(job.campaign_id);
       result.skipped++;
       continue;
     }
@@ -361,6 +362,7 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
       await db.from("campaign_jobs").update({ status: "canceled", last_error: "Lead replied", updated_at: nowIso })
         .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
       await exitEnrollmentByLead(job.campaign_id, job.lead_id, "replied");
+      await checkAndCompleteCampaign(job.campaign_id);
       result.skipped++;
       continue;
     }
@@ -373,6 +375,7 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
         await db.from("campaign_jobs").update({ status: "canceled", last_error: "Colleague replied", updated_at: nowIso })
           .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
         await exitEnrollmentByLead(job.campaign_id, job.lead_id, "colleague_replied");
+        await checkAndCompleteCampaign(job.campaign_id);
         result.skipped++;
         continue;
       }
@@ -407,7 +410,10 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
       const { count: remaining } = await db.from("campaign_jobs").select("id", { count: "exact", head: true })
         .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
       await advanceEnrollmentStep(job.campaign_id, job.lead_id, Number(job.step_order) || 0, null);
-      if (!remaining) await completeEnrollment(job.campaign_id, job.lead_id);
+      if (!remaining) {
+        await completeEnrollment(job.campaign_id, job.lead_id);
+        await checkAndCompleteCampaign(job.campaign_id);
+      }
       result.sent++;
     } else if (r.skipped) {
       await db.from("campaign_jobs").update({ status: "skipped", last_error: r.error, updated_at: nowIso }).eq("id", job.id);
