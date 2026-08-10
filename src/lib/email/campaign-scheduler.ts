@@ -97,13 +97,20 @@ async function connectedLinkedInAccount(db: Db, workspaceId: string): Promise<st
 async function connectedEmailAddress(db: Db, workspaceId: string): Promise<string | undefined> {
   const { data } = await db
     .from("outreach_accounts")
-    .select("identifier")
+    .select("identifier, name")
     .eq("workspace_id", workspaceId)
     .eq("channel", "email")
     .eq("status", "connected")
     .limit(1)
     .maybeSingle();
-  return (data?.identifier as string) || undefined;
+  // Unipile's account payload puts the real mailbox address in `name`, not
+  // `identifier` — every connected email account in production has an empty
+  // `identifier`, which made this always silently fall back to the single
+  // hardcoded REPLY_TO_EMAIL for every workspace instead of routing replies
+  // to that workspace's actual connected mailbox (the whole reason this
+  // function exists). `identifier` is checked first only in case a future
+  // Unipile response shape does populate it.
+  return (data?.identifier as string) || (data?.name as string) || undefined;
 }
 
 async function isBlockedIn(db: Db, workspaceId: string, email: string): Promise<boolean> {

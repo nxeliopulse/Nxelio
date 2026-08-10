@@ -158,8 +158,8 @@ export async function sendBackToDraft(campaignId: string, comment: string) {
 export async function archiveCampaign(campaignId: string) {
   const { userId, workspaceId } = await requireCaller();
   const campaign = await loadCampaign(campaignId);
-  if (campaign.approval_status === "Draft (AI-generated)" || campaign.approval_status === "Pending review") {
-    throw new Error("Only an Approved or Live campaign can be archived.");
+  if (campaign.approval_status === "Archived") {
+    throw new Error("This campaign is already archived.");
   }
   const admin = createAdminClient();
   const { error } = await admin.from("campaigns").update({ approval_status: "Archived" }).eq("id", campaignId);

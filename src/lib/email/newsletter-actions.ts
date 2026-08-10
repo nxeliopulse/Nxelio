@@ -193,12 +193,14 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
   // Route replies to whichever mailbox is actually connected, not a stale env var.
   const { data: mailbox } = await supabase
     .from("outreach_accounts")
-    .select("identifier")
+    .select("identifier, name")
     .eq("channel", "email")
     .eq("status", "connected")
     .limit(1)
     .maybeSingle();
-  const replyTo = (mailbox?.identifier as string) || undefined;
+  // Unipile puts the real mailbox address in `name`, not `identifier` — see
+  // the same fix in campaign-scheduler.ts's connectedEmailAddress().
+  const replyTo = (mailbox?.identifier as string) || (mailbox?.name as string) || undefined;
   let sent = 0;
   let failed = 0;
   let redirectedNote: string | undefined;
@@ -316,7 +318,7 @@ export async function sendTestNewsletter(newsletterId: string, testEmail: string
   const { data: onboarding } = await getOnboarding();
   const { data: mailbox } = await supabase
     .from("outreach_accounts")
-    .select("identifier")
+    .select("identifier, name")
     .eq("channel", "email")
     .eq("status", "connected")
     .limit(1)
@@ -326,7 +328,7 @@ export async function sendTestNewsletter(newsletterId: string, testEmail: string
     subject: `[TEST] ${substituteMergeTags(n.subject || n.title, fakeLead)}`,
     html,
     fromName: onboarding?.company_name?.trim() || "Nxelio Nurture",
-    replyTo: (mailbox?.identifier as string) || undefined,
+    replyTo: (mailbox?.identifier as string) || (mailbox?.name as string) || undefined,
   });
 
   return result.ok

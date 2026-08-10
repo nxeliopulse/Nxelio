@@ -7,6 +7,7 @@ import {
   BarChart3, MousePointerClick, CalendarClock, Loader2, X,
 } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +79,7 @@ type Tab = (typeof TABS)[number];
 
 export function CampaignDetailView({
   campaign, audience, audienceLabel, pendingJobs = 0, inboxConversations = [], audienceLeads = [], leadActivity = [], replyTrackingEnabled = false, owners = {},
-  segments = [], campaigns = [], leadStatsTotal = 0,
+  segments = [], campaigns = [], leadStatsTotal = 0, enrolledLeadIds = null,
 }: {
   campaign: CampaignRow;
   audience: number;
@@ -92,6 +93,11 @@ export function CampaignDetailView({
   segments?: (SegmentRow & { contacts: number })[];
   campaigns?: CampaignRow[];
   leadStatsTotal?: number;
+  /** null pre-launch (nothing to distinguish yet). Once launched, the set of
+   *  lead ids actually enrolled — everyone else in audienceLeads matched the
+   *  segment but was excluded (split-and-send) or added afterward, and
+   *  renders dulled in the Audience tab instead of being hidden outright. */
+  enrolledLeadIds?: Set<string> | null;
 }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
@@ -100,6 +106,7 @@ export function CampaignDetailView({
   const [tab, setTab] = useState<Tab>("Audience");
   const [name, setName] = useState(campaign.campaign_name);
   const [status, setStatusLocal] = useState(campaign.status);
+  const [requiresApproval, setRequiresApprovalLocal] = useState(campaign.requires_approval);
 
   // While a campaign is Active, poll for fresh stats so sent/opened/replied/pending
   // update on their own (follow-ups send via cron, opens arrive via webhook) without
@@ -215,6 +222,19 @@ export function CampaignDetailView({
   function saveName() {
     start(async () => { await updateCampaign(campaign.id, { campaign_name: name.trim() || "Untitled Campaign" }); toast("Campaign updated", "success"); });
   }
+  function toggleRequiresApproval(next: boolean) {
+    if (status !== "Draft") return; // locked once the campaign has run — the Switch is also disabled, this is the backstop
+    setRequiresApprovalLocal(next);
+    start(async () => {
+      try {
+        await updateCampaign(campaign.id, { requires_approval: next });
+        toast(next ? "This campaign now requires approval before it can launch." : "Approval requirement removed — this campaign can launch directly.", "success");
+      } catch (err) {
+        setRequiresApprovalLocal(!next);
+        toast(err instanceof Error ? err.message : "Couldn't update this setting.", "error");
+      }
+    });
+  }
   return (
     <div className="max-w-[1400px] mx-auto">
       <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4">
@@ -227,7 +247,13 @@ export function CampaignDetailView({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
               <h1 className="text-xl font-bold text-slate-900 truncate">{campaign.campaign_name}</h1>
-              <Badge variant={approvalBadgeVariant(campaign.approval_status)}>{campaign.approval_status}</Badge>
+              {/* Paused overrides the approval badge — "Live/Distributing" is the approval
+                  lifecycle stage, not whether sends are actually going out right now. */}
+              {status === "Paused" ? (
+                <Badge variant="warning">Paused</Badge>
+              ) : (
+                <Badge variant={approvalBadgeVariant(campaign.approval_status)}>{campaign.approval_status}</Badge>
+              )}
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden max-w-md">
               <div className={cn("h-full bg-blue-500 rounded-full transition-all", isActive && "lp-progress-active")} style={{ width: `${progress}%` }} />
@@ -308,6 +334,7 @@ export function CampaignDetailView({
           campaigns={campaigns}
           leadStatsTotal={leadStatsTotal}
           canAddProspects={status === "Draft"}
+          enrolledLeadIds={enrolledLeadIds}
         />
       )}
 
@@ -537,6 +564,19 @@ export function CampaignDetailView({
               {status === "Completed" && <p className="text-xs text-slate-400 mt-1">This campaign is completed — its status is locked.</p>}
               {status === "Draft" && <p className="text-xs text-slate-400 mt-1">This campaign hasn&apos;t launched yet — use the Launch button above.</p>}
             </div>
+            <div>
+              <label className="flex items-center justify-between gap-3 cursor-pointer">
+                <span>
+                  <span className="block text-sm font-medium text-slate-700">Require approval before sending</span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    {status === "Draft"
+                      ? "When on, this campaign must be reviewed and approved before it can be launched."
+                      : "Only settable when creating a campaign — this one has already run, so it's locked."}
+                  </span>
+                </span>
+                <Switch checked={requiresApproval} onChange={toggleRequiresApproval} disabled={pending || status !== "Draft"} />
+              </label>
+            </div>
           </Card>
         </div>
       )}
@@ -629,7 +669,7 @@ export function CampaignDetailView({
 function CampaignAudienceTable({
   campaignId, segmentId, audienceLabel, audience, leads, owners,
   selectable = false, includedLeadIds, onIncludedLeadIdsChange,
-  segments, campaigns, leadStatsTotal, canAddProspects = true,
+  segments, campaigns, leadStatsTotal, canAddProspects = true, enrolledLeadIds = null,
 }: {
   campaignId: string;
   segmentId: string | null;
@@ -649,6 +689,10 @@ function CampaignAudienceTable({
    *  snapshot; adding prospects afterward would silently grow it beyond what
    *  actually launched (same principle as the audience-snapshot fix). */
   canAddProspects?: boolean;
+  /** Post-launch — who actually got enrolled. Everyone else in `leads`
+   *  matched but was excluded (split-and-send) or joined afterward, and
+   *  renders dulled instead of being hidden. */
+  enrolledLeadIds?: Set<string> | null;
 }) {
   const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
@@ -687,6 +731,9 @@ function CampaignAudienceTable({
       {selectable && (
         <p className="text-xs text-slate-500 mb-2">Uncheck anyone you don&apos;t want this launch to include — everyone&apos;s included by default.</p>
       )}
+      {enrolledLeadIds !== null && (
+        <p className="text-xs text-slate-500 mb-2">Dulled rows matched this audience but weren&apos;t enrolled — excluded at launch, or added afterward.</p>
+      )}
 
       {leads.length === 0 ? (
         <Card className="p-10 text-center text-sm text-slate-500">No prospects in this audience yet.</Card>
@@ -703,20 +750,28 @@ function CampaignAudienceTable({
             </DataTableRow>
           </DataTableHead>
           <DataTableBody className="divide-y divide-slate-100">
-            {leads.map((l) => (
-              <DataTableRow key={l.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/leads/${l.id}`)}>
-                {selectable && (
-                  <DataTableTd onClick={(e) => e.stopPropagation()}>
-                    <input type="checkbox" checked={isIncluded(l.id)} onChange={() => toggleIncluded(l.id)} className="rounded border-slate-300" />
+            {leads.map((l) => {
+              // Post-launch only — everyone in `leads` matched the segment, but
+              // only the enrolled ones actually got sent to. Dulled rows are
+              // still visible (not hidden) so it's clear who was excluded.
+              const excluded = enrolledLeadIds !== null && !enrolledLeadIds.has(l.id);
+              return (
+                <DataTableRow key={l.id} className={cn("cursor-pointer hover:bg-slate-50", excluded && "opacity-45")} onClick={() => router.push(`/leads/${l.id}`)}>
+                  {selectable && (
+                    <DataTableTd onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={isIncluded(l.id)} onChange={() => toggleIncluded(l.id)} className="rounded border-slate-300" />
+                    </DataTableTd>
+                  )}
+                  <DataTableTd className="font-medium text-slate-900">{l.full_name || "—"}</DataTableTd>
+                  <DataTableTd className="text-slate-600">{l.company_name || "—"}</DataTableTd>
+                  <DataTableTd className="text-slate-600">{l.email || "—"}</DataTableTd>
+                  <DataTableTd className="text-slate-500">{l.owner_id ? owners[l.owner_id] || "—" : "Unassigned"}</DataTableTd>
+                  <DataTableTd>
+                    {excluded ? <Badge variant="default">Not included</Badge> : <Badge variant="default">{l.status}</Badge>}
                   </DataTableTd>
-                )}
-                <DataTableTd className="font-medium text-slate-900">{l.full_name || "—"}</DataTableTd>
-                <DataTableTd className="text-slate-600">{l.company_name || "—"}</DataTableTd>
-                <DataTableTd className="text-slate-600">{l.email || "—"}</DataTableTd>
-                <DataTableTd className="text-slate-500">{l.owner_id ? owners[l.owner_id] || "—" : "Unassigned"}</DataTableTd>
-                <DataTableTd><Badge variant="default">{l.status}</Badge></DataTableTd>
-              </DataTableRow>
-            ))}
+                </DataTableRow>
+              );
+            })}
           </DataTableBody>
         </DataTable>
       )}

@@ -27,15 +27,27 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   if (!campaign) notFound();
 
   const seg = campaign.segment_id ? segments.find((s) => s.id === campaign.segment_id) : null;
-  const audience = seg ? seg.contacts : leadStats.total;
   const audienceLabel = seg ? seg.segment_name : "All leads";
   const owners = Object.fromEntries(users.map((u) => [u.user_id, u.full_name]));
-  // Once launched, the Audience tab shows the frozen enrollment snapshot (who
-  // was actually enrolled at launch), never a live re-resolve of the segment —
-  // otherwise leads added to the segment afterward would appear to have joined
-  // a campaign that never actually sent to them. Pre-launch (no enrollments
-  // yet), the live segment/workspace membership is the correct preview.
-  const audienceLeads = enrolledLeads ?? (campaign.segment_id ? await getSegmentMemberLeads(campaign.segment_id) : allLeads);
+  const launched = campaign.status !== "Draft" && !!enrolledLeads;
+  const liveMatched = campaign.segment_id ? await getSegmentMemberLeads(campaign.segment_id) : allLeads;
+  // Pre-launch: just the live segment/workspace membership (nothing's frozen yet).
+  // Post-launch (split-and-send may have excluded some of the matched set):
+  // show the FULL matched set so excluded prospects are still visible and
+  // explainable, not silently hidden — but mark which ones actually got
+  // enrolled (enrolledLeadIds, passed to the table for bright/dulled styling)
+  // so it's obvious who this campaign really reached vs who was excluded.
+  // Matched leads that only showed up in the segment AFTER launch (never
+  // enrolled) appear dulled too — correctly, since they were never sent to.
+  const audienceLeads = launched
+    ? [...enrolledLeads!, ...liveMatched.filter((l) => !enrolledLeads!.some((e) => e.id === l.id))]
+    : liveMatched;
+  const enrolledLeadIds = launched ? new Set(enrolledLeads!.map((l) => l.id)) : null;
+  // "Audience" must count who this campaign actually reached (or a
+  // split-and-send subset of the matched segment), never the raw segment
+  // size — otherwise Analytics/the progress bar disagree with the Audience
+  // tab (e.g. "5 in the segment" when only 1 was ever actually enrolled).
+  const audience = launched ? enrolledLeads!.length : (seg ? seg.contacts : leadStats.total);
 
   return (
     <CampaignDetailView
@@ -45,6 +57,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       pendingJobs={pending}
       inboxConversations={inboxConversations}
       audienceLeads={audienceLeads}
+      enrolledLeadIds={enrolledLeadIds}
       leadActivity={leadActivity}
       replyTrackingEnabled={replyTrackingEnabled}
       owners={owners}
