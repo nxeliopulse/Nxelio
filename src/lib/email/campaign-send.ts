@@ -31,7 +31,7 @@ export interface CampaignSendResult {
 /** Shared send logic — takes whichever client/campaign the caller already has
  *  (a user-scoped client for a manual launch, or the admin client for the cron
  *  that fires scheduled sends with no user session to scope RLS to). */
-async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow): Promise<CampaignSendResult> {
+async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow, includeLeadIds?: string[]): Promise<CampaignSendResult> {
   const campaignId = campaign.id;
   const workspaceId = (campaign as { workspace_id?: string }).workspace_id;
   if (!workspaceId) return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Campaign has no workspace." };
@@ -41,6 +41,16 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
   // Campaigns created with "requires approval" unchecked skip this gate entirely.
   if (campaign.requires_approval && campaign.approval_status !== "Approved") {
     return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "This campaign must be approved before it can be launched." };
+  }
+
+  // A campaign's audience is a snapshot taken at launch, never a live segment
+  // re-resolved on every send — re-clicking Launch on an already-Active campaign
+  // must never re-enroll/re-send to leads added to the segment afterward. This
+  // is the authoritative server-side guard; the "Launch" button is also disabled
+  // client-side once Active, but that alone isn't enough (an API call could
+  // still bypass it), so it's enforced here too.
+  if (campaign.status === "Active") {
+    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "This campaign has already launched — its audience is locked to who was enrolled at launch time." };
   }
 
   const steps = parseCampaignSteps(campaign.content, campaign.subject);
@@ -67,6 +77,18 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
 
   if (matchedLeads.length === 0) {
     return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: `No recipients with a ${reqCol === "email" ? "email address" : "LinkedIn URL"} in this audience.` };
+  }
+
+  // Split-and-send (Phase 4A) — Draft campaigns may launch to a chosen subset
+  // of the matched audience instead of all of it (default: everyone included).
+  // Excluded leads are never enrolled at all, so they're simply not part of
+  // this campaign going forward — not suppressed, not paused, just untouched.
+  if (includeLeadIds) {
+    const includeSet = new Set(includeLeadIds);
+    matchedLeads = matchedLeads.filter((l) => includeSet.has(l.id));
+    if (matchedLeads.length === 0) {
+      return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "No prospects were selected to launch to." };
+    }
   }
 
   // Eligibility Service (Phase 4B) — one enrollment record per matched lead
@@ -200,11 +222,11 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow):
  * its delay in campaign_jobs. The per-minute cron then drains those follow-ups,
  * stopping a lead's remaining steps once they reply.
  */
-export async function sendCampaign(campaignId: string): Promise<CampaignSendResult> {
+export async function sendCampaign(campaignId: string, includeLeadIds?: string[]): Promise<CampaignSendResult> {
   const supabase = await createClient();
   const campaign = await getCampaignById(campaignId);
   if (!campaign) return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Campaign not found" };
-  return runCampaignSend(supabase, campaign);
+  return runCampaignSend(supabase, campaign, includeLeadIds);
 }
 
 /**

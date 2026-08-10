@@ -14,6 +14,18 @@ export async function getEmailStatus() {
   return { configured: emailConfigured, domainVerified: emailDomainVerified };
 }
 
+/** Whether any outbound email has ever been sent to this lead (campaign or
+ *  one-off) — drives the "you already emailed this lead" badge on reopen. */
+export async function hasSentEmailToLead(leadId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("inbox_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", leadId)
+    .eq("direction", "outbound");
+  return (count || 0) > 0;
+}
+
 export interface SendLeadEmailResult {
   ok: boolean;
   error?: string;
@@ -43,10 +55,14 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
   const fromName = onboarding?.company_name?.trim() || "Nxelio Nurture";
 
   // Route replies to whichever mailbox is actually connected, not a stale env var.
+  // Unipile puts the real mailbox address in `name`, not `identifier` — every
+  // connected email account has an empty `identifier`, so selecting only that
+  // column always silently fell back to sendEmail's hardcoded default instead
+  // of this workspace's actual connected mailbox.
   const supabase = await createClient();
   const { data: mailbox } = await supabase
     .from("outreach_accounts")
-    .select("identifier")
+    .select("identifier, name")
     .eq("channel", "email")
     .eq("status", "connected")
     .limit(1)
@@ -57,7 +73,7 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
     subject: finalSubject,
     text: finalBody,
     fromName,
-    replyTo: (mailbox?.identifier as string) || undefined,
+    replyTo: (mailbox?.identifier as string) || (mailbox?.name as string) || undefined,
   });
 
   if (!result.ok) {

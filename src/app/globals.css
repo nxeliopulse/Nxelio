@@ -570,6 +570,12 @@ html, body {
 .lp-anim-fade  { animation: lp-fade-in 0.18s ease-out; }
 .lp-anim-scale { animation: lp-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
 
+@keyframes lp-slide-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.lp-anim-slide-in { animation: lp-slide-in-right 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+
 /* Active-campaign progress bar — a moving barber-pole stripe so a running
    campaign visibly animates instead of sitting still. */
 @keyframes lp-progress-stripes {

@@ -41,7 +41,7 @@ interface UnifiedRow {
  *  embed LinkedIn steps as "[li:...]" header markers alongside plain email
  *  steps (see parseCampaignSteps in campaign-scheduler.ts), so a campaign with
  *  both kinds of step is genuinely multichannel, not just "email". */
-function campaignChannelLabel(content: string | null): "Email" | "LinkedIn" | "Multichannel" {
+export function campaignChannelLabel(content: string | null): "Email" | "LinkedIn" | "Multichannel" {
   if (!content || !content.trim()) return "Email";
   const blocks = content.split(/\n+\s*---\s*\n+/);
   let hasLinkedIn = false, hasEmail = false;
@@ -54,7 +54,7 @@ function campaignChannelLabel(content: string | null): "Email" | "LinkedIn" | "M
   return hasLinkedIn ? "LinkedIn" : "Email";
 }
 
-function ChannelBadge({ label }: { label: "Email" | "LinkedIn" | "Multichannel" }) {
+export function ChannelBadge({ label }: { label: "Email" | "LinkedIn" | "Multichannel" }) {
   const variant = label === "LinkedIn" ? "blue" : label === "Multichannel" ? "purple" : "info";
   return <Badge variant={variant}>{label}</Badge>;
 }
@@ -75,10 +75,10 @@ function StatusPill({ label, tone }: { label: string; tone: "success" | "warning
 function statusPillTone(status: string): "success" | "warning" | "danger" | "info" | "default" {
   switch (status) {
     case "Approved": case "Active": return "success";
-    case "Pending review": return "warning";
+    case "Pending review": case "Paused": return "warning";
     case "Archived": return "default";
     case "Live/Distributing": return "info";
-    default: return "default"; // Draft (AI-generated), Paused
+    default: return "default"; // Draft (AI-generated)
   }
 }
 
@@ -262,7 +262,7 @@ export function CampaignsView({
       else if (cardFilter === "opened") matchCard = (r.openRate ?? 0) > 0;
       else if (cardFilter === "replied") matchCard = r.replyRate > 0;
 
-      const matchApproval = approvalFilter === "All" || r.approvalStatus === approvalFilter;
+      const matchApproval = approvalFilter === "All" ? r.approvalStatus !== "Archived" : r.approvalStatus === approvalFilter;
       const matchDateFrom = !dateFrom || r.updatedAt >= dateFrom;
       const matchDateTo = !dateTo || r.updatedAt <= `${dateTo}T23:59:59.999Z`;
       const matchType = typeFilter.length === 0 || typeFilter.includes(r.channelLabel);
@@ -289,6 +289,7 @@ export function CampaignsView({
   const selectedRows = filtered.filter((r) => selected.includes(rowKey(r)));
   // Only rows an approver can actually approve — bulk-approve silently skips the rest.
   const selectedApprovable = selectedRows.filter((r) => r.kind === "email" && r.approvalStatus === "Pending review" && isApprover);
+  const selectedArchivable = selectedRows.filter((r) => r.kind === "email" && r.approvalStatus !== "Archived");
 
   function toggleStatus(r: UnifiedRow) {
     setOpenId(null);
@@ -369,6 +370,18 @@ export function CampaignsView({
       setSelected([]);
       if (failed) toast(`Approved ${ids.length - failed} of ${ids.length} — ${failed} failed.`, failed === ids.length ? "error" : "info");
       else toast(`${ids.length} campaign${ids.length === 1 ? "" : "s"} approved.`, "success");
+    });
+  }
+
+  function handleBulkArchive() {
+    const ids = selectedArchivable.map((r) => r.id);
+    if (!ids.length) return;
+    start(async () => {
+      const results = await Promise.allSettled(ids.map((id) => archiveCampaign(id)));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      setSelected([]);
+      if (failed) toast(`Archived ${ids.length - failed} of ${ids.length} — ${failed} failed.`, failed === ids.length ? "error" : "info");
+      else toast(`${ids.length} campaign${ids.length === 1 ? "" : "s"} archived.`, "success");
     });
   }
 
@@ -813,7 +826,12 @@ export function CampaignsView({
 
                   <div className="flex items-center gap-1.5 mt-3">
                     <ChannelBadge label={r.channelLabel} />
-                    {r.approvalStatus ? (
+                    {/* Paused overrides the approval badge — "Live/Distributing" is the
+                        approval lifecycle stage, not whether it's actually sending right
+                        now, so a paused campaign must never still read as running. */}
+                    {r.status === "Paused" ? (
+                      <Badge variant="warning">Paused</Badge>
+                    ) : r.approvalStatus ? (
                       <Badge variant={approvalBadgeVariant(r.approvalStatus)}>{r.approvalStatus}</Badge>
                     ) : (
                       <Badge variant={isActive ? "success" : "default"}>{r.status}</Badge>
@@ -907,7 +925,11 @@ export function CampaignsView({
                       {visibleCols.status && (
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-2">
-                            {r.approvalStatus ? (
+                            {/* Same override as the card view — Paused must never be
+                                masked by a stale "Live/Distributing" approval badge. */}
+                            {r.status === "Paused" ? (
+                              <StatusPill label="Paused" tone="warning" />
+                            ) : r.approvalStatus ? (
                               <StatusPill label={r.approvalStatus} tone={statusPillTone(r.approvalStatus)} />
                             ) : (
                               <StatusPill label={r.status} tone={statusPillTone(r.status)} />
@@ -1003,7 +1025,7 @@ export function CampaignsView({
                                   </button>
                                 </>
                               )}
-                              {(r.approvalStatus === "Approved" || r.approvalStatus === "Live/Distributing") && (
+                              {r.kind === "email" && r.approvalStatus !== "Archived" && (
                                 <button onClick={() => handleArchive(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
                                   <Archive className="h-4 w-4 text-slate-400" /> Archive
                                 </button>
@@ -1039,6 +1061,15 @@ export function CampaignsView({
                 className="inline-flex items-center gap-1.5 rounded-full bg-white text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" /> Approve ({selectedApprovable.length})
+              </button>
+            )}
+            {selectedArchivable.length > 0 && (
+              <button
+                onClick={handleBulkArchive}
+                disabled={pending}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors"
+              >
+                <Archive className="h-3.5 w-3.5" /> Archive ({selectedArchivable.length})
               </button>
             )}
             <button
