@@ -142,6 +142,58 @@ export async function exitEnrollmentByLead(campaignId: string, leadId: string, r
     .in("status", ["active", "scheduled", "paused", "pending_review"]);
 }
 
+/** A booked meeting is a positive outcome, not a stop rule like a reply/
+ *  unsubscribe — pauses (not exits) every active enrollment this lead has,
+ *  across every campaign AND the generic outreach-sequence system, and
+ *  cancels their pending jobs so no follow-up lands mid-conversation.
+ *  "Paused" (not "exited") because it's reversible: if the meeting falls
+ *  through, someone can manually resume it. */
+export async function pauseCampaignEnrollmentsForMeeting(leadId: string): Promise<{ paused: number }> {
+  const supabase = await createClient();
+  const { data: enrollments } = await supabase
+    .from("campaign_enrollments")
+    .select("id, campaign_id")
+    .eq("lead_id", leadId)
+    .in("status", ["active", "scheduled", "pending_review"]);
+
+  if (enrollments?.length) {
+    await supabase
+      .from("campaign_enrollments")
+      .update({ status: "paused", exit_reason: "Meeting booked" })
+      .in("id", enrollments.map((e) => e.id));
+
+    for (const e of enrollments) {
+      await supabase
+        .from("campaign_jobs")
+        .update({ status: "canceled", last_error: "Meeting booked", updated_at: new Date().toISOString() })
+        .eq("campaign_id", e.campaign_id)
+        .eq("lead_id", leadId)
+        .eq("status", "pending");
+    }
+  }
+
+  // Same treatment for the older/generic outreach-sequence system (used by
+  // src/lib/outreach/processor.ts) — a meeting should pause a lead's
+  // sequence there too, not just email-campaign enrollments.
+  const { data: seqEnrollments } = await supabase
+    .from("outreach_enrollments")
+    .select("id")
+    .eq("lead_id", leadId)
+    .eq("status", "active");
+  if (seqEnrollments?.length) {
+    const ids = seqEnrollments.map((e) => e.id);
+    await supabase.from("outreach_enrollments").update({ status: "paused", updated_at: new Date().toISOString() }).in("id", ids);
+    await supabase
+      .from("outreach_jobs")
+      .update({ status: "canceled", last_error: "Meeting booked", updated_at: new Date().toISOString() })
+      .in("enrollment_id", ids)
+      .eq("status", "pending");
+  }
+
+  revalidatePath("/campaigns");
+  return { paused: (enrollments?.length ?? 0) + (seqEnrollments?.length ?? 0) };
+}
+
 export async function advanceEnrollmentStep(campaignId: string, leadId: string, nextStep: number, nextExecutionAt: string | null): Promise<void> {
   const supabase = await createClient();
   await supabase

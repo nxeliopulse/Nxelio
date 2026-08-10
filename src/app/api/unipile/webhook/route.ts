@@ -92,6 +92,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, ignored: "own-outbound-mail" });
   }
 
+  // WhatsApp senders show up as phone-shaped provider ids (e.g. a bare
+  // "919876543210" or a WhatsApp JID "919876543210@s.whatsapp.net" under a
+  // provider_id/attendee_id key, already captured by collectIdentifiers'
+  // IDENTIFIER_KEY match). Strip the JID suffix and keep only digit strings.
+  const phoneCandidates = candidates
+    .map((c) => c.replace(/@s\.whatsapp\.net$/i, ""))
+    .filter((c) => /^\+?\d{7,15}$/.test(c))
+    .map((c) => c.replace(/^\+/, ""));
+
   let lead: { id: string; workspace_id: string; full_name: string | null; company_name: string | null; email: string | null } | null = null;
 
   // Match the reply sender to a lead — prefer the connected account's workspace.
@@ -141,6 +150,17 @@ export async function POST(request: NextRequest) {
       if (data?.[0]) { lead = data[0]; break; }
     }
   }
+  if (!lead && phoneCandidates.length) {
+    // Match on the last 10 digits so country-code formatting differences
+    // (stored "+91 98765 43210" vs. a webhook's "919876543210") still match.
+    for (const c of phoneCandidates) {
+      const tail = c.slice(-10);
+      let q = db.from("leads").select("id, workspace_id, full_name, company_name, email").ilike("phone", `%${tail}%`);
+      if (scopeWorkspaceId) q = q.eq("workspace_id", scopeWorkspaceId);
+      const { data } = await q.limit(1);
+      if (data?.[0]) { lead = data[0]; break; }
+    }
+  }
   if (!lead) {
     await log("skipped", "no-matching-lead");
     return NextResponse.json({ ok: true, ignored: "no-matching-lead" });
@@ -162,7 +182,7 @@ export async function POST(request: NextRequest) {
       workspace_id: lead.workspace_id,
       sequence_id: e.sequence_id,
       lead_id: lead.id,
-      channel: emails.length ? "email" : "linkedin",
+      channel: emails.length ? "email" : phoneCandidates.length ? "whatsapp" : "linkedin",
       action: "reply",
       status: "replied",
       detail: bodyText.slice(0, 300),

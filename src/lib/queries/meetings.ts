@@ -4,6 +4,9 @@ import { sendEmail } from "@/lib/email/resend";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
+import { pauseCampaignEnrollmentsForMeeting } from "@/lib/campaigns/enrollment";
+import { getLeadById } from "@/lib/queries/leads";
+import { unipileConfigured, unipileSendWhatsAppMessage } from "@/lib/outreach/unipile";
 
 export interface MeetingAttendee { name?: string; email?: string }
 
@@ -111,6 +114,7 @@ export async function createMeeting(input: MeetingInput): Promise<{ ok: boolean;
     attendees: input.attendees ?? [],
   });
   if (error) return { ok: false, error: error.message };
+  if (input.lead_id) await pauseCampaignEnrollmentsForMeeting(input.lead_id).catch(() => {});
   revalidatePath("/meetings");
   await logAudit({ action: "meeting.created", entityType: "meeting", entityLabel: input.title });
   return { ok: true };
@@ -142,11 +146,14 @@ function formatWhen(startIso: string, endIso: string): string {
  * Epic 4 (LP-19): creates a meeting AND emails an invite (with the join link) to
  * every attendee that has an email. Falls back to "Nxelio Nurture" as the From Name when
  * the workspace hasn't set a company name. Returns how many invites went out.
+ * If the meeting is tied to a lead with a phone number and the workspace has a
+ * connected WhatsApp number, also sends the same invite over WhatsApp — this is
+ * the only place WhatsApp is used today (not campaign sending).
  */
 export async function scheduleMeeting(
   input: MeetingInput,
   opts?: { sendInvites?: boolean }
-): Promise<{ ok: boolean; error?: string; invitesSent?: number }> {
+): Promise<{ ok: boolean; error?: string; invitesSent?: number; whatsappSent?: boolean }> {
   const supabase = await createClient();
   const { error } = await supabase.from("meetings").insert({
     title: input.title,
@@ -162,8 +169,10 @@ export async function scheduleMeeting(
     attendees: input.attendees ?? [],
   });
   if (error) return { ok: false, error: error.message };
+  if (input.lead_id) await pauseCampaignEnrollmentsForMeeting(input.lead_id).catch(() => {});
 
   let invitesSent = 0;
+  let whatsappSent = false;
   if (opts?.sendInvites !== false) {
     const { data: onboarding } = await getOnboarding();
     const fromName = onboarding?.company_name?.trim() || "Nxelio Nurture";
@@ -178,11 +187,41 @@ export async function scheduleMeeting(
       const r = await sendEmail({ to: a.email, subject: `Invitation: ${input.title} — ${when}`, text, fromName });
       if (r.ok) invitesSent++;
     }
+
+    // WhatsApp invite to the lead's own phone (not every attendee) — sent
+    // alongside the email invite whenever a number is connected and the lead
+    // has a phone on file. Never blocks the meeting on a send failure.
+    if (input.lead_id && unipileConfigured) {
+      try {
+        const lead = await getLeadById(input.lead_id);
+        if (lead?.phone) {
+          const { data: acct } = await supabase
+            .from("outreach_accounts")
+            .select("account_id")
+            .eq("channel", "whatsapp")
+            .eq("status", "connected")
+            .limit(1)
+            .maybeSingle();
+          const accountId = (acct?.account_id as string) ?? null;
+          if (accountId) {
+            const hi = lead.full_name ? ` ${lead.full_name.split(" ")[0]}` : "";
+            const text = `Hi${hi}, you're invited to "${input.title}".\n\nWhen: ${when}${whereLine}${input.description ? `\n\n${input.description}` : ""}\n\n— ${fromName}`;
+            await unipileSendWhatsAppMessage({ accountId, phone: lead.phone, text });
+            whatsappSent = true;
+            await supabase.from("inbox_messages").insert({
+              lead_id: lead.id, direction: "outbound", subject: "WhatsApp meeting invite", body: text, is_read: true,
+            });
+          }
+        }
+      } catch {
+        // A WhatsApp hiccup should never break scheduling — the email invite still went out.
+      }
+    }
   }
 
   revalidatePath("/meetings");
-  await logAudit({ action: "meeting.scheduled", entityType: "meeting", entityLabel: input.title, metadata: { invitesSent } });
-  return { ok: true, invitesSent };
+  await logAudit({ action: "meeting.scheduled", entityType: "meeting", entityLabel: input.title, metadata: { invitesSent, whatsappSent } });
+  return { ok: true, invitesSent, whatsappSent };
 }
 
 export async function cancelMeeting(id: string): Promise<{ ok: boolean; error?: string }> {

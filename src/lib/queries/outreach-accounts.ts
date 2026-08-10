@@ -6,6 +6,8 @@ import {
   createHostedAuthLink,
   listUnipileAccounts,
   unipileDeleteAccount,
+  createWhatsAppAccount,
+  getUnipileAccount,
 } from "@/lib/outreach/unipile";
 import { requireSuperAdmin } from "@/lib/queries/auth-guards";
 import { logAudit } from "@/lib/queries/audit-log";
@@ -13,7 +15,7 @@ import { logAudit } from "@/lib/queries/audit-log";
 export interface OutreachAccountRow {
   id: string;
   provider: string;
-  channel: "email" | "linkedin";
+  channel: "email" | "linkedin" | "whatsapp";
   account_id: string;
   name: string | null;
   identifier: string | null;
@@ -155,7 +157,7 @@ export async function syncOutreachAccounts(): Promise<{ ok: boolean; count: numb
     const accounts = await listUnipileAccounts();
     let count = 0;
     for (const a of accounts) {
-      const channel: "email" | "linkedin" = a.type === "LINKEDIN" ? "linkedin" : "email";
+      const channel: "email" | "linkedin" | "whatsapp" = a.type === "LINKEDIN" ? "linkedin" : a.type === "WHATSAPP" ? "whatsapp" : "email";
       const status = (a.status && a.status.toLowerCase().includes("ok")) || a.status === "CONNECTED" ? "connected" : (a.status || "connected");
 
       // 1) If THIS workspace already owns the account, just refresh it (RLS scopes the update).
@@ -189,6 +191,87 @@ export async function syncOutreachAccounts(): Promise<{ ok: boolean; count: numb
     return { ok: true, count };
   } catch (err) {
     return { ok: false, count: 0, error: err instanceof Error ? err.message : "Sync failed" };
+  }
+}
+
+/**
+ * Connects the workspace's shared WhatsApp number via Unipile's native QR /
+ * pairing-code flow (there's no hosted-auth-link option for WhatsApp). Pass a
+ * phone number (E.164) to get a short pairing code to type into WhatsApp, or
+ * omit it to get a QR code to scan instead. Same one-account-per-channel cap
+ * and Super-Admin guard as connectOutreachAccount(). The returned row is a
+ * "connecting" placeholder — checkWhatsAppConnection() polls it to "connected".
+ */
+export async function connectWhatsAppAccount(phoneNumber?: string): Promise<
+  { ok: false; error: string } | { ok: true; accountId: string; qrCode?: string; pairingCode?: string }
+> {
+  try {
+    await requireSuperAdmin();
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Forbidden" };
+  }
+  if (!unipileConfigured) {
+    return { ok: false, error: "Unipile is not configured. Add UNIPILE_DSN and UNIPILE_API_KEY to your environment." };
+  }
+  const supabase = await createClient();
+  await pruneDeadUnipileAccounts(supabase);
+
+  const { count } = await supabase
+    .from("outreach_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("channel", "whatsapp");
+  if ((count ?? 0) >= 1) {
+    return { ok: false, error: "A WhatsApp number is already connected. Disconnect it first to change numbers." };
+  }
+
+  try {
+    const { accountId, status, qrCode, pairingCode } = await createWhatsAppAccount(phoneNumber);
+    if (!accountId) return { ok: false, error: "Unipile did not return an account id" };
+
+    // Supabase-js never throws on a failed insert (RLS denial, constraint
+    // violation, etc.) — it resolves with { error } instead. Not checking that
+    // error here previously meant a Unipile-side success (account genuinely
+    // created and connected) could silently fail to save locally: the UI would
+    // report "connected" while outreach_accounts stayed empty, with no way to
+    // tell the two apart. Checking it now surfaces the real failure instead.
+    const { error } = await supabase.from("outreach_accounts").insert({
+      provider: "unipile",
+      channel: "whatsapp",
+      account_id: accountId,
+      name: phoneNumber || null,
+      identifier: phoneNumber || null,
+      status: status === "connected" ? "connected" : "connecting",
+    });
+    if (error) {
+      // The Unipile-side account now exists but isn't tracked locally — clean
+      // it up so a retry doesn't collide with an orphaned remote account.
+      await unipileDeleteAccount(accountId).catch(() => {});
+      return { ok: false, error: `Connected on WhatsApp's side, but couldn't save it: ${error.message}` };
+    }
+    await logAudit({ action: "connector.connected", entityType: "outreach_account", entityLabel: phoneNumber || "WhatsApp", metadata: { channel: "whatsapp" } });
+    revalidatePath("/admin");
+    return { ok: true, accountId, qrCode, pairingCode };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to start WhatsApp connection" };
+  }
+}
+
+/** Polls Unipile for a connecting WhatsApp account's real status, and syncs
+ *  the local row once it reports connected — the QR/pairing-code UI calls
+ *  this on an interval until it returns "connected". */
+export async function checkWhatsAppConnection(accountId: string): Promise<{ status: string }> {
+  if (!unipileConfigured) return { status: "unknown" };
+  try {
+    const data = await getUnipileAccount(accountId);
+    const raw = String(data.status ?? "");
+    const connected = raw.toUpperCase().includes("OK") || raw.toUpperCase() === "CONNECTED";
+    const status = connected ? "connected" : raw ? raw.toLowerCase() : "connecting";
+    const supabase = await createClient();
+    await supabase.from("outreach_accounts").update({ status, updated_at: new Date().toISOString() }).eq("account_id", accountId);
+    if (connected) revalidatePath("/admin");
+    return { status };
+  } catch {
+    return { status: "connecting" };
   }
 }
 

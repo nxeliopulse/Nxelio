@@ -38,7 +38,8 @@
       "PowerShell($env:NEXT_TELEMETRY_DISABLED=1; npx next build 2>&1 | Select-String -Pattern \"Compiled|Failed|error|Error|✓|warn\" | Select-Object -First 20)",
       "PowerShell(Tee-Object *)",
       "Bash(git stash *)",
-      "Bash(git clean *)"
+      "Bash(git clean *)",
+      "WebSearch"
     ]
   }
 }

@@ -1,10 +1,11 @@
 "use client";
-import { Mail, ShieldAlert, CheckCircle2, AlertCircle } from "lucide-react";
+import { Mail, ShieldAlert, CheckCircle2, AlertCircle, MessageCircle } from "lucide-react";
 import { Linkedin } from "@/components/outreach/linkedin-icon";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MailboxConnections } from "@/components/settings/mailbox-connections";
 import { LinkedInConnections } from "@/components/settings/linkedin-connections";
+import { WhatsAppConnections } from "@/components/settings/whatsapp-connections";
 import { CalendarConnections } from "@/components/settings/calendar-connections";
 import { SendLimitPanel } from "@/components/settings/send-limit-panel";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
@@ -102,6 +103,34 @@ export function LinkedInConnectorView({
         <fieldset disabled={!isSuperAdmin} className={!isSuperAdmin ? "opacity-60 pointer-events-none" : ""}>
           <LinkedInConnections accounts={linkedinAccounts} connectorReady={connectorReady} />
           <SendLimitPanel channel="linkedin" initial={sendLimit} label="LinkedIn actions" />
+        </fieldset>
+      </Card>
+    </div>
+  );
+}
+
+export function WhatsAppConnectorView({
+  isSuperAdmin,
+  whatsappAccounts,
+  connectorReady,
+}: {
+  isSuperAdmin: boolean;
+  whatsappAccounts: OutreachAccountRow[];
+  connectorReady: boolean;
+}) {
+  return (
+    <div className="space-y-4">
+      <AdminOnlyNotice isSuperAdmin={isSuperAdmin} />
+      <Card className="p-6">
+        <div className="flex items-start gap-2 mb-4">
+          <MessageCircle className="h-5 w-5 text-slate-700 mt-0.5" />
+          <div>
+            <h4 className="font-semibold text-slate-900">WhatsApp</h4>
+            <p className="text-sm text-slate-500">Connect one shared WhatsApp number for the whole workspace to send campaign messages and capture replies.</p>
+          </div>
+        </div>
+        <fieldset disabled={!isSuperAdmin} className={!isSuperAdmin ? "opacity-60 pointer-events-none" : ""}>
+          <WhatsAppConnections accounts={whatsappAccounts} connectorReady={connectorReady} />
         </fieldset>
       </Card>
     </div>

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket } from "lucide-react";
+import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle } from "lucide-react";
 import { platformAdminSignOut } from "@/lib/queries/platform-admin";
 import { OverviewTab } from "@/components/admin/overview-tab";
 import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
@@ -9,6 +9,8 @@ import { AdminLeadArchiveView } from "@/components/admin/lead-archive-view";
 import { VendorSubscriptionsTab } from "@/components/admin/vendor-subscriptions-tab";
 import { AiProviderTab } from "@/components/admin/ai-provider-tab";
 import { PromoCodesTab } from "@/components/admin/promo-codes-tab";
+import { WhatsAppConnectorView } from "@/components/settings/connectors-view";
+import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type {
   PlatformOverviewStats,
   HotCustomerRow,
@@ -29,6 +31,7 @@ const TABS = [
   { id: "leads", label: "Leads Archive", icon: Archive },
   { id: "vendors", label: "Our Vendor Subscriptions", icon: Plug },
   { id: "ai-provider", label: "AI Provider", icon: Sparkles },
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
 ] as const;
 
 export function AdminDashboard({
@@ -41,6 +44,8 @@ export function AdminDashboard({
   trendData,
   attentionWorkspaces,
   promoCodes,
+  whatsappAccounts,
+  unipileConfigured,
 }: {
   stats: PlatformOverviewStats;
   hotCustomers: HotCustomerRow[];
@@ -51,6 +56,8 @@ export function AdminDashboard({
   trendData: PlatformOverviewTrendPoint[];
   attentionWorkspaces: WorkspaceAttentionItem[];
   promoCodes: EmailPromoCodeRow[];
+  whatsappAccounts: OutreachAccountRow[];
+  unipileConfigured: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
@@ -166,6 +173,9 @@ export function AdminDashboard({
         {tab === "leads" && <AdminLeadArchiveView rows={leadArchive} />}
         {tab === "vendors" && <VendorSubscriptionsTab rows={vendorSubscriptions} />}
         {tab === "ai-provider" && <AiProviderTab status={aiProviderStatus} />}
+        {tab === "whatsapp" && (
+          <WhatsAppConnectorView isSuperAdmin whatsappAccounts={whatsappAccounts} connectorReady={unipileConfigured} />
+        )}
       </div>
     </div>
   );

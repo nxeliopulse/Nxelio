@@ -108,6 +108,83 @@ export async function unipileDeleteAccount(accountId: string): Promise<void> {
   await unipileFetch(`/accounts/${encodeURIComponent(accountId)}`, { method: "DELETE" });
 }
 
+/** Fetches a single account's current state — used to poll a WhatsApp
+ *  connection past its QR/pairing-code checkpoint to "OK" (connected). */
+export async function getUnipileAccount(accountId: string): Promise<Record<string, unknown>> {
+  const data = await unipileFetch(`/accounts/${encodeURIComponent(accountId)}`, { method: "GET" });
+  return (data as Record<string, unknown>) ?? {};
+}
+
+export interface WhatsAppConnectResult {
+  accountId: string;
+  /** "connected" once past the checkpoint, "pending" while a QR/code needs scanning/entering. */
+  status: "connected" | "pending";
+  qrCode?: string;      // data:image/... or base64 — field name unconfirmed by Unipile's docs, extracted defensively
+  pairingCode?: string; // short code to type into WhatsApp when a phone number was supplied
+  raw: Record<string, unknown>;
+}
+
+/**
+ * Connects a WhatsApp Business number via Unipile's native pairing flow (NOT
+ * the hosted-auth-link flow used for email/LinkedIn). If `pairingPhoneNumber`
+ * is given (E.164, e.g. "+15551234567") Unipile returns a short pairing code
+ * to type into WhatsApp; otherwise it returns a QR code to scan. Unipile's
+ * public docs don't pin down the exact checkpoint field names, so this reads
+ * several plausible field names defensively and keeps `raw` for debugging.
+ */
+export async function createWhatsAppAccount(pairingPhoneNumber?: string): Promise<WhatsAppConnectResult> {
+  const data = (await unipileFetch("/accounts", {
+    method: "POST",
+    body: JSON.stringify({
+      provider: "WHATSAPP",
+      ...(pairingPhoneNumber ? { pairing_phone_number: pairingPhoneNumber } : {}),
+    }),
+  })) as Record<string, unknown>;
+
+  const accountId = String(data.account_id ?? data.id ?? "");
+  const checkpoint = (data.checkpoint as Record<string, unknown> | undefined) ?? data;
+  const qrCode =
+    (checkpoint.qrcode as string) ||
+    (checkpoint.qr_code as string) ||
+    (checkpoint.qrCode as string) ||
+    (data.qrcode as string) ||
+    (data.qr_code as string) ||
+    undefined;
+  const pairingCode =
+    (checkpoint.pairing_code as string) ||
+    (checkpoint.pairingCode as string) ||
+    (checkpoint.code as string) ||
+    (data.pairing_code as string) ||
+    undefined;
+  const object = String(data.object ?? "");
+
+  return {
+    accountId,
+    status: object === "AccountCreated" && !qrCode && !pairingCode ? "connected" : "pending",
+    qrCode,
+    pairingCode,
+    raw: data,
+  };
+}
+
+/** Sends a WhatsApp message from a connected number to a lead's phone. */
+export async function unipileSendWhatsAppMessage(opts: {
+  accountId: string;
+  phone: string; // E.164, e.g. "+15551234567"
+  text: string;
+}): Promise<{ id?: string }> {
+  const attendeeId = opts.phone.replace(/[^\d]/g, "");
+  const data = await unipileFetch("/chats", {
+    method: "POST",
+    body: JSON.stringify({
+      account_id: opts.accountId,
+      attendees_ids: [attendeeId],
+      text: opts.text,
+    }),
+  });
+  return { id: (data as { id?: string })?.id };
+}
+
 /** Sends an email from a connected mailbox. */
 export async function unipileSendEmail(opts: {
   accountId: string;

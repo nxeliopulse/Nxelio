@@ -10,6 +10,7 @@ import {
 import { getVendorSubscriptions } from "@/lib/queries/platform-vendor-subscriptions";
 import { getAiProviderStatus } from "@/lib/queries/ai-provider-settings";
 import { getEmailPromoCodes } from "@/lib/queries/admin-promo-codes";
+import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach-accounts";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 
 export default async function AdminPage() {
@@ -25,6 +26,8 @@ export default async function AdminPage() {
     trendData,
     attentionWorkspaces,
     promoCodes,
+    outreachAccounts,
+    unipileReady,
   ] = await Promise.all([
     getPlatformOverviewStats(),
     getHotCustomers(),
@@ -35,7 +38,10 @@ export default async function AdminPage() {
     getPlatformOverviewTrend(),
     getWorkspacesNeedingAttention(),
     getEmailPromoCodes(),
+    getOutreachAccounts(),
+    isUnipileConfigured(),
   ]);
+  const whatsappAccounts = outreachAccounts.filter((a) => a.channel === "whatsapp");
 
   return (
     <AdminDashboard
@@ -48,6 +54,8 @@ export default async function AdminPage() {
       trendData={trendData}
       attentionWorkspaces={attentionWorkspaces}
       promoCodes={promoCodes}
+      whatsappAccounts={whatsappAccounts}
+      unipileConfigured={unipileReady}
     />
   );
 }
