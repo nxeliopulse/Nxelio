@@ -7,6 +7,8 @@ import { useFeedback } from "@/components/ui/feedback";
 import { createAccount, updateAccount, type AccountRow } from "@/lib/queries/accounts";
 import { useSidebar } from "@/components/layout/sidebar-context";
 import { cn, formatDate } from "@/lib/utils";
+import { PhoneInput, detectCountry, isPhoneValid, formatPhoneForStorage } from "@/components/ui/phone-input";
+import type { CountryCode } from "libphonenumber-js";
 
 const RATINGS = ["Hot", "Warm", "Cold"];
 const OWNERSHIPS = ["Public", "Private", "Subsidiary", "Other"];
@@ -116,7 +118,7 @@ export function EditAccountModal({
     parent_account: "",
     account_number: "",
     phone: account?.phone || "",
-    fax: "",
+    fax: account?.fax || "",
     website: account?.website || "",
     domain: account?.domain || "",
     account_status: account?.account_status || "",
@@ -144,6 +146,8 @@ export function EditAccountModal({
   };
 
   const [form, setForm] = useState(initialForm);
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(() => detectCountry(account?.phone));
+  const [faxCountry, setFaxCountry] = useState<CountryCode>(() => detectCountry(account?.fax));
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -191,13 +195,24 @@ export function EditAccountModal({
       setStep(0);
       return;
     }
+    if (!isPhoneValid(form.phone, phoneCountry)) {
+      setError("Phone number isn't valid for the selected country.");
+      setStep(1);
+      return;
+    }
+    if (!isPhoneValid(form.fax, faxCountry)) {
+      setError("Fax number isn't valid for the selected country.");
+      setStep(1);
+      return;
+    }
     setError(null);
     setSaving(true);
     try {
       const payload = {
         account_name: form.account_name.trim(),
         account_owner: form.account_owner || null,
-        phone: form.phone.trim() || null,
+        phone: formatPhoneForStorage(form.phone, phoneCountry) || null,
+        fax: formatPhoneForStorage(form.fax, faxCountry) || null,
         website: form.website.trim() || null,
         domain: form.domain.trim() || null,
         account_status: form.account_status || null,
@@ -385,12 +400,22 @@ export function EditAccountModal({
                     </select>
                   </FormRow>
 
-                  <FormRow label="Phone">
-                    <input type="text" className={inputStyle} value={form.phone} onChange={(e) => set("phone", e.target.value)} />
-                  </FormRow>
-                  <FormRow label="Fax">
-                    <input type="text" className={inputStyle} value={form.fax} onChange={(e) => set("fax", e.target.value)} />
-                  </FormRow>
+                  <PhoneInput
+                    label="Phone"
+                    country={phoneCountry}
+                    value={form.phone}
+                    onCountryChange={setPhoneCountry}
+                    onValueChange={(v) => set("phone", v)}
+                    inputClassName={inputStyle}
+                  />
+                  <PhoneInput
+                    label="Fax"
+                    country={faxCountry}
+                    value={form.fax}
+                    onCountryChange={setFaxCountry}
+                    onValueChange={(v) => set("fax", v)}
+                    inputClassName={inputStyle}
+                  />
 
                   <FormRow label="Account Site">
                     <input type="text" className={inputStyle} value={form.account_site} onChange={(e) => set("account_site", e.target.value)} />

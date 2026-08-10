@@ -358,17 +358,25 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
     const ids = [...selected];
     setSelected([]);
     start(async () => {
-      await bulkDeleteContacts(ids);
-      toast(`${ids.length} contact(s) deleted.`, "success");
+      try {
+        await bulkDeleteContacts(ids);
+        toast(`${ids.length} contact(s) deleted.`, "success");
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Couldn't delete contacts.", "error");
+      }
     });
   }
 
   async function handleDelete(id: string) {
     if (!(await confirm({ title: "Delete contact?", message: "Delete this contact?", confirmLabel: "Delete", danger: true }))) return;
     start(async () => {
-      await deleteContact(id);
-      setSelected((s) => s.filter((x) => x !== id));
-      toast("Contact deleted successfully", "success");
+      try {
+        await deleteContact(id);
+        setSelected((s) => s.filter((x) => x !== id));
+        toast("Contact deleted successfully", "success");
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Couldn't delete contact.", "error");
+      }
     });
   }
 
@@ -1212,13 +1220,16 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                             >
                               <Phone className="h-3.5 w-3.5" />
                             </a>
-                            <button
-                              onClick={() => toast(`Starting quick chat with ${c.first_name}...`, "info")}
+                            <a
+                              href={c.whatsapp ? `https://wa.me/${c.whatsapp.replace(/\D/g, "")}` : "#"}
+                              onClick={(e) => { if (!c.whatsapp) { e.preventDefault(); toast("This contact has no WhatsApp number on file.", "error"); } }}
+                              target={c.whatsapp ? "_blank" : undefined}
+                              rel="noopener noreferrer"
                               className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-purple-500 dark:hover:text-purple-400 hover:bg-slate-50 dark:hover:bg-slate-900"
-                              title="Message"
+                              title={c.whatsapp ? "Message on WhatsApp" : "No WhatsApp number"}
                             >
                               <MessageSquare className="h-3.5 w-3.5" />
-                            </button>
+                            </a>
                             <button
                               onClick={() => openContact(c.id)}
                               className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-900"
@@ -1391,12 +1402,16 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                   >
                     <Phone className="h-4 w-4" />
                   </a>
-                  <button
-                    onClick={() => toast(`Starting quick chat with ${c.first_name}...`, "info")}
+                  <a
+                    href={c.whatsapp ? `https://wa.me/${c.whatsapp.replace(/\D/g, "")}` : "#"}
+                    onClick={(e) => { if (!c.whatsapp) { e.preventDefault(); toast("This contact has no WhatsApp number on file.", "error"); } }}
+                    target={c.whatsapp ? "_blank" : undefined}
+                    rel="noopener noreferrer"
                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-purple-500 hover:bg-slate-50"
+                    title={c.whatsapp ? "Message on WhatsApp" : "No WhatsApp number"}
                   >
                     <MessageSquare className="h-4 w-4" />
-                  </button>
+                  </a>
                   <button
                     onClick={() => openContact(c.id)}
                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-indigo-500 hover:bg-slate-50"

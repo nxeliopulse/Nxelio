@@ -1,6 +1,6 @@
 export type Theme = "light" | "dark" | "system";
 export type FontSize = "default" | "compact" | "large" | "xl";
-export type FontStyle = "golos" | "sans" | "inter" | "roboto" | "outfit" | "serif" | "mono" | "rounded";
+export type FontStyle = "golos" | "sans" | "inter" | "roboto" | "outfit" | "serif" | "mono" | "rounded" | "arial" | "calibri" | "tahoma" | "segoe_ui";
 export type LightPreset = "light" | "warm" | "slate";
 export type DarkPreset = "dark" | "midnight" | "obsidian" | "emerald";
 export type AccentColor = "vermilion" | "blue" | "indigo" | "emerald" | "teal" | "black";

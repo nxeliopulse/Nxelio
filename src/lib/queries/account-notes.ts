@@ -58,6 +58,9 @@ export async function createAccountNote(accountId: string, formData: FormData): 
   const rawBody = String(formData.get("body") || "").trim();
   const isEmptyHtml = !rawBody || rawBody === "<p></p>";
   if (isEmptyHtml && files.length === 0) return { ok: false, error: "Note can't be empty" };
+  // An attachment is mandatory for account notes (not just a UI hint) — the
+  // client already enforces this, but never trust the client alone.
+  if (files.length === 0) return { ok: false, error: "An attachment is required." };
   const body = sanitizeBody(isEmptyHtml ? "<p>Attached a file</p>" : rawBody);
   for (const f of files) {
     if (f.size > MAX_FILE_BYTES) return { ok: false, error: `"${f.name}" is too large (max 50MB)` };

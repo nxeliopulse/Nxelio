@@ -139,16 +139,21 @@ export async function updateContact(id: string, payload: Partial<ContactRow>) {
 
 export async function deleteContact(id: string) {
   const supabase = await createClient();
-  const { error } = await supabase.from("contacts").delete().eq("id", id);
+  // .select() to get the deleted row(s) back — PostgREST reports no error
+  // when RLS silently blocks a delete (0 rows affected looks identical to
+  // success otherwise), so this is the only way to detect and report it.
+  const { data, error } = await supabase.from("contacts").delete().eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error("Contact not found, or you don't have permission to delete it.");
   revalidatePath("/contacts");
   await logAudit({ action: "contact.deleted", entityType: "contact", entityId: id });
 }
 
 export async function bulkDeleteContacts(ids: string[]) {
   const supabase = await createClient();
-  const { error } = await supabase.from("contacts").delete().in("id", ids);
+  const { data, error } = await supabase.from("contacts").delete().in("id", ids).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error("None of the selected contacts could be deleted.");
   revalidatePath("/contacts");
   await logAudit({ action: "contact.bulk_deleted", entityType: "contact", metadata: { count: ids.length, ids } });
 }

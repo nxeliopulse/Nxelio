@@ -363,6 +363,10 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
                       { value: "rounded", label: "Plus Jakarta (Rounded)" },
                       { value: "serif", label: "Georgia (Editorial Serif)" },
                       { value: "mono", label: "Fira Code (Monospace)" },
+                      { value: "arial", label: "Arial" },
+                      { value: "calibri", label: "Calibri" },
+                      { value: "tahoma", label: "Tahoma" },
+                      { value: "segoe_ui", label: "Segoe UI" },
                     ]}
                   />
                 </div>

@@ -528,20 +528,32 @@ export function ContactDetailView({
                   ) : (
                     <div className="space-y-2 pt-2">
                       {meetings.map((m) => (
-                        <button
+                        <div
                           key={m.id}
-                          onClick={() => router.push(`/meetings?open=${m.id}`)}
-                          className="w-full text-left p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors flex items-center justify-between gap-3"
+                          className="w-full p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors flex items-center justify-between gap-3"
                         >
-                          <div className="min-w-0">
+                          <button onClick={() => router.push(`/meetings?open=${m.id}`)} className="min-w-0 text-left flex-1">
                             <p className="text-xs font-bold text-slate-800 dark:text-slate-700 truncate">{m.title}</p>
                             <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                               <Calendar className="h-3 w-3" /> {formatDateTime(m.start_at)}
                               {m.location && <span>· {m.location}</span>}
                             </p>
+                          </button>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {m.join_url && (
+                              <a
+                                href={m.join_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                              >
+                                <Video className="h-3 w-3" /> Join
+                              </a>
+                            )}
+                            <Badge variant={m.status === "canceled" ? "default" : "blue"}>{m.status}</Badge>
                           </div>
-                          <Badge variant={m.status === "canceled" ? "default" : "blue"} className="flex-shrink-0">{m.status}</Badge>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   )}
