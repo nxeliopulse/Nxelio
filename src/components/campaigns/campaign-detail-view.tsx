@@ -307,6 +307,7 @@ export function CampaignDetailView({
           segments={segments}
           campaigns={campaigns}
           leadStatsTotal={leadStatsTotal}
+          canAddProspects={status === "Draft"}
         />
       )}
 
@@ -628,7 +629,7 @@ export function CampaignDetailView({
 function CampaignAudienceTable({
   campaignId, segmentId, audienceLabel, audience, leads, owners,
   selectable = false, includedLeadIds, onIncludedLeadIdsChange,
-  segments, campaigns, leadStatsTotal,
+  segments, campaigns, leadStatsTotal, canAddProspects = true,
 }: {
   campaignId: string;
   segmentId: string | null;
@@ -644,6 +645,10 @@ function CampaignAudienceTable({
   segments: (SegmentRow & { contacts: number })[];
   campaigns: CampaignRow[];
   leadStatsTotal: number;
+  /** Draft-only — once a campaign is running, its audience is a frozen
+   *  snapshot; adding prospects afterward would silently grow it beyond what
+   *  actually launched (same principle as the audience-snapshot fix). */
+  canAddProspects?: boolean;
 }) {
   const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
@@ -669,7 +674,14 @@ function CampaignAudienceTable({
             {selectable && includedLeadIds && ` · ${includedLeadIds.size.toLocaleString()} selected to launch to`}
           </p>
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)}>Add prospects</Button>
+        <Button
+          size="sm"
+          onClick={() => setAddOpen(true)}
+          disabled={!canAddProspects}
+          title={!canAddProspects ? "This campaign has already launched — its audience is locked and can't be added to." : undefined}
+        >
+          Add prospects
+        </Button>
       </div>
 
       {selectable && (

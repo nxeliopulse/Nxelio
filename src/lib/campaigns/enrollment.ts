@@ -163,9 +163,19 @@ export async function addProspectsToCampaign(
   campaignId: string,
   segmentId: string | null,
   leads: EnrollableLead[]
-): Promise<{ convertedSegmentToStatic: boolean; created: number; skipped: number }> {
+): Promise<{ convertedSegmentToStatic: boolean; created: number; skipped: number; locked?: boolean }> {
   if (!leads.length) return { convertedSegmentToStatic: false, created: 0, skipped: 0 };
   const supabase = await createClient();
+
+  // Authoritative server-side guard — the "Add prospects" button is disabled
+  // client-side once a campaign has launched, but that alone can't be trusted
+  // (a direct call could bypass it). A running campaign's audience is a
+  // frozen snapshot, same principle as the Launch-button re-click guard.
+  const { data: campaignRow } = await supabase.from("campaigns").select("status").eq("id", campaignId).single();
+  if (campaignRow && campaignRow.status !== "Draft") {
+    return { convertedSegmentToStatic: false, created: 0, skipped: leads.length, locked: true };
+  }
+
   let convertedSegmentToStatic = false;
 
   if (segmentId) {

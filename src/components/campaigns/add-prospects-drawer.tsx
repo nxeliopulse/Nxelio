@@ -93,7 +93,11 @@ export function AddProspectsDrawer({
     setRows(rows.map((r) => (r.id === id ? { ...r, [key]: value } : r)));
   }
 
-  async function finish(convertedSegmentToStatic: boolean, created: number, skipped: number) {
+  async function finish(convertedSegmentToStatic: boolean, created: number, skipped: number, locked?: boolean) {
+    if (locked) {
+      setError("This campaign has already launched — its audience is locked and can't be added to.");
+      return;
+    }
     if (convertedSegmentToStatic) toast(`"${audienceLabel}" was a dynamic segment — converted it to static so these manually added prospects aren't removed on the next refresh.`, "info");
     toast(`${created} prospect${created === 1 ? "" : "s"} added to this campaign${skipped ? ` (${skipped} already were)` : ""}.`, "success");
     onClose();
@@ -115,8 +119,8 @@ export function AddProspectsDrawer({
       const allLeads = await getLeads();
       const emails = new Set(valid.map((r) => r.email.trim().toLowerCase()));
       const inserted = allLeads.filter((l) => l.email && emails.has(l.email.toLowerCase()));
-      const { convertedSegmentToStatic, created, skipped } = await addProspectsToCampaign(campaignId, segmentId, inserted);
-      finish(convertedSegmentToStatic, created, skipped);
+      const { convertedSegmentToStatic, created, skipped, locked } = await addProspectsToCampaign(campaignId, segmentId, inserted);
+      finish(convertedSegmentToStatic, created, skipped, locked);
     });
   }
 
@@ -148,8 +152,8 @@ export function AddProspectsDrawer({
       const allLeads = await getLeads();
       const emails = new Set(valid.map((r) => r.email?.toLowerCase()).filter(Boolean));
       const inserted = allLeads.filter((l) => l.email && emails.has(l.email.toLowerCase()));
-      const { convertedSegmentToStatic, created, skipped } = await addProspectsToCampaign(campaignId, segmentId, inserted);
-      finish(convertedSegmentToStatic, created, skipped);
+      const { convertedSegmentToStatic, created, skipped, locked } = await addProspectsToCampaign(campaignId, segmentId, inserted);
+      finish(convertedSegmentToStatic, created, skipped, locked);
     });
   }
 
@@ -196,8 +200,8 @@ export function AddProspectsDrawer({
       const allLeads = await getLeads();
       const emails = new Set(buyResults.map((p) => p.email?.toLowerCase()).filter(Boolean));
       const inserted = allLeads.filter((l) => l.email && emails.has(l.email.toLowerCase()));
-      const { convertedSegmentToStatic, created, skipped } = await addProspectsToCampaign(campaignId, segmentId, inserted);
-      finish(convertedSegmentToStatic, created, skipped);
+      const { convertedSegmentToStatic, created, skipped, locked } = await addProspectsToCampaign(campaignId, segmentId, inserted);
+      finish(convertedSegmentToStatic, created, skipped, locked);
     });
   }
 
@@ -206,8 +210,8 @@ export function AddProspectsDrawer({
     setError(null);
     start(async () => {
       const members = await getSegmentMemberLeads(selectedSegmentId);
-      const { convertedSegmentToStatic, created, skipped } = await addProspectsToCampaign(campaignId, segmentId, members);
-      finish(convertedSegmentToStatic, created, skipped);
+      const { convertedSegmentToStatic, created, skipped, locked } = await addProspectsToCampaign(campaignId, segmentId, members);
+      finish(convertedSegmentToStatic, created, skipped, locked);
     });
   }
 
@@ -217,8 +221,8 @@ export function AddProspectsDrawer({
     start(async () => {
       const enrolled = await getEnrolledLeads<LeadRow>(selectedCampaignId);
       if (!enrolled || !enrolled.length) { setError("That campaign has no enrolled prospects yet (it may not have launched)."); return; }
-      const { convertedSegmentToStatic, created, skipped } = await addProspectsToCampaign(campaignId, segmentId, enrolled);
-      finish(convertedSegmentToStatic, created, skipped);
+      const { convertedSegmentToStatic, created, skipped, locked } = await addProspectsToCampaign(campaignId, segmentId, enrolled);
+      finish(convertedSegmentToStatic, created, skipped, locked);
     });
   }
 
