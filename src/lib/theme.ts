@@ -38,7 +38,7 @@ export interface AppearanceSettings {
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   theme: "system",
   fontSize: "default",
-  fontStyle: "outfit",
+  fontStyle: "segoe_ui",
   pointerCursors: true,
   underlineLinks: false,
   lightPreset: "light",
@@ -90,7 +90,7 @@ export function applyAppearance(settings: AppearanceSettings) {
 
   root.classList.toggle("dark", isDark);
   root.setAttribute("data-font-size", settings.fontSize || "default");
-  root.setAttribute("data-font-style", settings.fontStyle || "sans");
+  root.setAttribute("data-font-style", settings.fontStyle || "segoe_ui");
   root.setAttribute("data-pointer-cursors", settings.pointerCursors ? "true" : "false");
   root.setAttribute("data-underline-links", settings.underlineLinks ? "true" : "false");
   root.setAttribute("data-light-preset", settings.lightPreset || "light");
