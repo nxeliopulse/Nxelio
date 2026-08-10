@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import type {
-  SubscriptionWithPlan, SubscriptionPlan, BillingInterval,
+  SubscriptionWithPlan, SubscriptionPlan, BillingInterval, PromoValidationResult,
 } from "@/lib/queries/subscription-types";
 import type { PromotionHistoryEntry } from "@/lib/queries/promotions";
 import { PlanTermsModal } from "@/components/billing/plan-terms-modal";
@@ -38,6 +38,19 @@ function credPct(remaining: number, total: number) {
 }
 function isLow(remaining: number, total: number) {
   return total > 0 && remaining / total <= 0.1;
+}
+
+/** Builds a customer-facing "here's what you get" message from the actual discount fields — never just the admin's internal note, which may be blank or say nothing about the offer itself. */
+function promoSuccessMessage(result: { description?: string | null; discountType?: "percentage" | "fixed_amount" | null; discountValue?: number | null; bonusCredits?: number; bonusLeads?: number }): string {
+  const parts: string[] = [];
+  if (result.discountType && result.discountValue) {
+    parts.push(result.discountType === "percentage" ? `${result.discountValue}% off` : `${fmtCents(result.discountValue * 100)} off`);
+  }
+  if (result.bonusCredits) parts.push(`+${result.bonusCredits.toLocaleString()} AI credits`);
+  if (result.bonusLeads) parts.push(`+${result.bonusLeads.toLocaleString()} leads`);
+  const offer = parts.length ? parts.join(", ") : null;
+  if (offer) return `${offer} — will be applied at your next checkout.`;
+  return result.description || "Code applied — it'll be used on your next checkout below.";
 }
 
 // ── Plan display config ───────────────────────────────────────────────────────
@@ -170,7 +183,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
   const [successCredits, setSuccessCredits] = useState(0);
   const [promoCode, setPromoCode] = useState("");
   const [promoChecking, setPromoChecking] = useState(false);
-  const [promoResult, setPromoResult] = useState<{ ok: boolean; error?: string; description?: string | null } | null>(null);
+  const [promoResult, setPromoResult] = useState<PromoValidationResult | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
@@ -498,8 +511,8 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
               </Button>
             </div>
             {promoResult && (
-              <p className={`mt-2 text-xs ${promoResult.ok ? "text-emerald-600" : "text-red-600"}`}>
-                {promoResult.ok ? (promoResult.description || "Code applied — it'll be used on your next checkout below.") : promoResult.error}
+              <p className={`mt-2 text-xs font-semibold ${promoResult.ok ? "text-emerald-600" : "text-red-600"}`}>
+                {promoResult.ok ? promoSuccessMessage(promoResult) : promoResult.error}
               </p>
             )}
           </div>
