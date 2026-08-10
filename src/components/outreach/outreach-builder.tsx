@@ -152,7 +152,7 @@ export function OutreachBuilder({ initialSequence, initialSteps }: {
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="text-2xl font-bold border-transparent !h-auto px-0 hover:bg-slate-50 focus:bg-white focus:px-3 transition-all min-w-[300px]"
+            className="text-2xl font-bold border border-transparent !h-auto px-2 bg-transparent text-slate-900 dark:text-white hover:bg-slate-100/50 dark:hover:bg-slate-800/40 hover:border-slate-200 dark:hover:border-slate-800/80 focus:bg-slate-100/50 dark:focus:bg-slate-800/40 focus:border-[var(--primary)] transition-all min-w-[300px]"
           />
         </div>
         <div className="flex items-center gap-2">
