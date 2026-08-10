@@ -66,17 +66,6 @@ function hashCode(str: string): number {
   return Math.abs(hash);
 }
 
-function getFlagEmoji(country: string): string {
-  const c = country.toUpperCase();
-  if (c.includes("USA") || c.includes("UNITED STATES")) return "🇺🇸";
-  if (c.includes("UAE") || c.includes("EMIRATES")) return "🇦🇪";
-  if (c.includes("GERMANY")) return "🇩🇪";
-  if (c.includes("FRANCE")) return "🇫🇷";
-  if (c.includes("INDIA")) return "🇮🇳";
-  if (c.includes("BRAZIL")) return "🇧🇷";
-  if (c.includes("MEXICO")) return "🇲🇽";
-  return "🇺🇸"; // default fallback for template matches
-}
 
 export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[]; owners?: OwnerOption[] }) {
   const { confirm, toast } = useFeedback();
@@ -1084,7 +1073,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
 
                   const countries = ["USA", "UAE", "Germany", "France", "India", "Brazil", "Mexico"];
                   const countryName = c.mailing_country || countries[hashCode(c.id) % countries.length];
-                  const flag = getFlagEmoji(countryName);
 
                   const status = c.email_opt_out ? "Inactive" : "Active";
                   const statusColor = status === "Active"
@@ -1179,10 +1167,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                       {/* Location Column */}
                       {cols.location && (
                         <td className="px-3 py-2.5 text-slate-600 dark:text-slate-500 font-medium">
-                          <div className="flex items-center gap-1">
-                            <span className="text-sm leading-none">{flag}</span>
-                            <span>{countryName}</span>
-                          </div>
+                          <span>{countryName}</span>
                         </td>
                       )}
 
@@ -1312,7 +1297,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
 
             const countries = ["USA", "UAE", "Germany", "France", "India", "Brazil", "Mexico"];
             const countryName = c.mailing_country || countries[hashCode(c.id) % countries.length];
-            const flag = getFlagEmoji(countryName);
 
             const status = c.email_opt_out ? "Inactive" : "Active";
             const statusColor = status === "Active"
@@ -1358,9 +1342,8 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Location:</span>
-                    <span className="text-slate-800 dark:text-slate-700 flex items-center gap-1">
-                      <span>{flag}</span>
-                      <span>{countryName}</span>
+                    <span className="text-slate-800 dark:text-slate-700">
+                      {countryName}
                     </span>
                   </div>
                   <div className="flex justify-between">
