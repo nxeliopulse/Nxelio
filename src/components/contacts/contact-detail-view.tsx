@@ -292,9 +292,14 @@ export function ContactDetailView({
             >
               <Send className="h-3.5 w-3.5" /> Send Email
             </button>
+            {/* Most people never fill in a separate WhatsApp number — it's
+                almost always the same as their phone. Prefer an explicit
+                whatsapp value if set, otherwise fall back to phone so this
+                doesn't wrongly say "no number on file" for every contact
+                that only has Phone filled in. */}
             <a
-              href={contact.whatsapp ? `https://wa.me/${contact.whatsapp.replace(/\D/g, "")}` : undefined}
-              onClick={(e) => { if (!contact.whatsapp) { e.preventDefault(); toast("This contact has no WhatsApp number on file.", "error"); } }}
+              href={(contact.whatsapp || contact.phone) ? `https://wa.me/${(contact.whatsapp || contact.phone)!.replace(/\D/g, "")}` : undefined}
+              onClick={(e) => { if (!contact.whatsapp && !contact.phone) { e.preventDefault(); toast("This contact has no phone or WhatsApp number on file.", "error"); } }}
               target="_blank"
               rel="noopener noreferrer"
               title="Message on WhatsApp"

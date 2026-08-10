@@ -66,6 +66,14 @@ function hashCode(str: string): number {
   return Math.abs(hash);
 }
 
+/** Most people never fill in a separate WhatsApp number — it's almost always
+ *  the same as their phone. Prefer an explicit whatsapp value if set,
+ *  otherwise fall back to phone, so Chat doesn't wrongly say "no number on
+ *  file" for every contact that only has Phone filled in. */
+function chatNumber(c: { whatsapp: string | null; phone: string | null }): string | null {
+  return c.whatsapp || c.phone;
+}
+
 
 export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[]; owners?: OwnerOption[] }) {
   const { confirm, toast } = useFeedback();
@@ -1206,12 +1214,12 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                               <Phone className="h-3.5 w-3.5" />
                             </a>
                             <a
-                              href={c.whatsapp ? `https://wa.me/${c.whatsapp.replace(/\D/g, "")}` : "#"}
-                              onClick={(e) => { if (!c.whatsapp) { e.preventDefault(); toast("This contact has no WhatsApp number on file.", "error"); } }}
-                              target={c.whatsapp ? "_blank" : undefined}
+                              href={chatNumber(c) ? `https://wa.me/${chatNumber(c)!.replace(/\D/g, "")}` : "#"}
+                              onClick={(e) => { if (!chatNumber(c)) { e.preventDefault(); toast("This contact has no phone or WhatsApp number on file.", "error"); } }}
+                              target={chatNumber(c) ? "_blank" : undefined}
                               rel="noopener noreferrer"
                               className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-purple-500 dark:hover:text-purple-400 hover:bg-slate-50 dark:hover:bg-slate-900"
-                              title={c.whatsapp ? "Message on WhatsApp" : "No WhatsApp number"}
+                              title={chatNumber(c) ? "Message on WhatsApp" : "No phone or WhatsApp number"}
                             >
                               <MessageSquare className="h-3.5 w-3.5" />
                             </a>
@@ -1386,12 +1394,12 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                     <Phone className="h-4 w-4" />
                   </a>
                   <a
-                    href={c.whatsapp ? `https://wa.me/${c.whatsapp.replace(/\D/g, "")}` : "#"}
-                    onClick={(e) => { if (!c.whatsapp) { e.preventDefault(); toast("This contact has no WhatsApp number on file.", "error"); } }}
-                    target={c.whatsapp ? "_blank" : undefined}
+                    href={chatNumber(c) ? `https://wa.me/${chatNumber(c)!.replace(/\D/g, "")}` : "#"}
+                    onClick={(e) => { if (!chatNumber(c)) { e.preventDefault(); toast("This contact has no phone or WhatsApp number on file.", "error"); } }}
+                    target={chatNumber(c) ? "_blank" : undefined}
                     rel="noopener noreferrer"
                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-purple-500 hover:bg-slate-50"
-                    title={c.whatsapp ? "Message on WhatsApp" : "No WhatsApp number"}
+                    title={chatNumber(c) ? "Message on WhatsApp" : "No phone or WhatsApp number"}
                   >
                     <MessageSquare className="h-4 w-4" />
                   </a>
