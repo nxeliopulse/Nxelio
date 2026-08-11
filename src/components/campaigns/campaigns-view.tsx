@@ -459,199 +459,23 @@ export function CampaignsView({
       </div>
 
       <Card className="overflow-visible">
-        {/* Toolbar: Search, Filters, Actions, View Mode Toggle, Create button */}
-        <div data-tour-id="campaigns-filter" className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900">
-          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
-            {/* Search Input */}
-            <div className="w-full sm:w-52">
-              <Input
-                leftIcon={<Search className="h-4 w-4 text-slate-400" />}
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 text-xs rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xs focus:ring-1 focus:ring-[var(--primary)]"
-              />
-            </div>
+        {/* Toolbar Row 1: Search & Actions */}
+        <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-900">
+          
+          {/* Left Side: Search */}
+          <div className="w-full md:w-auto flex-grow max-w-sm">
+            <Input
+              leftIcon={<Search className="h-4 w-4 text-slate-400" />}
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 text-xs rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xs focus:ring-1 focus:ring-[var(--primary)] w-full"
+            />
+          </div>
 
-            {/* Badged Count Button */}
-            <div className="inline-flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-850 text-xs font-semibold text-slate-700 dark:text-slate-300 h-9 border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <Megaphone className="h-3.5 w-3.5 text-slate-500" />
-              <span>
-                {filtered.length}{" "}
-                {cardFilter === "active"
-                  ? "Active Campaign"
-                  : cardFilter === "sent"
-                  ? "Sent Campaign"
-                  : cardFilter === "opened"
-                  ? "Opened Campaign"
-                  : cardFilter === "replied"
-                  ? "Replied Campaign"
-                  : "Campaign"}
-                {filtered.length === 1 ? "" : "s"}
-              </span>
-              {cardFilter !== "all" && (
-                <button
-                  onClick={() => setCardFilter("all")}
-                  title="Clear filter"
-                  className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-
-            {/* Active only filter button */}
-            <button
-              onClick={() => setCardFilter((prev) => prev === "active" ? "all" : "active")}
-              className={cn(
-                "inline-flex items-center justify-center gap-1.5 px-3 rounded-xl text-xs font-semibold border transition-all h-9 shadow-2xs select-none",
-                cardFilter === "active"
-                  ? "bg-slate-900 text-white border-transparent dark:bg-slate-100 dark:text-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-350 dark:border-slate-800"
-              )}
-            >
-              {cardFilter === "active" ? "✓ Active Only" : "Active Only"}
-            </button>
-
-            {/* Approval stages select dropdown */}
-            <select
-              value={approvalFilter}
-              onChange={(e) => setApprovalFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-350 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9 shadow-2xs"
-            >
-              <option value="All">All approval stages</option>
-              {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-
-            {/* Sort Select */}
-            <select
-              value={`${sortField}:${sortDir}`}
-              onChange={(e) => { const [f, d] = e.target.value.split(":"); setSortField(f as SortField); setSortDir(d as "asc" | "desc"); }}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-350 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9 shadow-2xs"
-            >
-              <option value="updatedAt:desc">Sort: Newest first</option>
-              <option value="updatedAt:asc">Sort: Oldest first</option>
-              <option value="name:asc">Sort: Name A-Z</option>
-              <option value="leads:desc">Sort: Most prospects</option>
-              <option value="sent:desc">Sort: Most sent</option>
-              <option value="replyRate:desc">Sort: Best reply rate</option>
-            </select>
-
-            {/* Date range inputs */}
-            <div className="flex items-center gap-1 text-xs text-slate-500">
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                max={dateTo || undefined}
-                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-350 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] shadow-2xs"
-                aria-label="Last modified from"
-              />
-              <span className="text-slate-400">–</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                min={dateFrom || undefined}
-                className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-350 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] shadow-2xs"
-                aria-label="Last modified to"
-              />
-            </div>
-
-            {/* Filter Dropdown */}
-            <div className="relative" ref={filterRef}>
-              <Button
-                variant="outline"
-                size="custom"
-                onClick={() => setFilterOpen((v) => !v)}
-                className={cn(
-                  "h-9 px-3 text-xs rounded-xl font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-[var(--muted)] shadow-2xs flex items-center justify-center gap-1.5",
-                  filterOpen && "bg-slate-50 dark:bg-slate-800"
-                )}
-              >
-                <FilterIcon className="h-4 w-4" /> Filter
-                {activeFilterCount > 0 && (
-                  <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
-                    {activeFilterCount}
-                  </span>
-                )}
-                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
-              </Button>
-              {filterOpen && (
-                <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-72 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                    <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white"><FilterIcon className="h-4 w-4" /> Filter</span>
-                    <button onClick={() => setFilterOpen(false)} aria-label="Close" className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Type</p>
-                      <div className="flex flex-col gap-1.5">
-                        {(["Email", "LinkedIn", "Multichannel"] as const).map((t) => (
-                          <label key={t} className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-600 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={typeFilter.includes(t)}
-                              onChange={() => toggleTypeFilter(t)}
-                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            {t}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Start date</p>
-                      <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        max={dateTo || undefined}
-                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500 mb-1.5">End date</p>
-                      <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        min={dateFrom || undefined}
-                        className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
-                      <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-600 cursor-pointer select-none mb-2">
-                        <input
-                          type="checkbox"
-                          checked={cardFilter === "active"}
-                          onChange={(e) => setCardFilter(e.target.checked ? "active" : "all")}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        Active only
-                      </label>
-                      <Select value={approvalFilter} onChange={(e) => setApprovalFilter(e.target.value)}>
-                        <option value="All">All approval stages</option>
-                        {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 p-3 border-t border-slate-100 dark:border-slate-800">
-                    <Button variant="outline" className="flex-1" onClick={resetFilters}>Reset</Button>
-                    <Button className="flex-1" onClick={() => setFilterOpen(false)}>Filter</Button>
-                  </div>
-                </div>
-              )}
-            </div>
-
+          {/* Right Side Actions: Manage Columns, Templates, Connections, View Toggle */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+            
             {/* Manage Columns dropdown — list view only */}
             {viewMode === "list" && (
               <div className="relative" ref={colsRef}>
@@ -683,7 +507,7 @@ export function CampaignsView({
                           type="checkbox"
                           checked={visibleCols[key]}
                           onChange={() => toggleColumn(key)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                         />
                         {label}
                       </label>
@@ -742,9 +566,7 @@ export function CampaignsView({
             >
               <Link2 className="h-4 w-4" /> Connections
             </Button>
-          </div>
 
-          <div className="flex items-center gap-3">
             {/* View Mode Toggle */}
             <div className="flex items-center gap-0.5 rounded-xl border border-slate-200 dark:border-slate-800 p-0.5 bg-slate-50 dark:bg-slate-950/60">
               <button
@@ -754,7 +576,7 @@ export function CampaignsView({
                   "p-1.5 rounded-lg text-xs font-semibold transition-all",
                   viewMode === "list"
                     ? "bg-[var(--primary)] text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                    : "text-slate-550 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
                 <List className="h-4 w-4" />
@@ -766,13 +588,197 @@ export function CampaignsView({
                   "p-1.5 rounded-lg text-xs font-semibold transition-all",
                   viewMode === "grid"
                     ? "bg-[var(--primary)] text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                    : "text-slate-550 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
                 <LayoutGrid className="h-4 w-4" />
               </button>
             </div>
 
+          </div>
+
+        </div>
+
+        {/* Toolbar Row 2: Filters & Controls */}
+        <div data-tour-id="campaigns-filter" className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 overflow-x-auto bg-slate-50/30 dark:bg-slate-900/10 w-full">
+          
+          {/* Badged Count Button */}
+          <div className="inline-flex items-center gap-1.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-850 text-xs font-semibold text-slate-700 dark:text-slate-350 h-9 border border-slate-200 dark:border-slate-800 shadow-2xs">
+            <Megaphone className="h-3.5 w-3.5 text-slate-450" />
+            <span>
+              {filtered.length}{" "}
+              {cardFilter === "active"
+                ? "Active Campaign"
+                : cardFilter === "sent"
+                ? "Sent Campaign"
+                : cardFilter === "opened"
+                ? "Opened Campaign"
+                : cardFilter === "replied"
+                ? "Replied Campaign"
+                : "Campaign"}
+              {filtered.length === 1 ? "" : "s"}
+            </span>
+            {cardFilter !== "all" && (
+              <button
+                onClick={() => setCardFilter("all")}
+                title="Clear filter"
+                className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Active only filter button */}
+          <button
+            onClick={() => setCardFilter((prev) => prev === "active" ? "all" : "active")}
+            className={cn(
+              "inline-flex items-center justify-center gap-1.5 px-3 rounded-xl text-xs font-semibold border transition-all h-9 shadow-2xs select-none",
+              cardFilter === "active"
+                ? "bg-slate-900 text-white border-transparent dark:bg-slate-100 dark:text-slate-900"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-350 dark:border-slate-800"
+            )}
+          >
+            {cardFilter === "active" ? "✓ Active Only" : "Active Only"}
+          </button>
+
+          {/* Approval stages select dropdown */}
+          <select
+            value={approvalFilter}
+            onChange={(e) => setApprovalFilter(e.target.value)}
+            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-350 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9 shadow-2xs"
+          >
+            <option value="All">All approval stages</option>
+            {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+
+          {/* Sort Select */}
+          <select
+            value={`${sortField}:${sortDir}`}
+            onChange={(e) => { const [f, d] = e.target.value.split(":"); setSortField(f as SortField); setSortDir(d as "asc" | "desc"); }}
+            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-350 outline-none focus:ring-1 focus:ring-[var(--primary)] transition-all cursor-pointer h-9 shadow-2xs"
+          >
+            <option value="updatedAt:desc">Sort: Newest first</option>
+            <option value="updatedAt:asc">Sort: Oldest first</option>
+            <option value="name:asc">Sort: Name A-Z</option>
+            <option value="leads:desc">Sort: Most prospects</option>
+            <option value="sent:desc">Sort: Most sent</option>
+            <option value="replyRate:desc">Sort: Best reply rate</option>
+          </select>
+
+          {/* Date range inputs */}
+          <div className="flex items-center gap-1 text-xs text-slate-500">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              max={dateTo || undefined}
+              className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-350 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] shadow-2xs animate-none"
+              aria-label="Last modified from"
+            />
+            <span className="text-slate-400">–</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              min={dateFrom || undefined}
+              className="h-9 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs text-slate-700 dark:text-slate-350 focus:outline-none focus:ring-1 focus:ring-[var(--primary)] shadow-2xs animate-none"
+              aria-label="Last modified to"
+            />
+          </div>
+
+          {/* Filter Dropdown */}
+          <div className="relative" ref={filterRef}>
+            <Button
+              variant="outline"
+              size="custom"
+              onClick={() => setFilterOpen((v) => !v)}
+              className={cn(
+                "h-9 px-3 text-xs rounded-xl font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-[var(--muted)] shadow-2xs flex items-center justify-center gap-1.5",
+                filterOpen && "bg-slate-50 dark:bg-slate-800"
+              )}
+            >
+              <FilterIcon className="h-4 w-4" /> Filter
+              {activeFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
+            </Button>
+            {filterOpen && (
+              <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 z-20 w-72 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white"><FilterIcon className="h-4 w-4" /> Filter</span>
+                  <button onClick={() => setFilterOpen(false)} aria-label="Close" className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-1.5">Type</p>
+                    <div className="flex flex-col gap-1.5">
+                      {(["Email", "LinkedIn", "Multichannel"] as const).map((t) => (
+                        <label key={t} className="inline-flex items-center gap-2 text-sm text-slate-750 dark:text-slate-650 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={typeFilter.includes(t)}
+                            onChange={() => toggleTypeFilter(t)}
+                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
+                          />
+                          {t}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-1.5">Start date</p>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      max={dateTo || undefined}
+                      className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-1.5">End date</p>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      min={dateFrom || undefined}
+                      className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-sm text-slate-900 dark:text-slate-850 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-750 dark:text-slate-650 cursor-pointer select-none mb-2">
+                      <input
+                        type="checkbox"
+                        checked={cardFilter === "active"}
+                        onChange={(e) => setCardFilter(e.target.checked ? "active" : "all")}
+                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
+                      />
+                      Active only
+                    </label>
+                    <Select value={approvalFilter} onChange={(e) => setApprovalFilter(e.target.value)}>
+                      <option value="All">All approval stages</option>
+                      {APPROVAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-3 border-t border-slate-100 dark:border-slate-800">
+                  <Button variant="outline" className="flex-1" onClick={resetFilters}>Reset</Button>
+                  <Button className="flex-1" onClick={() => setFilterOpen(false)}>Filter</Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -870,7 +876,7 @@ export function CampaignsView({
                       type="checkbox"
                       checked={selected.length === filtered.length && filtered.length > 0}
                       onChange={toggleSelectAll}
-                      className="rounded border-slate-300"
+                      className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                     />
                   </th>
                   <th className="px-3 py-3 w-8" />
@@ -907,7 +913,7 @@ export function CampaignsView({
                           type="checkbox"
                           checked={selected.includes(key)}
                           onChange={() => toggleSelected(key)}
-                          className="rounded border-slate-300"
+                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                         />
                       </td>
                       <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>

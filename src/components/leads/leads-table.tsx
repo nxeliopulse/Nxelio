@@ -1045,91 +1045,33 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         </div>
       )}
       <Card className="overflow-hidden">
-        {/* Toolbar */}
-        <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
-          {/* Left Controls: Search + Count + Compact Tool Buttons */}
-          <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
-            {/* Search Input */}
-            <div className="w-36 sm:w-48 md:w-56 flex-shrink-0">
-              <Input
-                leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
-                rightIcon={
-                  search ? (
-                    <button
-                      type="button"
-                      onClick={() => setSearch("")}
-                      aria-label="Clear search"
-                      className="pointer-events-auto p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-[var(--muted)] hover:text-slate-600 dark:hover:text-slate-600"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  ) : undefined
-                }
-                placeholder="Search…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-8 text-xs rounded-xl"
-              />
-            </div>
+        {/* Toolbar Row 1: Search & Actions */}
+        <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+          {/* Left Side: Search Input */}
+          <div className="w-full md:w-auto flex-grow max-w-sm">
+            <Input
+              leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
+              rightIcon={
+                search ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    aria-label="Clear search"
+                    className="pointer-events-auto p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-[var(--muted)] hover:text-slate-600 dark:hover:text-slate-600"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : undefined
+              }
+              placeholder="Search…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 text-xs rounded-xl"
+            />
+          </div>
 
-            {/* Count Chip */}
-            <div className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
-              <Users2 className="h-3.5 w-3.5 text-slate-400" />
-              <span>
-                {filtered.length}{" "}
-                {cardFilter === "hot"
-                  ? "Hot Prospect"
-                  : cardFilter === "scored"
-                  ? "AI Scored Prospect"
-                  : cardFilter === "converted"
-                  ? "Converted Prospect"
-                  : "Prospect"}
-                {filtered.length === 1 ? "" : "s"}
-              </span>
-              {cardFilter !== "all" && (
-                <button
-                  onClick={() => handleCardFilterChange("all")}
-                  title="Clear filter"
-                  className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-
-            {/* Date Range Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={openDatesPopover}
-              className={cn(
-                "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
-                hasActiveDateFilter && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
-              )}
-              title="Filter by date added"
-            >
-              <Calendar className="h-3.5 w-3.5" />
-              <span>{dateRangeLabel()}</span>
-            </Button>
-
-            {/* Filter Button */}
-            <Button
-              data-tour-id="leads-filter"
-              variant="outline"
-              size="sm"
-              onClick={openFiltersPopover}
-              className={cn(
-                "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
-                hasActiveFilters && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
-              )}
-              title="Filter prospects"
-            >
-              <Filter className="h-3.5 w-3.5" />
-              <span>Filter</span>
-              <ChevronDown className="h-3 w-3" />
-              {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
-            </Button>
-
+          {/* Right Side Actions: Manage Columns, AI Actions, View Toggle, Add Prospect */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
             {/* Columns Button */}
             <Button
               variant="outline"
@@ -1138,7 +1080,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               className="rounded-xl gap-1 font-semibold h-8 text-xs px-2.5 flex-shrink-0 border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950/60"
               title="Customize visible columns"
             >
-              <Settings2 className="h-3.5 w-3.5" />
+              <Settings2 className="h-3.5 w-3.5 text-slate-500" />
               <span>Manage Columns</span>
             </Button>
 
@@ -1153,38 +1095,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               <Sparkles className="h-3.5 w-3.5 text-blue-500" />
               <span>AI Actions</span>
             </Button>
-          </div>
-
-          {/* Right Controls: Sort Dropdown + View Toggle + Add Lead */}
-          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-            {/* Sort Dropdown */}
-            <div className="relative inline-flex items-center gap-1 flex-shrink-0 w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 pl-2.5 pr-1.5 shadow-sm">
-              <ArrowUpDown className="h-3 w-3 text-slate-400 flex-shrink-0" />
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">Sort By</span>
-              <select
-                value={
-                  !sortKey ? "none"
-                  : sortKey === "name" && sortDir === "asc" ? "name"
-                  : sortKey === "score" && sortDir === "desc" ? "score"
-                  : sortKey === "created_at" && sortDir === "desc" ? "newest"
-                  : "none"
-                }
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "none") { setSortKey(null); setSortDir("asc"); }
-                  else if (v === "name") { setSortKey("name"); setSortDir("asc"); }
-                  else if (v === "score") { setSortKey("score"); setSortDir("desc"); }
-                  else if (v === "newest") { setSortKey("created_at"); setSortDir("desc"); }
-                }}
-                className="appearance-none bg-transparent border-0 pl-1 pr-4 py-1 text-xs font-semibold text-slate-700 dark:text-slate-600 focus:outline-none cursor-pointer truncate"
-              >
-                <option value="none">Default</option>
-                <option value="name">Name A–Z</option>
-                <option value="score">Score High→Low</option>
-                <option value="newest">Newest</option>
-              </select>
-              <ChevronDown className="h-3 w-3 text-slate-400 absolute right-1.5 pointer-events-none" />
-            </div>
 
             {/* List/Grid View Toggle */}
             <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0">
@@ -1192,7 +1102,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               <button type="button" onClick={() => setView("grid")} className={cn("h-8 w-8 flex items-center justify-center transition-colors border-l border-slate-200 dark:border-slate-800", view === "grid" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800")} title="Grid view"><LayoutGrid className="h-3.5 w-3.5" /></button>
             </div>
 
-            {/* Add Lead — opens the source-picker screen directly (Manual, CSV, LinkedIn, Buy Leads, etc.) */}
+            {/* Add Lead */}
             <Button
               data-tour-id="leads-add-prospect"
               size="sm"
@@ -1202,6 +1112,96 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               <Plus className="h-3.5 w-3.5" />
               <span>Add Prospect</span>
             </Button>
+          </div>
+        </div>
+
+        {/* Toolbar Row 2: Filters & Controls */}
+        <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 overflow-x-auto scrollbar-hide bg-slate-50/30 dark:bg-slate-900/10">
+          {/* Count Chip */}
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
+            <Users2 className="h-3.5 w-3.5 text-slate-400" />
+            <span>
+              {filtered.length}{" "}
+              {cardFilter === "hot"
+                ? "Hot Prospect"
+                : cardFilter === "scored"
+                ? "AI Scored Prospect"
+                : cardFilter === "converted"
+                ? "Converted Prospect"
+                : "Prospect"}
+              {filtered.length === 1 ? "" : "s"}
+            </span>
+            {cardFilter !== "all" && (
+              <button
+                onClick={() => handleCardFilterChange("all")}
+                title="Clear filter"
+                className="p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 cursor-pointer ml-1"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Date Range Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openDatesPopover}
+            className={cn(
+              "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
+              hasActiveDateFilter && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
+            )}
+            title="Filter by date added"
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            <span>{dateRangeLabel()}</span>
+          </Button>
+
+          {/* Filter Button */}
+          <Button
+            data-tour-id="leads-filter"
+            variant="outline"
+            size="sm"
+            onClick={openFiltersPopover}
+            className={cn(
+              "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
+              hasActiveFilters && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
+            )}
+            title="Filter prospects"
+          >
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filter</span>
+            <ChevronDown className="h-3 w-3" />
+            {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
+          </Button>
+
+          {/* Sort Dropdown */}
+          <div className="relative inline-flex items-center gap-1 flex-shrink-0 w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 pl-2.5 pr-1.5 shadow-sm">
+            <ArrowUpDown className="h-3 w-3 text-slate-400 flex-shrink-0" />
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">Sort By</span>
+            <select
+              value={
+                !sortKey ? "none"
+                : sortKey === "name" && sortDir === "asc" ? "name"
+                : sortKey === "score" && sortDir === "desc" ? "score"
+                : sortKey === "created_at" && sortDir === "desc" ? "newest"
+                : "none"
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "none") { setSortKey(null); setSortDir("asc"); }
+                else if (v === "name") { setSortKey("name"); setSortDir("asc"); }
+                else if (v === "score") { setSortKey("score"); setSortDir("desc"); }
+                else if (v === "newest") { setSortKey("created_at"); setSortDir("desc"); }
+              }}
+              className="appearance-none bg-transparent border-0 pl-1 pr-4 py-1 text-xs font-semibold text-slate-700 dark:text-slate-600 focus:outline-none cursor-pointer truncate"
+            >
+              <option value="none">Default</option>
+              <option value="name">Name A–Z</option>
+              <option value="score">Score High→Low</option>
+              <option value="newest">Newest</option>
+            </select>
+            <ChevronDown className="h-3 w-3 text-slate-400 absolute right-1.5 pointer-events-none" />
           </div>
         </div>
 
@@ -1223,7 +1223,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       type="checkbox"
                       checked={selected.length === filtered.length && filtered.length > 0}
                       onChange={toggleAll}
-                      className="rounded border-slate-300 dark:border-slate-700"
+                      className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                     />
                   </th>
                   {visibleCols.map((c) => {
@@ -1363,7 +1363,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         type="checkbox"
                         checked={selected.includes(l.id)}
                         onChange={() => toggle(l.id)}
-                        className="rounded border-slate-300"
+                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                       />
                     </td>
                     {visibleCols.map((c) => (
@@ -1683,7 +1683,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                     type="checkbox"
                     checked={cols[c.key]}
                     onChange={() => toggleCol(c.key)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                   />
                   <span className="flex-1 inline-flex items-center gap-1.5">
                     {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400" />}
@@ -1701,7 +1701,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       type="checkbox"
                       checked={cols[c.key]}
                       onChange={() => toggleCol(c.key)}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                      className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer flex-shrink-0"
                     />
                     <span className="flex-1 inline-flex items-center gap-1.5 min-w-0 truncate">
                       {c.icon && <c.icon className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />}

@@ -9,6 +9,7 @@ import { useSidebar } from "@/components/layout/sidebar-context";
 import { cn, formatDate } from "@/lib/utils";
 import { PhoneInput, detectCountry, isPhoneValid, formatPhoneForStorage } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
+import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 
 const RATINGS = ["Hot", "Warm", "Cold"];
 const OWNERSHIPS = ["Public", "Private", "Subsidiary", "Other"];
@@ -461,10 +462,13 @@ export function EditAccountModal({
                     <legend className="px-2 text-xs font-semibold text-slate-700 dark:text-slate-600">Billing Address</legend>
                     <div className="space-y-3">
                       <FormRow label="Country / Region">
-                        <select className={selectStyle} value={form.billing_country} onChange={(e) => set("billing_country", e.target.value)}>
-                          <option value="">-None-</option>
-                          {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <LocationAutocomplete
+                          type="country"
+                          value={form.billing_country || ""}
+                          onChange={(val) => set("billing_country", val)}
+                          placeholder="Country"
+                          className={selectStyle}
+                        />
                       </FormRow>
                       <FormRow label="Flat / House No.">
                         <input type="text" className={inputStyle} value={form.billing_building} onChange={(e) => set("billing_building", e.target.value)} />
@@ -473,10 +477,25 @@ export function EditAccountModal({
                         <input type="text" className={inputStyle} value={form.billing_street} onChange={(e) => set("billing_street", e.target.value)} />
                       </FormRow>
                       <FormRow label="City">
-                        <input type="text" className={inputStyle} value={form.billing_city} onChange={(e) => set("billing_city", e.target.value)} />
+                        <LocationAutocomplete
+                          type="city"
+                          value={form.billing_city || ""}
+                          onChange={(val) => set("billing_city", val)}
+                          placeholder="City"
+                          className={inputStyle}
+                          countryContext={form.billing_country}
+                          stateContext={form.billing_state}
+                        />
                       </FormRow>
                       <FormRow label="State">
-                        <input type="text" className={inputStyle} value={form.billing_state} onChange={(e) => set("billing_state", e.target.value)} />
+                        <LocationAutocomplete
+                          type="state"
+                          value={form.billing_state || ""}
+                          onChange={(val) => set("billing_state", val)}
+                          placeholder="State"
+                          className={inputStyle}
+                          countryContext={form.billing_country}
+                        />
                       </FormRow>
                       <FormRow label="Zip Code">
                         <input type="text" className={inputStyle} value={form.billing_zip} onChange={(e) => set("billing_zip", e.target.value)} />
@@ -488,10 +507,13 @@ export function EditAccountModal({
                     <legend className="px-2 text-xs font-semibold text-slate-700 dark:text-slate-600">Shipping Address</legend>
                     <div className="space-y-3">
                       <FormRow label="Country / Region">
-                        <select className={selectStyle} value={form.shipping_country} onChange={(e) => set("shipping_country", e.target.value)}>
-                          <option value="">-None-</option>
-                          {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <LocationAutocomplete
+                          type="country"
+                          value={form.shipping_country || ""}
+                          onChange={(val) => set("shipping_country", val)}
+                          placeholder="Country"
+                          className={selectStyle}
+                        />
                       </FormRow>
                       <FormRow label="Flat / House No.">
                         <input type="text" className={inputStyle} value={form.shipping_building} onChange={(e) => set("shipping_building", e.target.value)} />
@@ -500,10 +522,25 @@ export function EditAccountModal({
                         <input type="text" className={inputStyle} value={form.shipping_street} onChange={(e) => set("shipping_street", e.target.value)} />
                       </FormRow>
                       <FormRow label="City">
-                        <input type="text" className={inputStyle} value={form.shipping_city} onChange={(e) => set("shipping_city", e.target.value)} />
+                        <LocationAutocomplete
+                          type="city"
+                          value={form.shipping_city || ""}
+                          onChange={(val) => set("shipping_city", val)}
+                          placeholder="City"
+                          className={inputStyle}
+                          countryContext={form.shipping_country}
+                          stateContext={form.shipping_state}
+                        />
                       </FormRow>
                       <FormRow label="State">
-                        <input type="text" className={inputStyle} value={form.shipping_state} onChange={(e) => set("shipping_state", e.target.value)} />
+                        <LocationAutocomplete
+                          type="state"
+                          value={form.shipping_state || ""}
+                          onChange={(val) => set("shipping_state", val)}
+                          placeholder="State"
+                          className={inputStyle}
+                          countryContext={form.shipping_country}
+                        />
                       </FormRow>
                       <FormRow label="Zip Code">
                         <input type="text" className={inputStyle} value={form.shipping_zip} onChange={(e) => set("shipping_zip", e.target.value)} />

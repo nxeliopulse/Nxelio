@@ -169,7 +169,22 @@ export async function sendReply(
     const { getOnboarding } = await import("@/lib/queries/onboarding");
     const { data: onboarding } = await getOnboarding();
     const fromName = onboarding?.company_name?.trim() || "Nxelio Nurture";
-    const result = await sendEmail({ to: lead.email, subject, text: body, fromName });
+    // Route replies to the workspace's actual connected mailbox — Unipile only
+    // watches THAT address for inbound mail. This call used to omit replyTo
+    // entirely, silently falling back to sendEmail's global REPLY_TO_EMAIL env
+    // var (a mailbox nothing monitors), so every reply sent from this Compose/
+    // Reply flow was unreachable — the lead's own reply had nowhere real to land.
+    const { data: mailbox } = await supabase
+      .from("outreach_accounts")
+      .select("identifier, name")
+      .eq("workspace_id", lead.workspace_id)
+      .eq("channel", "email")
+      .eq("status", "connected")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const replyTo = (mailbox?.identifier as string) || (mailbox?.name as string) || undefined;
+    const result = await sendEmail({ to: lead.email, subject, text: body, fromName, replyTo });
     if (!result.ok) return { ok: false, error: result.error };
     simulated = result.simulated ?? false;
   } else if (lead?.linkedin || lead?.linkedin_provider_id) {

@@ -386,7 +386,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                               type="checkbox"
                               checked={!hiddenStages.has(s)}
                               onChange={() => toggleStageVisible(s)}
-                              className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                              className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                             />
                             {STAGE_LABELS[s]}
                           </label>
@@ -445,7 +445,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                             type="checkbox"
                             checked={visibleCols[key]}
                             onChange={() => toggleColumn(key)}
-                            className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                           />
                           {label}
                         </label>

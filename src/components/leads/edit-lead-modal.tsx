@@ -10,6 +10,7 @@ import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_A
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { useLeadInActiveCampaign } from "@/lib/leads/use-lead-in-active-campaign";
 import { isSuperAdmin } from "@/lib/queries/auth-guards";
+import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 
 const FALLBACK_STATUSES = ["New", "Contacted", "Qualified", "Nurturing"];
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
@@ -273,15 +274,36 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
             </div>
             <div>
               <label className={labelStyle}>City</label>
-              <input className={fieldStyle} value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="City" />
+              <LocationAutocomplete
+                type="city"
+                value={form.city}
+                onChange={(val) => set("city", val)}
+                placeholder="City"
+                className={fieldStyle}
+                countryContext={form.country}
+                stateContext={form.state}
+              />
             </div>
             <div>
               <label className={labelStyle}>State</label>
-              <input className={fieldStyle} value={form.state} onChange={(e) => set("state", e.target.value)} placeholder="State" />
+              <LocationAutocomplete
+                type="state"
+                value={form.state}
+                onChange={(val) => set("state", val)}
+                placeholder="State"
+                className={fieldStyle}
+                countryContext={form.country}
+              />
             </div>
             <div>
               <label className={labelStyle}>Country</label>
-              <input className={fieldStyle} value={form.country} onChange={(e) => set("country", e.target.value)} placeholder="Country" />
+              <LocationAutocomplete
+                type="country"
+                value={form.country}
+                onChange={(val) => set("country", val)}
+                placeholder="Country"
+                className={fieldStyle}
+              />
             </div>
             <div>
               <label className={labelStyle}>Postal Code</label>
