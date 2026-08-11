@@ -337,7 +337,12 @@ export function EmailsView({
       setComposeBody("");
       setComposeLabel(null);
       setReplyToLeadId(null);
+      // `emails` is local state seeded once from props (see its declaration) —
+      // router.refresh() alone re-fetches the server data but this component
+      // never re-mounts, so the new Sent row was invisible until a manual hard
+      // reload. Same fix already used by the Refresh button (handleRefresh).
       router.refresh();
+      setTimeout(() => window.location.reload(), 100);
     });
   };
 
