@@ -466,22 +466,8 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
         {/* Right Side: Filter, Columns, Toggle Grid */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
 
-<<<<<<< HEAD
           {/* More Filters — Rating + Account Type, the two filter dimensions that don't
               have their own dedicated toolbar dropdown (Status/Industry/Owner/Region do) */}
-=======
-          {/* Add Account Button */}
-          <Button
-            size="sm"
-            onClick={() => setShowModal(true)}
-            className="rounded-lg gap-1.5 font-bold h-8 px-3.5 text-xs bg-[var(--primary)] hover:opacity-90 text-white shadow-sm flex-shrink-0"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Account</span>
-          </Button>
-
-          {/* More Filters — Rating + Account Type */}
->>>>>>> 1b1a8d2 (Mani)
           <div className="relative">
             <Button
               variant="outline"
