@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import DOMPurify from "isomorphic-dompurify";
 import {
   Search, Mail, Star, Trash2, Send, Tag, RefreshCw,
   Plus, X, Reply, AlertOctagon,
@@ -13,6 +14,31 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import type { InboxConversation } from "@/lib/queries/inbox";
 import { sendReply, sendComposedEmail } from "@/lib/queries/inbox";
+
+// Email bodies come from external senders — HTML but untrusted. Sanitize
+// before rendering with dangerouslySetInnerHTML; allowlist is broader than a
+// simple note's (real emails use div/table/blockquote/img for quoted replies
+// and signatures) but still excludes anything that can execute script or
+// load a form. Plain-text emails (no tags) pass through unchanged and still
+// get their line breaks from the container's `whitespace-pre-line` class.
+const EMAIL_SANITIZE_OPTS = {
+  ALLOWED_TAGS: [
+    "p", "br", "div", "span", "strong", "b", "em", "i", "u", "s", "a", "ul", "ol", "li",
+    "h1", "h2", "h3", "h4", "blockquote", "table", "thead", "tbody", "tr", "td", "th", "img", "hr", "font",
+  ],
+  ALLOWED_ATTR: [
+    "href", "target", "rel", "style", "src", "alt", "width", "height", "align", "dir",
+    "colspan", "rowspan", "border", "cellpadding", "cellspacing", "class",
+  ],
+};
+function safeEmailHtml(html: string): string {
+  return DOMPurify.sanitize(html, EMAIL_SANITIZE_OPTS);
+}
+// List-row preview is a line-clamped snippet, not a reading pane — strip
+// tags entirely rather than render HTML that would get cut off mid-markup.
+function stripHtmlForPreview(html: string): string {
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).replace(/\s+/g, " ").trim();
+}
 
 interface EmailItem {
   id: string;
@@ -477,7 +503,7 @@ export function EmailsView({
                       <span className="text-[10px] text-slate-400 flex-shrink-0">{item.date}</span>
                     </div>
                     <p className={cn("text-slate-900 dark:text-white text-xs truncate mb-1", item.unread ? "font-bold" : "font-semibold")}>{item.subject}</p>
-                    <p className="text-slate-550 dark:text-slate-550 text-[11px] line-clamp-2 leading-relaxed">{item.body}</p>
+                    <p className="text-slate-550 dark:text-slate-550 text-[11px] line-clamp-2 leading-relaxed">{stripHtmlForPreview(item.body)}</p>
                     {labelColor && (
                       <div className="mt-2">
                         <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold", labelColor.text, labelColor.bg)}>{item.label}</span>
@@ -544,7 +570,10 @@ export function EmailsView({
                     <p className="text-[10px] text-slate-400 mt-0.5">{selectedEmail.time}</p>
                   </div>
                 </div>
-                <div className="text-slate-800 dark:text-slate-700 text-sm leading-relaxed whitespace-pre-line font-medium py-2">{selectedEmail.body}</div>
+                <div
+                  className="text-slate-800 dark:text-slate-700 text-sm leading-relaxed whitespace-pre-line font-medium py-2 [&_a]:text-blue-600 [&_a]:underline [&_img]:max-w-full [&_table]:max-w-full"
+                  dangerouslySetInnerHTML={{ __html: safeEmailHtml(selectedEmail.body) }}
+                />
               </div>
             </div>
           ) : (
