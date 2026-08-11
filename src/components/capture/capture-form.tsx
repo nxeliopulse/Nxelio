@@ -1,11 +1,13 @@
 "use client";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Mail, Globe, Phone, User, Building2, AlertCircle, CheckCircle2, Sparkles } from "lucide-react";
+import { Mail, Globe, User, Building2, AlertCircle, CheckCircle2, Sparkles } from "lucide-react";
 import { Input, Textarea, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/brand/logo";
 import { capturePublicLead } from "@/lib/queries/capture";
+import { PhoneInput, formatPhoneForStorage } from "@/components/ui/phone-input";
+import type { CountryCode } from "libphonenumber-js";
 
 const industries = ["Technology", "Consulting", "Enterprise Software", "Analytics", "Retail", "Cloud Services", "Manufacturing", "Training", "Healthcare", "Finance"];
 const interests = ["CRM Automation", "SAP AI", "Digital Transformation", "AI Platforms", "Customer Engagement", "Workflow Automation", "AI Personalization", "Lead Nurturing", "Lead Scoring"];
@@ -24,12 +26,13 @@ export function CaptureForm({ workspaceSlug, workspaceName }: Props) {
     industry: "", interestArea: "", message: "", linkedin: "",
   };
   const [form, setForm] = useState(initial);
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>("US");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     start(async () => {
-      const res = await capturePublicLead({ ...form, workspaceSlug });
+      const res = await capturePublicLead({ ...form, phone: form.phone.trim() ? formatPhoneForStorage(form.phone, phoneCountry) : "", workspaceSlug });
       if (!res.ok) setError(res.error || "Submission failed");
       else setDone(true);
     });
@@ -44,7 +47,7 @@ export function CaptureForm({ workspaceSlug, workspaceName }: Props) {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Thanks — we&apos;ve got it!</h1>
           <p className="text-slate-500 mb-6">Our team will be in touch within 1 business day. Keep an eye on your inbox.</p>
-          <Button onClick={() => { setDone(false); setForm(initial); }}>Submit another lead</Button>
+          <Button onClick={() => { setDone(false); setForm(initial); setPhoneCountry("US"); }}>Submit another lead</Button>
         </div>
       </div>
     );
@@ -95,7 +98,7 @@ export function CaptureForm({ workspaceSlug, workspaceName }: Props) {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone</label>
-              <Input leftIcon={<Phone className="h-4 w-4" />} placeholder="+1 415 555 0142" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              <PhoneInput label="" country={phoneCountry} value={form.phone} onCountryChange={setPhoneCountry} onValueChange={(v) => setForm({ ...form, phone: v })} />
             </div>
           </div>
 

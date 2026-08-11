@@ -6,11 +6,19 @@ import { getSubscription } from "@/lib/queries/subscriptions";
 import { SubscriptionGate } from "@/components/billing/subscription-gate";
 import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
 import { getMyWorkspaces } from "@/lib/queries/workspaces";
+import { isPlatformAdmin } from "@/lib/queries/platform-admin";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // The platform admin login (admin@nxelio.com) isn't a real tenant — it exists
+  // only to manage every customer workspace from /admin, not to run campaigns
+  // itself. It still has a `users` row (tied to some workspace) for legacy
+  // reasons, so without this it would hit the same onboarding/subscription
+  // gates as any customer. Send it straight to the admin panel instead.
+  if (await isPlatformAdmin()) redirect("/admin");
 
   // If an admin removed this login's access to its currently-active workspace
   // (updateUserStatus on workspace_members) since their last request, their

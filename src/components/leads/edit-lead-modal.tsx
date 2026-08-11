@@ -10,6 +10,8 @@ import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_A
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { useLeadInActiveCampaign } from "@/lib/leads/use-lead-in-active-campaign";
 import { isSuperAdmin } from "@/lib/queries/auth-guards";
+import { PhoneInput, detectCountry, formatPhoneForStorage } from "@/components/ui/phone-input";
+import type { CountryCode } from "libphonenumber-js";
 
 const FALLBACK_STATUSES = ["New", "Contacted", "Qualified", "Nurturing"];
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
@@ -23,6 +25,7 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
   useEffect(() => { isSuperAdmin().then(setAmSuperAdmin).catch(() => {}); }, []);
   const lockedFields = lead.locked_fields ?? {};
   const fieldLocked = (field: string) => Boolean(lockedFields[field]) && !amSuperAdmin;
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(() => detectCountry(lead.phone));
   const [form, setForm] = useState({
     full_name: lead.full_name || "",
     company_name: lead.company_name || "",
@@ -98,7 +101,7 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
         full_name: form.full_name.trim() || null,
         company_name: form.company_name.trim() || null,
         email: form.email.trim() || null,
-        phone: form.phone.trim() || null,
+        phone: form.phone.trim() ? formatPhoneForStorage(form.phone, phoneCountry) : null,
         website_url: form.website_url.trim() || null,
         linkedin: form.linkedin.trim() || null,
         industry: form.industry || null,
@@ -185,11 +188,16 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
               <label className={labelStyle}>
                 Phone {fieldLocked("phone") && <Lock className="inline h-3 w-3 text-slate-400 ml-1" />}
               </label>
-              <input
-                className={fieldStyle} value={form.phone} onChange={(e) => set("phone", e.target.value)}
-                placeholder="Phone number" disabled={fieldLocked("phone")}
-                title={fieldLocked("phone") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}
-              />
+              <fieldset disabled={fieldLocked("phone")} title={fieldLocked("phone") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}>
+                <PhoneInput
+                  label=""
+                  country={phoneCountry}
+                  value={form.phone}
+                  onCountryChange={setPhoneCountry}
+                  onValueChange={(v) => set("phone", v)}
+                  inputClassName={fieldStyle}
+                />
+              </fieldset>
               {fieldLocked("phone") && <p className="text-[11px] text-slate-400 mt-1">Locked — only a Super Admin can edit this.</p>}
             </div>
             <div>

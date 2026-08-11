@@ -15,7 +15,7 @@ import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
 import { AiColumnModal } from "@/components/leads/ai-column-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
-import { deleteLead, bulkDeleteLeads, updateLead, type LeadRow } from "@/lib/queries/leads";
+import { updateLead, type LeadRow } from "@/lib/queries/leads";
 import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
 import { createStaticSegment } from "@/lib/queries/segments";
 import { usePageTour } from "@/components/tour/use-page-tour";
@@ -256,7 +256,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
 
   // Selection contextual bar — replaces the toolbar controls while rows are selected.
   const [showOwnerMenu, setShowOwnerMenu] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
   const [segmentName, setSegmentName] = useState("");
   const [segmentDescription, setSegmentDescription] = useState("");
@@ -707,17 +706,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     printWindow.print();
   }
 
-  async function handleBulkDelete() {
-    setShowMoreMenu(false);
-    const n = selected.length;
-    if (!(await confirm({ title: "Delete lead?", message: `Delete ${n} lead${n === 1 ? "" : "s"}? This action cannot be undone.`, confirmLabel: "Delete", danger: true }))) return;
-    const ids = [...selected];
-    setSelected([]);
-    start(async () => {
-      await bulkDeleteLeads(ids); // single query instead of N round-trips
-    });
-  }
-
   function openSegmentDialog() {
     setSegmentName("");
     setSegmentDescription("");
@@ -773,14 +761,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       } catch (err) {
         toast("Failed to update favorite status", "error");
       }
-    });
-  }
-
-  async function handleDelete(id: string) {
-    if (!(await confirm({ title: "Delete lead?", message: "Delete this lead? This action cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
-    start(async () => {
-      await deleteLead(id);
-      setSelected((s) => s.filter((x) => x !== id));
     });
   }
 
@@ -1555,7 +1535,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         </>
       )}
 
-      {/* Row actions menu — kebab button in the rightmost column, Edit + Delete */}
+      {/* Row actions menu — kebab button in the rightmost column, Edit */}
       {rowMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setRowMenu(null)} />
@@ -1565,13 +1545,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <Pencil className="h-3.5 w-3.5" /> Edit
-            </button>
-            <button
-              onClick={() => { const id = rowMenu.id; setRowMenu(null); handleDelete(id); }}
-              disabled={pending}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-rose-950/50 rounded-lg disabled:opacity-50"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
             </button>
           </div>
         </>
@@ -1917,28 +1890,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         {name}
                       </button>
                     ))}
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setShowMoreMenu((v) => !v)}
-                className="inline-flex items-center gap-1 rounded-full text-slate-600 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
-              >
-                More <ChevronDown className={cn("h-3 w-3 transition-transform", showMoreMenu && "rotate-180")} />
-              </button>
-              {showMoreMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
-                  <div className="lp-anim-pop origin-bottom-left absolute left-0 bottom-full mb-1 z-50 w-44 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-1">
-                    <button
-                      onClick={handleBulkDelete}
-                      disabled={pending}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 text-left"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </button>
                   </div>
                 </>
               )}

@@ -2,6 +2,8 @@
 import { useEffect, useState, useTransition } from "react";
 import { X, CalendarDays, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { submitDemoRequest } from "@/lib/queries/demo-request";
+import { PhoneInput, formatPhoneForStorage } from "@/components/ui/phone-input";
+import type { CountryCode } from "libphonenumber-js";
 
 const INDUSTRIES = ["SaaS", "E-commerce", "Healthcare", "Finance", "Manufacturing", "Real Estate", "Education", "Other"];
 const EMPLOYEE_BANDS = ["1-10", "11-50", "51-200", "201-500", "500+"];
@@ -27,6 +29,7 @@ const labelClass = "block text-sm font-medium text-slate-700 mb-1.5";
 export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [pending, start] = useTransition();
   const [form, setForm] = useState(EMPTY_FORM);
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>("US");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ formattedDate: string; formattedTime: string } | null>(null);
 
@@ -41,6 +44,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
 
   function reset() {
     setForm(EMPTY_FORM);
+    setPhoneCountry("US");
     setError(null);
     setDone(null);
   }
@@ -61,7 +65,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
     if (!form.date) return setError("Please pick an available date.");
 
     start(async () => {
-      const res = await submitDemoRequest(form);
+      const res = await submitDemoRequest({ ...form, phone: formatPhoneForStorage(form.phone, phoneCountry) });
       if (!res.ok) { setError(res.error || "Couldn't book that time. Please try again."); return; }
       setDone({ formattedDate: res.formattedDate!, formattedTime: res.formattedTime! });
     });
@@ -132,7 +136,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
                 </div>
                 <div>
                   <label className={labelClass}>Phone number *</label>
-                  <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 555 123 4567" className={inputClass} />
+                  <PhoneInput label="" country={phoneCountry} value={form.phone} onCountryChange={setPhoneCountry} onValueChange={(v) => setForm({ ...form, phone: v })} inputClassName={inputClass} />
                 </div>
               </div>
 

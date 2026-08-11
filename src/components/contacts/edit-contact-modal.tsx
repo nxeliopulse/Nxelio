@@ -9,6 +9,8 @@ import { createContact, updateContact, type ContactRow } from "@/lib/queries/con
 import { getAccounts, type AccountRow } from "@/lib/queries/accounts";
 import { uploadContactPhoto } from "@/lib/storage/upload";
 import type { OwnerOption } from "@/components/contacts/contacts-table";
+import { PhoneInput, detectCountry, formatPhoneForStorage } from "@/components/ui/phone-input";
+import type { CountryCode } from "libphonenumber-js";
 
 const SALUTATIONS = ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof."];
 const INDUSTRIES = ["Technology", "Finance", "Healthcare", "Manufacturing", "Retail", "Education", "Consulting", "Other"];
@@ -93,6 +95,13 @@ export function EditContactModal({
   const { toast } = useFeedback();
   const isEdit = Boolean(contact);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(() => detectCountry(contact?.phone));
+  const [mobileCountry, setMobileCountry] = useState<CountryCode>(() => detectCountry(contact?.mobile));
+  const [faxCountry, setFaxCountry] = useState<CountryCode>(() => detectCountry(contact?.fax));
+  const [homePhoneCountry, setHomePhoneCountry] = useState<CountryCode>(() => detectCountry(contact?.home_phone));
+  const [otherPhoneCountry, setOtherPhoneCountry] = useState<CountryCode>(() => detectCountry(contact?.other_phone));
+  const [asstPhoneCountry, setAsstPhoneCountry] = useState<CountryCode>(() => detectCountry(contact?.assistant_phone));
+  const [whatsappCountry, setWhatsappCountry] = useState<CountryCode>(() => detectCountry(contact?.whatsapp));
 
   const initialForm = {
     contact_owner: contact?.contact_owner || "",
@@ -231,8 +240,8 @@ export function EditContactModal({
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
         email: form.email.trim() || null,
-        phone: form.phone.trim() || null,
-        mobile: form.mobile.trim() || null,
+        phone: form.phone.trim() ? formatPhoneForStorage(form.phone, phoneCountry) : null,
+        mobile: form.mobile.trim() ? formatPhoneForStorage(form.mobile, mobileCountry) : null,
         department: form.department.trim() || null,
         job_title: form.job_title.trim() || null,
         lead_source: form.lead_source.trim() || null,
@@ -246,17 +255,17 @@ export function EditContactModal({
         twitter: form.twitter.trim() || null,
         linkedin: form.linkedin.trim() || null,
         facebook: form.facebook.trim() || null,
-        whatsapp: form.whatsapp.trim() || null,
+        whatsapp: form.whatsapp.trim() ? formatPhoneForStorage(form.whatsapp, whatsappCountry) : null,
         instagram: form.instagram.trim() || null,
         youtube: form.youtube.trim() || null,
         pinterest: form.pinterest.trim() || null,
         email_opt_out: form.email_opt_out,
         description: form.description.trim() || null,
-        other_phone: form.other_phone.trim() || null,
-        home_phone: form.home_phone.trim() || null,
-        fax: form.fax.trim() || null,
+        other_phone: form.other_phone.trim() ? formatPhoneForStorage(form.other_phone, otherPhoneCountry) : null,
+        home_phone: form.home_phone.trim() ? formatPhoneForStorage(form.home_phone, homePhoneCountry) : null,
+        fax: form.fax.trim() ? formatPhoneForStorage(form.fax, faxCountry) : null,
         assistant_name: form.assistant.trim() || null,
-        assistant_phone: form.asst_phone.trim() || null,
+        assistant_phone: form.asst_phone.trim() ? formatPhoneForStorage(form.asst_phone, asstPhoneCountry) : null,
         date_of_birth: form.dob || null,
         photo_url: form.photo_url || null,
         tags: tagsList.length ? tagsList.join(", ") : null,
@@ -377,13 +386,13 @@ export function EditContactModal({
             </Field>
 
             <Field label="Phone 1">
-              <input className={fieldStyle} placeholder="(201) 555-0123" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+              <PhoneInput label="" country={phoneCountry} value={form.phone} onCountryChange={setPhoneCountry} onValueChange={(v) => set("phone", v)} inputClassName={fieldStyle} />
             </Field>
             <Field label="Phone 2">
-              <input className={fieldStyle} placeholder="(201) 555-0123" value={form.mobile} onChange={(e) => set("mobile", e.target.value)} />
+              <PhoneInput label="" country={mobileCountry} value={form.mobile} onCountryChange={setMobileCountry} onValueChange={(v) => set("mobile", v)} inputClassName={fieldStyle} />
             </Field>
             <Field label="Fax">
-              <input className={fieldStyle} value={form.fax} onChange={(e) => set("fax", e.target.value)} />
+              <PhoneInput label="" country={faxCountry} value={form.fax} onCountryChange={setFaxCountry} onValueChange={(v) => set("fax", v)} inputClassName={fieldStyle} />
             </Field>
             <Field label="Date of Birth">
               <input type="date" className={fieldStyle} value={form.dob} onChange={(e) => set("dob", e.target.value)} />
@@ -469,16 +478,16 @@ export function EditContactModal({
               <input type="email" className={fieldStyle} value={form.secondary_email} onChange={(e) => set("secondary_email", e.target.value)} />
             </Field>
             <Field label="Home Phone">
-              <input className={fieldStyle} value={form.home_phone} onChange={(e) => set("home_phone", e.target.value)} />
+              <PhoneInput label="" country={homePhoneCountry} value={form.home_phone} onCountryChange={setHomePhoneCountry} onValueChange={(v) => set("home_phone", v)} inputClassName={fieldStyle} />
             </Field>
             <Field label="Other Phone">
-              <input className={fieldStyle} value={form.other_phone} onChange={(e) => set("other_phone", e.target.value)} />
+              <PhoneInput label="" country={otherPhoneCountry} value={form.other_phone} onCountryChange={setOtherPhoneCountry} onValueChange={(v) => set("other_phone", v)} inputClassName={fieldStyle} />
             </Field>
             <Field label="Assistant">
               <input className={fieldStyle} value={form.assistant} onChange={(e) => set("assistant", e.target.value)} />
             </Field>
             <Field label="Asst Phone">
-              <input className={fieldStyle} value={form.asst_phone} onChange={(e) => set("asst_phone", e.target.value)} />
+              <PhoneInput label="" country={asstPhoneCountry} value={form.asst_phone} onCountryChange={setAsstPhoneCountry} onValueChange={(v) => set("asst_phone", v)} inputClassName={fieldStyle} />
             </Field>
           </Section>
 
@@ -520,7 +529,7 @@ export function EditContactModal({
               <input className={fieldStyle} placeholder="@handle" value={form.twitter} onChange={(e) => set("twitter", e.target.value)} />
             </Field>
             <Field label="Whatsapp">
-              <input className={fieldStyle} value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} />
+              <PhoneInput label="" country={whatsappCountry} value={form.whatsapp} onCountryChange={setWhatsappCountry} inputClassName={fieldStyle} onValueChange={(v) => set("whatsapp", v)} />
             </Field>
             <Field label="Instagram">
               <input className={fieldStyle} value={form.instagram} onChange={(e) => set("instagram", e.target.value)} />
