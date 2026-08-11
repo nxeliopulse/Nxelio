@@ -93,6 +93,8 @@ async function connectedLinkedInAccount(db: Db, workspaceId: string): Promise<st
  * Find the workspace's connected mailbox address, so replies actually land where
  * the app is watching for them — falls back to REPLY_TO_EMAIL (sendEmail's default)
  * when no mailbox is connected, rather than silently using a stale/unrelated address.
+ * Ordered newest-first: if the workspace reconnected its mailbox and the old row
+ * never flipped to 'disconnected', a bare LIMIT 1 would pick an unspecified one.
  */
 async function connectedEmailAddress(db: Db, workspaceId: string): Promise<string | undefined> {
   const { data } = await db
@@ -101,6 +103,7 @@ async function connectedEmailAddress(db: Db, workspaceId: string): Promise<strin
     .eq("workspace_id", workspaceId)
     .eq("channel", "email")
     .eq("status", "connected")
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   // Unipile's account payload puts the real mailbox address in `name`, not

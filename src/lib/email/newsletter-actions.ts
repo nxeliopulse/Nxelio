@@ -191,11 +191,14 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
   const { data: onboarding } = await getOnboarding();
   const fromName = onboarding?.company_name?.trim() || "Nxelio Nurture";
   // Route replies to whichever mailbox is actually connected, not a stale env var.
+  // Ordered newest-first: a reconnected mailbox whose old row never flipped to
+  // 'disconnected' would otherwise tie for a bare LIMIT 1 and win at random.
   const { data: mailbox } = await supabase
     .from("outreach_accounts")
     .select("identifier, name")
     .eq("channel", "email")
     .eq("status", "connected")
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   // Unipile puts the real mailbox address in `name`, not `identifier` — see
@@ -321,6 +324,7 @@ export async function sendTestNewsletter(newsletterId: string, testEmail: string
     .select("identifier, name")
     .eq("channel", "email")
     .eq("status", "connected")
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   const result = await sendEmail({

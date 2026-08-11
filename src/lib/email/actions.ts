@@ -59,12 +59,17 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
   // connected email account has an empty `identifier`, so selecting only that
   // column always silently fell back to sendEmail's hardcoded default instead
   // of this workspace's actual connected mailbox.
+  // ORDER BY is required: if a workspace reconnected its mailbox (old row never
+  // flipped to 'disconnected'), Postgres returns rows in an unspecified order
+  // for a bare LIMIT 1 — replies would land in whichever stale mailbox won the
+  // coin flip. Newest connected row always wins instead.
   const supabase = await createClient();
   const { data: mailbox } = await supabase
     .from("outreach_accounts")
     .select("identifier, name")
     .eq("channel", "email")
     .eq("status", "connected")
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
