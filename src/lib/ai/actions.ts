@@ -396,6 +396,36 @@ export async function improveEmail(currentBody: string, instruction: string): Pr
 }
 
 // ============================================================================
+// AI Compose — Inbox "AI draft" (fresh message or reply, from a free-text prompt)
+// ============================================================================
+export interface ComposeDraftContext {
+  recipientEmail?: string;
+  /** Set when drafting a reply — the thread being replied to. */
+  replyingToName?: string;
+  originalSubject?: string;
+  originalBody?: string;
+}
+
+export async function generateComposeEmail(instruction: string, context?: ComposeDraftContext): Promise<{ subject: string; body: string }> {
+  await assertCredits();
+  const isReply = Boolean(context?.originalBody);
+  const system = `You are an expert professional email writer inside a CRM inbox. Write clear, polite, concise business emails. ${isReply ? "You are drafting a REPLY — stay on-topic with the original message." : ""} Return ONLY valid JSON.`;
+
+  const threadBlock = isReply
+    ? `\nOriginal message from ${context?.replyingToName || "the sender"}, subject "${context?.originalSubject || ""}":\n"""${context?.originalBody}"""\n`
+    : "";
+
+  const prompt = `${threadBlock}Write ${isReply ? "a reply" : "an email"} based on this instruction: "${instruction || "Write a clear, friendly, professional email"}"${context?.recipientEmail ? `\nRecipient: ${context.recipientEmail}` : ""}
+
+Return JSON in exactly this shape:
+{ "subject": "...", "body": "..." }`;
+
+  const result = await aiJson<{ subject: string; body: string }>({ system, prompt, temperature: 0.7 });
+  await chargeCredits("email_generation", 1);
+  return result;
+}
+
+// ============================================================================
 // AI Builder — natural language → Segmentation Builder rule tree
 // ============================================================================
 export interface SegmentRuleGenerationResult {

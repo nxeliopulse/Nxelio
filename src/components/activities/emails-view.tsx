@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import DOMPurify from "isomorphic-dompurify";
 import {
   Search, Mail, Star, Trash2, Send, Tag, RefreshCw,
-  Plus, X, Reply, AlertOctagon,
+  Plus, X, Reply, AlertOctagon, Sparkles,
   ChevronLeft, ChevronRight, Inbox, FileText, CheckSquare, Square, Loader2
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -14,6 +14,8 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
 import type { InboxConversation } from "@/lib/queries/inbox";
 import { sendReply, sendComposedEmail } from "@/lib/queries/inbox";
+import { generateComposeEmail } from "@/lib/ai/actions";
+import { notifyCreditsChanged } from "@/lib/credits-refresh";
 
 // Email bodies come from external senders — HTML but untrusted. Sanitize
 // before rendering with dangerouslySetInnerHTML; allowlist is broader than a
@@ -146,6 +148,14 @@ export function EmailsView({
   // channel (email or LinkedIn). Null for a fresh Compose, which sends to
   // whatever address is typed and only ties to a lead if one matches.
   const [replyToLeadId, setReplyToLeadId] = useState<string | null>(null);
+  // AI draft — asking for the user's own instruction before generating,
+  // instead of always writing the same generic opener text.
+  const [drafting, setDrafting] = useState(false);
+  const [draftPromptOpen, setDraftPromptOpen] = useState(false);
+  const [draftInstruction, setDraftInstruction] = useState("");
+  // The reply/forward context to ground the AI draft in, so it stays on-topic
+  // with the thread instead of writing a generic email from nothing.
+  const [draftThreadContext, setDraftThreadContext] = useState<{ replyingToName?: string; originalSubject?: string; originalBody?: string } | null>(null);
 
   const filteredEmails = useMemo(() => {
     return emails.filter((item) => {
@@ -268,7 +278,35 @@ export function EmailsView({
     setComposeSubject("");
     setComposeBody("");
     setComposeLabel(null);
+    setDraftThreadContext(null);
+    setDraftPromptOpen(false);
+    setDraftInstruction("");
     setIsComposeOpen(true);
+  };
+
+  const runDraft = async (instruction: string) => {
+    setDrafting(true);
+    try {
+      const draft = await generateComposeEmail(instruction, {
+        recipientEmail: composeTo || undefined,
+        ...(draftThreadContext || {}),
+      });
+      setComposeSubject(draft.subject);
+      setComposeBody(draft.body);
+      notifyCreditsChanged();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "AI draft failed.", "error");
+    } finally {
+      setDrafting(false);
+      setDraftPromptOpen(false);
+      setDraftInstruction("");
+    }
+  };
+
+  const handleDraftInstructionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    if (!draftInstruction.trim()) return;
+    runDraft(draftInstruction.trim());
   };
 
   const handleComposeSubmit = (e: React.FormEvent) => {
@@ -311,11 +349,13 @@ export function EmailsView({
       setComposeTo(selectedEmail.senderEmail);
       setComposeSubject(selectedEmail.subject.startsWith("Re:") ? selectedEmail.subject : `Re: ${selectedEmail.subject}`);
       setComposeBody(`\n\nOn ${selectedEmail.date} at ${selectedEmail.time}, ${selectedEmail.senderName} wrote:\n> ${selectedEmail.body.split("\n").join("\n> ")}`);
+      setDraftThreadContext({ replyingToName: selectedEmail.senderName, originalSubject: selectedEmail.subject, originalBody: selectedEmail.body });
     } else {
       setReplyToLeadId(null);
       setComposeTo("");
       setComposeSubject(`Fwd: ${selectedEmail.subject}`);
       setComposeBody(`\n\n---------- Forwarded message ----------\nFrom: ${selectedEmail.senderName} <${selectedEmail.senderEmail}>\nDate: ${selectedEmail.date} at ${selectedEmail.time}\nSubject: ${selectedEmail.subject}\n\n${selectedEmail.body}`);
+      setDraftThreadContext(null);
     }
     setIsComposeOpen(true);
   };
@@ -613,9 +653,94 @@ export function EmailsView({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-655 dark:text-slate-455 uppercase mb-1.5">Subject</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-655 dark:text-slate-455 uppercase">Subject</label>
+                      {!draftPromptOpen && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setDraftPromptOpen(true)} disabled={drafting} className="h-7 px-2 text-xs font-bold hover:text-indigo-600">
+                          {drafting ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Writing…
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-3.5 w-3.5 text-indigo-600 animate-pulse" /> AI write it for me
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                     <Input required value={composeSubject} onChange={(e) => setComposeSubject(e.target.value)} placeholder="Enter subject line..." className="rounded-xl h-9.5 text-sm" />
                   </div>
+
+                  {draftPromptOpen && (
+                    <div className="bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-900/50 rounded-xl p-3.5 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-indigo-700 dark:text-indigo-450 text-xs font-bold tracking-wider">
+                          <Sparkles className="h-3.5 w-3.5 animate-pulse text-indigo-650 dark:text-indigo-400" />
+                          <span>AI EMAIL COMPOSER</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraftPromptOpen(false);
+                            setDraftInstruction("");
+                          }}
+                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="relative flex gap-2">
+                        <Input
+                          autoFocus
+                          value={draftInstruction}
+                          onChange={(e) => setDraftInstruction(e.target.value)}
+                          onKeyDown={handleDraftInstructionKeyDown}
+                          placeholder="What should this email say? (e.g. Follow up on demo, introduce product)"
+                          className="flex-1 rounded-xl text-sm border-indigo-200 dark:border-indigo-900/60 bg-white dark:bg-slate-900 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 h-10 shadow-sm"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (draftInstruction.trim()) {
+                              runDraft(draftInstruction.trim());
+                            }
+                          }}
+                          disabled={drafting || !draftInstruction.trim()}
+                          className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 px-4 gap-1.5 cursor-pointer shadow-sm transition-all active:scale-98"
+                        >
+                          {drafting ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Generating...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4" />
+                              <span>Write</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {[
+                          "Follow up after meeting",
+                          "Introduce our product",
+                          "Schedule a demo call",
+                          "Send pricing proposal"
+                        ].map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => setDraftInstruction(suggestion)}
+                            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-350 hover:border-indigo-350 hover:text-indigo-650 dark:hover:border-indigo-700 dark:hover:text-indigo-400 transition-all cursor-pointer hover:shadow-xs"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-bold text-slate-655 dark:text-slate-455 uppercase mb-1.5">Label (Optional)</label>
                     <select
