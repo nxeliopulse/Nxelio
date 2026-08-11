@@ -540,8 +540,8 @@ export function AddLeadsWizard({
       <div className="px-6 sm:px-10 py-5 border-b border-slate-100 flex-shrink-0">
         <div className="max-w-6xl mx-auto flex items-start justify-between">
           <div>
-            <h2 className="font-semibold text-xl text-slate-900">Create a list of prospects below</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Step {step} of 4 · {step === 1 ? "Choose a source" : step === 2 ? SOURCE_LABEL[source!] : step === 3 ? "Review" : "Summary"}</p>
+            <h2 className="font-semibold text-2xl text-slate-900">Create a list of prospects below</h2>
+            <p className="text-base text-slate-500 mt-1">Step {step} of 4 · {step === 1 ? "Choose a source" : step === 2 ? SOURCE_LABEL[source!] : step === 3 ? "Review" : "Summary"}</p>
           </div>
           <button
             onClick={attemptClose}
@@ -561,8 +561,11 @@ export function AddLeadsWizard({
       </div>
 
       {/* Body */}
-      <div className="overflow-auto flex-1 px-6 sm:px-10 py-8">
-        <div className="max-w-6xl mx-auto">
+      <div className="overflow-auto flex-1 px-6 sm:px-10 py-8 flex flex-col">
+        <div className={cn(
+          "max-w-6xl mx-auto w-full flex-1 flex flex-col",
+          (source === "linkedin-search" || source === "linkedin-post" || source === "youtube") && step === 2 && "justify-center"
+        )}>
           {step === 1 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {SOURCES.map((s) => {
@@ -693,7 +696,15 @@ export function AddLeadsWizard({
       {/* Footer nav */}
       <div className="px-6 sm:px-10 py-4 border-t border-slate-100 flex-shrink-0 flex items-center justify-between max-w-6xl mx-auto w-full">
           {step > 1 && step < 4 ? (
-            <Button variant="outline" onClick={back} disabled={pending || buyLoading}><ArrowLeft className="h-4 w-4" /> Back</Button>
+            <Button
+              variant="custom"
+              size="md"
+              onClick={back}
+              disabled={pending || buyLoading}
+              className="border border-red-200 text-red-600 bg-white hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition shadow-sm"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Button>
           ) : <span />}
 
           {step < 3 && (
@@ -822,41 +833,48 @@ function Step2Input(props: {
     manual: [], buy: [], csv: [],
   };
 
+  const showHowItWorks = true;
+
   return (
-    <div className="grid md:grid-cols-2 gap-8">
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{fieldLabel[source]}</label>
-          <Input value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={placeholder[source]} />
-        </div>
-
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-slate-400" />
-          <span>
-            Automated retrieval for {SOURCE_LABEL[source]} runs after you connect the channel. For now, enter the source above and add the
-            profiles you found in the next step — name, title and profile link are captured to your list.
-          </span>
-        </div>
-
-        {error && <ErrorNote text={error} />}
-        {warning && (
-          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{warning}</span>
-          </div>
-        )}
+    <div className="max-w-3xl mx-auto space-y-6 w-full">
+      <div>
+        <label className="block text-base font-semibold text-slate-800 mb-2">{fieldLabel[source]}</label>
+        <Input
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder={placeholder[source]}
+          className="!bg-white h-12 text-base border-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+        />
       </div>
 
-      <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-5">
-        <p className="font-semibold text-slate-900 text-sm mb-3">How this works</p>
-        <ol className="space-y-3">
-          {steps[source].map((s, i) => (
-            <li key={i} className="flex gap-3 text-sm text-slate-600">
-              <span className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">{i + 1}</span>
-              <span>{s}</span>
-            </li>
-          ))}
-        </ol>
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600 flex items-start gap-3">
+        <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0 text-slate-400" />
+        <span>
+          Automated retrieval for {SOURCE_LABEL[source]} runs after you connect the channel. For now, enter the source above and add the
+          profiles you found in the next step — name, title and profile link are captured to your list.
+        </span>
       </div>
+
+      {error && <ErrorNote text={error} />}
+      {warning && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{warning}</span>
+        </div>
+      )}
+
+      {showHowItWorks && (
+        <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-5">
+          <p className="font-semibold text-slate-900 text-sm mb-3">How this works</p>
+          <ol className="space-y-3">
+            {steps[source].map((s, i) => (
+              <li key={i} className="flex gap-3 text-sm text-slate-600">
+                <span className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">{i + 1}</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </div>
   );
 }
@@ -867,7 +885,7 @@ function Step2Input(props: {
 function EntryRow({ label, required, children, className }: { label: string; required?: boolean; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("grid grid-cols-[120px_1fr] items-center gap-3", className)}>
-      <label className="text-xs font-medium text-slate-600 text-right whitespace-nowrap truncate" title={label}>{label}</label>
+      <label className="text-sm font-semibold text-slate-700 text-right whitespace-nowrap truncate" title={label}>{label}</label>
       <div className="relative flex items-center w-full">
         {required && <span className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-l-md z-10" />}
         {children}
@@ -987,8 +1005,8 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-600">Type your leads below. Each needs a <span className="font-medium text-slate-900">name</span> and an <span className="font-medium text-slate-900">email</span>.</p>
-        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap"><Users2 className="h-3.5 w-3.5" /> {ready} ready</span>
+        <p className="text-base text-slate-600">Type your leads below. Each needs a <span className="font-semibold text-slate-900">name</span> and an <span className="font-semibold text-slate-900">email</span>.</p>
+        <span className="inline-flex items-center gap-1.5 text-sm text-slate-500 whitespace-nowrap"><Users2 className="h-4 w-4" /> {ready} ready</span>
       </div>
       <div className="space-y-4">
         {entries.map((e, idx) => {
@@ -996,36 +1014,36 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
           return (
             <div key={e.id} className="rounded-xl border border-slate-200 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-200">
-                <span className="text-xs font-semibold text-slate-500">Lead {idx + 1}</span>
+                <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Lead {idx + 1}</span>
                 <button onClick={() => remove(e.id)} aria-label="Remove lead" className="p-1 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
               <div className="p-5 space-y-6">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800 mb-3 pb-1.5 border-b border-slate-100">Contact Information</h4>
+                  <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">Contact Information</h4>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
-                    <EntryRow label="Name" required><Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Jane Doe" /></EntryRow>
-                    <EntryRow label="Email" required><Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="jane@company.com" className={bad ? "border-amber-300 focus:ring-amber-200" : ""} /></EntryRow>
-                    <EntryRow label="Phone"><Input value={e.phone} onChange={(ev) => update(e.id, "phone", ev.target.value)} placeholder="+1 555 000 0000" /></EntryRow>
-                    <EntryRow label="LinkedIn"><Input value={e.linkedin} onChange={(ev) => update(e.id, "linkedin", ev.target.value)} placeholder="linkedin.com/in/janedoe" leftIcon={<Link2 className="h-3.5 w-3.5" />} /></EntryRow>
-                    <EntryRow label="Twitter / X"><Input value={e.twitter} onChange={(ev) => update(e.id, "twitter", ev.target.value)} placeholder="@janedoe" /></EntryRow>
+                    <EntryRow label="Name" required><Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Jane Doe" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="Email" required><Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="jane@company.com" className={cn("h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm", bad && "border-amber-300 focus:ring-amber-200")} /></EntryRow>
+                    <EntryRow label="Phone"><Input value={e.phone} onChange={(ev) => update(e.id, "phone", ev.target.value)} placeholder="+1 555 000 0000" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="LinkedIn"><Input value={e.linkedin} onChange={(ev) => update(e.id, "linkedin", ev.target.value)} placeholder="linkedin.com/in/janedoe" leftIcon={<Link2 className="h-4 w-4" />} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="Twitter / X"><Input value={e.twitter} onChange={(ev) => update(e.id, "twitter", ev.target.value)} placeholder="@janedoe" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800 mb-3 pb-1.5 border-b border-slate-100">Company Information</h4>
+                  <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">Company Information</h4>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
-                    <EntryRow label="Company"><Input value={e.company} onChange={(ev) => update(e.id, "company", ev.target.value)} placeholder="Acme Inc." /></EntryRow>
-                    <EntryRow label="Job title"><Input value={e.title} onChange={(ev) => update(e.id, "title", ev.target.value)} placeholder="Head of Sales" /></EntryRow>
+                    <EntryRow label="Company"><Input value={e.company} onChange={(ev) => update(e.id, "company", ev.target.value)} placeholder="Acme Inc." className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="Job title"><Input value={e.title} onChange={(ev) => update(e.id, "title", ev.target.value)} placeholder="Head of Sales" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
                     <EntryRow label="Company size">
-                      <Select value={e.companySize} onChange={(ev) => update(e.id, "companySize", ev.target.value)}>
+                      <Select value={e.companySize} onChange={(ev) => update(e.id, "companySize", ev.target.value)} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
                         <option value="">Select…</option>
                         {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
                       </Select>
                     </EntryRow>
                     <EntryRow label="Seniority">
-                      <Select value={e.seniority} onChange={(ev) => update(e.id, "seniority", ev.target.value)}>
+                      <Select value={e.seniority} onChange={(ev) => update(e.id, "seniority", ev.target.value)} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
                         <option value="">Select…</option>
                         {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
                       </Select>
@@ -1034,13 +1052,13 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800 mb-3 pb-1.5 border-b border-slate-100">Address</h4>
+                  <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">Address</h4>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
-                    <EntryRow label="Street"><Input value={e.streetAddress} onChange={(ev) => update(e.id, "streetAddress", ev.target.value)} placeholder="123 Main St" /></EntryRow>
-                    <EntryRow label="City"><Input value={e.city} onChange={(ev) => update(e.id, "city", ev.target.value)} placeholder="City" /></EntryRow>
-                    <EntryRow label="State"><Input value={e.state} onChange={(ev) => update(e.id, "state", ev.target.value)} placeholder="State" /></EntryRow>
-                    <EntryRow label="Country"><Input value={e.country} onChange={(ev) => update(e.id, "country", ev.target.value)} placeholder="Country" /></EntryRow>
-                    <EntryRow label="Postal code"><Input value={e.postalCode} onChange={(ev) => update(e.id, "postalCode", ev.target.value)} placeholder="Postal" /></EntryRow>
+                    <EntryRow label="Street"><Input value={e.streetAddress} onChange={(ev) => update(e.id, "streetAddress", ev.target.value)} placeholder="123 Main St" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="City"><Input value={e.city} onChange={(ev) => update(e.id, "city", ev.target.value)} placeholder="City" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="State"><Input value={e.state} onChange={(ev) => update(e.id, "state", ev.target.value)} placeholder="State" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="Country"><Input value={e.country} onChange={(ev) => update(e.id, "country", ev.target.value)} placeholder="Country" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="Postal code"><Input value={e.postalCode} onChange={(ev) => update(e.id, "postalCode", ev.target.value)} placeholder="Postal" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
                   </div>
                 </div>
               </div>
@@ -1130,15 +1148,15 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Industry</label>
-            <Select value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })}>
+            <label className="block text-base font-semibold text-slate-800 mb-2">Industry</label>
+            <Select value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
               <option value="">Any industry</option>
               {LINKEDIN_INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
             </Select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Job title / role</label>
-            <Select value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })}>
+            <label className="block text-base font-semibold text-slate-800 mb-2">Job title / role</label>
+            <Select value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
               <option value="">Any role</option>
               {COMMON_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
             </Select>
@@ -1146,40 +1164,40 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
+          <label className="block text-base font-semibold text-slate-800 mb-2">Location</label>
           <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Company size / headcount</label>
-            <Select value={buy.companySize} onChange={(e) => setBuy({ ...buy, companySize: e.target.value })}>
+            <label className="block text-base font-semibold text-slate-800 mb-2">Company size / headcount</label>
+            <Select value={buy.companySize} onChange={(e) => setBuy({ ...buy, companySize: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
               <option value="Any">Any size</option>
               {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
             </Select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Seniority level</label>
-            <Select value={buy.seniority} onChange={(e) => setBuy({ ...buy, seniority: e.target.value })}>
+            <label className="block text-base font-semibold text-slate-800 mb-2">Seniority level</label>
+            <Select value={buy.seniority} onChange={(e) => setBuy({ ...buy, seniority: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
               <option value="Any">Any seniority</option>
               {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
             </Select>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" checked={buy.requireVerifiedEmail} onChange={(e) => setBuy({ ...buy, requireVerifiedEmail: e.target.checked })} className="rounded border-slate-300" />
+        <div className="space-y-3 py-1">
+          <label className="flex items-center gap-3 text-base text-slate-800 cursor-pointer">
+            <input type="checkbox" checked={buy.requireVerifiedEmail} onChange={(e) => setBuy({ ...buy, requireVerifiedEmail: e.target.checked })} className="rounded border-slate-400 h-5 w-5 cursor-pointer" />
             Require a verified work email
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" checked={buy.includePhoneAndSocial} onChange={(e) => setBuy({ ...buy, includePhoneAndSocial: e.target.checked })} className="rounded border-slate-300" />
+          <label className="flex items-center gap-3 text-base text-slate-800 cursor-pointer">
+            <input type="checkbox" checked={buy.includePhoneAndSocial} onChange={(e) => setBuy({ ...buy, includePhoneAndSocial: e.target.checked })} className="rounded border-slate-400 h-5 w-5 cursor-pointer" />
             Include phone number &amp; social handles (where available)
           </label>
         </div>
 
         <div className="max-w-[220px]">
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">How many (max {maxCount})</label>
+          <label className="block text-base font-semibold text-slate-800 mb-2">How many (max {maxCount})</label>
           <Input
             type="text"
             inputMode="numeric"
@@ -1188,10 +1206,11 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
             onChange={(e) => setCountDraft(e.target.value.replace(/[^0-9]/g, ""))}
             onBlur={commitCount}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitCount(); } }}
+            className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
           />
         </div>
 
-        <Button onClick={onGenerate} disabled={loading}>
+        <Button onClick={onGenerate} disabled={loading} size="lg" className="shadow-md">
           {loading
             ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
             : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
@@ -1215,17 +1234,17 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
 
       <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-5 h-fit space-y-4">
         <div>
-          <p className="font-semibold text-slate-900 text-sm mb-3">What you&apos;ll get</p>
-          <ul className="space-y-3 text-sm text-slate-600">
-            <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Name, job title, company and LinkedIn URL from real public profiles via BILEADS Kit.</li>
-            <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Seniority estimated from each person&apos;s real job title.</li>
-            <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Work email included when found — flagged as verified or catch-all, never guessed silently.</li>
-            <li className="flex gap-2"><CheckCircle2 className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
+          <p className="font-bold text-slate-900 text-base mb-3 uppercase tracking-wider">What you&apos;ll get</p>
+          <ul className="space-y-3 text-base text-slate-600">
+            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Name, job title, company and LinkedIn URL from real public profiles via BILEADS Kit.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Seniority estimated from each person&apos;s real job title.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Work email included when found — flagged as verified or catch-all, never guessed silently.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
           </ul>
         </div>
         <div className="pt-3 border-t border-amber-200/70">
-          <p className="text-xs font-semibold text-slate-700 mb-1.5">Not available from this source</p>
-          <p className="text-xs text-slate-500">Company size and seniority above are search filters/estimates, not verified fields — there&apos;s no public data source for a company&apos;s exact headcount, revenue, direct phone, or Twitter/X handle. Add those yourself afterward, or via Manual Entry / CSV Import where you already have them.</p>
+          <p className="text-sm font-bold uppercase tracking-wider text-slate-800 mb-1.5">Not available from this source</p>
+          <p className="text-sm text-slate-600 leading-relaxed">Company size and seniority above are search filters/estimates, not verified fields — there&apos;s no public data source for a company&apos;s exact headcount, revenue, direct phone, or Twitter/X handle. Add those yourself afterward, or via Manual Entry / CSV Import where you already have them.</p>
         </div>
       </div>
     </div>

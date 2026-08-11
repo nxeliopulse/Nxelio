@@ -370,11 +370,8 @@ export function LeadDetailView({
       {/* Redesigned Breadcrumbs & Export Header */}
       <div className="d-flex align-items-center justify-content-between gap-2 mb-4 flex-wrap flex justify-between items-center">
         <div>
-          <h4 className="mb-1 text-xl font-bold flex items-center gap-2">
+          <h4 className="mb-1 text-xl font-bold">
             Prospects
-            <span className="bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-xs px-2 py-0.5 rounded font-semibold border border-blue-100 dark:border-blue-900/30">
-              125
-            </span>
           </h4>
           <nav aria-label="breadcrumb">
             <ol className="breadcrumb mb-0 p-0 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-500">

@@ -60,12 +60,12 @@ export function MultiLocationInput({
 
   return (
     <div ref={wrapRef} className="relative">
-      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-400 bg-white px-3 py-2 min-h-12 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 shadow-sm">
         {value.map((loc) => (
-          <span key={loc} className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium pl-3 pr-1.5 py-1">
+          <span key={loc} className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 text-base font-medium pl-3 pr-1.5 py-1">
             {loc}
             <button type="button" onClick={() => removeLocation(loc)} aria-label={`Remove ${loc}`} className="p-0.5 rounded-full hover:bg-blue-100 text-blue-500">
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </button>
           </span>
         ))}
@@ -75,7 +75,7 @@ export function MultiLocationInput({
           onFocus={() => { if (suggestions.length) setOpen(true); }}
           placeholder={value.length ? "Add another location" : "e.g. United States, Austin TX"}
           autoComplete="off"
-          className="flex-1 min-w-[140px] border-0 shadow-none focus:ring-0 px-1 py-1 h-auto"
+          className="flex-1 min-w-[140px] border-0 shadow-none focus:ring-0 px-1 py-1 h-auto text-base"
         />
       </div>
       {open && (
@@ -85,7 +85,7 @@ export function MultiLocationInput({
               key={s}
               type="button"
               onClick={() => addLocation(s)}
-              className="block w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 truncate"
+              className="block w-full text-left px-3 py-2 text-base text-slate-700 hover:bg-slate-50 truncate"
               title={s}
             >
               {s}

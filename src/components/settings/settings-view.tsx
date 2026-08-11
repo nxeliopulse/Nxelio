@@ -352,10 +352,10 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
                     <p className="text-xs text-slate-500">Customize typography and font family for the application interface</p>
                   </div>
                   <CustomSelect<FontStyle>
-                    value={appearance.fontStyle || "golos"}
+                    value={appearance.fontStyle || "segoe_ui"}
                     onChange={(val) => updateAppearance({ fontStyle: val })}
                     options={[
-                      { value: "golos", label: "Golos Text (Default)" },
+                      { value: "golos", label: "Golos Text" },
                       { value: "sans", label: "Geist Sans" },
                       { value: "inter", label: "Inter (Modern Sans)" },
                       { value: "roboto", label: "Roboto (Classic)" },
@@ -363,6 +363,10 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
                       { value: "rounded", label: "Plus Jakarta (Rounded)" },
                       { value: "serif", label: "Georgia (Editorial Serif)" },
                       { value: "mono", label: "Fira Code (Monospace)" },
+                      { value: "arial", label: "Arial" },
+                      { value: "calibri", label: "Calibri" },
+                      { value: "tahoma", label: "Tahoma" },
+                      { value: "segoe_ui", label: "Segoe UI (Default)" },
                     ]}
                   />
                 </div>

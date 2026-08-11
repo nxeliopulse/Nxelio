@@ -10,7 +10,7 @@ import { consumeSendQuota } from "@/lib/outreach/send-quota";
 import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 import { revalidatePath } from "next/cache";
 import { isSuppressed } from "@/lib/segments";
-import { createEnrollments, advanceEnrollmentStep, completeEnrollment } from "@/lib/campaigns/enrollment";
+import { createEnrollments, advanceEnrollmentStep, completeEnrollment, checkAndCompleteCampaign } from "@/lib/campaigns/enrollment";
 
 const MAX_PER_SEND = 300;
 /** Credits charged per lead for launching a (sequence) campaign send. */
@@ -183,6 +183,12 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow, 
     status: "Active",
     approval_status: "Live/Distributing",
   }).eq("id", campaignId);
+
+  // Single-step campaigns (no follow-ups) can finish immediately in this
+  // very call — completeEnrollment() above may have already closed out
+  // every lead, so check right away instead of leaving status stuck on
+  // "Active" until some later action happens to notice.
+  await checkAndCompleteCampaign(campaignId);
 
   const admin = createAdminClient();
   await admin.from("campaign_approval_log").insert({

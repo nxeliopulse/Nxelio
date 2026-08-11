@@ -255,3 +255,38 @@ export async function completeEnrollment(campaignId: string, leadId: string): Pr
     .eq("campaign_id", campaignId)
     .eq("lead_id", leadId);
 }
+
+/** Enrollment statuses that mean "still has work left to do" — the opposite of done. */
+const IN_PROGRESS_STATUSES: EnrollmentStatus[] = ["pending_review", "scheduled", "active", "paused"];
+
+/**
+ * Call after any enrollment finishes (completeEnrollment, or a lead exiting/
+ * failing/being suppressed mid-sequence) — if every enrollment for this
+ * campaign is now done, flip the campaign itself to "Completed" instead of
+ * leaving it stuck on "Active" forever. Only touches campaigns that are
+ * still "Active" — never overrides a manually-set Paused/Draft/Completed
+ * status, so this can't undo an admin's own choice.
+ */
+export async function checkAndCompleteCampaign(campaignId: string): Promise<void> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("campaign_enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("campaign_id", campaignId)
+    .in("status", IN_PROGRESS_STATUSES);
+  if ((count ?? 0) > 0) return; // still work left — not done yet
+
+  const { count: totalEnrollments } = await supabase
+    .from("campaign_enrollments")
+    .select("id", { count: "exact", head: true })
+    .eq("campaign_id", campaignId);
+  if (!totalEnrollments) return; // nothing was ever enrolled — nothing to complete
+
+  await supabase
+    .from("campaigns")
+    .update({ status: "Completed" })
+    .eq("id", campaignId)
+    .eq("status", "Active"); // never overrides Paused/Draft or an already-Completed row
+  revalidatePath(`/campaigns/${campaignId}`);
+  revalidatePath("/campaigns");
+}

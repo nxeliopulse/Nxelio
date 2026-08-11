@@ -92,6 +92,8 @@ export async function previewPromoCode(code: string, planId: PlanId): Promise<Pr
     bonusCredits: promo.bonus_credits,
     bonusLeads: promo.bonus_leads,
     description: promo.description,
+    discountType: promo.discount_type,
+    discountValue: promo.discount_value,
   };
 }
 

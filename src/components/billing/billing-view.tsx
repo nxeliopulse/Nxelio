@@ -6,7 +6,7 @@ import {
   Check, X, Sparkles, CreditCard, Users2, Send,
   Zap, Crown, Rocket, Lock, AlertTriangle, Clock,
   TrendingUp, ExternalLink, Loader2, PartyPopper,
-  Search, Reply, Target, Ticket, Gift, ShoppingCart,
+  Search, Reply, Target, Ticket, Gift,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import type {
-  SubscriptionWithPlan, SubscriptionPlan, BillingInterval,
+  SubscriptionWithPlan, SubscriptionPlan, BillingInterval, PromoValidationResult,
 } from "@/lib/queries/subscription-types";
 import type { PromotionHistoryEntry } from "@/lib/queries/promotions";
 import { PlanTermsModal } from "@/components/billing/plan-terms-modal";
@@ -38,6 +38,19 @@ function credPct(remaining: number, total: number) {
 }
 function isLow(remaining: number, total: number) {
   return total > 0 && remaining / total <= 0.1;
+}
+
+/** Builds a customer-facing "here's what you get" message from the actual discount fields — never just the admin's internal note, which may be blank or say nothing about the offer itself. */
+function promoSuccessMessage(result: { description?: string | null; discountType?: "percentage" | "fixed_amount" | null; discountValue?: number | null; bonusCredits?: number; bonusLeads?: number }): string {
+  const parts: string[] = [];
+  if (result.discountType && result.discountValue) {
+    parts.push(result.discountType === "percentage" ? `${result.discountValue}% off` : `${fmtCents(result.discountValue * 100)} off`);
+  }
+  if (result.bonusCredits) parts.push(`+${result.bonusCredits.toLocaleString()} AI credits`);
+  if (result.bonusLeads) parts.push(`+${result.bonusLeads.toLocaleString()} leads`);
+  const offer = parts.length ? parts.join(", ") : null;
+  if (offer) return `${offer} — will be applied at your next checkout.`;
+  return result.description || "Code applied — it'll be used on your next checkout below.";
 }
 
 // ── Plan display config ───────────────────────────────────────────────────────
@@ -103,23 +116,12 @@ const STATUS_LABEL: Record<string, string> = {
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
-interface LeadPurchaseHistoryEntry {
-  id: string;
-  operation_type: string;
-  credits_delta: number;
-  resource_type: "credits" | "leads";
-  status: string;
-  created_at: string;
-  metadata: Record<string, unknown> | null;
-}
-
 interface Props {
   subscription: SubscriptionWithPlan | null;
   plans: SubscriptionPlan[];
   leadsCount: number;
   sentCount: number;
   promotionHistory: PromotionHistoryEntry[];
-  leadPurchaseHistory?: LeadPurchaseHistoryEntry[];
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -158,7 +160,7 @@ function CheckoutSuccessWatcher({
   return null;
 }
 
-export function BillingView({ subscription: sub, plans, leadsCount, sentCount, promotionHistory, leadPurchaseHistory = [] }: Props) {
+export function BillingView({ subscription: sub, plans, leadsCount, sentCount, promotionHistory }: Props) {
   const router = useRouter();
   const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -170,7 +172,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
   const [successCredits, setSuccessCredits] = useState(0);
   const [promoCode, setPromoCode] = useState("");
   const [promoChecking, setPromoChecking] = useState(false);
-  const [promoResult, setPromoResult] = useState<{ ok: boolean; error?: string; description?: string | null } | null>(null);
+  const [promoResult, setPromoResult] = useState<PromoValidationResult | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
@@ -498,8 +500,8 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
               </Button>
             </div>
             {promoResult && (
-              <p className={`mt-2 text-xs ${promoResult.ok ? "text-emerald-600" : "text-red-600"}`}>
-                {promoResult.ok ? (promoResult.description || "Code applied — it'll be used on your next checkout below.") : promoResult.error}
+              <p className={`mt-2 text-xs font-semibold ${promoResult.ok ? "text-emerald-600" : "text-red-600"}`}>
+                {promoResult.ok ? promoSuccessMessage(promoResult) : promoResult.error}
               </p>
             )}
           </div>
@@ -637,32 +639,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                 <div className="flex items-center gap-3 flex-wrap shrink-0">
                   {r.bonus_credits_granted > 0 && <span className="text-xs text-blue-600">+{r.bonus_credits_granted} credits</span>}
                   {r.bonus_leads_granted > 0 && <span className="text-xs text-emerald-600">+{r.bonus_leads_granted} leads</span>}
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
-                    {r.status}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      {/* ── Lead purchase history ────────────────────────────── */}
-      {leadPurchaseHistory.length > 0 && (
-        <Card className="p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <ShoppingCart className="h-5 w-5 text-emerald-500" />
-            <h3 className="font-semibold text-slate-900">Lead purchase history</h3>
-          </div>
-          <ul className="space-y-2">
-            {leadPurchaseHistory.map((r) => (
-              <li key={r.id} className="flex items-center justify-between flex-wrap gap-2 text-sm rounded-lg bg-slate-50 px-4 py-2.5">
-                <div className="min-w-0">
-                  <span className="font-semibold text-slate-800 capitalize">{r.operation_type.replace(/_/g, " ")}</span>
-                  <span className="text-slate-500 ml-2">{new Date(r.created_at).toLocaleDateString()}</span>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap shrink-0">
-                  <span className="text-xs font-semibold text-emerald-600">{Math.abs(r.credits_delta).toLocaleString()} leads</span>
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
                     {r.status}
                   </span>

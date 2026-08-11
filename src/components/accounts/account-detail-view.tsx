@@ -23,8 +23,6 @@ import { AddTaskModal } from "@/components/accounts/add-task-modal";
 import { AccountTasksCard } from "@/components/accounts/account-tasks-card";
 import { LogCallModal } from "@/components/accounts/log-call-modal";
 import { AccountCallsCard } from "@/components/accounts/account-calls-card";
-import { AddDocumentModal } from "@/components/accounts/add-document-modal";
-import { AccountDocumentsCard } from "@/components/accounts/account-documents-card";
 import { AccountEmailCard } from "@/components/accounts/account-email-card";
 import { ComposeEmailModal } from "@/components/accounts/compose-email-modal";
 import { createAccountNote, type AccountNoteRow } from "@/lib/queries/account-notes";
@@ -40,12 +38,15 @@ import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
 const STARRED_KEY = "lp_starred_accounts";
 
-type TabId = "activities" | "notes" | "calls" | "files" | "email";
+// No standalone "Files" tab — Notes already supports its own attachments, so a
+// second, separate Documents tab was redundant. Removed rather than the
+// underlying Documents feature/table, in case existing accounts still have
+// documents stored there.
+type TabId = "activities" | "notes" | "calls" | "email";
 const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "activities", label: "Activities", icon: Clock },
   { id: "notes", label: "Notes", icon: FileText },
   { id: "calls", label: "Calls", icon: PhoneCall },
-  { id: "files", label: "Files", icon: FileIcon },
   { id: "email", label: "Email", icon: Mail },
 ];
 
@@ -73,7 +74,6 @@ export function AccountDetailView({
   const [meetingOpen, setMeetingOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
-  const [documentOpen, setDocumentOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -134,8 +134,8 @@ export function AccountDetailView({
         await deleteAccount(account.id);
         toast("Account deleted.", "success");
         router.push("/accounts");
-      } catch {
-        toast("Couldn't delete account.", "error");
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Couldn't delete account.", "error");
       }
     });
   }
@@ -213,9 +213,8 @@ export function AccountDetailView({
       {/* Title + breadcrumb + page actions */}
       <div className="flex items-center justify-between mb-1 px-1">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight inline-flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Accounts
-            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400">{totalCount}</span>
           </h1>
           <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mt-1">
             <Link href="/dashboard" className="hover:text-slate-600">Home</Link>
@@ -334,6 +333,7 @@ export function AccountDetailView({
 
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
               <InfoRow label="Phone" value={account.phone ? <a href={`tel:${account.phone}`} className="text-blue-600 dark:text-blue-400 hover:underline">{account.phone}</a> : null} />
+              <InfoRow label="Fax" value={account.fax} />
               <InfoRow label="Website" value={account.website ? <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1">{account.website} <ExternalLink className="h-3 w-3" /></a> : null} />
               <InfoRow label="Industry" value={account.industry} />
               <InfoRow label="Created on" value={formatDateTime(account.created_at)} />
@@ -529,43 +529,6 @@ export function AccountDetailView({
               </div>
             )}
 
-            {activeTab === "files" && (
-              <div className="space-y-6">
-                <AccountDocumentsCard accountId={account.id} documents={documents} owners={owners} onAddNew={() => setDocumentOpen(true)} />
-
-                <div>
-                  <h5 className="font-bold text-slate-800 dark:text-slate-700 text-xs pb-2 border-b border-slate-100 dark:border-slate-800/80 mb-3">Files from Notes</h5>
-                  <div className="space-y-2">
-                    {notes.flatMap((n) => n.files.map((f) => ({ ...f, note: n }))).length === 0 ? (
-                      <div className="text-center py-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
-                        <Paperclip className="h-6 w-6 text-slate-300 mx-auto mb-2" />
-                        <p className="text-xs text-slate-400 italic">No files attached to notes yet.</p>
-                      </div>
-                    ) : (
-                      notes.flatMap((n) => n.files.map((f) => ({ ...f, note: n }))).map((f) => (
-                        <div key={f.id} className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs flex items-center justify-between">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="h-8 w-8 bg-sky-50 dark:bg-sky-950/20 text-sky-600 dark:text-sky-400 rounded flex items-center justify-center flex-shrink-0">
-                              <FileIcon className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <a href={f.file_url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-slate-800 dark:text-slate-700 hover:underline truncate block">
-                                {f.file_name || "Attached file"}
-                              </a>
-                              <p className="text-[9px] text-slate-400 mt-0.5">Uploaded by {f.note.author_name || "Unknown"} on {formatDateTime(f.note.created_at)}</p>
-                            </div>
-                          </div>
-                          <a href={f.file_url} target="_blank" rel="noopener noreferrer" className="p-1 text-slate-400 hover:text-blue-600 flex-shrink-0" title="Download file">
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {activeTab === "email" && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80">
@@ -609,13 +572,6 @@ export function AccountDetailView({
         open={callOpen}
         onClose={() => setCallOpen(false)}
         accountId={account.id}
-      />
-      <AddDocumentModal
-        open={documentOpen}
-        onClose={() => setDocumentOpen(false)}
-        accountId={account.id}
-        owners={owners}
-        deals={deals}
       />
       <ComposeEmailModal
         open={composeOpen}

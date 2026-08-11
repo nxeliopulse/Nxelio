@@ -66,17 +66,14 @@ function hashCode(str: string): number {
   return Math.abs(hash);
 }
 
-function getFlagEmoji(country: string): string {
-  const c = country.toUpperCase();
-  if (c.includes("USA") || c.includes("UNITED STATES")) return "🇺🇸";
-  if (c.includes("UAE") || c.includes("EMIRATES")) return "🇦🇪";
-  if (c.includes("GERMANY")) return "🇩🇪";
-  if (c.includes("FRANCE")) return "🇫🇷";
-  if (c.includes("INDIA")) return "🇮🇳";
-  if (c.includes("BRAZIL")) return "🇧🇷";
-  if (c.includes("MEXICO")) return "🇲🇽";
-  return "🇺🇸"; // default fallback for template matches
+/** Most people never fill in a separate WhatsApp number — it's almost always
+ *  the same as their phone. Prefer an explicit whatsapp value if set,
+ *  otherwise fall back to phone, so Chat doesn't wrongly say "no number on
+ *  file" for every contact that only has Phone filled in. */
+function chatNumber(c: { whatsapp: string | null; phone: string | null }): string | null {
+  return c.whatsapp || c.phone;
 }
+
 
 export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[]; owners?: OwnerOption[] }) {
   const { confirm, toast } = useFeedback();
@@ -358,17 +355,25 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
     const ids = [...selected];
     setSelected([]);
     start(async () => {
-      await bulkDeleteContacts(ids);
-      toast(`${ids.length} contact(s) deleted.`, "success");
+      try {
+        await bulkDeleteContacts(ids);
+        toast(`${ids.length} contact(s) deleted.`, "success");
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Couldn't delete contacts.", "error");
+      }
     });
   }
 
   async function handleDelete(id: string) {
     if (!(await confirm({ title: "Delete contact?", message: "Delete this contact?", confirmLabel: "Delete", danger: true }))) return;
     start(async () => {
-      await deleteContact(id);
-      setSelected((s) => s.filter((x) => x !== id));
-      toast("Contact deleted successfully", "success");
+      try {
+        await deleteContact(id);
+        setSelected((s) => s.filter((x) => x !== id));
+        toast("Contact deleted successfully", "success");
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Couldn't delete contact.", "error");
+      }
     });
   }
 
@@ -1076,7 +1081,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
 
                   const countries = ["USA", "UAE", "Germany", "France", "India", "Brazil", "Mexico"];
                   const countryName = c.mailing_country || countries[hashCode(c.id) % countries.length];
-                  const flag = getFlagEmoji(countryName);
 
                   const status = c.email_opt_out ? "Inactive" : "Active";
                   const statusColor = status === "Active"
@@ -1171,10 +1175,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                       {/* Location Column */}
                       {cols.location && (
                         <td className="px-3 py-2.5 text-slate-600 dark:text-slate-500 font-medium">
-                          <div className="flex items-center gap-1">
-                            <span className="text-sm leading-none">{flag}</span>
-                            <span>{countryName}</span>
-                          </div>
+                          <span>{countryName}</span>
                         </td>
                       )}
 
@@ -1212,13 +1213,16 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                             >
                               <Phone className="h-3.5 w-3.5" />
                             </a>
-                            <button
-                              onClick={() => toast(`Starting quick chat with ${c.first_name}...`, "info")}
+                            <a
+                              href={chatNumber(c) ? `https://wa.me/${chatNumber(c)!.replace(/\D/g, "")}` : "#"}
+                              onClick={(e) => { if (!chatNumber(c)) { e.preventDefault(); toast("This contact has no phone or WhatsApp number on file.", "error"); } }}
+                              target={chatNumber(c) ? "_blank" : undefined}
+                              rel="noopener noreferrer"
                               className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-purple-500 dark:hover:text-purple-400 hover:bg-slate-50 dark:hover:bg-slate-900"
-                              title="Message"
+                              title={chatNumber(c) ? "Message on WhatsApp" : "No phone or WhatsApp number"}
                             >
                               <MessageSquare className="h-3.5 w-3.5" />
-                            </button>
+                            </a>
                             <button
                               onClick={() => openContact(c.id)}
                               className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-900"
@@ -1301,7 +1305,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
 
             const countries = ["USA", "UAE", "Germany", "France", "India", "Brazil", "Mexico"];
             const countryName = c.mailing_country || countries[hashCode(c.id) % countries.length];
-            const flag = getFlagEmoji(countryName);
 
             const status = c.email_opt_out ? "Inactive" : "Active";
             const statusColor = status === "Active"
@@ -1347,9 +1350,8 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Location:</span>
-                    <span className="text-slate-800 dark:text-slate-700 flex items-center gap-1">
-                      <span>{flag}</span>
-                      <span>{countryName}</span>
+                    <span className="text-slate-800 dark:text-slate-700">
+                      {countryName}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -1391,12 +1393,16 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                   >
                     <Phone className="h-4 w-4" />
                   </a>
-                  <button
-                    onClick={() => toast(`Starting quick chat with ${c.first_name}...`, "info")}
+                  <a
+                    href={chatNumber(c) ? `https://wa.me/${chatNumber(c)!.replace(/\D/g, "")}` : "#"}
+                    onClick={(e) => { if (!chatNumber(c)) { e.preventDefault(); toast("This contact has no phone or WhatsApp number on file.", "error"); } }}
+                    target={chatNumber(c) ? "_blank" : undefined}
+                    rel="noopener noreferrer"
                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-purple-500 hover:bg-slate-50"
+                    title={chatNumber(c) ? "Message on WhatsApp" : "No phone or WhatsApp number"}
                   >
                     <MessageSquare className="h-4 w-4" />
-                  </button>
+                  </a>
                   <button
                     onClick={() => openContact(c.id)}
                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-indigo-500 hover:bg-slate-50"

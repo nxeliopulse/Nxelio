@@ -101,4 +101,6 @@ export interface PromoValidationResult {
   bonusCredits?: number;
   bonusLeads?: number;
   description?: string | null;
+  discountType?: "percentage" | "fixed_amount" | null;
+  discountValue?: number | null;
 }

@@ -4,6 +4,22 @@ import { logAudit } from "@/lib/queries/audit-log";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
 import type { ContactRow } from "@/lib/queries/contacts";
+import { isValidPhoneNumber } from "libphonenumber-js";
+
+/**
+ * The client always sends phone/fax pre-formatted to international form
+ * (e.g. "+1 555 123 4567") via formatPhoneForStorage() — that's
+ * self-describing, so no country needs to be passed here. Never trust the
+ * client alone though: reject anything that doesn't actually parse.
+ */
+function assertValidPhoneFields(payload: Partial<AccountRow>) {
+  for (const field of ["phone", "fax"] as const) {
+    const value = payload[field];
+    if (value && !isValidPhoneNumber(value)) {
+      throw new Error(`${field === "phone" ? "Phone" : "Fax"} number isn't valid.`);
+    }
+  }
+}
 
 export interface AccountRow {
   id: string;
@@ -11,6 +27,7 @@ export interface AccountRow {
   account_owner: string | null;
   parent_account_id: string | null;
   phone: string | null;
+  fax: string | null;
   website: string | null;
   domain: string | null;
   account_status: string | null;
@@ -117,6 +134,7 @@ export async function findMatchingAccount({ companyName, website }: { companyNam
 }
 
 export async function createAccount(payload: Partial<AccountRow>) {
+  assertValidPhoneFields(payload);
   const supabase = await createClient();
   const actorName = await getCurrentUserName(supabase);
   const { data, error } = await supabase.from("accounts").insert({ ...payload, created_by: actorName, updated_by: actorName }).select().single();
@@ -127,6 +145,7 @@ export async function createAccount(payload: Partial<AccountRow>) {
 }
 
 export async function updateAccount(id: string, payload: Partial<AccountRow>) {
+  assertValidPhoneFields(payload);
   const supabase = await createClient();
   const actorName = await getCurrentUserName(supabase);
   const { error } = await supabase.from("accounts").update({ ...payload, updated_by: actorName }).eq("id", id);
@@ -138,8 +157,12 @@ export async function updateAccount(id: string, payload: Partial<AccountRow>) {
 
 export async function deleteAccount(id: string) {
   const supabase = await createClient();
-  const { error } = await supabase.from("accounts").delete().eq("id", id);
+  // .select() to get the deleted row(s) back — PostgREST reports no error when
+  // RLS silently blocks a delete (0 rows affected looks identical to success
+  // otherwise), so this is the only way to detect that and report it honestly.
+  const { data, error } = await supabase.from("accounts").delete().eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error("Account not found, or you don't have permission to delete it.");
   revalidatePath("/accounts");
   await logAudit({ action: "account.deleted", entityType: "account", entityId: id });
 }

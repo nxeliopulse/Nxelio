@@ -204,9 +204,8 @@ export function ContactDetailView({
       {/* Title + breadcrumb + page actions */}
       <div className="flex items-center justify-between mb-1 px-1">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight inline-flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Contacts
-            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400">{totalCount}</span>
           </h1>
           <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mt-1">
             <Link href="/dashboard" className="hover:text-slate-600">Home</Link>
@@ -293,9 +292,14 @@ export function ContactDetailView({
             >
               <Send className="h-3.5 w-3.5" /> Send Email
             </button>
+            {/* Most people never fill in a separate WhatsApp number — it's
+                almost always the same as their phone. Prefer an explicit
+                whatsapp value if set, otherwise fall back to phone so this
+                doesn't wrongly say "no number on file" for every contact
+                that only has Phone filled in. */}
             <a
-              href={contact.whatsapp ? `https://wa.me/${contact.whatsapp.replace(/\D/g, "")}` : undefined}
-              onClick={(e) => { if (!contact.whatsapp) { e.preventDefault(); toast("This contact has no WhatsApp number on file.", "error"); } }}
+              href={(contact.whatsapp || contact.phone) ? `https://wa.me/${(contact.whatsapp || contact.phone)!.replace(/\D/g, "")}` : undefined}
+              onClick={(e) => { if (!contact.whatsapp && !contact.phone) { e.preventDefault(); toast("This contact has no phone or WhatsApp number on file.", "error"); } }}
               target="_blank"
               rel="noopener noreferrer"
               title="Message on WhatsApp"
@@ -528,20 +532,32 @@ export function ContactDetailView({
                   ) : (
                     <div className="space-y-2 pt-2">
                       {meetings.map((m) => (
-                        <button
+                        <div
                           key={m.id}
-                          onClick={() => router.push(`/meetings?open=${m.id}`)}
-                          className="w-full text-left p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors flex items-center justify-between gap-3"
+                          className="w-full p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors flex items-center justify-between gap-3"
                         >
-                          <div className="min-w-0">
+                          <button onClick={() => router.push(`/meetings?open=${m.id}`)} className="min-w-0 text-left flex-1">
                             <p className="text-xs font-bold text-slate-800 dark:text-slate-700 truncate">{m.title}</p>
                             <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                               <Calendar className="h-3 w-3" /> {formatDateTime(m.start_at)}
                               {m.location && <span>· {m.location}</span>}
                             </p>
+                          </button>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {m.join_url && (
+                              <a
+                                href={m.join_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                              >
+                                <Video className="h-3 w-3" /> Join
+                              </a>
+                            )}
+                            <Badge variant={m.status === "canceled" ? "default" : "blue"}>{m.status}</Badge>
                           </div>
-                          <Badge variant={m.status === "canceled" ? "default" : "blue"} className="flex-shrink-0">{m.status}</Badge>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   )}

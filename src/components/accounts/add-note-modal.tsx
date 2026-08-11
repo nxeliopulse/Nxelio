@@ -50,6 +50,7 @@ export function AddNoteModal({ open, onClose, accountId }: { open: boolean; onCl
   async function save() {
     if (!title.trim()) { setError("Title is required."); return; }
     if (!note.trim()) { setError("Note is required."); return; }
+    if (files.length === 0) { setError("An attachment is required."); return; }
     setError(null);
     setSaving(true);
     try {

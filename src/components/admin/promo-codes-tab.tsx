@@ -30,6 +30,7 @@ export function PromoCodesTab({ initialCodes }: { initialCodes: EmailPromoCodeRo
   const [discountValue, setDiscountValue] = useState("20");
   const [expiresAt, setExpiresAt] = useState(tomorrowPlus(30));
   const [note, setNote] = useState("");
+  const [justCreatedDetails, setJustCreatedDetails] = useState<{ email: string; discountType: "percentage" | "fixed_amount"; discountValue: number; expiresAt: string; note: string } | null>(null);
 
   function handleCreate() {
     setError(null);
@@ -44,6 +45,7 @@ export function PromoCodesTab({ initialCodes }: { initialCodes: EmailPromoCodeRo
       });
       if (!res.ok || !res.code) { setError(res.error || "Couldn't create the code."); return; }
       setJustCreated(res.code);
+      setJustCreatedDetails({ email: email.trim(), discountType, discountValue: parseFloat(discountValue), expiresAt, note: note.trim() });
       setCodes((prev) => [
         {
           id: crypto.randomUUID(), code: res.code!, restricted_email: email.trim().toLowerCase(),
@@ -148,16 +150,24 @@ export function PromoCodesTab({ initialCodes }: { initialCodes: EmailPromoCodeRo
           </div>
         </div>
         {error && <p className="px-5 pb-4 text-xs text-red-600">{error}</p>}
-        {justCreated && (
-          <div className="mx-5 mb-5 flex items-center justify-between gap-3 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-4 py-3">
-            <div>
-              <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold">Code created — send this to the customer:</p>
-              <p className="font-mono text-lg font-bold text-emerald-800 dark:text-emerald-300 tracking-wider">{justCreated}</p>
+        {justCreated && justCreatedDetails && (
+          <div className="mx-5 mb-5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold">Code created — send this to the customer:</p>
+                <p className="font-mono text-lg font-bold text-emerald-800 dark:text-emerald-300 tracking-wider">{justCreated}</p>
+              </div>
+              <button onClick={() => copy(justCreated)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
+                {copiedCode === justCreated ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copiedCode === justCreated ? "Copied" : "Copy"}
+              </button>
             </div>
-            <button onClick={() => copy(justCreated)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
-              {copiedCode === justCreated ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copiedCode === justCreated ? "Copied" : "Copy"}
-            </button>
+            <dl className="mt-3 pt-3 border-t border-emerald-200/60 dark:border-emerald-500/20 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div><dt className="text-emerald-600/70 dark:text-emerald-400/70">Email</dt><dd className="font-semibold text-emerald-800 dark:text-emerald-300">{justCreatedDetails.email}</dd></div>
+              <div><dt className="text-emerald-600/70 dark:text-emerald-400/70">Discount</dt><dd className="font-semibold text-emerald-800 dark:text-emerald-300">{justCreatedDetails.discountType === "percentage" ? `${justCreatedDetails.discountValue}% off` : `$${justCreatedDetails.discountValue} off`}</dd></div>
+              <div><dt className="text-emerald-600/70 dark:text-emerald-400/70">Expires</dt><dd className="font-semibold text-emerald-800 dark:text-emerald-300">{new Date(justCreatedDetails.expiresAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</dd></div>
+              {justCreatedDetails.note && <div><dt className="text-emerald-600/70 dark:text-emerald-400/70">Note</dt><dd className="font-semibold text-emerald-800 dark:text-emerald-300">{justCreatedDetails.note}</dd></div>}
+            </dl>
           </div>
         )}
       </div>

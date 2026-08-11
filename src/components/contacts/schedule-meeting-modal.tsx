@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { X, Video, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback";
 import { scheduleMeeting } from "@/lib/queries/meetings";
+import { generateConferenceLink, CONFERENCE_PROVIDERS, type ConferenceProvider } from "@/lib/meetings/conference-link";
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90];
 
@@ -32,10 +33,16 @@ export function ScheduleMeetingModal({
   const [duration, setDuration] = useState(30);
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
+  const [provider, setProvider] = useState<ConferenceProvider>("google_meet");
+  const [joinUrl, setJoinUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!open) return null;
+
+  function handleGenerateLink() {
+    setJoinUrl(generateConferenceLink(provider));
+  }
 
   async function save() {
     if (!title.trim()) {
@@ -58,6 +65,8 @@ export function ScheduleMeetingModal({
           start_at: start.toISOString(),
           end_at: end.toISOString(),
           location: location.trim() || null,
+          join_url: joinUrl || null,
+          provider: joinUrl ? provider : "manual",
           contact_id: contactId,
           attendees: contactEmail ? [{ name: contactName, email: contactEmail }] : [],
         },
@@ -124,10 +133,33 @@ export function ScheduleMeetingModal({
               </div>
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Location</label>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Meeting link</label>
+              <div className="flex gap-2">
+                <select
+                  className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-white px-2 py-2 text-sm outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)]"
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value as ConferenceProvider)}
+                >
+                  {CONFERENCE_PROVIDERS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+                <Button type="button" variant="outline" onClick={handleGenerateLink} className="flex-shrink-0">
+                  <Video className="h-3.5 w-3.5" /> Generate link
+                </Button>
+              </div>
+              {joinUrl && (
+                <div className="mt-2 flex items-center gap-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-2">
+                  <Link2 className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <a href={joinUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">{joinUrl}</a>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5">Location (optional)</label>
               <input
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)]"
-                placeholder="Google Meet, phone, address..."
+                placeholder="Phone, address, or other details..."
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
               />
