@@ -1,11 +1,11 @@
 "use client";
-import { useState, useTransition, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Search, Plus, Trash2, ChevronDown, Building2, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
+  Search, Plus, ChevronDown, Building2, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, Globe, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  Pencil, RefreshCw, Download, FileText, FileSpreadsheet, Upload, CheckCircle2, Target, Award, XCircle
+  Pencil, RefreshCw, Download, FileText, FileSpreadsheet, Upload
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn, formatDate } from "@/lib/utils";
 import { EditAccountModal, type AccountOwnerOption } from "@/components/accounts/edit-account-modal";
 import { AddAccountsWizard } from "@/components/accounts/add-accounts-wizard";
-import { deleteAccount, bulkDeleteAccounts, type AccountRow } from "@/lib/queries/accounts";
+import { type AccountRow } from "@/lib/queries/accounts";
 
 // "index" (Row #) is NOT part of this list — like leads-table.tsx's own Row #
 // column, it's always shown and fixed in position, never toggleable.
@@ -52,6 +52,19 @@ const STATUS_OPTIONS = ["Active", "Inactive", "Prospect", "On Hold", "Churned"];
 const INDUSTRY_OPTIONS = ["Technology", "Finance", "Healthcare", "Manufacturing", "Retail", "Education", "Consulting", "Other"];
 const ACCOUNT_TYPE_OPTIONS = ["Analyst", "Competitor", "Customer", "Integrator", "Investor", "Partner", "Prospect", "Reseller", "Vendor", "Other"];
 
+function getFlagEmoji(country: string): string {
+  const c = country.toLowerCase();
+  if (c.includes("united states") || c.includes("usa")) return "🇺🇸";
+  if (c.includes("canada")) return "🇨🇦";
+  if (c.includes("united kingdom") || c.includes("uk")) return "🇬🇧";
+  if (c.includes("australia")) return "🇦🇺";
+  if (c.includes("india")) return "🇮🇳";
+  if (c.includes("germany")) return "🇩🇪";
+  if (c.includes("france")) return "🇫🇷";
+  if (c.includes("japan")) return "🇯🇵";
+  return "🌐";
+}
+
 function ownershipColor(value: string | null): string {
   switch (value) {
     case "Public": return "text-blue-500 bg-blue-50 dark:bg-blue-950/20 border-blue-250 dark:border-blue-800/40";
@@ -76,9 +89,9 @@ function accountTypeColor(value: string | null): string {
 }
 
 export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[]; owners?: AccountOwnerOption[] }) {
-  const { confirm, toast } = useFeedback();
+  const { toast } = useFeedback();
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [nowMs] = useState(() => Date.now());
 
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -93,7 +106,6 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
     else { setSortKey(key); setSortDir("asc"); }
   }
   const [page, setPage] = useState(0);
-  const [showModal, setShowModal] = useState(false);
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
@@ -273,25 +285,6 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
     router.push(`/accounts/${id}`);
   }
 
-  async function handleBulkDelete() {
-    if (!(await confirm({ title: "Delete accounts?", message: `Delete ${selected.length} account(s)?`, confirmLabel: "Delete", danger: true }))) return;
-    const ids = [...selected];
-    setSelected([]);
-    start(async () => {
-      await bulkDeleteAccounts(ids);
-      toast(`${ids.length} account(s) deleted.`, "success");
-    });
-  }
-
-  async function handleDelete(id: string) {
-    if (!(await confirm({ title: "Delete account?", message: "Delete this account?", confirmLabel: "Delete", danger: true }))) return;
-    start(async () => {
-      await deleteAccount(id);
-      setSelected((s) => s.filter((x) => x !== id));
-      toast("Account deleted successfully", "success");
-    });
-  }
-
   const AVATAR_COLORS = ["bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-violet-500", "bg-cyan-500", "bg-pink-500", "bg-indigo-500"];
 
   function avatarColor(name: string): string {
@@ -419,62 +412,42 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
         </div>
       </div>
 
-      {/* Stat cards — clickable colored KPI grid, same pattern as Prospects */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-        {(
-          [
-            { label: "Total Accounts", value: accounts.length, icon: Building2, accent: "bg-amber-500", ring: "ring-amber-500", bg: "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]", kind: "all" as const, filterValue: null },
-            { label: "Active Accounts", value: accounts.filter((a) => a.account_status === "Active").length, icon: CheckCircle2, accent: "bg-emerald-500", ring: "ring-emerald-500", bg: "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]", kind: "status" as const, filterValue: "Active" },
-            { label: "Prospect Accounts", value: accounts.filter((a) => a.account_status === "Prospect").length, icon: Target, accent: "bg-blue-500", ring: "ring-blue-500", bg: "bg-blue-500/[0.04] dark:bg-blue-500/[0.08]", kind: "status" as const, filterValue: "Prospect" },
-            { label: "Customer Accounts", value: accounts.filter((a) => a.account_type === "Customer").length, icon: Award, accent: "bg-purple-500", ring: "ring-purple-500", bg: "bg-purple-500/[0.04] dark:bg-purple-500/[0.08]", kind: "type" as const, filterValue: "Customer" },
-            { label: "Inactive Accounts", value: accounts.filter((a) => a.account_status === "Inactive").length, icon: XCircle, accent: "bg-rose-500", ring: "ring-rose-500", bg: "bg-rose-500/[0.04] dark:bg-rose-500/[0.08]", kind: "status" as const, filterValue: "Inactive" },
-          ]
-        ).map((s) => {
-          const Icon = s.icon;
-          const isActive =
-            s.kind === "all" ? statusFilter === "all" && accountTypeFilter === "all"
-            : s.kind === "status" ? statusFilter === s.filterValue
-            : accountTypeFilter === s.filterValue;
-          return (
-            <Card
-              key={s.label}
-              onClick={() => {
-                if (s.kind === "all") {
-                  setStatusFilter("all");
-                  setAccountTypeFilter("all");
-                  toast("Showing all accounts", "info");
-                  return;
-                }
-                if (s.kind === "status") {
-                  const next = statusFilter === s.filterValue ? "all" : (s.filterValue as string);
-                  setStatusFilter(next);
-                  setAccountTypeFilter("all");
-                  toast(next === "all" ? "Showing all accounts" : `Filtering by "${s.label}"`, "info");
-                  return;
-                }
-                const next = accountTypeFilter === s.filterValue ? "all" : (s.filterValue as string);
-                setAccountTypeFilter(next);
-                setStatusFilter("all");
-                toast(next === "all" ? "Showing all accounts" : `Filtering by "${s.label}"`, "info");
-              }}
-              className={cn(
-                "p-4 sm:p-5 flex items-center gap-3 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
-                isActive
-                  ? `ring-2 ${s.ring} ${s.bg} border-transparent shadow-xs`
-                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-              )}
-            >
-              <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
-                <Icon className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
-                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value.toLocaleString()}</p>
+      {(() => {
+        // "vs last 30 days" is computed from created_at, which is the only
+        // historical signal we actually have (no snapshot/audit table tracks
+        // status changes over time). For "Total" this is an exact comparison.
+        // For status/type-based counts it's an approximation — an account
+        // could have changed status since it was created — but it's a real,
+        // derived number rather than a fabricated one.
+        const cutoff = nowMs - 30 * 24 * 60 * 60 * 1000;
+        const pctChange = (matches: (a: AccountRow) => boolean) => {
+          const current = accounts.filter(matches).length;
+          const previous = accounts.filter((a) => matches(a) && new Date(a.created_at).getTime() <= cutoff).length;
+          if (previous === 0) return current > 0 ? 100 : 0;
+          return Math.round(((current - previous) / previous) * 100);
+        };
+        const cards = [
+          { label: "Total Accounts", value: accounts.length, pct: pctChange(() => true) },
+          { label: "Active Accounts", value: accounts.filter((a) => a.account_status === "Active").length, pct: pctChange((a) => a.account_status === "Active") },
+          { label: "Prospect Accounts", value: accounts.filter((a) => a.account_status === "Prospect").length, pct: pctChange((a) => a.account_status === "Prospect") },
+          { label: "Customer Accounts", value: accounts.filter((a) => a.account_type === "Customer").length, pct: pctChange((a) => a.account_type === "Customer") },
+          { label: "Inactive Accounts", value: accounts.filter((a) => a.account_status === "Inactive").length, pct: pctChange((a) => a.account_status === "Inactive") },
+        ];
+        return (
+          <Card className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800 mb-5 overflow-hidden">
+            {cards.map((s) => (
+              <div key={s.label} className="p-4 sm:p-5 min-w-0">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
+                <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">{s.value.toLocaleString()}</p>
+                <p className={cn("text-[11px] font-semibold mt-1 flex items-center gap-0.5", s.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                  {s.pct >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                  {Math.abs(s.pct)}% vs last 30 days
+                </p>
               </div>
-            </Card>
-          );
-        })}
-      </div>
+            ))}
+          </Card>
+        );
+      })()}
 
       {/* Redesigned Sub-header / Actions Controls bar */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-3 sm:p-4 rounded-xl shadow-2xs">
@@ -715,18 +688,8 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
           </div>
         </div>
 
-        {/* Right Side: Add Account, Filter, Columns, Toggle Grid */}
+        {/* Right Side: Filter, Columns, Toggle Grid */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-
-          {/* Add Account Button */}
-          <Button
-            size="sm"
-            onClick={() => setShowModal(true)}
-            className="rounded-lg gap-1.5 font-bold h-8 px-3.5 text-xs bg-[var(--primary)] hover:opacity-90 text-white shadow-sm flex-shrink-0"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Account</span>
-          </Button>
 
           {/* More Filters — Rating + Account Type, the two filter dimensions that don't
               have their own dedicated toolbar dropdown (Status/Industry/Owner/Region do) */}
@@ -891,7 +854,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
               <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paged.length === 0 && (
                   <DataTableEmpty colSpan={visibleCols.length + 4}>
-                    No accounts found matching the filters. Click <strong>Add Account</strong> to create one.
+                    No accounts found matching the filters.
                   </DataTableEmpty>
                 )}
                 {paged.map((a, i) => {
@@ -900,6 +863,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                   const rowNumber = safePage * PAGE_SIZE + i + 1;
 
                   const countryName = a.billing_country;
+                  const flag = countryName ? getFlagEmoji(countryName) : null;
 
                   return (
                     <DataTableRow
@@ -984,6 +948,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                         <td className="px-3 py-2.5 text-slate-600 dark:text-slate-500 font-medium">
                           {countryName ? (
                             <div className="flex items-center gap-1">
+                              <span className="text-sm leading-none">{flag}</span>
                               <span>{[a.billing_city, countryName].filter(Boolean).join(", ")}</span>
                             </div>
                           ) : (
@@ -1124,6 +1089,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
           {sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE).map((a) => {
             const isStarred = starred.includes(a.id);
             const countryName = a.billing_country;
+            const flag = countryName ? getFlagEmoji(countryName) : null;
 
             return (
               <Card
@@ -1170,7 +1136,10 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                     <span className="text-slate-400">Location:</span>
                     <span className="text-slate-800 dark:text-slate-700 flex items-center gap-1">
                       {countryName ? (
-                        <span>{[a.billing_city, countryName].filter(Boolean).join(", ")}</span>
+                        <>
+                          <span>{flag}</span>
+                          <span>{[a.billing_city, countryName].filter(Boolean).join(", ")}</span>
+                        </>
                       ) : "—"}
                     </span>
                   </div>
@@ -1225,13 +1194,12 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
       </div>
 
       {/* Modal overlays */}
-      <EditAccountModal open={showModal} onClose={() => setShowModal(false)} owners={owners} />
       {editingAccount && (
         <EditAccountModal open={true} onClose={() => setEditingAccount(null)} account={editingAccount} owners={owners} />
       )}
       <AddAccountsWizard open={showImportWizard} onClose={() => setShowImportWizard(false)} />
 
-      {/* Row actions menu — kebab button in the rightmost column, Edit + Delete */}
+      {/* Row actions menu — kebab button in the rightmost column, Edit */}
       {rowMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setRowMenu(null)} />
@@ -1245,17 +1213,6 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <Pencil className="h-3.5 w-3.5" /> Edit
-            </button>
-            <button
-              onClick={() => {
-                const id = rowMenu.id;
-                setRowMenu(null);
-                handleDelete(id);
-              }}
-              disabled={pending}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-rose-950/50 rounded-lg disabled:opacity-50"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
             </button>
           </div>
         </>
@@ -1287,9 +1244,6 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
               <span className="font-extrabold">{selected.length}</span> selected
             </span>
             <span className="h-5 w-px bg-white/20" />
-            <button onClick={handleBulkDelete} disabled={pending} className="inline-flex items-center gap-1.5 rounded-full bg-white text-red-600 hover:bg-red-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-bold transition-colors">
-              <Trash2 className="h-3.5 w-3.5" /> Delete
-            </button>
             <button onClick={() => setSelected([])} className="rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-bold transition-colors">
               Clear
             </button>

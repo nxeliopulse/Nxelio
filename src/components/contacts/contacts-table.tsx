@@ -1,9 +1,9 @@
 "use client";
-import { useState, useTransition, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Search, Plus, Trash2, ChevronDown, ChevronRight, Users2, Mail, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
+  Search, Plus, ChevronDown, ChevronRight, Users2, Mail, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
   Pencil, RefreshCw, User, Link2, Download, FileText, FileSpreadsheet, Upload, X
 } from "lucide-react";
@@ -16,7 +16,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn, formatDate } from "@/lib/utils";
 import { EditContactModal } from "@/components/contacts/edit-contact-modal";
 import { AddContactsWizard } from "@/components/contacts/add-contacts-wizard";
-import { deleteContact, bulkDeleteContacts, type ContactRow } from "@/lib/queries/contacts";
+import { type ContactRow } from "@/lib/queries/contacts";
 
 /** Owner picker option — same shape as accounts' AccountOwnerOption (id/name/role),
  *  kept as a local type here since Contacts has no need for the rest of that module. */
@@ -76,11 +76,10 @@ function chatNumber(c: { whatsapp: string | null; phone: string | null }): strin
 
 
 export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[]; owners?: OwnerOption[] }) {
-  const { confirm, toast } = useFeedback();
+  const { toast } = useFeedback();
   const router = useRouter();
   const searchParams = useSearchParams();
   const accountFilterId = searchParams.get("account");
-  const [pending, start] = useTransition();
 
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -94,7 +93,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
     else { setSortKey(key); setSortDir("asc"); }
   }
   const [page, setPage] = useState(0);
-  const [showModal, setShowModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
@@ -348,33 +346,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
 
   function openContact(id: string) {
     router.push(`/contacts/${id}`);
-  }
-
-  async function handleBulkDelete() {
-    if (!(await confirm({ title: "Delete contacts?", message: `Delete ${selected.length} contact(s)?`, confirmLabel: "Delete", danger: true }))) return;
-    const ids = [...selected];
-    setSelected([]);
-    start(async () => {
-      try {
-        await bulkDeleteContacts(ids);
-        toast(`${ids.length} contact(s) deleted.`, "success");
-      } catch (err) {
-        toast(err instanceof Error ? err.message : "Couldn't delete contacts.", "error");
-      }
-    });
-  }
-
-  async function handleDelete(id: string) {
-    if (!(await confirm({ title: "Delete contact?", message: "Delete this contact?", confirmLabel: "Delete", danger: true }))) return;
-    start(async () => {
-      try {
-        await deleteContact(id);
-        setSelected((s) => s.filter((x) => x !== id));
-        toast("Contact deleted successfully", "success");
-      } catch (err) {
-        toast(err instanceof Error ? err.message : "Couldn't delete contact.", "error");
-      }
-    });
   }
 
   const AVATAR_COLORS = ["bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-violet-500", "bg-cyan-500", "bg-pink-500", "bg-indigo-500"];
@@ -710,18 +681,8 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
           </div>
         </div>
 
-        {/* Right Side: Add Contact, Filter, Columns, Toggle Grid */}
+        {/* Right Side: Filter, Columns, Toggle Grid */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-          
-          {/* Add Contacts Button */}
-          <Button
-            size="sm"
-            onClick={() => setShowModal(true)}
-            className="rounded-lg gap-1.5 font-bold h-8 px-3.5 text-xs bg-[var(--primary)] hover:opacity-90 text-white shadow-sm flex-shrink-0"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Contacts</span>
-          </Button>
 
           {/* Filter Dropdown */}
           <div className="relative">
@@ -1068,7 +1029,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
               <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paged.length === 0 && (
                   <DataTableEmpty colSpan={visibleCols.length + 4}>
-                    No contacts found matching the filters. Click <strong>Add Contacts</strong> to create one.
+                    No contacts found matching the filters.
                   </DataTableEmpty>
                 )}
                 {paged.map((c, i) => {
@@ -1422,7 +1383,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
       </div>
 
       {/* Modal overlays */}
-      <EditContactModal open={showModal} onClose={() => setShowModal(false)} defaultAccountId={accountFilterId || undefined} owners={owners} />
       {editingContact && (
         <EditContactModal open={true} onClose={() => setEditingContact(null)} contact={editingContact} owners={owners} />
       )}
@@ -1442,17 +1402,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg"
             >
               <Pencil className="h-3.5 w-3.5" /> Edit
-            </button>
-            <button
-              onClick={() => {
-                const id = rowMenu.id;
-                setRowMenu(null);
-                handleDelete(id);
-              }}
-              disabled={pending}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-rose-950/50 rounded-lg disabled:opacity-50"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
             </button>
           </div>
         </>
@@ -1484,9 +1433,6 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
               <span className="font-extrabold">{selected.length}</span> selected
             </span>
             <span className="h-5 w-px bg-white/20" />
-            <button onClick={handleBulkDelete} disabled={pending} className="inline-flex items-center gap-1.5 rounded-full bg-white text-red-600 hover:bg-red-50 disabled:opacity-50 px-3.5 py-1.5 text-sm font-bold transition-colors">
-              <Trash2 className="h-3.5 w-3.5" /> Delete
-            </button>
             <button onClick={() => setSelected([])} className="rounded-full bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 text-sm font-bold transition-colors">
               Clear
             </button>

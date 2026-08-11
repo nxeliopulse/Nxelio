@@ -20,6 +20,7 @@ import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, deductLeads } from "@/
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { cn } from "@/lib/utils";
+import { PhoneInput, formatPhoneForStorage, type CountryCode } from "@/components/ui/phone-input";
 
 export type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
 
@@ -58,7 +59,7 @@ type ManualLead = { id: string; name: string; title: string; url: string };
 // Leads, this source genuinely has this data because the person typing it in knows it).
 type ManualEntry = {
   id: string; name: string; email: string; company: string; title: string;
-  phone: string; companySize: string; seniority: string; twitter: string; linkedin: string;
+  phone: string; phoneCountry: CountryCode; companySize: string; seniority: string; twitter: string; linkedin: string;
   streetAddress: string; city: string; state: string; country: string; postalCode: string;
 };
 
@@ -158,11 +159,11 @@ const manualInvalidCount = (rows: ManualLead[]) => rows.filter((m) => !m.url.tri
 
 const newEntry = (): ManualEntry => ({
   id: `e${++_mid}`, name: "", email: "", company: "", title: "",
-  phone: "", companySize: "", seniority: "", twitter: "", linkedin: "",
+  phone: "", phoneCountry: "US", companySize: "", seniority: "", twitter: "", linkedin: "",
   streetAddress: "", city: "", state: "", country: "", postalCode: "",
 });
-// A manual entry imports if it has a name (or company) AND an email.
-const entryValid = (e: ManualEntry) => !!((e.name.trim() || e.company.trim()) && e.email.trim());
+// A manual entry imports if it has a name AND a LinkedIn profile — email is optional.
+const entryValid = (e: ManualEntry) => !!(e.name.trim() && e.linkedin.trim());
 const entryStarted = (e: ManualEntry) =>
   !!(e.name.trim() || e.email.trim() || e.company.trim() || e.title.trim() || e.phone.trim() ||
      e.companySize.trim() || e.seniority.trim() || e.twitter.trim() || e.linkedin.trim() ||
@@ -371,10 +372,10 @@ export function AddLeadsWizard({
     }
     if (isManualEntry) {
       const started = entries.filter(entryStarted);
-      if (started.length === 0) { setStep2Error("Add at least one lead with a name and email."); return false; }
+      if (started.length === 0) { setStep2Error("Add at least one lead with a name and a LinkedIn profile."); return false; }
       const badEmail = started.find((e) => e.email.trim() && !isEmail(e.email));
       if (badEmail) { setStep2Error(`"${badEmail.email}" isn't a valid email address.`); return false; }
-      if (started.filter(entryValid).length === 0) { setStep2Error("Each lead needs a name (or company) and an email."); return false; }
+      if (started.filter(entryValid).length === 0) { setStep2Error("Each lead needs a name and a LinkedIn profile."); return false; }
       return true;
     }
     if (isBuy) {
@@ -453,7 +454,7 @@ export function AddLeadsWizard({
       payload = entryValidRows.map((e) => ({
         full_name: e.name.trim() || null,
         email: e.email.trim() || null,
-        phone: e.phone.trim() || null,
+        phone: e.phone.trim() ? formatPhoneForStorage(e.phone, e.phoneCountry) : null,
         company_name: e.company.trim() || null,
         interest_area: e.title.trim() || null,
         job_title: e.title.trim() || null,
@@ -1005,9 +1006,10 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-base text-slate-600">Type your leads below. Each needs a <span className="font-semibold text-slate-900">name</span> and an <span className="font-semibold text-slate-900">email</span>.</p>
+        <p className="text-base text-slate-600">Type your leads below. Each needs a <span className="font-semibold text-slate-900">name</span> and a <span className="font-semibold text-slate-900">LinkedIn profile</span>.</p>
         <span className="inline-flex items-center gap-1.5 text-sm text-slate-500 whitespace-nowrap"><Users2 className="h-4 w-4" /> {ready} ready</span>
       </div>
+      {error && <ErrorNote text={error} />}
       <div className="space-y-4">
         {entries.map((e, idx) => {
           const bad = entryStarted(e) && !entryValid(e);
@@ -1024,9 +1026,18 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
                   <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">Contact Information</h4>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
                     <EntryRow label="Name" required><Input value={e.name} onChange={(ev) => update(e.id, "name", ev.target.value)} placeholder="Jane Doe" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
-                    <EntryRow label="Email" required><Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="jane@company.com" className={cn("h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm", bad && "border-amber-300 focus:ring-amber-200")} /></EntryRow>
-                    <EntryRow label="Phone"><Input value={e.phone} onChange={(ev) => update(e.id, "phone", ev.target.value)} placeholder="+1 555 000 0000" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
-                    <EntryRow label="LinkedIn"><Input value={e.linkedin} onChange={(ev) => update(e.id, "linkedin", ev.target.value)} placeholder="linkedin.com/in/janedoe" leftIcon={<Link2 className="h-4 w-4" />} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="Email"><Input value={e.email} onChange={(ev) => update(e.id, "email", ev.target.value)} placeholder="jane@company.com" className={cn("h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm", bad && "border-amber-300 focus:ring-amber-200")} /></EntryRow>
+                    <EntryRow label="Phone" className="lg:col-span-2">
+                      <PhoneInput
+                        label=""
+                        country={e.phoneCountry}
+                        value={e.phone}
+                        onCountryChange={(c) => update(e.id, "phoneCountry", c)}
+                        onValueChange={(v) => update(e.id, "phone", v)}
+                        inputClassName="flex-1 h-11 text-base rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+                      />
+                    </EntryRow>
+                    <EntryRow label="LinkedIn" required><Input value={e.linkedin} onChange={(ev) => update(e.id, "linkedin", ev.target.value)} placeholder="linkedin.com/in/janedoe" leftIcon={<Link2 className="h-4 w-4" />} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
                     <EntryRow label="Twitter / X"><Input value={e.twitter} onChange={(ev) => update(e.id, "twitter", ev.target.value)} placeholder="@janedoe" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
                   </div>
                 </div>
@@ -1067,7 +1078,6 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
         })}
       </div>
       <Button variant="outline" size="sm" onClick={add}><Plus className="h-4 w-4" /> Add another</Button>
-      {error && <ErrorNote text={error} />}
     </div>
   );
 }
@@ -1090,9 +1100,9 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
                 <td className="px-3 py-2">{e.name || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{e.email || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{e.company || <span className="text-slate-400">—</span>}</td>
-                <td className="px-3 py-2">{e.phone || <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2">{e.phone ? formatPhoneForStorage(e.phone, e.phoneCountry) : <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{e.seniority || <span className="text-slate-400">—</span>}</td>
-                <td className="px-3 py-2">{entryValid(e) ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <span className="inline-flex items-center gap-1 text-red-600 text-xs"><AlertCircle className="h-3.5 w-3.5" /> Needs name + email</span>}</td>
+                <td className="px-3 py-2">{entryValid(e) ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <span className="inline-flex items-center gap-1 text-red-600 text-xs"><AlertCircle className="h-3.5 w-3.5" /> Needs name + LinkedIn</span>}</td>
               </tr>
             ))}
           </tbody>
