@@ -16,6 +16,7 @@ import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outr
 import { searchBuyLeads, type GeneratedProspect } from "@/lib/leads/buy-leads";
 import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
 import { MultiLocationInput } from "@/components/leads/location-search-input";
+import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, deductLeads } from "@/lib/queries/subscriptions";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
@@ -1066,9 +1067,36 @@ function ManualEntryForm({ entries, setEntries, error }: { entries: ManualEntry[
                   <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">Address</h4>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
                     <EntryRow label="Street"><Input value={e.streetAddress} onChange={(ev) => update(e.id, "streetAddress", ev.target.value)} placeholder="123 Main St" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
-                    <EntryRow label="City"><Input value={e.city} onChange={(ev) => update(e.id, "city", ev.target.value)} placeholder="City" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
-                    <EntryRow label="State"><Input value={e.state} onChange={(ev) => update(e.id, "state", ev.target.value)} placeholder="State" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
-                    <EntryRow label="Country"><Input value={e.country} onChange={(ev) => update(e.id, "country", ev.target.value)} placeholder="Country" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
+                    <EntryRow label="City">
+                      <LocationAutocomplete
+                        type="city"
+                        value={e.city || ""}
+                        onChange={(val) => update(e.id, "city", val)}
+                        placeholder="City"
+                        className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+                        countryContext={e.country}
+                        stateContext={e.state}
+                      />
+                    </EntryRow>
+                    <EntryRow label="State">
+                      <LocationAutocomplete
+                        type="state"
+                        value={e.state || ""}
+                        onChange={(val) => update(e.id, "state", val)}
+                        placeholder="State"
+                        className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+                        countryContext={e.country}
+                      />
+                    </EntryRow>
+                    <EntryRow label="Country">
+                      <LocationAutocomplete
+                        type="country"
+                        value={e.country || ""}
+                        onChange={(val) => update(e.id, "country", val)}
+                        placeholder="Country"
+                        className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+                      />
+                    </EntryRow>
                     <EntryRow label="Postal code"><Input value={e.postalCode} onChange={(ev) => update(e.id, "postalCode", ev.target.value)} placeholder="Postal" className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm" /></EntryRow>
                   </div>
                 </div>

@@ -111,7 +111,13 @@ export async function POST(request: NextRequest) {
   // Prefer whichever matching lead has real outbound activity, most recent first.
   const matchEmail = async (ws: string | null) => {
     if (!emails.length) return null;
-    let q = db.from("leads").select("id, workspace_id, full_name, company_name, email").in("email", emails);
+    // Case-insensitive: `emails` is already lowercased (collectIdentifiers), but
+    // CSV-imported leads commonly have mixed-case addresses (e.g. "Yvette@..."),
+    // so an exact `.in("email", ...)` silently never matches a real lead.
+    let q = db
+      .from("leads")
+      .select("id, workspace_id, full_name, company_name, email")
+      .or(emails.map((e) => `email.ilike.${e}`).join(","));
     if (ws) q = q.eq("workspace_id", ws);
     const { data } = await q;
     const candidates = data ?? [];

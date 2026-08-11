@@ -449,243 +449,18 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
         );
       })()}
 
-      {/* Redesigned Sub-header / Actions Controls bar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-3 sm:p-4 rounded-xl shadow-2xs">
+      {/* Redesigned Sub-header / Actions Controls bar: Row 1 */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-3 sm:p-4 rounded-xl shadow-2xs">
 
-        {/* Left Side: Search, Status/Industries/Owners/Regions, Sort, Date range */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div className="w-full sm:w-64 md:w-72 flex-shrink-0">
-            <Input
-              leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
-              placeholder="Search accounts by name, domain, industry, or owner..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs"
-            />
-          </div>
-
-          {/* Status Filter */}
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
-            >
-              <span>{statusFilter === "all" ? "All Status" : statusFilter}</span>
-              <ChevronDown className="h-3 w-3 text-slate-450" />
-            </Button>
-            {statusDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setStatusDropdownOpen(false)} />
-                <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                  {["all", ...STATUS_OPTIONS].map((opt) => (
-                    <button
-                      key={opt}
-                      onClick={() => { setStatusFilter(opt); setStatusDropdownOpen(false); }}
-                      className={cn(
-                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                        statusFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
-                      )}
-                    >
-                      {opt === "all" ? "All Status" : opt}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Industry Filter */}
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIndustryDropdownOpen(!industryDropdownOpen)}
-              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
-            >
-              <span>{industryFilter === "all" ? "All Industries" : industryFilter}</span>
-              <ChevronDown className="h-3 w-3 text-slate-450" />
-            </Button>
-            {industryDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setIndustryDropdownOpen(false)} />
-                <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                  {["all", ...INDUSTRY_OPTIONS].map((opt) => (
-                    <button
-                      key={opt}
-                      onClick={() => { setIndustryFilter(opt); setIndustryDropdownOpen(false); }}
-                      className={cn(
-                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                        industryFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
-                      )}
-                    >
-                      {opt === "all" ? "All Industries" : opt}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Owner Filter */}
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
-              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
-            >
-              <span>{ownerFilter === "all" ? "All Owners" : (owners.find((o) => o.id === ownerFilter)?.name ?? "Unknown owner")}</span>
-              <ChevronDown className="h-3 w-3 text-slate-450" />
-            </Button>
-            {ownerDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setOwnerDropdownOpen(false)} />
-                <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                  <button
-                    onClick={() => { setOwnerFilter("all"); setOwnerDropdownOpen(false); }}
-                    className={cn(
-                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      ownerFilter === "all" ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
-                    )}
-                  >
-                    All Owners
-                  </button>
-                  {owners.map((o) => (
-                    <button
-                      key={o.id}
-                      onClick={() => { setOwnerFilter(o.id); setOwnerDropdownOpen(false); }}
-                      className={cn(
-                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                        ownerFilter === o.id ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
-                      )}
-                    >
-                      {o.name}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Region Filter — options derived from real billing_country values present in the data */}
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
-              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
-            >
-              <span>{regionFilter === "all" ? "All Regions" : regionFilter}</span>
-              <ChevronDown className="h-3 w-3 text-slate-450" />
-            </Button>
-            {regionDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setRegionDropdownOpen(false)} />
-                <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                  <button
-                    onClick={() => { setRegionFilter("all"); setRegionDropdownOpen(false); }}
-                    className={cn(
-                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      regionFilter === "all" ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
-                    )}
-                  >
-                    All Regions
-                  </button>
-                  {REGION_OPTIONS.length === 0 && (
-                    <p className="px-4 py-2 text-slate-400">No regions yet</p>
-                  )}
-                  {REGION_OPTIONS.map((opt) => (
-                    <button
-                      key={opt}
-                      onClick={() => { setRegionFilter(opt); setRegionDropdownOpen(false); }}
-                      className={cn(
-                        "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                        regionFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
-                      )}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Count Chip — matches leads-table.tsx's bordered icon+count pill */}
-          <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
-            <Building2 className="h-3.5 w-3.5 text-slate-400" />
-            <span>{filtered.length} Account{filtered.length === 1 ? "" : "s"}</span>
-          </div>
-
-          {/* Sort By Dropdown Button */}
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-              className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
-            >
-              <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
-              <span>
-                Sort By: {sortByLabel()}
-              </span>
-              <ChevronDown className="h-3 w-3 text-slate-450" />
-            </Button>
-            {sortDropdownOpen && (
-              <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                {SORT_PRESETS.map((opt) => (
-                  <button
-                    key={opt.key}
-                    onClick={() => {
-                      opt.apply();
-                      setSortDropdownOpen(false);
-                      toast(`Sorted accounts by ${opt.label}`, "success");
-                    }}
-                    className={cn(
-                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      opt.isActive() ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Date Picker Button */}
-          <div className="relative">
-            <button
-              onClick={() => setDateRangeOpen(!dateRangeOpen)}
-              className="h-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800"
-            >
-              <Calendar className="h-3.5 w-3.5 text-slate-500" />
-              <span>{activeDateRange}</span>
-              <ChevronDown className="h-3 w-3 text-slate-400 ml-1" />
-            </button>
-            {dateRangeOpen && (
-              <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                {["Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"].map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => {
-                      setActiveDateRange(opt);
-                      setDateRangeOpen(false);
-                      toast(`Date range updated to ${opt}`, "success");
-                    }}
-                    className={cn(
-                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                      activeDateRange === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
-                    )}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* Left Side: Search Bar */}
+        <div className="w-full md:w-auto flex-grow max-w-md">
+          <Input
+            leftIcon={<Search className="h-3.5 w-3.5 text-slate-400" />}
+            placeholder="Search accounts by name, domain, industry, or owner..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 shadow-2xs"
+          />
         </div>
 
         {/* Right Side: Filter, Columns, Toggle Grid */}
@@ -792,6 +567,233 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
         </div>
       </div>
 
+      {/* Redesigned Sub-header / Actions Controls bar: Row 2 */}
+      <div className="flex flex-wrap items-center gap-2 mb-5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 p-3 sm:p-4 rounded-xl shadow-2xs w-full">
+
+        {/* Status Filter */}
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+            className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+          >
+            <span>{statusFilter === "all" ? "All Status" : statusFilter}</span>
+            <ChevronDown className="h-3 w-3 text-slate-450" />
+          </Button>
+          {statusDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setStatusDropdownOpen(false)} />
+              <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                {["all", ...STATUS_OPTIONS].map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => { setStatusFilter(opt); setStatusDropdownOpen(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                      statusFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                    )}
+                  >
+                    {opt === "all" ? "All Status" : opt}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Industry Filter */}
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIndustryDropdownOpen(!industryDropdownOpen)}
+            className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+          >
+            <span>{industryFilter === "all" ? "All Industries" : industryFilter}</span>
+            <ChevronDown className="h-3 w-3 text-slate-450" />
+          </Button>
+          {industryDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIndustryDropdownOpen(false)} />
+              <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                {["all", ...INDUSTRY_OPTIONS].map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => { setIndustryFilter(opt); setIndustryDropdownOpen(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                      industryFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                    )}
+                  >
+                    {opt === "all" ? "All Industries" : opt}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Owner Filter */}
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOwnerDropdownOpen(!ownerDropdownOpen)}
+            className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+          >
+            <span>{ownerFilter === "all" ? "All Owners" : (owners.find((o) => o.id === ownerFilter)?.name ?? "Unknown owner")}</span>
+            <ChevronDown className="h-3 w-3 text-slate-450" />
+          </Button>
+          {ownerDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setOwnerDropdownOpen(false)} />
+              <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                <button
+                  onClick={() => { setOwnerFilter("all"); setOwnerDropdownOpen(false); }}
+                  className={cn(
+                    "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                    ownerFilter === "all" ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                  )}
+                >
+                  All Owners
+                </button>
+                {owners.map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => { setOwnerFilter(o.id); setOwnerDropdownOpen(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                      ownerFilter === o.id ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                    )}
+                  >
+                    {o.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Region Filter */}
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+            className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+          >
+            <span>{regionFilter === "all" ? "All Regions" : regionFilter}</span>
+            <ChevronDown className="h-3 w-3 text-slate-450" />
+          </Button>
+          {regionDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setRegionDropdownOpen(false)} />
+              <div className="absolute left-0 mt-1.5 w-44 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                <button
+                  onClick={() => { setRegionFilter("all"); setRegionDropdownOpen(false); }}
+                  className={cn(
+                    "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                    regionFilter === "all" ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                  )}
+                >
+                  All Regions
+                </button>
+                {REGION_OPTIONS.length === 0 && (
+                  <p className="px-4 py-2 text-slate-400">No regions yet</p>
+                )}
+                {REGION_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => { setRegionFilter(opt); setRegionDropdownOpen(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                      regionFilter === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                    )}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Count Chip — matches leads-table.tsx's bordered icon+count pill */}
+        <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
+          <Building2 className="h-3.5 w-3.5 text-slate-400" />
+          <span>{filtered.length} Account{filtered.length === 1 ? "" : "s"}</span>
+        </div>
+
+        {/* Sort By Dropdown Button */}
+        <div className="relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+            className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-xs font-semibold gap-1.5 shadow-2xs"
+          >
+            <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+            <span>
+              Sort By: {sortByLabel()}
+            </span>
+            <ChevronDown className="h-3 w-3 text-slate-450" />
+          </Button>
+          {sortDropdownOpen && (
+            <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+              {SORT_PRESETS.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => {
+                    opt.apply();
+                    setSortDropdownOpen(false);
+                    toast(`Sorted accounts by ${opt.label}`, "success");
+                  }}
+                  className={cn(
+                    "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                    opt.isActive() ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Date Picker Button */}
+        <div className="relative">
+          <button
+            onClick={() => setDateRangeOpen(!dateRangeOpen)}
+            className="h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 px-3 py-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Calendar className="h-3.5 w-3.5 text-slate-500" />
+            <span>{activeDateRange}</span>
+            <ChevronDown className="h-3 w-3 text-slate-400 ml-1" />
+          </button>
+          {dateRangeOpen && (
+            <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+              {["Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"].map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => {
+                    setActiveDateRange(opt);
+                    setDateRangeOpen(false);
+                    toast(`Date range updated to ${opt}`, "success");
+                  }}
+                  className={cn(
+                    "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                    activeDateRange === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/20" : "text-slate-700 dark:text-slate-600"
+                  )}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* RENDER VIEW: LIST OR GRID */}
       {viewMode === "list" ? (
         <Card className="overflow-hidden bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl">
@@ -804,7 +806,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                       type="checkbox"
                       checked={selected.length === filtered.length && filtered.length > 0}
                       onChange={toggleAll}
-                      className="rounded border-slate-350 dark:border-slate-750"
+                      className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                     />
                   </DataTableTh>
                   {/* Row # — always shown, fixed position, not part of the Manage Columns toggle (matches leads-table.tsx) */}
@@ -880,7 +882,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => toggle(a.id)}
-                          className="rounded border-slate-350 dark:border-slate-700"
+                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                         />
                       </DataTableTd>
 
@@ -1227,7 +1229,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
             <div className="max-h-80 overflow-y-auto">
               {COLUMNS.map((c) => (
                 <label key={c.key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm text-slate-700 dark:text-slate-600 font-semibold">
-                  <input type="checkbox" checked={cols[c.key]} onChange={() => toggleCol(c.key)} className="rounded border-slate-350 text-blue-600 focus:ring-blue-500" />
+                  <input type="checkbox" checked={cols[c.key]} onChange={() => toggleCol(c.key)} className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer" />
                   <span>{c.label}</span>
                 </label>
               ))}

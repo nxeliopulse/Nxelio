@@ -11,6 +11,7 @@ import { uploadContactPhoto } from "@/lib/storage/upload";
 import type { OwnerOption } from "@/components/contacts/contacts-table";
 import { PhoneInput, detectCountry, formatPhoneForStorage } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
+import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 
 const SALUTATIONS = ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof."];
 const INDUSTRIES = ["Technology", "Finance", "Healthcare", "Manufacturing", "Retail", "Education", "Consulting", "Other"];
@@ -493,10 +494,13 @@ export function EditContactModal({
 
           <Section icon={MapPin} title="Address Info" open={openSections.address} onToggle={() => toggleSection("address")}>
             <Field label="Country / Region">
-              <select className={fieldStyle} value={form.mailing_country} onChange={(e) => set("mailing_country", e.target.value)}>
-                <option value="">-None-</option>
-                {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <LocationAutocomplete
+                type="country"
+                value={form.mailing_country || ""}
+                onChange={(val) => set("mailing_country", val)}
+                placeholder="Country"
+                className={fieldStyle}
+              />
             </Field>
             <Field label="Flat / House No.">
               <input className={fieldStyle} value={form.mailing_building} onChange={(e) => set("mailing_building", e.target.value)} />
@@ -505,10 +509,25 @@ export function EditContactModal({
               <input className={fieldStyle} value={form.mailing_street} onChange={(e) => set("mailing_street", e.target.value)} />
             </Field>
             <Field label="City">
-              <input className={fieldStyle} value={form.mailing_city} onChange={(e) => set("mailing_city", e.target.value)} />
+              <LocationAutocomplete
+                type="city"
+                value={form.mailing_city || ""}
+                onChange={(val) => set("mailing_city", val)}
+                placeholder="City"
+                className={fieldStyle}
+                countryContext={form.mailing_country}
+                stateContext={form.mailing_state}
+              />
             </Field>
             <Field label="State">
-              <input className={fieldStyle} value={form.mailing_state} onChange={(e) => set("mailing_state", e.target.value)} />
+              <LocationAutocomplete
+                type="state"
+                value={form.mailing_state || ""}
+                onChange={(val) => set("mailing_state", val)}
+                placeholder="State"
+                className={fieldStyle}
+                countryContext={form.mailing_country}
+              />
             </Field>
             <Field label="Zip Code">
               <input className={fieldStyle} value={form.mailing_zip} onChange={(e) => set("mailing_zip", e.target.value)} />

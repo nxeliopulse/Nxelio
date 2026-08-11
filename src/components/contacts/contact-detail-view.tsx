@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Pencil, Trash2, MoreHorizontal, Mail, Phone, Building2, ExternalLink,
+  Pencil, Mail, Phone, Building2, ExternalLink,
   Download, RefreshCw, ChevronDown, Star, Send, Share2, Heart, Plus, Paperclip,
   Calendar, Globe, MessageCircle, Link2, AtSign, ArrowLeft, Video, Pin,
   Clock, FileText, PhoneCall, File as FileIcon, UserPlus, Users, CalendarPlus, ListTodo, ArrowUpDown,
@@ -34,7 +34,7 @@ import type { ContactCallRow } from "@/lib/queries/contact-calls";
 import type { ContactDocumentRow } from "@/lib/queries/contact-documents";
 import type { ContactEmailRow } from "@/lib/queries/contact-emails";
 import type { OpportunityRow } from "@/lib/opportunities";
-import { deleteContact, type ContactWithAccount } from "@/lib/queries/contacts";
+import { type ContactWithAccount } from "@/lib/queries/contacts";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
 const STARRED_KEY = "lp_starred_contacts";
@@ -64,8 +64,7 @@ export function ContactDetailView({
   totalCount?: number;
 }) {
   const router = useRouter();
-  const { confirm, toast } = useFeedback();
-  const [, startDelete] = useTransition();
+  const { toast } = useFeedback();
   const [editOpen, setEditOpen] = useState(false);
   const [dealOpen, setDealOpen] = useState(false);
   const [meetingOpen, setMeetingOpen] = useState(false);
@@ -73,7 +72,6 @@ export function ContactDetailView({
   const [callOpen, setCallOpen] = useState(false);
   const [documentOpen, setDocumentOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("activities");
@@ -104,21 +102,6 @@ export function ContactDetailView({
       () => toast("Link copied to clipboard.", "success"),
       () => toast("Couldn't copy link.", "error")
     );
-  }
-
-  async function handleDelete() {
-    setMenuOpen(false);
-    const ok = await confirm({ title: "Delete contact?", message: `Delete ${displayName}? This can't be undone.`, confirmLabel: "Delete", danger: true });
-    if (!ok) return;
-    startDelete(async () => {
-      try {
-        await deleteContact(contact.id);
-        toast("Contact deleted.", "success");
-        router.push("/contacts");
-      } catch {
-        toast("Couldn't delete contact.", "error");
-      }
-    });
   }
 
   function handleExport(format: "pdf" | "csv") {
@@ -310,21 +293,6 @@ export function ContactDetailView({
             <button onClick={() => setEditOpen(true)} title="Edit contact" className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-[var(--muted)]">
               <Pencil className="h-4 w-4" />
             </button>
-            <div className="relative">
-              <Button variant="outline" size="icon" onClick={() => setMenuOpen((v) => !v)} className="rounded-lg h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-              {menuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-lg text-xs dark:bg-slate-900 dark:border-slate-800">
-                    <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
-                      <Trash2 className="h-3.5 w-3.5" /> Delete Record
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -433,9 +401,6 @@ export function ContactDetailView({
             </button>
             <button onClick={toggleStar} className="w-full flex items-center gap-2 px-1 py-2 rounded-lg text-left text-slate-700 hover:bg-slate-50 dark:text-slate-600 dark:hover:bg-[var(--muted)]">
               <Heart className={isStarred ? "h-3.5 w-3.5 fill-amber-500 text-amber-500" : "h-3.5 w-3.5 text-slate-400"} /> {isStarred ? "Remove from Favourite" : "Add to Favourite"}
-            </button>
-            <button onClick={handleDelete} className="w-full flex items-center gap-2 px-1 py-2 rounded-lg text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
-              <Trash2 className="h-3.5 w-3.5" /> Delete Contact
             </button>
           </Card>
         </div>
