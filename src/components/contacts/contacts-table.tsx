@@ -57,15 +57,6 @@ const DEFAULT_COLS = COLUMNS.reduce((acc, c) => { acc[c.key] = c.defaultOn; retu
 const COLS_STORAGE_KEY = "lp_contacts_columns_redesign";
 const PAGE_SIZE = 15;
 
-// Simple string hash to generate consistent derived mock data
-function hashCode(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash);
-}
-
 /** Most people never fill in a separate WhatsApp number — it's almost always
  *  the same as their phone. Prefer an explicit whatsapp value if set,
  *  otherwise fall back to phone, so Chat doesn't wrongly say "no number on
@@ -1040,8 +1031,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                   // real contact record (contacts.tags, contacts.rating), no mock.
                   const rowTags = (c.tags || "").split(",").map((t) => t.trim()).filter(Boolean);
 
-                  const countries = ["USA", "UAE", "Germany", "France", "India", "Brazil", "Mexico"];
-                  const countryName = c.mailing_country || countries[hashCode(c.id) % countries.length];
+                  const countryName = c.mailing_country || null;
 
                   const status = c.email_opt_out ? "Inactive" : "Active";
                   const statusColor = status === "Active"
@@ -1136,7 +1126,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                       {/* Location Column */}
                       {cols.location && (
                         <td className="px-3 py-2.5 text-slate-600 dark:text-slate-500 font-medium">
-                          <span>{countryName}</span>
+                          {countryName ? <span>{countryName}</span> : <span className="text-slate-300 dark:text-slate-700">—</span>}
                         </td>
                       )}
 
@@ -1264,8 +1254,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
             const isStarred = starred.includes(c.id);
             const rowTags = (c.tags || "").split(",").map((t) => t.trim()).filter(Boolean);
 
-            const countries = ["USA", "UAE", "Germany", "France", "India", "Brazil", "Mexico"];
-            const countryName = c.mailing_country || countries[hashCode(c.id) % countries.length];
+            const countryName = c.mailing_country || null;
 
             const status = c.email_opt_out ? "Inactive" : "Active";
             const statusColor = status === "Active"
@@ -1312,7 +1301,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
                   <div className="flex justify-between">
                     <span className="text-slate-400">Location:</span>
                     <span className="text-slate-800 dark:text-slate-700">
-                      {countryName}
+                      {countryName || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between">

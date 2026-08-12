@@ -99,9 +99,25 @@ export function OutreachView({ sequences, stats, leads, accounts, unipileReady }
       await syncOutreachAccounts();
       router.replace("/outreach");
       router.refresh();
+      // This page is very likely the OAuth popup tab landing back after a
+      // connect flow — close it so the user ends up back on the tab they
+      // started from instead of an extra tab they have to close manually.
+      // A no-op if this tab wasn't opened by a script (e.g. a direct visit).
+      window.close();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedParam]);
+
+  // The connect popup lands in a different tab/React tree, so it can't push
+  // state back to THIS tab directly — re-sync on regaining focus, since the
+  // user switching back after authorizing is the actual signal we have.
+  useEffect(() => {
+    function onFocus() {
+      syncOutreachAccounts().then(() => router.refresh());
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [router]);
 
   function toggleStatus(s: OutreachSequenceRow) {
     start(async () => { await setSequenceStatus(s.id, s.status === "Active" ? "Paused" : "Active"); });

@@ -121,11 +121,36 @@ export function ConvertLeadModal({
         account:
           accountMode === "existing" && matchedAccount
             ? { mode: "existing", id: matchedAccount.id }
-            : { mode: "new", payload: { account_name: accountName.trim() || "Untitled Account", website: accountWebsite.trim() || null, industry: accountIndustry.trim() || null } },
+            : {
+                mode: "new",
+                payload: {
+                  account_name: accountName.trim() || "Untitled Account",
+                  website: accountWebsite.trim() || null,
+                  industry: accountIndustry.trim() || null,
+                  billing_street: lead.street_address || null,
+                  billing_city: lead.city || null,
+                  billing_state: lead.state || null,
+                  billing_country: lead.country || null,
+                  billing_zip: lead.postal_code || null,
+                },
+              },
         contact:
           contactMode === "existing" && matchedContact
             ? { mode: "existing", id: matchedContact.id }
-            : { mode: "new", payload: { first_name: contactFirstName.trim() || "Unknown", last_name: contactLastName.trim() || "—", email: contactEmail.trim() || null, phone: contactPhone.trim() || null } },
+            : {
+                mode: "new",
+                payload: {
+                  first_name: contactFirstName.trim() || "Unknown",
+                  last_name: contactLastName.trim() || "—",
+                  email: contactEmail.trim() || null,
+                  phone: contactPhone.trim() || null,
+                  mailing_street: lead.street_address || null,
+                  mailing_city: lead.city || null,
+                  mailing_state: lead.state || null,
+                  mailing_country: lead.country || null,
+                  mailing_zip: lead.postal_code || null,
+                },
+              },
         opportunity: createOpportunity
           ? { name: oppName.trim() || "New Deal", stage: oppStage, dealValue: parseFloat(oppAmount) || 0, expectedCloseDate: oppCloseDate || null }
           : null,
