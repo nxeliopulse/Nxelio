@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
-import { leadMatchesTree, hasAnyComplete, flatRulesToTree, isSuppressed, validateRuleTree, type Group, type EvalRule } from "@/lib/segments";
+import { leadMatchesTree, hasAnyComplete, flatRulesToTree, isSuppressed, validateRuleTree, SEGMENT_FIELDS, type Group, type EvalRule } from "@/lib/segments";
 import type { LeadRow } from "@/lib/queries/leads";
 
 // Only the columns a rule can match (see SEGMENT_FIELDS in lib/segments.ts),
@@ -30,6 +30,8 @@ export interface SegmentRow {
   status: string;
   logic_type: string;
   rule_json: Group | null;
+  created_by: string | null;
+  created_by_name?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,21 +65,30 @@ export async function getSegmentWithRules(id: string): Promise<{ segment: Segmen
   const supabase = await createClient();
   const { data: segment } = await supabase.from("segments").select("*").eq("id", id).single();
   if (!segment) return { segment: null, rule: null };
-  if (segment.rule_json) return { segment, rule: segment.rule_json as Group };
+
+  let created_by_name: string | null = null;
+  if (segment.created_by) {
+    const { data: creator } = await supabase.from("users").select("full_name").eq("user_id", segment.created_by).maybeSingle();
+    created_by_name = creator?.full_name ?? null;
+  }
+  const withCreator = { ...segment, created_by_name } as SegmentRow;
+
+  if (segment.rule_json) return { segment: withCreator, rule: segment.rule_json as Group };
 
   const { data: rules } = await supabase.from("segment_rules").select("field, operator, value, rule_order").eq("segment_id", id).order("rule_order");
   const rule = flatRulesToTree((rules || []) as EvalRule[], segment.logic_type === "OR" ? "OR" : "AND");
-  return { segment, rule };
+  return { segment: withCreator, rule };
 }
 
-export async function createSegment(name: string, description: string, type: string, rule: Group) {
+export async function createSegment(name: string, description: string, type: string, rule: Group, status: string = "Active") {
   const errors = validateRuleTree(rule);
   if (errors.length) throw new Error(errors[0]);
 
   const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
   const { data: segment, error } = await supabase
     .from("segments")
-    .insert({ segment_name: name, description, segment_type: type, status: "Active", rule_json: rule })
+    .insert({ segment_name: name, description, segment_type: type, status, rule_json: rule, created_by: userData?.user?.id ?? null })
     .select()
     .single();
   if (error) throw error;
@@ -90,16 +101,18 @@ export async function createSegment(name: string, description: string, type: str
   return segment;
 }
 
-/** Updates an existing segment's name/rules and re-evaluates its members. */
-export async function updateSegment(id: string, name: string, description: string, type: string, rule: Group) {
+/** Updates an existing segment's name/rules and re-evaluates its members.
+ *  `status` is optional — omit it to leave the segment's current status
+ *  untouched (e.g. an Archived segment being re-materialized shouldn't
+ *  silently flip back to Active). */
+export async function updateSegment(id: string, name: string, description: string, type: string, rule: Group, status?: string) {
   const errors = validateRuleTree(rule);
   if (errors.length) throw new Error(errors[0]);
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("segments")
-    .update({ segment_name: name, description, segment_type: type, rule_json: rule })
-    .eq("id", id);
+  const payload: Record<string, unknown> = { segment_name: name, description, segment_type: type, rule_json: rule };
+  if (status) payload.status = status;
+  const { error } = await supabase.from("segments").update(payload).eq("id", id);
   if (error) throw error;
 
   await materializeSegmentMembers(id);
@@ -116,6 +129,10 @@ export interface SegmentPreview {
   suppressed: number;
   /** matched - suppressed — the count that could actually be enrolled in a campaign. */
   eligible: number;
+  /** Distinct non-empty company_name among matched leads. */
+  companies: number;
+  /** Average lead_score among matched leads, 0 when none matched. */
+  avgScore: number;
 }
 
 /**
@@ -125,23 +142,108 @@ export interface SegmentPreview {
  * can legally be contacted.
  */
 export async function previewSegment(rule: Group): Promise<SegmentPreview> {
-  if (!hasAnyComplete(rule)) return { matched: 0, suppressed: 0, eligible: 0 };
+  if (!hasAnyComplete(rule)) return { matched: 0, suppressed: 0, eligible: 0, companies: 0, avgScore: 0 };
   const supabase = await createClient();
   const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
   const matched = ((leads || []) as MatchLead[]).filter((l) => leadMatchesTree(l, rule));
   const suppressed = matched.filter(isSuppressed).length;
-  return { matched: matched.length, suppressed, eligible: matched.length - suppressed };
+  const companies = new Set(matched.map((l) => l.company_name).filter((v): v is string => Boolean(v))).size;
+  const avgScore = matched.length ? Math.round(matched.reduce((sum, l) => sum + (l.lead_score || 0), 0) / matched.length) : 0;
+  return { matched: matched.length, suppressed, eligible: matched.length - suppressed, companies, avgScore };
 }
 
-/** Five sample matching leads (name/title/company/score) for the preview panel. */
-export async function getSamplePreviewLeads(rule: Group, limit = 5): Promise<{ id: string; name: string; title: string | null; company: string | null; score: number }[]> {
+/** Five sample matching leads (name/title/company/score/country) for the preview panel. */
+export async function getSamplePreviewLeads(rule: Group, limit = 5): Promise<{ id: string; name: string; title: string | null; company: string | null; score: number; country: string | null }[]> {
   if (!hasAnyComplete(rule)) return [];
   const supabase = await createClient();
   const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
   return ((leads || []) as MatchLead[])
     .filter((l) => leadMatchesTree(l, rule) && !isSuppressed(l))
     .slice(0, limit)
-    .map((l) => ({ id: l.id, name: l.full_name || l.company_name || "—", title: l.job_title, company: l.company_name, score: l.lead_score }));
+    .map((l) => ({ id: l.id, name: l.full_name || l.company_name || "—", title: l.job_title, company: l.company_name, score: l.lead_score, country: (l.country as string | null) ?? null }));
+}
+
+/** Real distinct-value breakdown of matched leads (top 4 + "Other"), as
+ *  percentages of the matched set — used by the Audience Insights panel.
+ *  Empty arrays when nothing matches, rather than a fabricated distribution. */
+export async function getSegmentBreakdown(rule: Group): Promise<{ industries: { name: string; value: number }[]; countries: { name: string; value: number }[] }> {
+  if (!hasAnyComplete(rule)) return { industries: [], countries: [] };
+  const supabase = await createClient();
+  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
+  const matched = ((leads || []) as MatchLead[]).filter((l) => leadMatchesTree(l, rule));
+  const total = matched.length;
+  if (!total) return { industries: [], countries: [] };
+
+  const bucket = (key: "industry" | "country") => {
+    const counts = new Map<string, number>();
+    for (const l of matched) {
+      const v = (l[key] as string | null) || "Unknown";
+      counts.set(v, (counts.get(v) || 0) + 1);
+    }
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 4).map(([n, c]) => ({ name: n, value: Math.round((c / total) * 100) }));
+    const restCount = sorted.slice(4).reduce((sum, [, c]) => sum + c, 0);
+    if (restCount > 0) top.push({ name: "Other", value: Math.round((restCount / total) * 100) });
+    return top;
+  };
+  return { industries: bucket("industry"), countries: bucket("country") };
+}
+
+/** Real cumulative count of matched leads by their actual created_at date,
+ *  bucketed over the last N days — used by the Audience Trend chart. There is
+ *  no historical membership snapshot table, so this shows real lead-creation
+ *  growth within the matched set rather than fabricating a moment-in-time series. */
+export async function getSegmentTrend(rule: Group, days: number = 30): Promise<{ date: string; count: number }[]> {
+  if (!hasAnyComplete(rule)) return [];
+  const supabase = await createClient();
+  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
+  const matched = ((leads || []) as MatchLead[]).filter((l) => leadMatchesTree(l, rule));
+  const matchedDates = matched.map((l) => new Date(l.created_at as string).getTime()).filter((t) => !Number.isNaN(t));
+
+  const now = new Date();
+  const buckets: { date: string; count: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(now);
+    day.setDate(now.getDate() - i);
+    day.setHours(23, 59, 59, 999);
+    buckets.push({
+      date: day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      count: matchedDates.filter((t) => t <= day.getTime()).length,
+    });
+  }
+  return buckets;
+}
+
+/** Real progressive funnel: total leads → after applying each successive
+ *  top-level rule condition → final matched count. Only meaningful for an
+ *  "ALL" (AND) root group — narrowing step-by-step doesn't map cleanly onto
+ *  ANY/NOT semantics, so those just show total → final. */
+export async function getSegmentFunnel(rule: Group): Promise<{ label: string; value: number }[]> {
+  const supabase = await createClient();
+  const { count: totalCount } = await supabase.from("leads").select("id", { count: "exact", head: true });
+  const total = totalCount || 0;
+
+  if (!hasAnyComplete(rule) || rule.operator !== "ALL") {
+    const final = hasAnyComplete(rule) ? (await previewSegment(rule)).matched : 0;
+    return [{ label: "Total Prospects", value: total }, { label: "Final Segment", value: final }];
+  }
+
+  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
+  const allLeads = (leads || []) as MatchLead[];
+  const steps: { label: string; value: number }[] = [{ label: "Total Prospects", value: total }];
+
+  const completeChildren = rule.children.filter(hasAnyComplete);
+  for (let i = 0; i < completeChildren.length; i++) {
+    const partial: Group = { type: "group", operator: "ALL", children: completeChildren.slice(0, i + 1) };
+    const count = allLeads.filter((l) => leadMatchesTree(l, partial)).length;
+    const child = completeChildren[i];
+    const stepLabel = child.type === "condition"
+      ? `After ${SEGMENT_FIELDS.find((f) => f.key === child.field)?.label || child.field}`
+      : `After Group ${i + 1}`;
+    steps.push({ label: i === completeChildren.length - 1 ? "Final Segment" : stepLabel, value: count });
+  }
+  if (steps.length === 1) steps.push({ label: "Final Segment", value: 0 });
+  return steps;
 }
 
 /**
