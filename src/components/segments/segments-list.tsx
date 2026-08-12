@@ -252,7 +252,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
       </div>
 
       {/* Metrics Summary Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
         {[
           { label: "Total Segments", value: segments.length, icon: Layers, key: "all", ring: "ring-blue-500", bg: "bg-blue-50/20 dark:bg-blue-950/40", accent: "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400" },
           { label: "Active Rules", value: activeCount, icon: CheckCircle2, key: "active", ring: "ring-emerald-500", bg: "bg-emerald-50/20 dark:bg-emerald-950/40", accent: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400" },
@@ -291,7 +291,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
 
       {/* Dynamic Bulk Action Bar when items selected */}
       {hasSelection && (
-        <div className="rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/80 dark:bg-blue-950/50 p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/80 dark:bg-blue-950/50 p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200 mb-5">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-600 text-white text-xs font-bold">
               {selected.length}
