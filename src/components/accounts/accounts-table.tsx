@@ -986,19 +986,22 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                             )}
                             <a
                               href={a.phone ? `tel:${a.phone}` : "#"}
-                              onClick={() => a.phone && toast(`Opening call dialer for ${a.phone}`, "success")}
+                              onClick={(e) => { if (!a.phone) { e.preventDefault(); toast("This account has no phone number on file.", "error"); } else toast(`Opening call dialer for ${a.phone}`, "success"); }}
                               className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-900"
                               title={a.phone || "No Phone"}
                             >
                               <Phone className="h-3.5 w-3.5" />
                             </a>
-                            <button
-                              onClick={() => toast(`Starting quick chat with ${a.account_name}...`, "info")}
+                            <a
+                              href={a.phone ? `https://wa.me/${a.phone.replace(/\D/g, "")}` : "#"}
+                              onClick={(e) => { if (!a.phone) { e.preventDefault(); toast("This account has no phone number on file.", "error"); } }}
+                              target={a.phone ? "_blank" : undefined}
+                              rel="noopener noreferrer"
                               className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-purple-500 dark:hover:text-purple-400 hover:bg-slate-50 dark:hover:bg-slate-900"
-                              title="Message"
+                              title={a.phone ? "Message on WhatsApp" : "No phone number on file"}
                             >
                               <MessageSquare className="h-3.5 w-3.5" />
-                            </button>
+                            </a>
                             <button
                               onClick={() => openAccount(a.id)}
                               className="p-1 rounded-md border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-900"
@@ -1153,16 +1156,22 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                   </a>
                   <a
                     href={a.phone ? `tel:${a.phone}` : "#"}
+                    onClick={(e) => { if (!a.phone) { e.preventDefault(); toast("This account has no phone number on file.", "error"); } }}
+                    title={a.phone || "No Phone"}
                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-emerald-500 hover:bg-slate-50"
                   >
                     <Phone className="h-4 w-4" />
                   </a>
-                  <button
-                    onClick={() => toast(`Starting quick chat with ${a.account_name}...`, "info")}
+                  <a
+                    href={a.phone ? `https://wa.me/${a.phone.replace(/\D/g, "")}` : "#"}
+                    onClick={(e) => { if (!a.phone) { e.preventDefault(); toast("This account has no phone number on file.", "error"); } }}
+                    target={a.phone ? "_blank" : undefined}
+                    rel="noopener noreferrer"
+                    title={a.phone ? "Message on WhatsApp" : "No phone number on file"}
                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-purple-500 hover:bg-slate-50"
                   >
                     <MessageSquare className="h-4 w-4" />
-                  </button>
+                  </a>
                   <button
                     onClick={() => openAccount(a.id)}
                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-indigo-500 hover:bg-slate-50"
