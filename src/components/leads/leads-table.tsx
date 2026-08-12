@@ -435,7 +435,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   const activeColumnFilterKeys = (Object.keys(columnFilters) as ColKey[]).filter((k) => columnFilters[k]);
 
   const baseFiltered = optimisticLeads.filter((l) => {
-    const name = l.full_name || l.company_name || "";
+    const name = l.full_name || [l.first_name, l.last_name].filter(Boolean).join(" ") || l.company_name || "";
     const q = search.toLowerCase();
     const matchSearch =
       !search ||
@@ -487,7 +487,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   const filtered = baseFiltered
     .filter((l) => matchesQuickFilter(l, quickFilter))
     .filter((l) => {
-      if (cardFilter === "hot") return l.status === "Hot";
+      if (cardFilter === "hot") return scoreLevel(l.lead_score).label === "Hot";
       if (cardFilter === "scored") return l.lead_score > 0;
       if (cardFilter === "converted") return l.status === "Converted";
       return true;

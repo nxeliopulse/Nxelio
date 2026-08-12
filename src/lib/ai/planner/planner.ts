@@ -35,7 +35,19 @@ function extractField(goal: string, key: string): string | undefined {
 
 /** Registry-style arg validation — the plan executor revalidates via the real registry. */
 function makeSteps(steps: PlanStep[]): PlanStep[] {
-  return steps.map((s) => ({ ...s, requires_approval: s.requires_approval ?? WRITE_TOOLS.has(s.tool) }));
+  return steps.map((s) => {
+    const args: Record<string, unknown> = {};
+    if (s.args) {
+      for (const [k, v] of Object.entries(s.args)) {
+        if (v !== undefined) args[k] = v;
+      }
+    }
+    return {
+      ...s,
+      args: s.args ? args : undefined,
+      requires_approval: s.requires_approval ?? WRITE_TOOLS.has(s.tool)
+    };
+  });
 }
 
 const STATUSES = ["new", "qualified", "hot", "converted"] as const;

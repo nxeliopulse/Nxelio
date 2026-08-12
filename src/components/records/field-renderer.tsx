@@ -1,11 +1,32 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Mail, Phone, ExternalLink, Calendar, Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { FieldDefinition } from "@/core/engine/types";
 import { formatDate, formatDateTime, cn } from "@/lib/utils";
+import { PhoneInput, detectCountry, formatPhoneForStorage, type CountryCode } from "@/components/ui/phone-input";
+
+/** Custom "phone" fields have no separate column to persist a selected
+ *  country in — only the single string value FieldRenderer already stores.
+ *  detectCountry() re-derives a sensible starting country from that stored
+ *  value on every mount, so no schema change is needed to get country-code
+ *  support here. Formats to international form onBlur (not on every
+ *  keystroke) so reformatting mid-type doesn't fight the cursor. */
+function PhoneFieldEditor({ value, onChange, disabled, className }: { value: string; onChange?: (v: string) => void; disabled?: boolean; className?: string }) {
+  const [country, setCountry] = useState<CountryCode>(() => detectCountry(value));
+  return (
+    <PhoneInput
+      label=""
+      country={country}
+      value={value}
+      onCountryChange={setCountry}
+      onValueChange={(v) => onChange?.(v)}
+      inputClassName={cn("flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-400", disabled && "opacity-60 pointer-events-none", className)}
+    />
+  );
+}
 
 function formatCurrency(n: number | string): string {
   const num = typeof n === "string" ? parseFloat(n) : n;
@@ -32,9 +53,17 @@ export function FieldRenderer({
 
   if (isEditing) {
     switch (definition.type) {
+      case "phone":
+        return (
+          <PhoneFieldEditor
+            value={value ?? ""}
+            onChange={onChange}
+            disabled={definition.readOnly}
+            className={className}
+          />
+        );
       case "text":
       case "email":
-      case "phone":
       case "url":
         return (
           <Input

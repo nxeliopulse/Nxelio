@@ -11,7 +11,7 @@ import { getPicklistValues } from "@/lib/queries/picklists";
 import { useLeadInActiveCampaign } from "@/lib/leads/use-lead-in-active-campaign";
 import { allowedNextStatuses } from "@/lib/leads/status-flow";
 import { isSuperAdmin } from "@/lib/queries/auth-guards";
-import { PhoneInput, detectCountry, formatPhoneForStorage } from "@/components/ui/phone-input";
+import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 
@@ -83,6 +83,10 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
     }
     if (!form.email.trim() && !form.website_url.trim() && !form.linkedin.trim()) {
       setError("At least one of Email, Website, or LinkedIn is required.");
+      return;
+    }
+    if (!isPhoneValid(form.phone, phoneCountry)) {
+      setError("Phone number isn't valid for the selected country.");
       return;
     }
     // Status changes need a reason, logged separately from the rest of the

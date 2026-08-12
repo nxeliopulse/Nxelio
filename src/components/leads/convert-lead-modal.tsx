@@ -11,6 +11,7 @@ import type { ContactRow } from "@/lib/queries/contacts";
 import { OPPORTUNITY_STAGES, STAGE_LABELS, type OpportunityStage } from "@/lib/opportunities";
 import type { LeadRow } from "@/lib/queries/leads";
 import { cn } from "@/lib/utils";
+import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid, type CountryCode } from "@/components/ui/phone-input";
 
 function splitName(fullName: string | null): { first: string; last: string } {
   const parts = (fullName || "").trim().split(/\s+/);
@@ -83,6 +84,7 @@ export function ConvertLeadModal({
   const [contactLastName, setContactLastName] = useState(defaultLast || "—");
   const [contactEmail, setContactEmail] = useState(lead.email || "");
   const [contactPhone, setContactPhone] = useState(lead.phone || "");
+  const [contactPhoneCountry, setContactPhoneCountry] = useState<CountryCode>(() => detectCountry(lead.phone));
 
   const [createOpportunity, setCreateOpportunity] = useState(true);
   const [oppName, setOppName] = useState("");
@@ -114,6 +116,10 @@ export function ConvertLeadModal({
   }, [effectiveAccountName, open]);
 
   async function handleConvert() {
+    if (contactMode === "new" && !isPhoneValid(contactPhone, contactPhoneCountry)) {
+      toast("Contact phone number isn't valid for the selected country.", "error");
+      return;
+    }
     setSaving(true);
     try {
       const result = await convertLead({
@@ -143,7 +149,7 @@ export function ConvertLeadModal({
                   first_name: contactFirstName.trim() || "Unknown",
                   last_name: contactLastName.trim() || "—",
                   email: contactEmail.trim() || null,
-                  phone: contactPhone.trim() || null,
+                  phone: contactPhone.trim() ? formatPhoneForStorage(contactPhone, contactPhoneCountry) : null,
                   mailing_street: lead.street_address || null,
                   mailing_city: lead.city || null,
                   mailing_state: lead.state || null,
@@ -288,7 +294,14 @@ export function ConvertLeadModal({
                     </div>
                     <div>
                       <label className={labelStyle}>Phone</label>
-                      <input className={fieldStyle} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+                      <PhoneInput
+                        label=""
+                        country={contactPhoneCountry}
+                        value={contactPhone}
+                        onCountryChange={setContactPhoneCountry}
+                        onValueChange={setContactPhone}
+                        inputClassName={fieldStyle}
+                      />
                     </div>
                   </div>
                 )}
