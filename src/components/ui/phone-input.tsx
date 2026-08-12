@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { getCountries, getCountryCallingCode, getExampleNumber, isValidPhoneNumber, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
 import examples from "libphonenumber-js/examples.mobile.json";
 import { cn } from "@/lib/utils";
+import { CountryFlag } from "@/components/ui/country-flag";
 
 export type { CountryCode };
 
@@ -15,11 +16,6 @@ interface CountryOption {
   code: CountryCode;
   name: string;
   callingCode: string;
-}
-
-/** ISO 3166-1 alpha-2 -> flag emoji, via Unicode regional indicator symbols — no image assets needed. */
-function flagEmoji(code: string): string {
-  return code.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
 }
 
 let cachedCountryList: CountryOption[] | null = null;
@@ -111,7 +107,7 @@ function CountryDropdown({ country, onChange }: { country: CountryCode; onChange
         onClick={toggleOpen}
         className="flex items-center gap-1 h-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-400"
       >
-        <span className="text-base leading-none">{current ? flagEmoji(current.code) : "🏳️"}</span>
+        <CountryFlag code={current?.code} className="h-3.5 w-5" />
         <ChevronDown className="h-3 w-3 text-slate-400" />
       </button>
       {open && (
@@ -139,7 +135,7 @@ function CountryDropdown({ country, onChange }: { country: CountryCode; onChange
                     c.code === country && "bg-blue-50 dark:bg-blue-950/40"
                   )}
                 >
-                  <span className="text-base leading-none">{flagEmoji(c.code)}</span>
+                  <CountryFlag code={c.code} />
                   <span className="flex-1 truncate text-slate-700 dark:text-slate-300">{c.name}</span>
                   <span className="text-slate-400 tabular-nums">+{c.callingCode}</span>
                 </button>

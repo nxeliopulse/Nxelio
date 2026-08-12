@@ -17,6 +17,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn, formatDate } from "@/lib/utils";
 import { EditAccountModal, type AccountOwnerOption } from "@/components/accounts/edit-account-modal";
 import { AddAccountsWizard } from "@/components/accounts/add-accounts-wizard";
+import { CountryFlag } from "@/components/ui/country-flag";
 import { type AccountRow } from "@/lib/queries/accounts";
 
 // "index" (Row #) is NOT part of this list — like leads-table.tsx's own Row #
@@ -51,19 +52,6 @@ const PAGE_SIZE = 15;
 const STATUS_OPTIONS = ["Active", "Inactive", "Prospect", "On Hold", "Churned"];
 const INDUSTRY_OPTIONS = ["Technology", "Finance", "Healthcare", "Manufacturing", "Retail", "Education", "Consulting", "Other"];
 const ACCOUNT_TYPE_OPTIONS = ["Analyst", "Competitor", "Customer", "Integrator", "Investor", "Partner", "Prospect", "Reseller", "Vendor", "Other"];
-
-function getFlagEmoji(country: string): string {
-  const c = country.toLowerCase();
-  if (c.includes("united states") || c.includes("usa")) return "🇺🇸";
-  if (c.includes("canada")) return "🇨🇦";
-  if (c.includes("united kingdom") || c.includes("uk")) return "🇬🇧";
-  if (c.includes("australia")) return "🇦🇺";
-  if (c.includes("india")) return "🇮🇳";
-  if (c.includes("germany")) return "🇩🇪";
-  if (c.includes("france")) return "🇫🇷";
-  if (c.includes("japan")) return "🇯🇵";
-  return "🌐";
-}
 
 function ownershipColor(value: string | null): string {
   switch (value) {
@@ -865,7 +853,6 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                   const rowNumber = safePage * PAGE_SIZE + i + 1;
 
                   const countryName = a.billing_country;
-                  const flag = countryName ? getFlagEmoji(countryName) : null;
 
                   return (
                     <DataTableRow
@@ -950,7 +937,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                         <td className="px-3 py-2.5 text-slate-600 dark:text-slate-500 font-medium">
                           {countryName ? (
                             <div className="flex items-center gap-1">
-                              <span className="text-sm leading-none">{flag}</span>
+                              <CountryFlag country={countryName} />
                               <span>{[a.billing_city, countryName].filter(Boolean).join(", ")}</span>
                             </div>
                           ) : (
@@ -1091,7 +1078,6 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
           {sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE).map((a) => {
             const isStarred = starred.includes(a.id);
             const countryName = a.billing_country;
-            const flag = countryName ? getFlagEmoji(countryName) : null;
 
             return (
               <Card
@@ -1139,7 +1125,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                     <span className="text-slate-800 dark:text-slate-700 flex items-center gap-1">
                       {countryName ? (
                         <>
-                          <span>{flag}</span>
+                          <CountryFlag country={countryName} />
                           <span>{[a.billing_city, countryName].filter(Boolean).join(", ")}</span>
                         </>
                       ) : "—"}

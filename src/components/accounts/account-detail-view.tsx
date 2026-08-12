@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Pencil, Trash2, MoreHorizontal, Mail, Building2, ExternalLink,
+  Pencil, MoreHorizontal, Mail, Building2, ExternalLink,
   Download, RefreshCw, ChevronDown, Star, Send, Share2, Heart, Plus, Paperclip,
   Calendar, ArrowLeft, Clock, FileText, PhoneCall,
   File as FileIcon, UserPlus, Users, Users2, CalendarPlus, ListTodo, ArrowUpDown,
@@ -32,7 +32,7 @@ import type { AccountCallRow } from "@/lib/queries/account-calls";
 import type { AccountDocumentRow } from "@/lib/queries/account-documents";
 import type { AccountEmailRow } from "@/lib/queries/account-emails";
 import type { OpportunityRow } from "@/lib/opportunities";
-import { deleteAccount, type AccountRow } from "@/lib/queries/accounts";
+import { type AccountRow } from "@/lib/queries/accounts";
 import type { ContactRow } from "@/lib/queries/contacts";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
@@ -67,8 +67,7 @@ export function AccountDetailView({
   totalCount?: number;
 }) {
   const router = useRouter();
-  const { confirm, toast } = useFeedback();
-  const [, startDelete] = useTransition();
+  const { toast } = useFeedback();
   const [editOpen, setEditOpen] = useState(false);
   const [dealOpen, setDealOpen] = useState(false);
   const [meetingOpen, setMeetingOpen] = useState(false);
@@ -123,21 +122,6 @@ export function AccountDetailView({
       () => toast("Link copied to clipboard.", "success"),
       () => toast("Couldn't copy link.", "error")
     );
-  }
-
-  async function handleDelete() {
-    setMenuOpen(false);
-    const ok = await confirm({ title: "Delete account?", message: `Delete ${account.account_name}? This can't be undone.`, confirmLabel: "Delete", danger: true });
-    if (!ok) return;
-    startDelete(async () => {
-      try {
-        await deleteAccount(account.id);
-        toast("Account deleted.", "success");
-        router.push("/accounts");
-      } catch (err) {
-        toast(err instanceof Error ? err.message : "Couldn't delete account.", "error");
-      }
-    });
   }
 
   function handleExport(format: "pdf" | "csv") {
@@ -314,9 +298,6 @@ export function AccountDetailView({
                     <button onClick={() => { setMenuOpen(false); setEditOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-600 dark:hover:bg-[var(--muted)]">
                       <Pencil className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" /> Edit Record
                     </button>
-                    <button onClick={handleDelete} className="w-full flex items-center gap-2 px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
-                      <Trash2 className="h-3.5 w-3.5" /> Delete Record
-                    </button>
                   </div>
                 </>
               )}
@@ -407,9 +388,6 @@ export function AccountDetailView({
             </button>
             <button onClick={toggleStar} className="w-full flex items-center gap-2 px-1 py-2 rounded-lg text-left text-slate-700 hover:bg-slate-50 dark:text-slate-600 dark:hover:bg-[var(--muted)]">
               <Heart className={isStarred ? "h-3.5 w-3.5 fill-amber-500 text-amber-500" : "h-3.5 w-3.5 text-slate-400"} /> {isStarred ? "Remove from Favourite" : "Add to Favourite"}
-            </button>
-            <button onClick={handleDelete} className="w-full flex items-center gap-2 px-1 py-2 rounded-lg text-left text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50">
-              <Trash2 className="h-3.5 w-3.5" /> Delete Account
             </button>
           </Card>
         </div>
