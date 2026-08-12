@@ -26,6 +26,7 @@ import type { LeadHistory } from "@/lib/queries/lead-detail";
 import type { LeadCampaignSummary } from "@/lib/queries/campaigns";
 import { createLeadNote, deleteLeadNote, type LeadNoteRow } from "@/lib/queries/lead-notes";
 import { formatDate, formatDateTime, cn } from "@/lib/utils";
+import { allowedNextStatuses, isManualStatusTransitionAllowed, statusTransitionError } from "@/lib/leads/status-flow";
 
 function money(n: number): string {
   return "$" + Math.round(n).toLocaleString("en-US");
@@ -210,13 +211,25 @@ export function LeadDetailView({
   // Locks manual Status edits while this lead is part of a currently
   // Running/Active campaign, so nobody contradicts what a live send
   // sequence is doing to it mid-flight.
-  const statusLocked = campaigns.some((c) => c.status === "Active");
+  const campaignLocked = campaigns.some((c) => c.status === "Active");
+  // "Converted" is a dead end — only the Convert button may set it, and once
+  // set nothing may manually change status away from it. See status-flow.ts.
+  const statusDeadEnd = lead.status === "Converted";
+  const statusLocked = campaignLocked || statusDeadEnd;
 
   // Update lead status — requires a reason, logged with who made the change.
+  // Rejects anything status-flow.ts doesn't allow (e.g. jumping straight to
+  // "Converted", or a status not reachable from the current one) — this is
+  // enforced again server-side in updateLeadStatus(), this is just the
+  // immediate/clear UI-level rejection.
   const handleStatusUpdate = async (newStatus: string) => {
     if (statusLocked) return;
     setStatusDropdownOpen(false);
     if (newStatus === lead.status) return;
+    if (!isManualStatusTransitionAllowed(lead.status, newStatus)) {
+      toast(statusTransitionError(lead.status, newStatus), "error");
+      return;
+    }
     const reason = await prompt({
       title: `Change status to "${newStatus}"?`,
       message: "Add a short reason for this change — it's saved to this lead's activity history.",
@@ -229,7 +242,6 @@ export function LeadDetailView({
     try {
       await updateLeadStatus(lead.id, newStatus, reason);
       setLead((l) => ({ ...l, status: newStatus }));
-      setConverted(newStatus === "Converted");
       toast(`Status updated to ${newStatus}.`, "success");
       router.refresh();
     } catch (e) {
@@ -505,7 +517,13 @@ export function LeadDetailView({
               <button
                 onClick={() => !statusLocked && setStatusDropdownOpen(!statusDropdownOpen)}
                 disabled={statusLocked}
-                title={statusLocked ? "This lead is part of a running campaign — status is locked until it finishes or is paused." : undefined}
+                title={
+                  statusDeadEnd
+                    ? "This lead is Converted — status can't be changed manually anymore."
+                    : campaignLocked
+                    ? "This lead is part of a running campaign — status is locked until it finishes or is paused."
+                    : undefined
+                }
                 className={cn(
                   "py-1 px-3 text-xs rounded-md font-semibold flex items-center gap-1 shadow-sm transition-colors",
                   statusLocked
@@ -519,7 +537,7 @@ export function LeadDetailView({
 
               {statusDropdownOpen && !statusLocked && (
                 <div className="absolute right-0 mt-1.5 w-36 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                  {["New", "Contacted", "Qualified", "Nurturing", "Win", "Converted", "Lost"].map((st) => (
+                  {allowedNextStatuses(lead.status).map((st) => (
                     <button
                       key={st}
                       onClick={() => handleStatusUpdate(st)}
@@ -548,9 +566,8 @@ export function LeadDetailView({
                 <Button
                   size="sm"
                   onClick={() => setConvertOpen(true)}
-                  disabled={lead.status !== "Win"}
                   title="Create accounts and contacts from lead record"
-                  className="text-xs font-bold gap-1 bg-green-600 hover:bg-green-700 text-white py-1 px-2.5 h-auto border-none disabled:opacity-40 disabled:pointer-events-none"
+                  className="text-xs font-bold gap-1 bg-green-600 hover:bg-green-700 text-white py-1 px-2.5 h-auto border-none"
                 >
                   <Building2 className="h-3.5 w-3.5" /> Create Account & Contact
                 </Button>
@@ -718,23 +735,25 @@ export function LeadDetailView({
               {steps.map((step, idx) => {
                 const isActive = activePipelineIndex === idx;
                 return (
-                  <button
+                  // Read-only status indicator — NOT a control. It used to let
+                  // you click "Closed"/"Lost" to force status straight to
+                  // "Converted"/"Lost", which faked a conversion with no
+                  // Account/Contact/Opportunity ever created. Change status via
+                  // the dropdown above instead, which goes through the real
+                  // status-flow rules (see status-flow.ts) and the Convert button.
+                  <div
                     key={idx}
-                    onClick={() => {
-                      const statusMap = ["New", "Contacted", "Converted", "Lost"];
-                      handleStatusUpdate(statusMap[idx]);
-                    }}
                     className={cn(
                       "flex-1 min-w-[110px] text-center text-xs font-bold py-2.5 px-4 transition-all duration-200 text-white relative",
                       step.bg,
-                      isActive ? "opacity-100 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 scale-[1.01] shadow-md z-10" : "opacity-60 hover:opacity-85"
+                      isActive ? "opacity-100 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900 scale-[1.01] shadow-md z-10" : "opacity-60"
                     )}
                     style={{
                       clipPath: getClipPath(idx, steps.length),
                     }}
                   >
                     {step.label}
-                  </button>
+                  </div>
                 );
               })}
             </div>

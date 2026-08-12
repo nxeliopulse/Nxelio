@@ -91,12 +91,16 @@ export async function convertLead(input: ConvertLeadInput): Promise<ConvertLeadR
   }
 
   // 4. Mark the lead Converted and permanently link it to what it became.
+  // allowConvertedStatus: this is the one legitimate place status: "Converted"
+  // may be set — every other caller (edit modal, AI tool, etc.) is blocked
+  // from setting it manually, since that would fake a conversion with no
+  // Account/Contact/Opportunity ever actually created (see status-flow.ts).
   await updateLead(input.leadId, {
     status: "Converted",
     converted_account_id: accountId,
     converted_contact_id: contactId,
     converted_opportunity_id: opportunityId,
-  });
+  }, { allowConvertedStatus: true });
 
   await supabase.from("lead_activities").insert({
     lead_id: input.leadId,

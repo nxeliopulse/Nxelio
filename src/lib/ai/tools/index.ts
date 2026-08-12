@@ -359,7 +359,11 @@ const update_lead = def({
   params: [
     { key: "lead_id", type: "string", description: "Lead id from search_leads", required: true },
     { key: "display", type: "string", description: "Lead's name for the approval card", required: true },
-    { key: "status", type: "string", enum: ["New", "Warm", "Hot", "Scored", "Converted"], required: false },
+    // "Converted" deliberately excluded — that value is only ever set by the
+    // real Convert flow (creates Account/Contact/Opportunity); letting the AI
+    // set it here would fake a conversion with none of those records created.
+    // updateLead() also rejects it server-side regardless (see status-flow.ts).
+    { key: "status", type: "string", enum: ["New", "Contacted", "Qualified", "Nurturing"], required: false },
     { key: "full_name", type: "string", required: false },
     { key: "email", type: "string", required: false },
     { key: "company_name", type: "string", required: false },

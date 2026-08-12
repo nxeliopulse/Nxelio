@@ -9,19 +9,28 @@ import { updateLead, updateLeadStatus, type LeadRow } from "@/lib/queries/leads"
 import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { useLeadInActiveCampaign } from "@/lib/leads/use-lead-in-active-campaign";
+import { allowedNextStatuses } from "@/lib/leads/status-flow";
 import { isSuperAdmin } from "@/lib/queries/auth-guards";
 import { PhoneInput, detectCountry, formatPhoneForStorage } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 
-const FALLBACK_STATUSES = ["New", "Contacted", "Qualified", "Nurturing"];
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
 
 export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose: () => void; lead: LeadRow }) {
   const router = useRouter();
   const { toast, prompt } = useFeedback();
-  const statusLocked = useLeadInActiveCampaign(lead.id);
+  const campaignLocked = useLeadInActiveCampaign(lead.id);
+  // "Converted" is a dead end — nothing may change a lead's status manually
+  // once it's converted (only the Convert button sets that value, and it
+  // never sets it back). See src/lib/leads/status-flow.ts.
+  const statusDeadEnd = lead.status === "Converted";
+  const statusLocked = campaignLocked || statusDeadEnd;
+  // The dropdown shows the current status plus whatever it's allowed to move
+  // to next — never "Converted" (that's only ever set by the Convert flow),
+  // never an arbitrary jump (e.g. New straight to Qualified).
+  const statusOptions = [lead.status, ...allowedNextStatuses(lead.status)].filter((s, i, arr) => s && arr.indexOf(s) === i);
   const [amSuperAdmin, setAmSuperAdmin] = useState(false);
   useEffect(() => { isSuperAdmin().then(setAmSuperAdmin).catch(() => {}); }, []);
   const lockedFields = lead.locked_fields ?? {};
@@ -53,14 +62,12 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
 
   const [industries, setIndustries] = useState(FALLBACK_INDUSTRIES);
   const [interestAreas, setInterestAreas] = useState(FALLBACK_INTEREST_AREAS);
-  const [statuses, setStatuses] = useState(FALLBACK_STATUSES);
   const [companySizeBuckets, setCompanySizeBuckets] = useState(FALLBACK_COMPANY_SIZE_BUCKETS);
   const [seniorityLevels, setSeniorityLevels] = useState(FALLBACK_SENIORITY_LEVELS);
 
   useEffect(() => {
     getPicklistValues("lead_industry").then(setIndustries).catch(() => {});
     getPicklistValues("lead_interest_area").then(setInterestAreas).catch(() => {});
-    getPicklistValues("lead_status").then(setStatuses).catch(() => {});
     getPicklistValues("lead_company_size").then(setCompanySizeBuckets).catch(() => {});
     getPicklistValues("lead_seniority").then(setSeniorityLevels).catch(() => {});
   }, []);
@@ -244,13 +251,21 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
                 value={form.status}
                 onChange={(e) => set("status", e.target.value)}
                 disabled={statusLocked}
-                title={statusLocked ? "This lead is part of a running campaign — status is locked until it finishes or is paused." : undefined}
+                title={
+                  statusDeadEnd
+                    ? "This lead is Converted — status can't be changed manually anymore."
+                    : campaignLocked
+                    ? "This lead is part of a running campaign — status is locked until it finishes or is paused."
+                    : undefined
+                }
               >
-                {(statuses.includes(form.status) ? statuses : [...statuses, form.status]).map((s) => (
+                {statusOptions.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </Select>
-              {statusLocked && (
+              {statusDeadEnd ? (
+                <p className="text-xs text-slate-400 mt-1">Converted — status can&apos;t be changed manually.</p>
+              ) : campaignLocked && (
                 <p className="text-xs text-amber-600 mt-1">Locked — this lead is part of a running campaign.</p>
               )}
             </div>

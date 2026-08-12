@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { scoreLeadWithAi, isAiConfigured, type AiScoreResult } from "@/lib/ai/actions";
 import { mapWithConcurrency } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/queries/auth-guards";
+import { isManualStatusTransitionAllowed, statusTransitionError } from "@/lib/leads/status-flow";
 
 export interface LeadRow {
   id: string;
@@ -141,8 +142,23 @@ export async function createLead(payload: Partial<LeadRow>) {
   return data;
 }
 
-export async function updateLead(id: string, payload: Partial<LeadRow>) {
+/**
+ * `opts.allowConvertedStatus` exists ONLY for lead-conversion.ts's convertLead()
+ * — the single legitimate place that's allowed to set status: "Converted".
+ * Every other caller (the edit modal, the AI update_lead tool, etc.) goes
+ * through the normal status-flow validation below, which always rejects
+ * "Converted" as a manual target.
+ */
+export async function updateLead(id: string, payload: Partial<LeadRow>, opts?: { allowConvertedStatus?: boolean }) {
   const supabase = await createClient();
+
+  if (payload.status !== undefined && !opts?.allowConvertedStatus) {
+    const { data: current } = await supabase.from("leads").select("status").eq("id", id).single();
+    const fromStatus = current?.status ?? "New";
+    if (!isManualStatusTransitionAllowed(fromStatus, payload.status)) {
+      throw new Error(statusTransitionError(fromStatus, payload.status));
+    }
+  }
 
   const touchedLockable = SELF_LOCKING_FIELDS.filter((f) =>
     Object.prototype.hasOwnProperty.call(payload, f)
@@ -267,6 +283,10 @@ export async function updateLeadStatus(id: string, newStatus: string, reason: st
   const { data: { user } } = await supabase.auth.getUser();
   const { data: current } = await supabase.from("leads").select("status, full_name, company_name, email").eq("id", id).single();
   const fromStatus = current?.status ?? null;
+
+  if (fromStatus !== null && !isManualStatusTransitionAllowed(fromStatus, newStatus)) {
+    throw new Error(statusTransitionError(fromStatus, newStatus));
+  }
 
   const { error } = await supabase.from("leads").update({ status: newStatus }).eq("id", id);
   if (error) throw error;
