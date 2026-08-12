@@ -193,6 +193,66 @@ export async function updateLead(id: string, payload: Partial<LeadRow>) {
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
   await logAudit({ action: "lead.updated", entityType: "lead", entityId: id, metadata: payload as Record<string, unknown> });
+
+  // Once a lead is converted, its Account/Contact are the "real" record people
+  // actually work from — but the Lead itself is never deleted (see
+  // lead-conversion.ts), so edits made here would otherwise silently drift out
+  // of sync with what was already converted. Mirror just the fields that
+  // overlap 1:1 with the same person/company, best-effort (a sync failure here
+  // should never roll back or block the lead's own save).
+  await syncConvertedRecords(supabase, id, payload).catch(() => {});
+}
+
+const LEAD_TO_CONTACT_FIELD: Partial<Record<keyof LeadRow, string>> = {
+  email: "email",
+  phone: "phone",
+  linkedin: "linkedin",
+  job_title: "job_title",
+  twitter_handle: "twitter",
+  street_address: "mailing_street",
+  city: "mailing_city",
+  state: "mailing_state",
+  country: "mailing_country",
+  postal_code: "mailing_zip",
+};
+
+const LEAD_TO_ACCOUNT_FIELD: Partial<Record<keyof LeadRow, string>> = {
+  website_url: "website",
+  industry: "industry",
+  street_address: "billing_street",
+  city: "billing_city",
+  state: "billing_state",
+  country: "billing_country",
+  postal_code: "billing_zip",
+};
+
+async function syncConvertedRecords(supabase: Awaited<ReturnType<typeof createClient>>, leadId: string, payload: Partial<LeadRow>): Promise<void> {
+  const { data: lead } = await supabase.from("leads").select("converted_contact_id, converted_account_id").eq("id", leadId).single();
+  if (!lead?.converted_contact_id && !lead?.converted_account_id) return;
+
+  if (lead.converted_contact_id) {
+    const patch: Record<string, unknown> = {};
+    for (const [leadField, contactField] of Object.entries(LEAD_TO_CONTACT_FIELD)) {
+      if (leadField in payload) patch[contactField] = payload[leadField as keyof LeadRow];
+    }
+    if (Object.keys(patch).length) {
+      await supabase.from("contacts").update(patch).eq("id", lead.converted_contact_id);
+      revalidatePath("/contacts");
+      revalidatePath(`/contacts/${lead.converted_contact_id}`);
+    }
+  }
+
+  if (lead.converted_account_id) {
+    const patch: Record<string, unknown> = {};
+    for (const [leadField, accountField] of Object.entries(LEAD_TO_ACCOUNT_FIELD)) {
+      if (leadField in payload) patch[accountField] = payload[leadField as keyof LeadRow];
+    }
+    if (Object.keys(patch).length) {
+      await supabase.from("accounts").update(patch).eq("id", lead.converted_account_id);
+      revalidatePath("/accounts");
+      revalidatePath(`/accounts/${lead.converted_account_id}`);
+    }
+  }
 }
 
 /**
