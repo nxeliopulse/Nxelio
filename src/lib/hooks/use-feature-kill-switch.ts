@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { isFeatureEnabledForCurrentUser, type KillSwitchFeature } from "@/lib/queries/feature-kill-switches";
+import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
+import type { KillSwitchFeature } from "@/lib/kill-switch-rules";
 
 /**
  * Whether the current user can use a platform-wide-switchable feature

@@ -1,10 +1,8 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { isPlatformAdmin, PLATFORM_ADMIN_EMAIL } from "@/lib/queries/platform-admin";
+import { isPlatformAdmin } from "@/lib/queries/platform-admin";
 import { revalidatePath } from "next/cache";
 import { ALL_KILL_SWITCH_FEATURES, FEATURE_LABELS, resolveEffectiveEnabled, type KillSwitchFeature } from "@/lib/kill-switch-rules";
-
-export type { KillSwitchFeature };
 
 /**
  * Raw flags straight from the DB via the service-role admin client — safe to
@@ -76,7 +74,9 @@ export async function verifyPlatformAdminPassword(password: string): Promise<boo
   if (!(await isPlatformAdmin())) return false;
   if (!password) return false;
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email: PLATFORM_ADMIN_EMAIL, password });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.email) return false;
+  const { error } = await supabase.auth.signInWithPassword({ email: user.email, password });
   return !error;
 }
 

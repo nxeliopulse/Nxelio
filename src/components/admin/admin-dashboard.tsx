@@ -12,7 +12,7 @@ import { PromoCodesTab } from "@/components/admin/promo-codes-tab";
 import { FeatureKillSwitchesTab } from "@/components/admin/feature-kill-switches-tab";
 import { WhatsAppConnectorView } from "@/components/settings/connectors-view";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
-import type { KillSwitchFeature } from "@/lib/queries/feature-kill-switches";
+import type { KillSwitchFeature } from "@/lib/kill-switch-rules";
 import type {
   PlatformOverviewStats,
   HotCustomerRow,

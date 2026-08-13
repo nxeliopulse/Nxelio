@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { Lock, ShieldAlert } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { setFeatureKillSwitch, type KillSwitchFeature } from "@/lib/queries/feature-kill-switches";
+import { setFeatureKillSwitch } from "@/lib/queries/feature-kill-switches";
+import type { KillSwitchFeature } from "@/lib/kill-switch-rules";
 import { ConfirmPasswordModal } from "@/components/admin/confirm-password-modal";
 
 const FEATURES: { key: KillSwitchFeature; label: string; description: string }[] = [
