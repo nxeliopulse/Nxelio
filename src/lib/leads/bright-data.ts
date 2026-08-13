@@ -142,6 +142,10 @@ export async function brightDataSearchPeople(criteria: {
   companySize?: string;
   /** Biases the search AND filters the real, derived seniority of what comes back. */
   seniority?: string;
+  /** Company-wise Buy Leads: restrict the search to people AT these specific
+   *  companies (an OR-group of quoted names), instead of an open industry/role
+   *  search. Used by searchPeopleAtCompanies() once companies are selected. */
+  companyNames?: string[];
 }): Promise<{ ok: boolean; prospects: BrightDataProspect[]; error?: string }> {
   if (!API_KEY) return { ok: false, prospects: [], error: "Bright Data not configured" };
 
@@ -152,11 +156,15 @@ export async function brightDataSearchPeople(criteria: {
   const locPart = locs.length > 1 ? `(${locs.map((l) => `"${l}"`).join(" OR ")})` : locs[0] || "";
   const seniorityFilter = criteria.seniority && criteria.seniority !== "Any" ? criteria.seniority : undefined;
   const seniorityPart = seniorityFilter ? SENIORITY_QUERY_TERMS[seniorityFilter] || "" : "";
+  const companyNames = (criteria.companyNames || []).filter(Boolean);
+  const companyPart = companyNames.length > 1
+    ? `(${companyNames.map((c) => `"${c}"`).join(" OR ")})`
+    : companyNames[0] ? `"${companyNames[0]}"` : "";
   // Company size is intentionally NOT added to the query: LinkedIn search-result
   // snippets never contain a literal "X-Y employees" phrase, so requiring it as
   // a quoted AND-term collapses recall to near-zero for no real filtering benefit
   // (there's no per-prospect headcount signal to verify against anyway).
-  const query = `site:linkedin.com/in ${terms} ${seniorityPart} ${locPart}`.replace(/\s+/g, " ").trim();
+  const query = `site:linkedin.com/in ${terms} ${companyPart} ${seniorityPart} ${locPart}`.replace(/\s+/g, " ").trim();
   const displayLocation = locs.join(", ");
 
   const prospects: BrightDataProspect[] = [];
@@ -197,6 +205,82 @@ export async function brightDataSearchPeople(criteria: {
 
   if (!prospects.length) return { ok: false, prospects: [], error: "No LinkedIn profiles found. Try broader criteria." };
   return { ok: true, prospects };
+}
+
+export interface BrightDataCompany {
+  name: string;
+  industry: string;
+  location: string; // "" when the SERP snippet doesn't state one — never guessed
+  linkedin: string;
+}
+
+/**
+ * Parse a LinkedIn company-page SERP title. Google returns these as one of:
+ *   "Acme Corp | LinkedIn"
+ *   "Acme Corp: Overview | LinkedIn"
+ *   "Acme Corp - Software Company | LinkedIn"
+ */
+function parseLinkedInCompanyTitle(rawTitle: string): { name: string; location: string } {
+  const t = (rawTitle || "").replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
+  const parts = t.split(/\s*[:\-–]\s*/).map((p) => p.trim()).filter(Boolean);
+  return { name: parts[0] || "N/A", location: "" };
+}
+
+/**
+ * Company-first discovery for the "Company-wise Leads" flow — there is no
+ * dedicated company-directory product here, so this reuses the exact same
+ * SERP mechanism as brightDataSearchPeople, just pointed at
+ * site:linkedin.com/company instead of /in. Employee count, revenue, logo,
+ * and technologies are NOT returned — LinkedIn's own SERP snippet for a
+ * company page never states them, so callers must show "Not available"
+ * rather than invent them (see buy-leads.ts's GeneratedCompany mapping).
+ */
+export async function brightDataSearchCompanies(criteria: {
+  industry?: string;
+  subIndustry?: string;
+  locations?: string[];
+  keywords?: string;
+  count: number;
+}): Promise<{ ok: boolean; companies: BrightDataCompany[]; error?: string }> {
+  if (!API_KEY) return { ok: false, companies: [], error: "Bright Data not configured" };
+
+  const target = Math.max(1, Math.min(100, Math.round(criteria.count || 10)));
+  const terms = [criteria.industry, criteria.subIndustry, criteria.keywords].filter(Boolean).join(" ").trim() || "company";
+  const generic = new Set(["", "worldwide", "global", "anywhere", "remote"]);
+  const locs = (criteria.locations || []).filter((l) => !generic.has(l.toLowerCase()));
+  const locPart = locs.length > 1 ? `(${locs.map((l) => `"${l}"`).join(" OR ")})` : locs[0] || "";
+  const displayLocation = locs.join(", ");
+  const query = `site:linkedin.com/company ${terms} ${locPart}`.replace(/\s+/g, " ").trim();
+
+  const companies: BrightDataCompany[] = [];
+  const seen = new Set<string>();
+  try {
+    for (let page = 0; page < 10 && companies.length < target; page++) {
+      const organic = await withRetry(() => brightDataSerp(query, page * 10, 120_000));
+      if (!organic.length) break;
+      for (const r of organic) {
+        if (companies.length >= target) break;
+        const link = (r.link || "").split("?")[0];
+        // Only real company pages — not /company/.../posts, /jobs, /people sub-pages.
+        if (!/linkedin\.com\/company\/[^/]+\/?$/i.test(link) || seen.has(link)) continue;
+        seen.add(link);
+        const { name } = parseLinkedInCompanyTitle(r.title || "");
+        if (!name || name === "N/A") continue;
+        companies.push({
+          name: cut(name, 200),
+          industry: cut(criteria.industry, 100),
+          location: cut(displayLocation, 150),
+          linkedin: cut(link, 500),
+        });
+      }
+    }
+  } catch (e) {
+    if (companies.length) return { ok: true, companies };
+    return { ok: false, companies: [], error: e instanceof Error ? e.message : "Bright Data request failed" };
+  }
+
+  if (!companies.length) return { ok: false, companies: [], error: "No companies found. Try broader criteria." };
+  return { ok: true, companies };
 }
 
 // Search-result domains that are never a company's own website — directories,
