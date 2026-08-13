@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle } from "lucide-react";
+import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle, ShieldAlert } from "lucide-react";
 import { platformAdminSignOut } from "@/lib/queries/platform-admin";
 import { OverviewTab } from "@/components/admin/overview-tab";
 import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
@@ -9,8 +9,10 @@ import { AdminLeadArchiveView } from "@/components/admin/lead-archive-view";
 import { VendorSubscriptionsTab } from "@/components/admin/vendor-subscriptions-tab";
 import { AiProviderTab } from "@/components/admin/ai-provider-tab";
 import { PromoCodesTab } from "@/components/admin/promo-codes-tab";
+import { FeatureKillSwitchesTab } from "@/components/admin/feature-kill-switches-tab";
 import { WhatsAppConnectorView } from "@/components/settings/connectors-view";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
+import type { KillSwitchFeature } from "@/lib/queries/feature-kill-switches";
 import type {
   PlatformOverviewStats,
   HotCustomerRow,
@@ -32,6 +34,7 @@ const TABS = [
   { id: "vendors", label: "Our Vendor Subscriptions", icon: Plug },
   { id: "ai-provider", label: "AI Provider", icon: Sparkles },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { id: "feature-access", label: "Feature Access", icon: ShieldAlert },
 ] as const;
 
 export function AdminDashboard({
@@ -46,6 +49,7 @@ export function AdminDashboard({
   promoCodes,
   whatsappAccounts,
   unipileConfigured,
+  featureKillSwitches,
 }: {
   stats: PlatformOverviewStats;
   hotCustomers: HotCustomerRow[];
@@ -58,6 +62,7 @@ export function AdminDashboard({
   promoCodes: EmailPromoCodeRow[];
   whatsappAccounts: OutreachAccountRow[];
   unipileConfigured: boolean;
+  featureKillSwitches: Record<KillSwitchFeature, boolean>;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
@@ -176,6 +181,7 @@ export function AdminDashboard({
         {tab === "whatsapp" && (
           <WhatsAppConnectorView isSuperAdmin whatsappAccounts={whatsappAccounts} connectorReady={unipileConfigured} />
         )}
+        {tab === "feature-access" && <FeatureKillSwitchesTab initialSwitches={featureKillSwitches} />}
       </div>
     </div>
   );

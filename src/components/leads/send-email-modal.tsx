@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Send, Sparkles, Loader2, AlertCircle, Info, CheckCircle2, X } from "lucide-react";
+import { Send, Sparkles, Loader2, AlertCircle, Info, CheckCircle2, X, Lock } from "lucide-react";
+import { useFeatureKillSwitch } from "@/lib/hooks/use-feature-kill-switch";
 import { Modal } from "@/components/ui/modal";
 import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ interface Props {
 
 export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: Props) {
   const { toast } = useFeedback();
+  const { enabled: sendEmailEnabled } = useFeatureKillSwitch("send_email");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -208,8 +210,16 @@ export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: P
 
       <div className="p-5 border-t border-slate-100 flex justify-end gap-2">
         <Button variant="outline" onClick={onClose} disabled={sending}>Cancel</Button>
-        <Button onClick={handleSend} disabled={sending || !leadEmail}>
-          {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : <><Send className="h-4 w-4" /> Send email</>}
+        <Button
+          onClick={handleSend}
+          disabled={!sendEmailEnabled || sending || !leadEmail}
+          title={!sendEmailEnabled ? "Sending email has been temporarily disabled by the administrator." : undefined}
+        >
+          {sending
+            ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</>
+            : !sendEmailEnabled
+            ? <><Lock className="h-4 w-4" /> Send email</>
+            : <><Send className="h-4 w-4" /> Send email</>}
         </Button>
       </div>
     </Modal>

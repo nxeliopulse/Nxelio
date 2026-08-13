@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { X, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { useFeedback } from "@/components/ui/feedback";
 import { sendContactEmail, saveContactEmailDraft, deleteContactEmail, type ContactEmailRow } from "@/lib/queries/contact-emails";
+import { useFeatureKillSwitch } from "@/lib/hooks/use-feature-kill-switch";
 
 const fieldStyle = "w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)] placeholder-slate-400";
 
@@ -28,6 +29,7 @@ export function ComposeEmailModal({
 }) {
   const router = useRouter();
   const { toast } = useFeedback();
+  const { enabled: sendEmailEnabled } = useFeatureKillSwitch("send_email");
   const [to, setTo] = useState(draft?.to_email || defaultTo || "");
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
@@ -111,8 +113,13 @@ export function ComposeEmailModal({
             <RichTextEditor value={body} onChange={setBody} toolbar="compact" minHeight={110} />
           </div>
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
-            <Button onClick={handleSend} disabled={busy !== null} className="bg-blue-600 hover:bg-blue-700 text-white">
-              {busy === "send" ? "Sending…" : "Send"}
+            <Button
+              onClick={handleSend}
+              disabled={!sendEmailEnabled || busy !== null}
+              title={!sendEmailEnabled ? "Sending email has been temporarily disabled by the administrator." : undefined}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {busy === "send" ? "Sending…" : !sendEmailEnabled ? (<><Lock className="h-3.5 w-3.5" /> Send</>) : "Send"}
             </Button>
             <Button variant="outline" onClick={handleDraft} disabled={busy !== null}>
               {busy === "draft" ? "Saving…" : "Draft"}

@@ -1,7 +1,8 @@
 "use client";
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Forward, Star, Send, Paperclip, MoreHorizontal, Tag, X, Trash2, Video } from "lucide-react";
+import { Search, Filter, Forward, Star, Send, Paperclip, MoreHorizontal, Tag, X, Trash2, Video, Lock } from "lucide-react";
+import { useFeatureKillSwitch } from "@/lib/hooks/use-feature-kill-switch";
 import { generateConferenceLink, CONFERENCE_PROVIDERS, type ConferenceProvider } from "@/lib/meetings/conference-link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ export function InboxView({ conversations, embedded = false, campaignId }: Inbox
   const router = useRouter();
   const { toast, confirm } = useFeedback();
   const [pending, start] = useTransition();
+  const { enabled: sendEmailEnabled } = useFeatureKillSwitch("send_email");
   const visible = conversations;
   const [active, setActive] = useState<InboxConversation | null>(visible[0] || null);
   const [thread, setThread] = useState<InboxMessage[]>([]);
@@ -553,8 +555,14 @@ export function InboxView({ conversations, embedded = false, campaignId }: Inbox
                       <Button variant="outline" size="sm" onClick={() => setForwardOpen(true)} className="h-7 text-xs px-2.5">
                         <Forward className="h-3 w-3" /> Forward
                       </Button>
-                      <Button size="sm" onClick={handleSend} disabled={!reply.trim() || pending} className="h-7 text-xs px-3">
-                        <Send className="h-3 w-3" /> {pending ? "Sending..." : "Send"}
+                      <Button
+                        size="sm"
+                        onClick={handleSend}
+                        disabled={!sendEmailEnabled || !reply.trim() || pending}
+                        title={!sendEmailEnabled ? "Sending email has been temporarily disabled by the administrator." : undefined}
+                        className="h-7 text-xs px-3"
+                      >
+                        {!sendEmailEnabled ? <Lock className="h-3 w-3" /> : <Send className="h-3 w-3" />} {pending ? "Sending..." : "Send"}
                       </Button>
                     </div>
                   </div>
