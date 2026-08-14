@@ -7,6 +7,7 @@ import { SubscriptionGate } from "@/components/billing/subscription-gate";
 import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
 import { getMyWorkspaces } from "@/lib/queries/workspaces";
 import { isPlatformAdmin } from "@/lib/queries/platform-admin";
+import { getIdleTimeoutMinutes, getWarningLeadMinutes } from "@/lib/idle-timeout-config";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -73,6 +74,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       userRole={userRole}
       navAccess={navAccess}
       workspaces={workspaces}
+      idleTimeoutMinutes={getIdleTimeoutMinutes()}
+      warningLeadMinutes={getWarningLeadMinutes()}
     >
       {children}
     </AppShell>

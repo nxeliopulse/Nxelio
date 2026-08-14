@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/queries/audit-log";
 import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 import { revalidatePath } from "next/cache";
 import type { NewsletterBlock, NewsletterContent, NewsletterRow } from "@/lib/queries/newsletters";
+import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
 
 /** Credits charged per recipient for sending a newsletter (Bulk Email Campaign). */
 const CREDITS_PER_NEWSLETTER_LEAD = 3;
@@ -146,6 +147,9 @@ interface SendResult {
  * recipient rows to make analytics realistic.
  */
 export async function sendNewsletter(newsletterId: string): Promise<SendResult> {
+  if (!(await isFeatureEnabledForCurrentUser("send_newsletter"))) {
+    return { ok: false, error: "Sending newsletters has been temporarily disabled by the administrator." };
+  }
   const supabase = await createClient();
   const admin = createAdminClient();
 
@@ -301,6 +305,9 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
  * Sends a test newsletter to a specific email (no recipient logging).
  */
 export async function sendTestNewsletter(newsletterId: string, testEmail: string): Promise<SendResult> {
+  if (!(await isFeatureEnabledForCurrentUser("send_newsletter"))) {
+    return { ok: false, error: "Sending newsletters has been temporarily disabled by the administrator." };
+  }
   const supabase = await createClient();
   const { data: newsletter, error } = await supabase.from("newsletters").select("*").eq("id", newsletterId).single();
   if (error || !newsletter) return { ok: false, error: "Newsletter not found" };

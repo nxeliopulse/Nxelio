@@ -8,6 +8,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { bulkInsertAccounts, type AccountRow } from "@/lib/queries/accounts";
 import { useSidebar } from "@/components/layout/sidebar-context";
 import { cn } from "@/lib/utils";
+import { formatPhoneForStorage, detectCountry } from "@/components/ui/phone-input";
 
 type AccountCsvRow = {
   account_name: string | null;
@@ -157,7 +158,12 @@ export function AddAccountsWizard({ open, onClose }: { open: boolean; onClose: (
       account_name: (r.account_name || "").trim(),
       website: r.website?.trim() || null,
       domain: r.domain?.trim() || null,
-      phone: r.phone?.trim() || null,
+      // CSV text has no country column — format it the same best-effort way as
+      // manual entry with no country picked. Previously this stored the raw
+      // CSV text verbatim, which then hard-failed the server's strict
+      // (country-less) isValidPhoneNumber check for any number without a
+      // leading "+", rejecting perfectly normal local-format spreadsheet data.
+      phone: r.phone?.trim() ? formatPhoneForStorage(r.phone, detectCountry(r.phone)) : null,
       industry: r.industry?.trim() || null,
       account_type: r.account_type?.trim() || null,
       employees: parseNumeric(r.employees),

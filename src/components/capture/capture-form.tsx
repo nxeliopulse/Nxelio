@@ -6,7 +6,7 @@ import { Input, Textarea, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/brand/logo";
 import { capturePublicLead } from "@/lib/queries/capture";
-import { PhoneInput, formatPhoneForStorage } from "@/components/ui/phone-input";
+import { PhoneInput, formatPhoneForStorage, isPhoneValid } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 
 const industries = ["Technology", "Consulting", "Enterprise Software", "Analytics", "Retail", "Cloud Services", "Manufacturing", "Training", "Healthcare", "Finance"];
@@ -30,6 +30,10 @@ export function CaptureForm({ workspaceSlug, workspaceName }: Props) {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!isPhoneValid(form.phone, phoneCountry)) {
+      setError("Phone number isn't valid for the selected country.");
+      return;
+    }
     setError(null);
     start(async () => {
       const res = await capturePublicLead({ ...form, phone: form.phone.trim() ? formatPhoneForStorage(form.phone, phoneCountry) : "", workspaceSlug });

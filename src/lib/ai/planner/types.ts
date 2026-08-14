@@ -55,6 +55,8 @@ export interface PlanExecution {
   ok: boolean;
   /** Steps that failed and blocked the rest. */
   failed: StepExecution[];
+  /** Steps that require user approval before running. */
+  awaitingApproval: StepExecution[];
   startedAt: number;
   finishedAt: number;
 }

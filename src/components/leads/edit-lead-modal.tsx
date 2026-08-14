@@ -11,7 +11,7 @@ import { getPicklistValues } from "@/lib/queries/picklists";
 import { useLeadInActiveCampaign } from "@/lib/leads/use-lead-in-active-campaign";
 import { allowedNextStatuses } from "@/lib/leads/status-flow";
 import { isSuperAdmin } from "@/lib/queries/auth-guards";
-import { PhoneInput, detectCountry, formatPhoneForStorage } from "@/components/ui/phone-input";
+import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { isValidEmail, isValidWebsite, EMAIL_ERROR, WEBSITE_ERROR } from "@/lib/validation";
@@ -88,6 +88,10 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
     }
     if (!isValidEmail(form.email)) { setError(EMAIL_ERROR); return; }
     if (!isValidWebsite(form.website_url)) { setError(WEBSITE_ERROR); return; }
+    if (!isPhoneValid(form.phone, phoneCountry)) {
+      setError("Phone number isn't valid for the selected country.");
+      return;
+    }
     // Status changes need a reason, logged separately from the rest of the
     // form — collect it before touching anything, so canceling here aborts
     // the whole save rather than silently dropping just the status change.

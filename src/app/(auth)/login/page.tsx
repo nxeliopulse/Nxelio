@@ -38,6 +38,9 @@ function LoginForm() {
     if (params.get("reset") === "1") {
       setNotice("Password updated — sign in with your new password.");
     }
+    if (params.get("reason") === "idle") {
+      setNotice("You were signed out after a period of inactivity.");
+    }
   }, [params]);
 
   const valid = form.email.includes("@") && form.password.length >= 6;

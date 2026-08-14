@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Users2, Send, MailOpen, Reply, AlertTriangle, Clock,
-  BarChart3, MousePointerClick, CalendarClock, Loader2, X,
+  BarChart3, MousePointerClick, CalendarClock, Loader2, X, Lock,
 } from "lucide-react";
+import { useFeatureKillSwitch } from "@/lib/hooks/use-feature-kill-switch";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ export function CampaignDetailView({
   const { confirm, toast } = useFeedback();
   const [pending, start] = useTransition();
   const [sending, setSending] = useState(false);
+  const { enabled: launchEnabled } = useFeatureKillSwitch("launch_campaign");
   const [tab, setTab] = useState<Tab>("Audience");
   const [name, setName] = useState(campaign.campaign_name);
   const [status, setStatusLocal] = useState(campaign.status);
@@ -275,15 +277,18 @@ export function CampaignDetailView({
             <div className="flex items-center gap-2">
               <Button
                 onClick={handleSendNow}
-                disabled={pending || sending || status !== "Draft" && status !== "Scheduled"}
+                disabled={!launchEnabled || pending || sending || status !== "Draft" && status !== "Scheduled"}
                 title={
-                  status === "Active" ? "This campaign has already launched — its audience is locked to who was enrolled at launch."
+                  !launchEnabled ? "Campaign launches have been temporarily disabled by the administrator."
+                  : status === "Active" ? "This campaign has already launched — its audience is locked to who was enrolled at launch."
                   : status === "Paused" || status === "Completed" ? `This campaign is ${status.toLowerCase()} — reactivate it to launch.`
                   : undefined
                 }
               >
                 {sending
                   ? <><Loader2 className="h-4 w-4 animate-spin" /> Launching…</>
+                  : !launchEnabled
+                  ? <><Lock className="h-4 w-4" /> Launch</>
                   : <><Send className="h-4 w-4" /> Launch</>}
               </Button>
             </div>

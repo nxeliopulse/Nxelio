@@ -5,6 +5,10 @@ import type { LeadArchiveRow } from "@/lib/queries/lead-import-archive";
 // Sole allowed identity for the standalone platform admin panel (/admin) —
 // intentionally NOT the same thing as a workspace's in-app Super Admin role.
 // This account can see the lead-import archive across every workspace.
+// Not exported — a "use server" file can only export async functions, so
+// other modules needing to confirm/reuse this identity (e.g.
+// feature-kill-switches.ts's password re-verification) call isPlatformAdmin()
+// and read the session's own email instead of importing this constant.
 const PLATFORM_ADMIN_EMAIL = "admin@nxelio.com";
 
 export async function isPlatformAdmin(): Promise<boolean> {

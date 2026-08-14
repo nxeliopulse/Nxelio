@@ -1,5 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getIdleTimeoutMinutes, IDLE_ACTIVITY_COOKIE } from "@/lib/idle-timeout-config";
+import { isPublicPath, isIdleExpired } from "@/lib/idle-timeout-rules";
+
+// NOTE: this app is on a Next.js version where "Middleware" was renamed to
+// "Proxy" (file must be named proxy.ts, exported function must be named
+// `proxy`, not `middleware`) — see node_modules/next/dist/docs/01-app/
+// 03-api-reference/03-file-conventions/proxy.md. Functionality is the same.
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -43,6 +50,43 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  // --- Idle session timeout ---
+  // Real server-side enforcement, not just a client-side timer: a request
+  // arriving after the configured idle window gets its session revoked and
+  // is redirected, regardless of whether the underlying Supabase token is
+  // technically still valid. Only reads a cookie on the common "still
+  // active" path — Next's own Proxy guidance warns against DB/auth-API
+  // calls on every request since Proxy runs on every route including
+  // prefetches; the signOut() call below only fires once actually expired.
+  if (user && !isPublicPath(path)) {
+    const now = Date.now();
+    const lastActivityRaw = request.cookies.get(IDLE_ACTIVITY_COOKIE)?.value;
+    const lastActivity = lastActivityRaw ? Number(lastActivityRaw) : null;
+    const idleLimitMs = getIdleTimeoutMinutes() * 60_000;
+
+    if (isIdleExpired(lastActivity, now, idleLimitMs)) {
+      try {
+        await supabase.auth.signOut(); // reassigns `response` via setAll above, clearing the Supabase session cookies
+      } catch {
+        // best-effort — the idle cookie is cleared and the redirect happens either way
+      }
+      const idleResponse = NextResponse.redirect(new URL("/login?reason=idle", request.url));
+      response.cookies.getAll().forEach((c) => idleResponse.cookies.set(c));
+      idleResponse.cookies.delete(IDLE_ACTIVITY_COOKIE);
+      return idleResponse;
+    }
+
+    // Still within the window (or first authenticated request of a fresh
+    // session) — slide the cookie forward so real activity never expires.
+    response.cookies.set(IDLE_ACTIVITY_COOKIE, String(now), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: idleLimitMs / 1000,
+    });
   }
 
   return response;

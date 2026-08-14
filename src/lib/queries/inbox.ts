@@ -1,6 +1,7 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
 
 export interface InboxMessage {
   id: string;
@@ -139,6 +140,9 @@ export async function sendReply(
   subject: string,
   body: string
 ): Promise<{ ok: boolean; error?: string; simulated?: boolean }> {
+  if (!(await isFeatureEnabledForCurrentUser("send_email"))) {
+    return { ok: false, error: "Sending email has been temporarily disabled by the administrator." };
+  }
   const supabase = await createClient();
 
   // Actually deliver the reply via the email service (Brevo/dev-sim) —
@@ -243,6 +247,9 @@ export async function sendComposedEmail(
   subject: string,
   body: string
 ): Promise<{ ok: boolean; error?: string; simulated?: boolean }> {
+  if (!(await isFeatureEnabledForCurrentUser("send_email"))) {
+    return { ok: false, error: "Sending email has been temporarily disabled by the administrator." };
+  }
   const recipient = to.trim();
   if (!recipient) return { ok: false, error: "Recipient email is required" };
   if (!subject.trim()) return { ok: false, error: "Subject is required" };

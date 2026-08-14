@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Save, Send, Sparkles, AlertCircle, CheckCircle2, Loader2, Plus, X,
-  Heading, Type, MousePointer2, Minus, Mail, Users, Layers3, Eye, Image as ImageIcon, Upload, Square, LayoutTemplate,
+  Heading, Type, MousePointer2, Minus, Mail, Users, Layers3, Eye, Image as ImageIcon, Upload, Square, LayoutTemplate, Lock,
 } from "lucide-react";
 import { uploadNewsletterImage } from "@/lib/storage/upload";
+import { useFeatureKillSwitch } from "@/lib/hooks/use-feature-kill-switch";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -73,6 +74,7 @@ export function NewsletterBuilder({
   const [templateCatFilter, setTemplateCatFilter] = useState<"All" | NewsletterTemplateCategory>("All");
   const [pending, start] = useTransition();
   const [generating, setGenerating] = useState(false);
+  const { enabled: sendNewsletterEnabled } = useFeatureKillSwitch("send_newsletter");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -344,14 +346,23 @@ export function NewsletterBuilder({
           <Button variant="outline" onClick={openPreview} disabled={pending || sending}>
             <Eye className="h-4 w-4" /> Preview
           </Button>
-          <Button variant="outline" onClick={() => setShowTestModal(true)} disabled={pending || sending || isLocked}>
-            <Mail className="h-4 w-4" /> Send test
+          <Button
+            variant="outline"
+            onClick={() => setShowTestModal(true)}
+            disabled={!sendNewsletterEnabled || pending || sending || isLocked}
+            title={!sendNewsletterEnabled ? "Sending newsletters has been temporarily disabled by the administrator." : undefined}
+          >
+            {sendNewsletterEnabled ? <Mail className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Send test
           </Button>
           <Button variant="outline" onClick={() => handleSave(false)} disabled={pending || sending || isLocked}>
             <Save className="h-4 w-4" /> {pending ? "Saving..." : "Save"}
           </Button>
-          <Button onClick={() => setShowSendModal(true)} disabled={pending || sending || isLocked}>
-            <Send className="h-4 w-4" /> Send to subscribers
+          <Button
+            onClick={() => setShowSendModal(true)}
+            disabled={!sendNewsletterEnabled || pending || sending || isLocked}
+            title={!sendNewsletterEnabled ? "Sending newsletters has been temporarily disabled by the administrator." : undefined}
+          >
+            {sendNewsletterEnabled ? <Send className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Send to subscribers
           </Button>
         </div>
       </div>

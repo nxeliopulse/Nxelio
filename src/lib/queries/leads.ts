@@ -8,6 +8,19 @@ import { scoreLeadWithAi, isAiConfigured, type AiScoreResult } from "@/lib/ai/ac
 import { mapWithConcurrency } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/queries/auth-guards";
 import { isManualStatusTransitionAllowed, statusTransitionError } from "@/lib/leads/status-flow";
+import { isValidPhoneNumber } from "libphonenumber-js";
+
+/**
+ * The client always sends phone pre-formatted to international form (e.g.
+ * "+1 555 123 4567") via formatPhoneForStorage() — that's self-describing, so
+ * no country needs to be passed here. Never trust the client alone though:
+ * reject anything that doesn't actually parse (mirrors accounts.ts's check).
+ */
+function assertValidLeadPhone(payload: Partial<LeadRow>) {
+  if (payload.phone && !isValidPhoneNumber(payload.phone)) {
+    throw new Error("Phone number isn't valid.");
+  }
+}
 
 export interface LeadRow {
   id: string;
@@ -112,7 +125,7 @@ export async function getLeadStats() {
   if (!data) return { total: 0, hot: 0, scored: 0, converted: 0 };
   return {
     total: data.length,
-    hot: data.filter((l) => l.status === "Hot").length,
+    hot: data.filter((l) => l.lead_score >= 70).length,
     scored: data.filter((l) => l.lead_score > 0).length,
     converted: data.filter((l) => l.status === "Converted").length,
   };
@@ -139,6 +152,7 @@ export async function getDistinctLeadValues(
 }
 
 export async function createLead(payload: Partial<LeadRow>) {
+  assertValidLeadPhone(payload);
   const supabase = await createClient();
   const { data, error } = await supabase.from("leads").insert(payload).select().single();
   if (error) throw error;
@@ -155,6 +169,7 @@ export async function createLead(payload: Partial<LeadRow>) {
  * "Converted" as a manual target.
  */
 export async function updateLead(id: string, payload: Partial<LeadRow>, opts?: { allowConvertedStatus?: boolean }) {
+  assertValidLeadPhone(payload);
   const supabase = await createClient();
 
   if (payload.status !== undefined && !opts?.allowConvertedStatus) {

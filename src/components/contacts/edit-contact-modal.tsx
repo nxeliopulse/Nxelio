@@ -9,7 +9,7 @@ import { createContact, updateContact, type ContactRow } from "@/lib/queries/con
 import { getAccounts, type AccountRow } from "@/lib/queries/accounts";
 import { uploadContactPhoto } from "@/lib/storage/upload";
 import type { OwnerOption } from "@/components/contacts/contacts-table";
-import { PhoneInput, detectCountry, formatPhoneForStorage } from "@/components/ui/phone-input";
+import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { isValidEmail, EMAIL_ERROR } from "@/lib/validation";
@@ -245,6 +245,26 @@ export function EditContactModal({
     if (form.phone.trim() && form.mobile.trim() && formatPhoneForStorage(form.phone, phoneCountry) === formatPhoneForStorage(form.mobile, mobileCountry)) {
       setError("Phone 1 and Phone 2 must be different numbers.");
       setOpenSections((s) => ({ ...s, basic: true }));
+      return;
+    }
+    const basicPhoneChecks: [string, string, CountryCode][] = [
+      ["Phone", form.phone, phoneCountry],
+      ["Mobile", form.mobile, mobileCountry],
+      ["Fax", form.fax, faxCountry],
+      ["Home phone", form.home_phone, homePhoneCountry],
+      ["Other phone", form.other_phone, otherPhoneCountry],
+      ["Assistant phone", form.asst_phone, asstPhoneCountry],
+    ];
+    for (const [label, value, country] of basicPhoneChecks) {
+      if (!isPhoneValid(value, country)) {
+        setError(`${label} isn't valid for the selected country.`);
+        setOpenSections((s) => ({ ...s, basic: true }));
+        return;
+      }
+    }
+    if (!isPhoneValid(form.whatsapp, whatsappCountry)) {
+      setError("WhatsApp number isn't valid for the selected country.");
+      setOpenSections((s) => ({ ...s, social: true }));
       return;
     }
     setError(null);

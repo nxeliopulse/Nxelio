@@ -2,7 +2,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { X, CalendarDays, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { submitDemoRequest } from "@/lib/queries/demo-request";
-import { PhoneInput, formatPhoneForStorage } from "@/components/ui/phone-input";
+import { PhoneInput, formatPhoneForStorage, isPhoneValid } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 
 const INDUSTRIES = ["SaaS", "E-commerce", "Healthcare", "Finance", "Manufacturing", "Real Estate", "Education", "Other"];
@@ -59,6 +59,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
     if (!form.fullName.trim()) return setError("Please enter your name.");
     if (!form.businessEmail.includes("@")) return setError("Please enter a valid business email.");
     if (!form.phone.trim()) return setError("Please enter your phone number.");
+    if (!isPhoneValid(form.phone, phoneCountry)) return setError("Phone number isn't valid for the selected country.");
     if (!form.industry) return setError("Please select your industry.");
     if (!form.employeeCount) return setError("Please select your number of employees.");
     if (!form.monthlyRevenue) return setError("Please select your monthly revenue.");

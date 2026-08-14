@@ -19,6 +19,7 @@ import { uploadAvatarImage } from "@/lib/storage/upload";
 import { connectOutreachAccount, syncOutreachAccounts, hasConnectedMailbox, hasConnectedLinkedIn } from "@/lib/queries/outreach-accounts";
 import { getZoomAccounts } from "@/lib/queries/zoom-accounts";
 import { getCalendarAccounts } from "@/lib/queries/calendar-accounts";
+import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid, type CountryCode } from "@/components/ui/phone-input";
 
 const GOALS = ["Generate leads", "Book more meetings", "Grow pipeline", "Close deals faster", "Automate outreach", "Track performance"];
 const SIZES = ["1–10", "11–50", "51–200", "201–500", "500+"];
@@ -99,6 +100,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
 
   // Profile step state
   const [phone, setPhone] = useState(status.profile?.phone ?? "");
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(() => detectCountry(status.profile?.phone));
   const [jobTitle, setJobTitle] = useState(status.profile?.job_title ?? "");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
@@ -142,6 +144,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
   async function next() {
     if (step === 1) {
       if (!phone.trim() || !jobTitle.trim()) { setErr("Phone and job title are required."); return; }
+      if (!isPhoneValid(phone, phoneCountry)) { setErr("Phone number isn't valid for the selected country."); return; }
       setError(null);
       let nextAvatarUrl = avatarUrl;
       if (avatarFile) {
@@ -156,7 +159,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
       }
       setSaving(true);
       try {
-        await updateProfile({ phone: phone.trim(), job_title: jobTitle.trim(), ...(nextAvatarUrl ? { avatar_url: nextAvatarUrl } : {}) });
+        await updateProfile({ phone: formatPhoneForStorage(phone, phoneCountry), job_title: jobTitle.trim(), ...(nextAvatarUrl ? { avatar_url: nextAvatarUrl } : {}) });
       } catch (e) {
         setSaving(false);
         setError(e instanceof Error ? e.message : "Couldn't save your profile. Please try again.");
@@ -250,10 +253,11 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
 
   async function finish() {
     if (!isEdit && !mailboxConnected) { setErr("Connect a mailbox to finish setting up your workspace."); return; }
+    if (!isPhoneValid(phone, phoneCountry)) { setErr("Phone number isn't valid for the selected country."); return; }
     setSaving(true);
     setError(null);
     const [profileRes, businessRes] = await Promise.all([
-      updateProfile({ phone: phone.trim(), job_title: jobTitle.trim(), ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }).then(() => ({ ok: true }) as { ok: boolean; error?: string }).catch((e) => ({ ok: false, error: e instanceof Error ? e.message : "Couldn't save your profile." })),
+      updateProfile({ phone: formatPhoneForStorage(phone, phoneCountry), job_title: jobTitle.trim(), ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }).then(() => ({ ok: true }) as { ok: boolean; error?: string }).catch((e) => ({ ok: false, error: e instanceof Error ? e.message : "Couldn't save your profile." })),
       saveOnboarding(form),
     ]);
     if (!profileRes.ok || !businessRes.ok) {
@@ -375,8 +379,8 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Phone number" required icon={<Phone className="h-4 w-4" />}>
-                <Input className="pl-10" placeholder="e.g. +1 555 123 4567" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <Field label="Phone number" required>
+                <PhoneInput label="" country={phoneCountry} value={phone} onCountryChange={setPhoneCountry} onValueChange={setPhone} required />
               </Field>
               <Field label="Job title" required icon={<Briefcase className="h-4 w-4" />}>
                 <Input className="pl-10" placeholder="e.g. Head of Sales" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />

@@ -92,7 +92,10 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
-  const [activeDateRange, setActiveDateRange] = useState("Last 30 Days");
+  const [activeDateRange, setActiveDateRange] = useState("All Time");
+  const [customDateFrom, setCustomDateFrom] = useState("");
+  const [customDateTo, setCustomDateTo] = useState("");
+  const [showCustomInputs, setShowCustomInputs] = useState(false);
   const [cardFilter, setCardFilter] = useState<"all" | "linked" | "unassigned" | "email">("all");
 
   // Multi-section Filter panel state — replaces the old single-select statusFilter.
@@ -222,13 +225,50 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
   const visibleOwnerList = filteredOwnerList.slice(0, ownersShown);
 
   // Apply filters
-  const filtered = scoped.filter((c) => {
+  // Apply base filters (all filters except cardFilter)
+  const baseFiltered = scoped.filter((c) => {
     const q = search.toLowerCase();
 
-    // Card Filter
-    if (cardFilter === "linked" && !c.account_id) return false;
-    if (cardFilter === "unassigned" && c.account_id) return false;
-    if (cardFilter === "email" && !c.email) return false;
+    // Date range filter
+    if (activeDateRange !== "All Time") {
+      const date = new Date(c.created_at);
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      if (activeDateRange === "Today") {
+        if (date < todayStart) return false;
+      } else if (activeDateRange === "Yesterday") {
+        const yesterdayStart = new Date(todayStart);
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        if (date < yesterdayStart || date >= todayStart) return false;
+      } else if (activeDateRange === "Last 7 Days") {
+        const sevenDaysAgo = new Date(todayStart);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        if (date < sevenDaysAgo) return false;
+      } else if (activeDateRange === "Last 30 Days") {
+        const thirtyDaysAgo = new Date(todayStart);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        if (date < thirtyDaysAgo) return false;
+      } else if (activeDateRange === "This Month") {
+        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        if (date < thisMonthStart) return false;
+      } else if (activeDateRange === "Last Month") {
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        if (date < lastMonthStart || date >= thisMonthStart) return false;
+      } else if (activeDateRange === "Custom Range") {
+        if (customDateFrom) {
+          const fromDate = new Date(customDateFrom);
+          fromDate.setHours(0, 0, 0, 0);
+          if (date < fromDate) return false;
+        }
+        if (customDateTo) {
+          const toDate = new Date(customDateTo);
+          toDate.setHours(23, 59, 59, 999);
+          if (date > toDate) return false;
+        }
+      }
+    }
 
     // Filter panel: Name (specific contacts) — checking one or more names restricts
     // the table to ONLY those contacts.
@@ -267,6 +307,14 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
       (c.phone?.toLowerCase().includes(q) ?? false) ||
       (c.mailing_country?.toLowerCase().includes(q) ?? false)
     );
+  });
+
+  const filtered = baseFiltered.filter((c) => {
+    // Card Filter
+    if (cardFilter === "linked" && !c.account_id) return false;
+    if (cardFilter === "unassigned" && c.account_id) return false;
+    if (cardFilter === "email" && !c.email) return false;
+    return true;
   });
 
   /** Plain-text value of a sortable column. Owner resolves through the `owners` list
@@ -461,26 +509,29 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
               <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3.5 w-3.5" />
             </Button>
             {exportDropdownOpen && (
-              <div className="absolute right-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                <button
-                  onClick={() => {
-                    toast("Exporting PDF contacts...", "info");
-                    setExportDropdownOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
-                >
-                  <FileText className="h-3.5 w-3.5 text-slate-400" /> Export as PDF
-                </button>
-                <button
-                  onClick={() => {
-                    toast("Exporting Excel contacts...", "info");
-                    setExportDropdownOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5 text-slate-400" /> Export as Excel
-                </button>
-              </div>
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setExportDropdownOpen(false)} />
+                <div className="absolute right-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
+                  <button
+                    onClick={() => {
+                      toast("Exporting PDF contacts...", "info");
+                      setExportDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-slate-400" /> Export as PDF
+                  </button>
+                  <button
+                    onClick={() => {
+                      toast("Exporting Excel contacts...", "info");
+                      setExportDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold flex items-center gap-1.5 text-slate-700 dark:text-slate-600"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-slate-400" /> Export as Excel
+                  </button>
+                </div>
+              </>
             )}
           </div>
 
@@ -512,10 +563,10 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         {[
-          { label: "Total contacts", value: scoped.length, icon: Users2, accent: "bg-amber-500", key: "all", ring: "ring-amber-500", bg: "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]" },
-          { label: "Linked to account", value: scoped.filter((c) => c.account_id).length, icon: Link2, accent: "bg-blue-500", key: "linked", ring: "ring-blue-500", bg: "bg-blue-50/[0.04] dark:bg-blue-50/[0.08]" },
-          { label: "Unassigned", value: scoped.filter((c) => !c.account_id).length, icon: User, accent: "bg-rose-500", key: "unassigned", ring: "ring-rose-500", bg: "bg-rose-500/[0.04] dark:bg-rose-500/[0.08]" },
-          { label: "With email", value: scoped.filter((c) => c.email).length, icon: Mail, accent: "bg-emerald-500", key: "email", ring: "ring-emerald-500", bg: "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" },
+          { label: "Total contacts", value: baseFiltered.length, icon: Users2, accent: "bg-amber-500", key: "all", ring: "ring-amber-500", bg: "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]" },
+          { label: "Linked to account", value: baseFiltered.filter((c) => c.account_id).length, icon: Link2, accent: "bg-blue-500", key: "linked", ring: "ring-blue-500", bg: "bg-blue-50/[0.04] dark:bg-blue-50/[0.08]" },
+          { label: "Unassigned", value: baseFiltered.filter((c) => !c.account_id).length, icon: User, accent: "bg-rose-500", key: "unassigned", ring: "ring-rose-500", bg: "bg-rose-500/[0.04] dark:bg-rose-500/[0.08]" },
+          { label: "With email", value: baseFiltered.filter((c) => c.email).length, icon: Mail, accent: "bg-emerald-500", key: "email", ring: "ring-emerald-500", bg: "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" },
         ].map((s) => {
           const Icon = s.icon;
           const active = cardFilter === s.key;
@@ -916,28 +967,85 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
             className="h-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800"
           >
             <Calendar className="h-3.5 w-3.5 text-slate-500" />
-            <span>{activeDateRange}</span>
+            <span>
+              {activeDateRange === "Custom Range"
+                ? (customDateFrom || customDateTo
+                  ? `${customDateFrom ? formatDate(customDateFrom) : "..."} - ${customDateTo ? formatDate(customDateTo) : "..."}`
+                  : "Custom Range")
+                : activeDateRange}
+            </span>
             <ChevronDown className="h-3 w-3 text-slate-400 ml-1" />
           </button>
           {dateRangeOpen && (
-            <div className="absolute left-0 mt-1.5 w-40 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-              {["Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"].map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => {
-                    setActiveDateRange(opt);
-                    setDateRangeOpen(false);
-                    toast(`Date range updated to ${opt}`, "success");
-                  }}
-                  className={cn(
-                    "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
-                    activeDateRange === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/15" : "text-slate-700 dark:text-slate-600"
-                  )}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => { setDateRangeOpen(false); setShowCustomInputs(false); }} />
+              <div className="absolute left-0 mt-1.5 w-60 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs overflow-hidden">
+                {showCustomInputs ? (
+                  <div className="p-3 space-y-2">
+                    <p className="font-bold text-[10px] text-slate-400 uppercase tracking-wider">Custom Range</p>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="date"
+                        value={customDateFrom}
+                        onChange={(e) => setCustomDateFrom(e.target.value)}
+                        className="w-full h-8 rounded border border-slate-200 dark:border-slate-850 px-1.5 py-0.5 text-[11px] text-slate-700 bg-white dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                        aria-label="From date"
+                      />
+                      <span className="text-[10px] text-slate-400">to</span>
+                      <input
+                        type="date"
+                        value={customDateTo}
+                        onChange={(e) => setCustomDateTo(e.target.value)}
+                        className="w-full h-8 rounded border border-slate-200 dark:border-slate-850 px-1.5 py-0.5 text-[11px] text-slate-700 bg-white dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-200"
+                        aria-label="To date"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-1.5 pt-1">
+                      <button
+                        onClick={() => setShowCustomInputs(false)}
+                        className="px-2.5 py-1 text-[10px] font-semibold text-slate-500 hover:bg-slate-55 dark:hover:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-800"
+                      >
+                        Back
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActiveDateRange("Custom Range");
+                          setDateRangeOpen(false);
+                          setShowCustomInputs(false);
+                          toast("Custom date range applied", "success");
+                        }}
+                        className="px-2.5 py-1 text-[10px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {["All Time", "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "Custom Range"].map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => {
+                          if (opt === "Custom Range") {
+                            setShowCustomInputs(true);
+                          } else {
+                            setActiveDateRange(opt);
+                            setDateRangeOpen(false);
+                            toast(`Date range updated to ${opt}`, "success");
+                          }
+                        }}
+                        className={cn(
+                          "w-full text-left px-4 py-2 font-medium hover:bg-slate-50 dark:hover:bg-slate-800",
+                          activeDateRange === opt ? "text-[var(--primary)] bg-[var(--primary)]/10 dark:bg-[var(--primary)]/15" : "text-slate-700 dark:text-slate-600"
+                        )}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>

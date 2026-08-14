@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import DOMPurify from "isomorphic-dompurify";
 import {
   Search, Mail, Star, Trash2, Send, Tag, RefreshCw,
-  Plus, X, Reply, AlertOctagon, Sparkles,
+  Plus, X, Reply, AlertOctagon, Sparkles, Lock,
   ChevronLeft, ChevronRight, Inbox, FileText, CheckSquare, Square, Loader2
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import type { InboxConversation } from "@/lib/queries/inbox";
 import { sendReply, sendComposedEmail } from "@/lib/queries/inbox";
 import { generateComposeEmail } from "@/lib/ai/actions";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
+import { useFeatureKillSwitch } from "@/lib/hooks/use-feature-kill-switch";
 
 // Email bodies come from external senders — HTML but untrusted. Sanitize
 // before rendering with dangerouslySetInnerHTML; allowlist is broader than a
@@ -122,6 +123,7 @@ export function EmailsView({
   const { toast, confirm } = useFeedback();
   const router = useRouter();
   const [isSending, startSend] = useTransition();
+  const { enabled: sendEmailEnabled } = useFeatureKillSwitch("send_email");
 
   // Real data only, seeded once — local overlay (starred/label/spam/trash moves)
   // lives on top of it since none of that has real backing yet.
@@ -777,8 +779,13 @@ export function EmailsView({
                   <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)} className="rounded-xl px-4 py-2 font-semibold text-sm border-slate-200 dark:border-slate-800 h-10">
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isSending} className="rounded-xl px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 shadow-sm">
-                    {isSending ? (<><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>) : "Send Message"}
+                  <Button
+                    type="submit"
+                    disabled={!sendEmailEnabled || isSending}
+                    title={!sendEmailEnabled ? "Sending email has been temporarily disabled by the administrator." : undefined}
+                    className="rounded-xl px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 shadow-sm"
+                  >
+                    {isSending ? (<><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>) : !sendEmailEnabled ? (<><Lock className="h-4 w-4" /> Send Message</>) : "Send Message"}
                   </Button>
                 </div>
               </form>

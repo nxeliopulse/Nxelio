@@ -2,6 +2,27 @@
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
+import { isValidPhoneNumber } from "libphonenumber-js";
+
+const PHONE_FIELD_LABELS: Record<string, string> = {
+  phone: "Phone", mobile: "Mobile", home_phone: "Home phone", other_phone: "Other phone",
+  assistant_phone: "Assistant phone", fax: "Fax", whatsapp: "WhatsApp",
+};
+
+/**
+ * The client always sends these pre-formatted to international form (e.g.
+ * "+1 555 123 4567") via formatPhoneForStorage() — that's self-describing, so
+ * no country needs to be passed here. Never trust the client alone though:
+ * reject anything that doesn't actually parse (mirrors accounts.ts's check).
+ */
+function assertValidContactPhoneFields(payload: Partial<ContactRow>) {
+  for (const field of Object.keys(PHONE_FIELD_LABELS) as (keyof typeof PHONE_FIELD_LABELS)[]) {
+    const value = payload[field as keyof ContactRow] as string | null | undefined;
+    if (value && !isValidPhoneNumber(value)) {
+      throw new Error(`${PHONE_FIELD_LABELS[field]} number isn't valid.`);
+    }
+  }
+}
 
 export interface ContactRow {
   id: string;
@@ -113,6 +134,7 @@ export async function findMatchingContact({ email, phone, linkedin }: { email?: 
 }
 
 export async function createContact(payload: Partial<ContactRow>) {
+  assertValidContactPhoneFields(payload);
   const supabase = await createClient();
   const { data, error } = await supabase.from("contacts").insert(payload).select().single();
   if (error) throw error;
@@ -128,6 +150,7 @@ export async function createContact(payload: Partial<ContactRow>) {
 }
 
 export async function updateContact(id: string, payload: Partial<ContactRow>) {
+  assertValidContactPhoneFields(payload);
   const supabase = await createClient();
   // .select("id") to get the updated row back — PostgREST reports no error when
   // RLS silently blocks an update (0 rows affected looks identical to success

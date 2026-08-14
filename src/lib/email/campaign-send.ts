@@ -11,6 +11,7 @@ import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 import { revalidatePath } from "next/cache";
 import { isSuppressed } from "@/lib/segments";
 import { createEnrollments, advanceEnrollmentStep, completeEnrollment, checkAndCompleteCampaign } from "@/lib/campaigns/enrollment";
+import { isFeatureEnabledForCurrentUser, isFeatureEnabledForSystem } from "@/lib/queries/feature-kill-switches";
 
 const MAX_PER_SEND = 300;
 /** Credits charged per lead for launching a (sequence) campaign send. */
@@ -229,6 +230,12 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow, 
  * stopping a lead's remaining steps once they reply.
  */
 export async function sendCampaign(campaignId: string, includeLeadIds?: string[]): Promise<CampaignSendResult> {
+  // Real enforcement, not just a disabled "Launch" button — the platform
+  // admin can still bypass this themselves (isFeatureEnabledForCurrentUser),
+  // everyone else is blocked outright while the switch is off.
+  if (!(await isFeatureEnabledForCurrentUser("launch_campaign"))) {
+    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Campaign launches have been temporarily disabled by the administrator." };
+  }
   const supabase = await createClient();
   const campaign = await getCampaignById(campaignId);
   if (!campaign) return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Campaign not found" };
@@ -241,6 +248,11 @@ export async function sendCampaign(campaignId: string, includeLeadIds?: string[]
  * RLS to at that point, so the lookup and send both need to bypass it.
  */
 export async function processDueScheduledCampaigns(limit = 20): Promise<{ launched: number; failed: number }> {
+  // No user session here — no admin to bypass for either. If the switch is
+  // off, scheduled launches simply stay "Scheduled" and are picked up again
+  // next tick once it's back on, rather than being silently dropped.
+  if (!(await isFeatureEnabledForSystem("launch_campaign"))) return { launched: 0, failed: 0 };
+
   const admin = createAdminClient();
   const { data: due } = await admin
     .from("campaigns")

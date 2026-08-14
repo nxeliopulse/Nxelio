@@ -26,7 +26,7 @@ import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, deductLeads } from "@/
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { cn } from "@/lib/utils";
-import { PhoneInput, formatPhoneForStorage, type CountryCode } from "@/components/ui/phone-input";
+import { PhoneInput, formatPhoneForStorage, isPhoneValid, detectCountry, type CountryCode } from "@/components/ui/phone-input";
 
 export type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
 
@@ -169,7 +169,7 @@ const newEntry = (): ManualEntry => ({
   streetAddress: "", city: "", state: "", country: "", postalCode: "",
 });
 // A manual entry imports if it has a name AND a LinkedIn profile — email is optional.
-const entryValid = (e: ManualEntry) => !!(e.name.trim() && e.linkedin.trim());
+const entryValid = (e: ManualEntry) => !!(e.name.trim() && e.linkedin.trim()) && isPhoneValid(e.phone, e.phoneCountry);
 const entryStarted = (e: ManualEntry) =>
   !!(e.name.trim() || e.email.trim() || e.company.trim() || e.title.trim() || e.phone.trim() ||
      e.companySize.trim() || e.seniority.trim() || e.twitter.trim() || e.linkedin.trim() ||
@@ -535,7 +535,12 @@ export function AddLeadsWizard({
     if (isCsv) {
       skipped = csvInvalid.length;
       payload = csvValid.map((r) => ({
-        full_name: r.full_name, email: r.email, phone: r.phone,
+        full_name: r.full_name, email: r.email,
+        // CSV phone text has no country column of its own — detectCountry falls
+        // back to "US" for anything without a leading "+", same as a manual
+        // entry with no country picked. Not perfect for non-US local-format
+        // numbers, but far better than storing the raw unformatted CSV text.
+        phone: r.phone?.trim() ? formatPhoneForStorage(r.phone, detectCountry(r.phone)) : null,
         company_name: r.company_name, industry: r.industry, interest_area: r.interest_area,
         job_title: r.job_title, seniority: r.seniority, department: r.department,
         company_size: r.company_size, annual_revenue: r.annual_revenue, twitter_handle: r.twitter_handle,
@@ -1262,7 +1267,16 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
                 <td className="px-3 py-2">{e.company || <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{e.phone ? formatPhoneForStorage(e.phone, e.phoneCountry) : <span className="text-slate-400">—</span>}</td>
                 <td className="px-3 py-2">{e.seniority || <span className="text-slate-400">—</span>}</td>
-                <td className="px-3 py-2">{entryValid(e) ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <span className="inline-flex items-center gap-1 text-red-600 text-xs"><AlertCircle className="h-3.5 w-3.5" /> Needs name + LinkedIn</span>}</td>
+                <td className="px-3 py-2">
+                  {entryValid(e) ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-red-600 text-xs">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      {!e.name.trim() || !e.linkedin.trim() ? "Needs name + LinkedIn" : "Invalid phone number"}
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

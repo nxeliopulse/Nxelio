@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Save, Send, Mail, Plus, Clock, AlertCircle,
   Loader2, Users2, Layers3, Trash2, Filter, LayoutTemplate, Wand2, CheckCircle2, Eye, Share2,
-  X,
+  X, Lock,
 } from "lucide-react";
+import { useFeatureKillSwitch } from "@/lib/hooks/use-feature-kill-switch";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -88,6 +89,7 @@ export default function CampaignBuilderPage() {
   const router = useRouter();
   const { toast } = useFeedback();
   const [pending, start] = useTransition();
+  const { enabled: launchEnabled } = useFeatureKillSwitch("launch_campaign");
 
   const [tab, setTab] = useState<TabId>("leads");
   const [name, setName] = useState("Untitled Campaign");
@@ -512,10 +514,17 @@ export default function CampaignBuilderPage() {
           )}
           <Button
             onClick={launch}
-            disabled={pending || !leadsGate || audienceEmpty || !approvalGate}
-            title={!leadsGate ? LEADS_GATE_MESSAGE : audienceEmpty ? AUDIENCE_EMPTY_MSG : !approvalGate ? APPROVAL_GATE_MESSAGE : undefined}
+            disabled={!launchEnabled || pending || !leadsGate || audienceEmpty || !approvalGate}
+            title={
+              !launchEnabled ? "Campaign launches have been temporarily disabled by the administrator."
+              : !leadsGate ? LEADS_GATE_MESSAGE : audienceEmpty ? AUDIENCE_EMPTY_MSG : !approvalGate ? APPROVAL_GATE_MESSAGE : undefined
+            }
           >
-            {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Launching…</> : <><Send className="h-4 w-4" /> Launch campaign</>}
+            {pending
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Launching…</>
+              : !launchEnabled
+              ? <><Lock className="h-4 w-4" /> Launch campaign</>
+              : <><Send className="h-4 w-4" /> Launch campaign</>}
           </Button>
         </div>
       </div>

@@ -10,6 +10,7 @@ import {
 import { consumeSendQuota } from "@/lib/outreach/send-quota";
 import { isSuppressed } from "@/lib/segments";
 import { exitEnrollmentByLead, advanceEnrollmentStep, completeEnrollment, checkAndCompleteCampaign } from "@/lib/campaigns/enrollment";
+import { isFeatureEnabledForSystem } from "@/lib/queries/feature-kill-switches";
 
 // Loosely-typed client — both the authenticated and admin clients expose the same query API.
 type Db = SupabaseClient;
@@ -271,9 +272,14 @@ export interface CampaignProcessResult { processed: number; sent: number; failed
  * once they reply, and pauses (leaves pending) if the campaign isn't Active.
  */
 export async function processDueCampaignJobs(limit = 50): Promise<CampaignProcessResult> {
+  const result: CampaignProcessResult = { processed: 0, sent: 0, failed: 0, skipped: 0, deferred: 0 };
+  // No user session here (cron), so no admin bypass either — a disabled
+  // switch leaves due jobs pending as-is; they're picked up again once it's
+  // back on, rather than being silently dropped or failed.
+  if (!(await isFeatureEnabledForSystem("launch_campaign"))) return result;
+
   const db = createAdminClient();
   const nowIso = new Date().toISOString();
-  const result: CampaignProcessResult = { processed: 0, sent: 0, failed: 0, skipped: 0, deferred: 0 };
 
   const { data: jobs } = await db
     .from("campaign_jobs")

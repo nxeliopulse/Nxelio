@@ -8,6 +8,7 @@ import { useSidebar } from "@/components/layout/sidebar-context";
 import { cn } from "@/lib/utils";
 import { bulkInsertContacts } from "@/lib/queries/contacts-import";
 import type { ContactRow } from "@/lib/queries/contacts";
+import { formatPhoneForStorage, detectCountry } from "@/components/ui/phone-input";
 
 // CSV-specific parsing, adapted from add-leads-wizard.tsx (splitCsvLine /
 // parseCsv / CSV_HEADER_MAP / CsvRow pattern) for the Contacts field set.
@@ -160,8 +161,10 @@ export function AddContactsWizard({ open, onClose }: { open: boolean; onClose: (
         first_name: r.first_name ?? "",
         last_name: r.last_name ?? "",
         email: r.email,
-        phone: r.phone,
-        mobile: r.mobile,
+        // Same best-effort formatting as manual entry with no country picked —
+        // CSV text has no country column of its own to key off of.
+        phone: r.phone?.trim() ? formatPhoneForStorage(r.phone, detectCountry(r.phone)) : null,
+        mobile: r.mobile?.trim() ? formatPhoneForStorage(r.mobile, detectCountry(r.mobile)) : null,
         job_title: r.job_title,
         department: r.department,
         mailing_street: r.mailing_street,

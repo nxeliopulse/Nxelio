@@ -5,6 +5,7 @@ import { getOnboarding } from "@/lib/queries/onboarding";
 import { isBlocked } from "@/lib/queries/blocklist";
 import { revalidatePath } from "next/cache";
 import type { ComposeEmailInput } from "@/lib/queries/contact-emails";
+import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
 
 export interface AccountEmailRow {
   id: string;
@@ -36,6 +37,9 @@ export async function getAccountEmails(accountId: string): Promise<AccountEmailR
  *  inbox_messages with account_id + to_email set. Cc/Bcc are passed to the
  *  send API but not persisted — only the primary "To" is kept in history. */
 export async function sendAccountEmail(accountId: string, input: ComposeEmailInput): Promise<{ ok: boolean; error?: string; simulated?: boolean }> {
+  if (!(await isFeatureEnabledForCurrentUser("send_email"))) {
+    return { ok: false, error: "Sending email has been temporarily disabled by the administrator." };
+  }
   const recipient = input.to.trim();
   if (!recipient) return { ok: false, error: "A recipient (To) is required." };
   if (!input.subject.trim()) return { ok: false, error: "Subject is required." };

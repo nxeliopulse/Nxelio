@@ -9,6 +9,7 @@ import { getOnboarding } from "@/lib/queries/onboarding";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
+import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
 
 export async function getEmailStatus() {
   return { configured: emailConfigured, domainVerified: emailDomainVerified };
@@ -37,6 +38,9 @@ export interface SendLeadEmailResult {
  * in the inbox thread so it shows up in conversation history.
  */
 export async function sendLeadEmail(leadId: string, subject: string, body: string): Promise<SendLeadEmailResult> {
+  if (!(await isFeatureEnabledForCurrentUser("send_email"))) {
+    return { ok: false, error: "Sending email has been temporarily disabled by the administrator." };
+  }
   const lead = await getLeadById(leadId);
   if (!lead) return { ok: false, error: "Lead not found" };
   if (!lead.email) return { ok: false, error: "This lead has no email address" };

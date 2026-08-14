@@ -175,6 +175,11 @@ export function PhoneInput({ label, country, value, onCountryChange, onValueChan
           type="tel"
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
+          // Normalize to international form as soon as the user leaves the
+          // field, not just whenever the parent form happens to submit — so a
+          // consumer that persists on blur (rather than waiting for a Save
+          // button) still stores a properly formatted value.
+          onBlur={() => { if (value.trim()) onValueChange(formatPhoneForStorage(value, country)); }}
           placeholder={examplePlaceholder(country)}
           className={inputClassName ?? "flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-400"}
           aria-invalid={!valid}

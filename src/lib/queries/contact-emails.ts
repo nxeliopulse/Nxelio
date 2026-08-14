@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email/resend";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { isBlocked } from "@/lib/queries/blocklist";
 import { revalidatePath } from "next/cache";
+import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
 
 export interface ContactEmailRow {
   id: string;
@@ -43,6 +44,9 @@ export async function getContactEmails(contactId: string): Promise<ContactEmailR
  *  inbox_messages with contact_id + to_email set. Cc/Bcc are passed to the
  *  send API but not persisted — only the primary "To" is kept in history. */
 export async function sendContactEmail(contactId: string, input: ComposeEmailInput): Promise<{ ok: boolean; error?: string; simulated?: boolean }> {
+  if (!(await isFeatureEnabledForCurrentUser("send_email"))) {
+    return { ok: false, error: "Sending email has been temporarily disabled by the administrator." };
+  }
   const recipient = input.to.trim();
   if (!recipient) return { ok: false, error: "A recipient (To) is required." };
   if (!input.subject.trim()) return { ok: false, error: "Subject is required." };
