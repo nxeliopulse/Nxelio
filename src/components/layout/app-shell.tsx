@@ -14,6 +14,7 @@ import { TourProvider } from "@/components/tour/tour-context";
 import { CURRENT_VERSIONS } from "@/components/tour/tour-registry";
 import { markTourSeen } from "@/lib/queries/tour";
 import type { MyWorkspaceRow } from "@/lib/queries/workspaces";
+import { IdleTimeoutProvider } from "@/components/layout/idle-timeout-provider";
 
 interface Props {
   userName: string;
@@ -23,6 +24,8 @@ interface Props {
   onboardingCompleted?: boolean;
   mailboxConnected?: boolean;
   workspaces?: MyWorkspaceRow[];
+  idleTimeoutMinutes: number;
+  warningLeadMinutes: number;
   children: React.ReactNode;
 }
 
@@ -68,9 +71,11 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
 export function AppShell(props: Props) {
   return (
     <FeedbackProvider>
-      <SidebarProvider>
-        <Shell {...props} />
-      </SidebarProvider>
+      <IdleTimeoutProvider idleTimeoutMinutes={props.idleTimeoutMinutes} warningLeadMinutes={props.warningLeadMinutes}>
+        <SidebarProvider>
+          <Shell {...props} />
+        </SidebarProvider>
+      </IdleTimeoutProvider>
     </FeedbackProvider>
   );
 }
