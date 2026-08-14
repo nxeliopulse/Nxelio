@@ -1,27 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getIdleTimeoutMinutes, IDLE_ACTIVITY_COOKIE } from "@/lib/idle-timeout-config";
+import { isPublicPath, isIdleExpired } from "@/lib/idle-timeout-rules";
 
 // NOTE: this app is on a Next.js version where "Middleware" was renamed to
 // "Proxy" (file must be named proxy.ts, exported function must be named
 // `proxy`, not `middleware`) — see node_modules/next/dist/docs/01-app/
 // 03-api-reference/03-file-conventions/proxy.md. Functionality is the same.
-
-// Paths with no authenticated app session — the idle-timeout check below
-// skips these. Separate from (and broader than) the isAppPage allowlist
-// further down, which only gates the login/dashboard redirect and predates
-// several newer sections (accounts, contacts, opportunities, etc.) — reusing
-// its gaps here would leave those pages unprotected by the idle timeout.
-const PUBLIC_PATH_PREFIXES = [
-  "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email", "/check-email",
-  "/auth", "/privacy", "/terms", "/capture", "/book", "/checkout-return",
-  "/admin", "/api",
-];
-
-function isPublicPath(pathname: string): boolean {
-  if (pathname === "/") return true;
-  return PUBLIC_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -81,7 +66,7 @@ export async function proxy(request: NextRequest) {
     const lastActivity = lastActivityRaw ? Number(lastActivityRaw) : null;
     const idleLimitMs = getIdleTimeoutMinutes() * 60_000;
 
-    if (lastActivity !== null && Number.isFinite(lastActivity) && now - lastActivity > idleLimitMs) {
+    if (isIdleExpired(lastActivity, now, idleLimitMs)) {
       try {
         await supabase.auth.signOut(); // reassigns `response` via setAll above, clearing the Supabase session cookies
       } catch {

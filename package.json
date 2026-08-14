@@ -14,7 +14,8 @@
     "test:ai-proactive": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-proactive-ai.mjs",
     "test:ai-dashboard": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-ai-dashboard.mjs",
     "test:ai-contextual": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-ai-contextual.mjs",
-    "test:feature-kill-switches": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-feature-kill-switches.mjs"
+    "test:feature-kill-switches": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-feature-kill-switches.mjs",
+    "test:idle-timeout": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-idle-timeout.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
