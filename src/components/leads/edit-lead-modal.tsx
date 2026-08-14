@@ -14,6 +14,7 @@ import { isSuperAdmin } from "@/lib/queries/auth-guards";
 import { PhoneInput, detectCountry, formatPhoneForStorage } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
+import { isValidEmail, isValidWebsite, EMAIL_ERROR, WEBSITE_ERROR } from "@/lib/validation";
 
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
@@ -85,6 +86,8 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
       setError("At least one of Email, Website, or LinkedIn is required.");
       return;
     }
+    if (!isValidEmail(form.email)) { setError(EMAIL_ERROR); return; }
+    if (!isValidWebsite(form.website_url)) { setError(WEBSITE_ERROR); return; }
     // Status changes need a reason, logged separately from the rest of the
     // form — collect it before touching anything, so canceling here aborts
     // the whole save rather than silently dropping just the status change.

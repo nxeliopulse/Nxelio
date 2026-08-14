@@ -11,6 +11,7 @@ import type { ContactRow } from "@/lib/queries/contacts";
 import { OPPORTUNITY_STAGES, STAGE_LABELS, type OpportunityStage } from "@/lib/opportunities";
 import type { LeadRow } from "@/lib/queries/leads";
 import { cn } from "@/lib/utils";
+import { isValidEmail, isValidWebsite, EMAIL_ERROR, WEBSITE_ERROR } from "@/lib/validation";
 
 function splitName(fullName: string | null): { first: string; last: string } {
   const parts = (fullName || "").trim().split(/\s+/);
@@ -114,6 +115,8 @@ export function ConvertLeadModal({
   }, [effectiveAccountName, open]);
 
   async function handleConvert() {
+    if (accountMode === "new" && !isValidWebsite(accountWebsite)) { toast(WEBSITE_ERROR, "error"); return; }
+    if (contactMode === "new" && !isValidEmail(contactEmail)) { toast(EMAIL_ERROR, "error"); return; }
     setSaving(true);
     try {
       const result = await convertLead({

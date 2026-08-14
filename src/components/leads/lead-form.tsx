@@ -6,6 +6,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { industries, interestAreas } from "@/lib/mock-data";
 import { User, Building2, AlertCircle } from "lucide-react";
 import { createLead } from "@/lib/queries/leads";
+import { isValidEmail, isValidWebsite, EMAIL_ERROR, WEBSITE_ERROR } from "@/lib/validation";
 
 export function LeadForm({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState("details");
@@ -42,6 +43,8 @@ export function LeadForm({ onClose }: { onClose: () => void }) {
       setError("Email or website URL is required");
       return;
     }
+    if (!isValidEmail(form.email)) { setError(EMAIL_ERROR); return; }
+    if (!isValidWebsite(form.website_url)) { setError(WEBSITE_ERROR); return; }
 
     start(async () => {
       try {
