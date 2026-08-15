@@ -46,7 +46,7 @@ async function resolveWorkspace(sub: Stripe.Subscription): Promise<string | null
   return workspaceByStripeCustomer(customerId(sub));
 }
 
-async function upsertFromSubscription(sub: Stripe.Subscription) {
+async function upsertFromSubscription(sub: Stripe.Subscription, checkoutSessionId?: string) {
   const workspaceId = await resolveWorkspace(sub);
   if (!workspaceId) return;
 
@@ -98,7 +98,13 @@ async function upsertFromSubscription(sub: Stripe.Subscription) {
     canceledAt:           sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
   });
 
-  await finalizePendingPromotion(workspaceId, { stripeSubscriptionId: sub.id });
+  // Only ever finalize a promo from the actual checkout.session.completed
+  // event, where checkoutSessionId is real and known — not from every later
+  // subscription.updated/invoice.paid event for this workspace, which would
+  // grab and grant whatever stale pending redemption happens to exist.
+  if (checkoutSessionId) {
+    await finalizePendingPromotion(workspaceId, { stripeSubscriptionId: sub.id, checkoutSessionId });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -127,7 +133,7 @@ export async function POST(req: NextRequest) {
         if (session.subscription) {
           const subId = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
           const sub = await stripe().subscriptions.retrieve(subId);
-          await upsertFromSubscription(sub);
+          await upsertFromSubscription(sub, session.id);
         }
         break;
       }

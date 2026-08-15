@@ -44,20 +44,35 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow, 
     return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "This campaign must be approved before it can be launched." };
   }
 
+  const steps = parseCampaignSteps(campaign.content, campaign.subject);
+  const step1 = steps[0];
+  if (!step1 || (!step1.subject && !step1.body)) {
+    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: `This campaign has no ${step1?.channel === "linkedin" ? "LinkedIn message" : "email"} content yet.` };
+  }
+
   // A campaign's audience is a snapshot taken at launch, never a live segment
   // re-resolved on every send — re-clicking Launch on an already-Active campaign
   // must never re-enroll/re-send to leads added to the segment afterward. This
   // is the authoritative server-side guard; the "Launch" button is also disabled
   // client-side once Active, but that alone isn't enough (an API call could
   // still bypass it), so it's enforced here too.
-  if (campaign.status === "Active") {
+  //
+  // Claimed atomically and BEFORE resolving the audience or sending anything —
+  // an exception partway through a previous attempt (or a concurrent/retried
+  // call) left the campaign at its pre-launch status until the very end of a
+  // successful run, so a crash mid-send never tripped this guard and the next
+  // cron tick would resend to the whole audience again. The UPDATE...WHERE
+  // only ever succeeds for one caller since Postgres locks the row during the
+  // update itself.
+  const { data: claimed } = await supabase
+    .from("campaigns")
+    .update({ status: "Active" })
+    .eq("id", campaignId)
+    .neq("status", "Active")
+    .select("id")
+    .maybeSingle();
+  if (!claimed) {
     return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "This campaign has already launched — its audience is locked to who was enrolled at launch time." };
-  }
-
-  const steps = parseCampaignSteps(campaign.content, campaign.subject);
-  const step1 = steps[0];
-  if (!step1 || (!step1.subject && !step1.body)) {
-    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: `This campaign has no ${step1?.channel === "linkedin" ? "LinkedIn message" : "email"} content yet.` };
   }
 
   // Resolve audience (segment members, or all workspace leads). Email sequences
@@ -181,7 +196,6 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow, 
 
   await supabase.from("campaigns").update({
     sent_count: (campaign.sent_count || 0) + sent,
-    status: "Active",
     approval_status: "Live/Distributing",
   }).eq("id", campaignId);
 

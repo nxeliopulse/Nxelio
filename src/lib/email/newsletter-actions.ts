@@ -163,6 +163,22 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
 
   const n = newsletter as NewsletterRow;
 
+  // Atomically claim this newsletter for sending BEFORE resolving recipients
+  // or checking credits — a plain status check here (read now, write later)
+  // would let two overlapping calls (a double-click, or a client retry) both
+  // pass and both send/charge twice. The UPDATE...WHERE only ever succeeds
+  // for one caller since Postgres locks the row during the update itself.
+  const { data: claimed } = await supabase
+    .from("newsletters")
+    .update({ status: "Sending" })
+    .eq("id", n.id)
+    .not("status", "in", '("Sending","Sent")')
+    .select("id")
+    .maybeSingle();
+  if (!claimed) {
+    return { ok: false, error: "This newsletter is already sending or has already been sent." };
+  }
+
   // 2. Resolve recipients with the RLS client so we ONLY ever reach the current
   //    workspace's leads (the admin client would leak/mail every tenant's leads).
   let query = supabase.from("leads").select("id, email, full_name, company_name, industry, interest_area").not("email", "is", null);
@@ -185,9 +201,9 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
     return { ok: false, error: `You don't have enough AI credits to send this newsletter to ${leads.length} recipient${leads.length === 1 ? "" : "s"} (${CREDITS_PER_NEWSLETTER_LEAD} credits/lead). Upgrade your plan or wait for your next cycle.` };
   }
 
-  // 3. Mark newsletter as Sending
+  // 3. Record the recipient count now that it's known (status was already
+  // claimed as "Sending" above).
   await supabase.from("newsletters").update({
-    status: "Sending",
     recipient_count: leads.length,
   }).eq("id", n.id);
 
