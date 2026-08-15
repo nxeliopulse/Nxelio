@@ -13,19 +13,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { stripe, PRICE_ID_TO_PLAN, PLAN_CREDITS, PLAN_LEADS } from "@/lib/stripe";
 import { syncSubscriptionFromStripe } from "@/lib/queries/subscriptions";
+import { mapStripeStatus } from "@/lib/queries/subscription-types";
 import { finalizePendingPromotion } from "@/lib/queries/promotions";
 import type { PlanId, BillingInterval } from "@/lib/queries/subscriptions";
 import type Stripe from "stripe";
-
-function mapStatus(s: Stripe.Subscription.Status): "trialing" | "active" | "past_due" | "canceled" {
-  switch (s) {
-    case "trialing":  return "trialing";
-    case "canceled":  return "canceled";
-    case "past_due":
-    case "unpaid":    return "past_due";
-    default:          return "active";
-  }
-}
 
 export async function GET(req: NextRequest) {
   const origin        = new URL(req.url).origin;
@@ -79,7 +70,7 @@ export async function GET(req: NextRequest) {
           workspaceId:          profile.workspace_id,
           planId:               parsed.planId as PlanId,
           billingInterval:      parsed.interval as BillingInterval,
-          status:               mapStatus(stripeSub.status),
+          status:               mapStripeStatus(stripeSub.status),
           creditsTotal:         PLAN_CREDITS[parsed.planId] ?? 0,
           leadsTotal:           PLAN_LEADS[parsed.planId] ?? 0,
           currentPeriodStart:   new Date(item.current_period_start * 1000),
@@ -88,6 +79,8 @@ export async function GET(req: NextRequest) {
           stripeCustomerId,
           stripeSubscriptionId: stripeSub.id,
           stripePriceId:        priceId,
+          cancelAtPeriodEnd:    stripeSub.cancel_at_period_end,
+          canceledAt:           stripeSub.canceled_at ? new Date(stripeSub.canceled_at * 1000) : null,
         });
 
         await finalizePendingPromotion(profile.workspace_id, {

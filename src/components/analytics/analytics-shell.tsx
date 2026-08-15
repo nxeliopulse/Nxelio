@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, Database, Sparkles, Eye, EyeOff } from "lucide-react";
+import { LayoutDashboard, FileText, Database, Sparkles, Eye, EyeOff, Gauge, Users, PieChart, Megaphone, Mail, CalendarCheck, GitBranch, DollarSign, Building2, Bot, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAssistant } from "@/components/layout/assistant-context";
 import { FolderTree } from "@/components/analytics/folder-tree";
@@ -12,6 +12,17 @@ import type { DashboardSummary } from "@/lib/queries/analytics-dashboards";
 import type { ReportDefinition } from "@/lib/analytics-reports";
 
 const RAIL_ITEMS = [
+  { key: "overview", label: "Overview", icon: Gauge, href: "/analytics/overview" },
+  { key: "prospects", label: "Prospects", icon: Users, href: "/analytics/prospects" },
+  { key: "segments", label: "Segments", icon: PieChart, href: "/analytics/segments" },
+  { key: "campaigns", label: "Campaigns", icon: Megaphone, href: "/analytics/campaigns" },
+  { key: "engagement", label: "Engagement", icon: Mail, href: "/analytics/engagement" },
+  { key: "meetings", label: "Meetings", icon: CalendarCheck, href: "/analytics/meetings" },
+  { key: "pipeline", label: "Pipeline", icon: GitBranch, href: "/analytics/pipeline" },
+  { key: "revenue", label: "Revenue", icon: DollarSign, href: "/analytics/revenue" },
+  { key: "accounts", label: "Accounts", icon: Building2, href: "/analytics/accounts" },
+  { key: "ai-performance", label: "AI Performance", icon: Bot, href: "/analytics/ai-performance" },
+  { key: "team", label: "Team", icon: Trophy, href: "/analytics/team" },
   { key: "dashboards", label: "Dashboards", icon: LayoutDashboard, href: "/analytics?type=dashboard" },
   { key: "reports", label: "Reports", icon: FileText, href: "/analytics?type=report" },
   { key: "data", label: "Data", icon: Database, href: "/analytics/data" },
@@ -40,7 +51,20 @@ export function AnalyticsShell({
         <div className="w-56 flex-shrink-0 border-r border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/20 p-3 space-y-4 overflow-y-auto">
           <div className="space-y-0.5">
             {RAIL_ITEMS.map((item) => {
-              const active = item.key === "data" ? pathname.startsWith("/analytics/data") : pathname === "/analytics" && item.href.includes(item.key === "dashboards" ? "dashboard" : "report");
+              const active =
+                item.key === "overview" ? pathname.startsWith("/analytics/overview") :
+                item.key === "prospects" ? pathname.startsWith("/analytics/prospects") :
+                item.key === "segments" ? pathname.startsWith("/analytics/segments") :
+                item.key === "campaigns" ? pathname.startsWith("/analytics/campaigns") :
+                item.key === "engagement" ? pathname.startsWith("/analytics/engagement") :
+                item.key === "meetings" ? pathname.startsWith("/analytics/meetings") :
+                item.key === "pipeline" ? pathname.startsWith("/analytics/pipeline") :
+                item.key === "revenue" ? pathname.startsWith("/analytics/revenue") :
+                item.key === "accounts" ? pathname.startsWith("/analytics/accounts") :
+                item.key === "ai-performance" ? pathname.startsWith("/analytics/ai-performance") :
+                item.key === "team" ? pathname.startsWith("/analytics/team") :
+                item.key === "data" ? pathname.startsWith("/analytics/data") :
+                pathname === "/analytics" && item.href.includes(item.key === "dashboards" ? "dashboard" : "report");
               return (
                 <Link
                   key={item.key}

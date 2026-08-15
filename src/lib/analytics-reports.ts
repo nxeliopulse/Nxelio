@@ -3,7 +3,7 @@
 // field/operator catalogs and types directly — mirrors the split already
 // used by src/lib/segments.ts for the segment rule model.
 
-export type ReportDataSource = "leads" | "opportunities" | "campaigns" | "accounts" | "contacts";
+export type ReportDataSource = "leads" | "opportunities" | "campaigns" | "accounts" | "contacts" | "meetings" | "segments";
 
 export type MetricDefinition =
   | { type: "count" }
@@ -221,6 +221,28 @@ export const REPORT_DATA_SOURCES: Record<ReportDataSource, DataSourceMeta> = {
       { key: "lead_source", label: "Lead Source", type: "text", filterable: true, groupable: true },
       { key: "department", label: "Department", type: "text", filterable: true, groupable: true },
       { key: "contact_owner", label: "Owner", type: "text", filterable: true, groupable: true },
+      { key: "created_at", label: "Created", type: "date", filterable: true, groupable: true },
+    ],
+  },
+  meetings: {
+    table: "meetings",
+    label: "Meetings",
+    defaultDateField: "start_at",
+    fields: [
+      { key: "status", label: "Status", type: "text", filterable: true, groupable: true },
+      { key: "provider", label: "Provider", type: "text", filterable: true, groupable: true },
+      { key: "start_at", label: "Start Date", type: "date", filterable: true, groupable: true },
+      { key: "created_at", label: "Created", type: "date", filterable: true, groupable: true },
+    ],
+  },
+  segments: {
+    table: "segments",
+    label: "Segments / Audiences",
+    defaultDateField: "created_at",
+    fields: [
+      { key: "segment_type", label: "Type", type: "text", filterable: true, groupable: true },
+      { key: "status", label: "Status", type: "text", filterable: true, groupable: true },
+      { key: "logic_type", label: "Logic", type: "text", filterable: true, groupable: true },
       { key: "created_at", label: "Created", type: "date", filterable: true, groupable: true },
     ],
   },

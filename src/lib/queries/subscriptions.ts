@@ -156,6 +156,8 @@ export interface SyncPayload {
   stripeCustomerId: string;
   stripeSubscriptionId: string;
   stripePriceId: string;
+  cancelAtPeriodEnd: boolean;
+  canceledAt: Date | null;
 }
 
 export async function syncSubscriptionFromStripe(payload: SyncPayload): Promise<void> {
@@ -191,6 +193,8 @@ export async function syncSubscriptionFromStripe(payload: SyncPayload): Promise<
       stripe_customer_id:     payload.stripeCustomerId,
       stripe_subscription_id: payload.stripeSubscriptionId,
       stripe_price_id:        payload.stripePriceId,
+      cancel_at_period_end:   payload.cancelAtPeriodEnd,
+      canceled_at:            payload.canceledAt?.toISOString() ?? null,
     },
     { onConflict: "workspace_id" }
   );
@@ -227,9 +231,15 @@ export async function syncSubscriptionFromStripe(payload: SyncPayload): Promise<
   }
 }
 
-export async function resetCycleCredits(workspaceId: string): Promise<void> {
+/**
+ * `idempotencyKey` should be the Stripe invoice ID that triggered this
+ * reset. Stripe redelivers webhooks (at-least-once delivery), so without
+ * this the same renewal invoice could grant a second full free credits/
+ * leads refill if its invoice.paid event ever arrives twice.
+ */
+export async function resetCycleCredits(workspaceId: string, idempotencyKey?: string): Promise<void> {
   const admin = createAdminClient();
-  await admin.rpc("reset_subscription_cycle", { p_workspace_id: workspaceId });
+  await admin.rpc("reset_subscription_cycle", { p_workspace_id: workspaceId, p_idempotency_key: idempotencyKey ?? null });
 }
 
 export async function workspaceByStripeCustomer(
