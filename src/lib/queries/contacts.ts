@@ -152,8 +152,12 @@ export async function createContact(payload: Partial<ContactRow>) {
 export async function updateContact(id: string, payload: Partial<ContactRow>) {
   assertValidContactPhoneFields(payload);
   const supabase = await createClient();
-  const { error } = await supabase.from("contacts").update(payload).eq("id", id);
+  // .select("id") to get the updated row back — PostgREST reports no error when
+  // RLS silently blocks an update (0 rows affected looks identical to success
+  // otherwise), same footgun already handled below in deleteContact.
+  const { data, error } = await supabase.from("contacts").update(payload).eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error("Contact not found, or you don't have permission to edit it.");
   revalidatePath("/contacts");
   revalidatePath(`/contacts/${id}`);
   if (payload.account_id) revalidatePath(`/accounts/${payload.account_id}`);

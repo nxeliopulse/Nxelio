@@ -1,10 +1,12 @@
 "use server";
 import { aiJson } from "@/lib/ai/client";
-import { brightDataConfigured, brightDataSearchPeople, brightDataFindCompanyWebsite } from "@/lib/leads/bright-data";
+import { brightDataConfigured, brightDataSearchPeople, brightDataFindCompanyWebsite, brightDataSearchCompanies } from "@/lib/leads/bright-data";
 import { anysiteConfigured, findEmailsByLinkedIn } from "@/lib/leads/anysite";
 import { guessAndVerifyEmail } from "@/lib/leads/email-guess";
-import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
+import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, deductLeads } from "@/lib/queries/subscriptions";
 import { mapWithConcurrency } from "@/lib/utils";
+import { bulkInsertLeads } from "@/lib/queries/leads";
+import { findMatchingAccount, createAccount } from "@/lib/queries/accounts";
 
 export interface BuyCriteria {
   industry: string;
@@ -65,7 +67,7 @@ export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeads
   if (brightDataConfigured) {
     const r = await brightDataSearchPeople(criteria);
     if (r.ok && r.prospects.length) {
-      let prospects: GeneratedProspect[] = r.prospects.map((p) => ({
+      const prospects: GeneratedProspect[] = r.prospects.map((p) => ({
         full_name: p.full_name,
         first_name: p.first_name,
         last_name: p.last_name,
@@ -78,69 +80,7 @@ export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeads
         location: p.location,
         email: p.email || "",
       }));
-
-      // Company website — free, reuses the same Bright Data credentials as the
-      // people search. One lookup per UNIQUE company (leads sharing an employer
-      // share the result) instead of one per prospect.
-      const companyNames = [...new Set(prospects.map((p) => p.company_name).filter(Boolean))];
-      const websiteByCompany = new Map<string, string | null>();
-      await mapWithConcurrency(companyNames, 5, async (name) => {
-        websiteByCompany.set(name, await brightDataFindCompanyWebsite(name));
-      });
-      prospects = prospects.map((p) => ({
-        ...p,
-        website_url: (p.company_name && websiteByCompany.get(p.company_name)) || p.website_url,
-      }));
-
-      // Enrich real LinkedIn profiles with an email via Anysite, when configured.
-      // Never fabricated — a lookup miss just leaves email empty.
-      if (anysiteConfigured) {
-        const urls = prospects.map((p) => p.linkedin).filter((u): u is string => Boolean(u));
-        console.log(`[buy-leads] Enriching ${urls.length} profiles with AnySite email lookup…`);
-        const found = await findEmailsByLinkedIn(urls);
-        prospects = prospects.map((p) => {
-          const hit = p.linkedin ? found.get(p.linkedin) : undefined;
-          return hit?.ok ? { ...p, email: hit.email || p.email, emailVerificationStatus: hit.email ? "valid" : p.emailVerificationStatus } : p;
-        });
-        const emailCount = prospects.filter(p => p.email).length;
-        console.log(`[buy-leads] Email enrichment done: ${emailCount}/${prospects.length} prospects have an email`);
-        // Log misses so we can debug
-        found.forEach((result, url) => {
-          if (!result.ok) console.log(`[buy-leads] Miss: ${url} → ${result.error}`);
-        });
-      }
-
-      // Free fallback: for anyone AnySite (or no AnySite) still left without an
-      // email, try the pattern-guess + SMTP-verify method against their company
-      // website. See email-guess.ts for the serverless/port-25 caveat — this
-      // step is a no-op (fails closed, never fabricates) wherever outbound SMTP
-      // isn't reachable, e.g. on Vercel.
-      const stillMissing = prospects.filter((p) => !p.email && p.website_url && p.full_name);
-      if (stillMissing.length) {
-        const guesses = await mapWithConcurrency(stillMissing, 5, async (p) => {
-          const r = await guessAndVerifyEmail(p.full_name, p.website_url);
-          return { key: p.linkedin || p.full_name, result: r };
-        });
-        const guessByKey = new Map(guesses.map((g) => [g.key, g.result]));
-        prospects = prospects.map((p) => {
-          if (p.email) return p;
-          const g = guessByKey.get(p.linkedin || p.full_name);
-          return g?.ok && g.email ? { ...p, email: g.email, emailVerificationStatus: g.status } : p;
-        });
-      }
-
-      // Real filter — only drop prospects whose email was actually confirmed
-      // by one of the checks above (Anysite hit, SMTP-valid, or catch-all
-      // best-guess). Never relaxes into keeping an unconfirmed contact.
-      if (criteria.requireVerifiedEmail) {
-        prospects = prospects.filter((p) => p.email && p.emailVerificationStatus);
-      }
-
-      if (!prospects.length) {
-        return { ok: false, prospects: [], error: criteria.requireVerifiedEmail ? "No prospects with a verified email found. Try broader criteria or turn off that filter." : "No prospects found." };
-      }
-
-      return { ok: true, source: "brightdata", prospects };
+      return enrichAndFilterProspects(prospects, criteria.requireVerifiedEmail);
     }
     // Bright Data configured but failed → surface the error rather than faking data.
     return { ok: false, prospects: [], error: r.error || "No prospects found." };
@@ -148,6 +88,223 @@ export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeads
   // No Bright Data key → AI samples.
   const ai = await generateSampleProspects(criteria);
   return { ...ai, source: "ai" };
+}
+
+/**
+ * Shared by searchBuyLeads and searchPeopleAtCompanies (Company-wise Leads):
+ * resolves each prospect's company website, enriches with a real email via
+ * Anysite when configured, falls back to the pattern-guess+SMTP-verify method,
+ * then (optionally) drops anyone whose email was never actually confirmed.
+ * Never fabricates a website, email, or verification status.
+ */
+async function enrichAndFilterProspects(rawProspects: GeneratedProspect[], requireVerifiedEmail?: boolean): Promise<BuyLeadsResult> {
+  let prospects = rawProspects;
+
+  // Company website — free, reuses the same Bright Data credentials as the
+  // people search. One lookup per UNIQUE company (leads sharing an employer
+  // share the result) instead of one per prospect.
+  const companyNames = [...new Set(prospects.map((p) => p.company_name).filter(Boolean))];
+  const websiteByCompany = new Map<string, string | null>();
+  await mapWithConcurrency(companyNames, 5, async (name) => {
+    websiteByCompany.set(name, await brightDataFindCompanyWebsite(name));
+  });
+  prospects = prospects.map((p) => ({
+    ...p,
+    website_url: (p.company_name && websiteByCompany.get(p.company_name)) || p.website_url,
+  }));
+
+  // Enrich real LinkedIn profiles with an email via Anysite, when configured.
+  // Never fabricated — a lookup miss just leaves email empty.
+  if (anysiteConfigured) {
+    const urls = prospects.map((p) => p.linkedin).filter((u): u is string => Boolean(u));
+    console.log(`[buy-leads] Enriching ${urls.length} profiles with AnySite email lookup…`);
+    const found = await findEmailsByLinkedIn(urls);
+    prospects = prospects.map((p) => {
+      const hit = p.linkedin ? found.get(p.linkedin) : undefined;
+      return hit?.ok ? { ...p, email: hit.email || p.email, emailVerificationStatus: hit.email ? "valid" : p.emailVerificationStatus } : p;
+    });
+    const emailCount = prospects.filter(p => p.email).length;
+    console.log(`[buy-leads] Email enrichment done: ${emailCount}/${prospects.length} prospects have an email`);
+    found.forEach((result, url) => {
+      if (!result.ok) console.log(`[buy-leads] Miss: ${url} → ${result.error}`);
+    });
+  }
+
+  // Free fallback: for anyone AnySite (or no AnySite) still left without an
+  // email, try the pattern-guess + SMTP-verify method against their company
+  // website. See email-guess.ts for the serverless/port-25 caveat — this
+  // step is a no-op (fails closed, never fabricates) wherever outbound SMTP
+  // isn't reachable, e.g. on Vercel.
+  const stillMissing = prospects.filter((p) => !p.email && p.website_url && p.full_name);
+  if (stillMissing.length) {
+    const guesses = await mapWithConcurrency(stillMissing, 5, async (p) => {
+      const r = await guessAndVerifyEmail(p.full_name, p.website_url);
+      return { key: p.linkedin || p.full_name, result: r };
+    });
+    const guessByKey = new Map(guesses.map((g) => [g.key, g.result]));
+    prospects = prospects.map((p) => {
+      if (p.email) return p;
+      const g = guessByKey.get(p.linkedin || p.full_name);
+      return g?.ok && g.email ? { ...p, email: g.email, emailVerificationStatus: g.status } : p;
+    });
+  }
+
+  // Real filter — only drop prospects whose email was actually confirmed
+  // by one of the checks above (Anysite hit, SMTP-valid, or catch-all
+  // best-guess). Never relaxes into keeping an unconfirmed contact.
+  if (requireVerifiedEmail) {
+    prospects = prospects.filter((p) => p.email && p.emailVerificationStatus);
+  }
+
+  if (!prospects.length) {
+    return { ok: false, prospects: [], error: requireVerifiedEmail ? "No prospects with a verified email found. Try broader criteria or turn off that filter." : "No prospects found." };
+  }
+
+  return { ok: true, source: "brightdata", prospects };
+}
+
+// ============================================================================
+// Company-wise Leads — company-first discovery, then people at those companies
+// ============================================================================
+export interface CompanySearchCriteria {
+  industry: string;
+  subIndustry?: string;
+  locations: string[];
+  /** Query-hint only, same caveat as BuyCriteria.companySize — no real per-company
+   *  headcount data exists in this pipeline, so it's never written back as a field. */
+  companySize?: string;
+  companyType?: string;
+  keywords?: string;
+  count: number;
+}
+
+export interface GeneratedCompany {
+  name: string;
+  industry: string;
+  /** "" when unavailable — never guessed. */
+  location: string;
+  /** Real LinkedIn company page URL. */
+  linkedin: string;
+  /** Resolved via the same free website-lookup as people search; null if not found. */
+  website: string | null;
+}
+
+export interface CompanySearchResult {
+  ok: boolean;
+  companies: GeneratedCompany[];
+  source?: "brightdata" | "ai";
+  error?: string;
+}
+
+/** Company-first discovery for the "Company-wise Leads" tab — mirrors searchBuyLeads's
+ *  gating/fallback shape exactly, just for companies instead of people. */
+export async function searchCompanies(rawCriteria: CompanySearchCriteria): Promise<CompanySearchResult> {
+  if (!(await hasFeature("discovery"))) {
+    return { ok: false, companies: [], error: "Lead discovery isn't included on your plan. Upgrade to Starter or Pro to unlock it." };
+  }
+  const maxAllowed = await getMaxBuyLeadsCount();
+  const criteria: CompanySearchCriteria = { ...rawCriteria, count: Math.max(1, Math.min(rawCriteria.count, maxAllowed)) };
+
+  if (brightDataConfigured) {
+    const r = await brightDataSearchCompanies(criteria);
+    if (r.ok && r.companies.length) {
+      const websiteByName = new Map<string, string | null>();
+      await mapWithConcurrency(r.companies, 5, async (c) => {
+        websiteByName.set(c.name, await brightDataFindCompanyWebsite(c.name));
+      });
+      const companies: GeneratedCompany[] = r.companies.map((c) => ({
+        name: c.name,
+        industry: c.industry,
+        location: c.location,
+        linkedin: c.linkedin,
+        website: websiteByName.get(c.name) ?? null,
+      }));
+      return { ok: true, source: "brightdata", companies };
+    }
+    return { ok: false, companies: [], error: r.error || "No companies found." };
+  }
+  const ai = await generateSampleCompanies(criteria);
+  return { ...ai, source: "ai" };
+}
+
+/** AI-sample fallback for company search, same honesty rules as generateSampleProspects:
+ *  clearly-fake .example.com domains, no LinkedIn URL (that would imply a real profile). */
+async function generateSampleCompanies(criteria: CompanySearchCriteria): Promise<CompanySearchResult> {
+  const count = Math.max(1, Math.min(100, Math.round(criteria.count || 10)));
+  const system = "You generate SAMPLE B2B company data for a sales-tool demo. The data is synthetic, not real companies. Return ONLY valid JSON.";
+  const prompt = `Generate ${count} sample companies matching:
+- Industry: ${criteria.industry || "any"}${criteria.subIndustry ? ` (${criteria.subIndustry})` : ""}
+- Location: ${criteria.locations.length ? criteria.locations.join(", ") : "global"}
+${criteria.keywords ? `- Keywords: ${criteria.keywords}` : ""}
+
+Return JSON: { "companies": [ { "name": "Company Name", "industry": "Industry" } ] }
+Rules: ${count} items. Realistic, varied company names for the industry/location. No websites, no LinkedIn URLs.`;
+  try {
+    const out = await aiJson<{ companies: { name: string; industry?: string }[] }>({ system, prompt, temperature: 0.8, maxTokens: 2048 });
+    const companies: GeneratedCompany[] = (out.companies || [])
+      .filter((c) => c && c.name)
+      .slice(0, count)
+      .map((c) => ({ name: String(c.name).trim(), industry: String(c.industry || criteria.industry || "").trim(), location: "", linkedin: "", website: null }));
+    if (!companies.length) return { ok: false, companies: [], error: "No companies were generated. Try broader criteria." };
+    return { ok: true, companies };
+  } catch (e) {
+    return { ok: false, companies: [], error: e instanceof Error ? e.message : "Generation failed" };
+  }
+}
+
+export interface CompanyPeopleCriteria {
+  companyNames: string[];
+  department?: string;
+  role: string;
+  seniority?: string;
+  locations?: string[];
+  count: number;
+  requireVerifiedEmail?: boolean;
+}
+
+/** Second stage of Company-wise Leads: people search scoped to the selected
+ *  companies, reusing the exact same enrichment pipeline as Individual Leads. */
+export async function searchPeopleAtCompanies(rawCriteria: CompanyPeopleCriteria): Promise<BuyLeadsResult> {
+  if (!(await hasFeature("discovery"))) {
+    return { ok: false, prospects: [], error: "Lead discovery isn't included on your plan. Upgrade to Starter or Pro to unlock it." };
+  }
+  if (!rawCriteria.companyNames.length) {
+    return { ok: false, prospects: [], error: "Select at least one company first." };
+  }
+  const maxAllowed = await getMaxBuyLeadsCount();
+  const count = Math.max(1, Math.min(rawCriteria.count, maxAllowed));
+
+  if (!brightDataConfigured) {
+    return { ok: false, prospects: [], error: "Lead discovery requires Bright Data to be configured." };
+  }
+  // Department has no dedicated query field in Bright Data's SERP-based search —
+  // fold it into the same free-text "role" term the way job title already works,
+  // rather than inventing a filter the data source can't actually apply.
+  const role = [rawCriteria.role, rawCriteria.department].filter(Boolean).join(" ").trim();
+  const r = await brightDataSearchPeople({
+    role,
+    locations: rawCriteria.locations,
+    count,
+    seniority: rawCriteria.seniority,
+    companyNames: rawCriteria.companyNames,
+  });
+  if (!r.ok || !r.prospects.length) {
+    return { ok: false, prospects: [], error: r.error || "No prospects found at the selected companies." };
+  }
+  const prospects: GeneratedProspect[] = r.prospects.map((p) => ({
+    full_name: p.full_name,
+    first_name: p.first_name,
+    last_name: p.last_name,
+    title: p.title,
+    seniority: p.seniority,
+    company_name: p.company_name,
+    industry: "",
+    website_url: "",
+    linkedin: p.linkedin,
+    location: p.location,
+    email: p.email || "",
+  }));
+  return enrichAndFilterProspects(prospects, rawCriteria.requireVerifiedEmail);
 }
 
 /**
@@ -196,4 +353,75 @@ Rules: ${count} items. Realistic, varied names and companies for the industry/lo
   } catch (e) {
     return { ok: false, prospects: [], error: e instanceof Error ? e.message : "Generation failed" };
   }
+}
+
+export interface PurchaseCompanyWiseLeadsResult {
+  ok: boolean;
+  inserted: number;
+  duplicates: number;
+  leadsRemaining?: number;
+  error?: string;
+}
+
+/** Purchase step for Company-wise Leads: matches/creates one Account per unique
+ *  selected company (reusing the same findMatchingAccount rules as everywhere
+ *  else in the CRM, so this never creates a duplicate Account), then inserts
+ *  the leads via the same bulkInsertLeads path Individual Leads uses, tagging
+ *  each with discovered_account_id so the company relationship survives. */
+export async function purchaseCompanyWiseLeads(prospects: GeneratedProspect[]): Promise<PurchaseCompanyWiseLeadsResult> {
+  if (!prospects.length) return { ok: false, inserted: 0, duplicates: 0, error: "No prospects selected." };
+  if (!(await canAffordLeads(prospects.length))) {
+    return { ok: false, inserted: 0, duplicates: 0, error: "You don't have enough leads remaining on your plan this cycle. Upgrade your plan or wait for renewal." };
+  }
+
+  const companyNames = [...new Set(prospects.map((p) => p.company_name).filter(Boolean))];
+  const accountIdByCompany = new Map<string, string>();
+  await mapWithConcurrency(companyNames, 3, async (name) => {
+    const sample = prospects.find((p) => p.company_name === name);
+    const existing = await findMatchingAccount({ companyName: name, website: sample?.website_url || null });
+    if (existing) {
+      accountIdByCompany.set(name, existing.id);
+      return;
+    }
+    try {
+      const created = await createAccount({ account_name: name, website: sample?.website_url || null, industry: sample?.industry || null });
+      accountIdByCompany.set(name, created.id);
+    } catch (e) {
+      console.error(`[company-wise-leads] Couldn't create Account for "${name}":`, e);
+    }
+  });
+
+  const payload = prospects.map((p) => ({
+    full_name: (p.full_name || "").slice(0, 150) || null,
+    first_name: (p.first_name || "").slice(0, 100) || null,
+    last_name: (p.last_name || "").slice(0, 100) || null,
+    company_name: (p.company_name || "").slice(0, 200) || null,
+    industry: (p.industry || "").slice(0, 100) || null,
+    interest_area: (p.title || "").slice(0, 150) || null,
+    job_title: (p.title || "").slice(0, 150) || null,
+    seniority: p.seniority || null,
+    email: p.email || null,
+    email_verification_status: p.emailVerificationStatus || null,
+    linkedin: p.linkedin || null,
+    website_url: p.website_url || null,
+    source: "Company-wise Leads",
+    status: "New",
+    discovered_account_id: (p.company_name && accountIdByCompany.get(p.company_name)) || null,
+  }));
+
+  const res = await bulkInsertLeads(payload, { defaultSource: "Company-wise Leads" });
+  if (res.error) return { ok: false, inserted: 0, duplicates: res.duplicates, error: res.error };
+
+  let leadsRemaining: number | undefined;
+  if (res.inserted > 0) {
+    try {
+      const deductRes = await deductLeads(res.inserted, { source: "company_wise_leads" });
+      if (!deductRes.ok) console.error("[company-wise-leads/credits] deduct failed:", deductRes.error);
+      else leadsRemaining = deductRes.remaining;
+    } catch (err) {
+      console.error("[company-wise-leads/credits] deduct threw:", err);
+    }
+  }
+
+  return { ok: true, inserted: res.inserted, duplicates: res.duplicates, leadsRemaining };
 }

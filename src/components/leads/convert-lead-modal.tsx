@@ -11,6 +11,7 @@ import type { ContactRow } from "@/lib/queries/contacts";
 import { OPPORTUNITY_STAGES, STAGE_LABELS, type OpportunityStage } from "@/lib/opportunities";
 import type { LeadRow } from "@/lib/queries/leads";
 import { cn } from "@/lib/utils";
+import { isValidEmail, isValidWebsite, EMAIL_ERROR, WEBSITE_ERROR } from "@/lib/validation";
 import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid, type CountryCode } from "@/components/ui/phone-input";
 
 function splitName(fullName: string | null): { first: string; last: string } {
@@ -116,6 +117,8 @@ export function ConvertLeadModal({
   }, [effectiveAccountName, open]);
 
   async function handleConvert() {
+    if (accountMode === "new" && !isValidWebsite(accountWebsite)) { toast(WEBSITE_ERROR, "error"); return; }
+    if (contactMode === "new" && !isValidEmail(contactEmail)) { toast(EMAIL_ERROR, "error"); return; }
     if (contactMode === "new" && !isPhoneValid(contactPhone, contactPhoneCountry)) {
       toast("Contact phone number isn't valid for the selected country.", "error");
       return;

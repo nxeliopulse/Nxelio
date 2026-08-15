@@ -68,6 +68,11 @@ export interface LeadRow {
   converted_account_id: string | null;
   converted_contact_id: string | null;
   converted_opportunity_id: string | null;
+  /** Set by Company-wise Buy Leads when the company was matched/created up
+   *  front — NOT the same as converted_account_id (that means "was actually
+   *  converted"); this just records "was sourced from this company" so
+   *  Convert can pre-fill the right Account without re-matching by name. */
+  discovered_account_id: string | null;
   /** Suppression flags (Phase 1 segmentation) — checked via isSuppressed() before every send. */
   email_opt_out: boolean | null;
   do_not_contact: boolean | null;
@@ -411,6 +416,7 @@ export async function bulkInsertLeads(
       message: l.message ?? null,
       source: l.source ?? opts?.defaultSource ?? "Import",
       status: l.status ?? "New",
+      discovered_account_id: l.discovered_account_id ?? null,
     });
   }
 

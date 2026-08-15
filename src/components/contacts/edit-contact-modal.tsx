@@ -12,6 +12,7 @@ import type { OwnerOption } from "@/components/contacts/contacts-table";
 import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
+import { isValidEmail, EMAIL_ERROR } from "@/lib/validation";
 
 const SALUTATIONS = ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof."];
 const INDUSTRIES = ["Technology", "Finance", "Healthcare", "Manufacturing", "Retail", "Education", "Consulting", "Other"];
@@ -231,6 +232,21 @@ export function EditContactModal({
       setOpenSections((s) => ({ ...s, basic: true }));
       return;
     }
+    if (!isValidEmail(form.email)) {
+      setError(EMAIL_ERROR);
+      setOpenSections((s) => ({ ...s, basic: true }));
+      return;
+    }
+    if (!isValidEmail(form.secondary_email)) {
+      setError(EMAIL_ERROR);
+      setOpenSections((s) => ({ ...s, basic: true }));
+      return;
+    }
+    if (form.phone.trim() && form.mobile.trim() && formatPhoneForStorage(form.phone, phoneCountry) === formatPhoneForStorage(form.mobile, mobileCountry)) {
+      setError("Phone 1 and Phone 2 must be different numbers.");
+      setOpenSections((s) => ({ ...s, basic: true }));
+      return;
+    }
     const basicPhoneChecks: [string, string, CountryCode][] = [
       ["Phone", form.phone, phoneCountry],
       ["Mobile", form.mobile, mobileCountry],
@@ -311,8 +327,8 @@ export function EditContactModal({
         onClose();
       }
       router.refresh();
-    } catch {
-      toast("Couldn't save changes. Try again.", "error");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't save changes. Try again.", "error");
     } finally {
       setSaving(false);
     }

@@ -4,7 +4,7 @@ import { logAudit } from "@/lib/queries/audit-log";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
 import { getLeadDetail } from "@/lib/queries/lead-detail";
-import { findMatchingAccount, createAccount, type AccountRow } from "@/lib/queries/accounts";
+import { findMatchingAccount, createAccount, getAccountById, type AccountRow } from "@/lib/queries/accounts";
 import { findMatchingContact, createContact, type ContactRow } from "@/lib/queries/contacts";
 import { updateLead } from "@/lib/queries/leads";
 import { resolveLeadAttribution, type OpportunityStage } from "@/lib/opportunities";
@@ -14,8 +14,13 @@ export async function getConversionMatches(leadId: string): Promise<{ account: A
   const { lead } = await getLeadDetail(leadId);
   if (!lead) return { account: null, contact: null };
 
+  // Company-wise Buy Leads already resolved/created the right Account up
+  // front (discovered_account_id) — use that directly instead of re-matching
+  // by name/website, which could theoretically land on a different account
+  // than the one this lead was actually sourced from.
+  const discoveredAccountId = (lead as { discovered_account_id?: string | null }).discovered_account_id;
   const [account, contact] = await Promise.all([
-    findMatchingAccount({ companyName: lead.company_name, website: lead.website_url }),
+    discoveredAccountId ? getAccountById(discoveredAccountId) : findMatchingAccount({ companyName: lead.company_name, website: lead.website_url }),
     findMatchingContact({ email: lead.email, phone: lead.phone, linkedin: lead.linkedin }),
   ]);
   return { account, contact };

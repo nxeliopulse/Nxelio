@@ -10,6 +10,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { PhoneInput, detectCountry, isPhoneValid, formatPhoneForStorage } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
+import { isValidWebsite, WEBSITE_ERROR } from "@/lib/validation";
 
 const RATINGS = ["Hot", "Warm", "Cold"];
 const OWNERSHIPS = ["Public", "Private", "Subsidiary", "Other"];
@@ -204,6 +205,11 @@ export function EditAccountModal({
     if (!isPhoneValid(form.fax, faxCountry)) {
       setError("Fax number isn't valid for the selected country.");
       setStep(1);
+      return;
+    }
+    if (!isValidWebsite(form.website)) {
+      setError(WEBSITE_ERROR);
+      setStep(0);
       return;
     }
     setError(null);

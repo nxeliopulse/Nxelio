@@ -148,8 +148,12 @@ export async function updateAccount(id: string, payload: Partial<AccountRow>) {
   assertValidPhoneFields(payload);
   const supabase = await createClient();
   const actorName = await getCurrentUserName(supabase);
-  const { error } = await supabase.from("accounts").update({ ...payload, updated_by: actorName }).eq("id", id);
+  // .select("id") to get the updated row back — PostgREST reports no error when
+  // RLS silently blocks an update (0 rows affected looks identical to success
+  // otherwise), same footgun already handled below in deleteAccount.
+  const { data, error } = await supabase.from("accounts").update({ ...payload, updated_by: actorName }).eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error("Account not found, or you don't have permission to edit it.");
   revalidatePath("/accounts");
   revalidatePath(`/accounts/${id}`);
   await logAudit({ action: "account.updated", entityType: "account", entityId: id, metadata: payload as Record<string, unknown> });

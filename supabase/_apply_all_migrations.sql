@@ -4471,3 +4471,7 @@ BEGIN
     EXECUTE format('CREATE POLICY ws_delete_%s ON %I FOR DELETE TO authenticated USING (workspace_id = get_current_workspace_id());', t, t);
   END LOOP;
 END $$;
+
+-- >>> FILE: 0120_lead_discovered_account.sql
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS discovered_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_leads_discovered_account ON leads(discovered_account_id);
