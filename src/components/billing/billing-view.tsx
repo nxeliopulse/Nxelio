@@ -6,7 +6,7 @@ import {
   Check, X, Sparkles, CreditCard, Users2, Send,
   Zap, Crown, Rocket, Lock, AlertTriangle, Clock,
   TrendingUp, ExternalLink, Loader2, PartyPopper,
-  Search, Reply, Target, Ticket, Gift,
+  Search, Reply, Target, Ticket, Gift, RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -397,14 +397,26 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                   Manage billing
                 </Button>
               )}
-              <Button
-                variant="custom"
-                className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
-                onClick={() => setCancelOpen(true)}
-              >
-                <X className="h-4 w-4" />
-                Cancel subscription
-              </Button>
+              {cancelAtPeriodEnd ? (
+                <Button
+                  variant="custom"
+                  className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
+                  onClick={resumeSubscription}
+                  disabled={cancelPending}
+                >
+                  {cancelPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                  Resume subscription
+                </Button>
+              ) : (
+                <Button
+                  variant="custom"
+                  className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
+                  onClick={() => setCancelOpen(true)}
+                >
+                  <X className="h-4 w-4" />
+                  Cancel subscription
+                </Button>
+              )}
               <Button
                 variant="custom"
                 className="bg-white text-blue-700 hover:bg-blue-50"
