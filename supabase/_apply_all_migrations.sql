@@ -4475,3 +4475,17 @@ END $$;
 -- >>> FILE: 0120_lead_discovered_account.sql
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS discovered_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_leads_discovered_account ON leads(discovered_account_id);
+
+-- >>> FILE: 0121_lead_provider_settings.sql
+CREATE TABLE IF NOT EXISTS lead_provider_settings (
+  id               INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- single-row table
+  active_provider  TEXT NOT NULL DEFAULT 'bright_data' CHECK (active_provider IN ('anysite', 'bright_data')),
+  updated_by       UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO lead_provider_settings (id, active_provider)
+VALUES (1, 'bright_data')
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE lead_provider_settings ENABLE ROW LEVEL SECURITY;

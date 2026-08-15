@@ -1,7 +1,8 @@
 "use server";
 import { aiJson } from "@/lib/ai/client";
 import { brightDataConfigured, brightDataSearchPeople, brightDataFindCompanyWebsite, brightDataSearchCompanies } from "@/lib/leads/bright-data";
-import { anysiteConfigured, findEmailsByLinkedIn } from "@/lib/leads/anysite";
+import { anysiteConfigured, findEmailsByLinkedIn, searchAnysiteUsers } from "@/lib/leads/anysite";
+import { getActiveLeadProvider } from "@/lib/leads/provider";
 import { guessAndVerifyEmail } from "@/lib/leads/email-guess";
 import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, deductLeads } from "@/lib/queries/subscriptions";
 import { mapWithConcurrency } from "@/lib/utils";
@@ -45,15 +46,17 @@ export interface GeneratedProspect {
 export interface BuyLeadsResult {
   ok: boolean;
   prospects: GeneratedProspect[];
-  /** "brightdata" = real prospects, "ai" = synthetic samples. */
-  source?: "brightdata" | "ai";
+  /** "brightdata" / "anysite" = real prospects (from whichever provider is active), "ai" = synthetic samples. */
+  source?: "brightdata" | "anysite" | "ai";
   error?: string;
 }
 
 /**
- * Fetches prospects for the "Buy Leads" flow. Prefers Bright Data (real LinkedIn
- * profile sourcing via SERP); falls back to AI-generated samples when Bright
- * Data isn't configured or returns nothing.
+ * Fetches prospects for the "Buy Leads" flow. Which real data source is used
+ * (Anysite's own LinkedIn database, or Bright Data's SERP scraping) is a
+ * platform-wide admin setting (see src/lib/leads/provider.ts) — both stay
+ * fully wired, this just decides which one runs. Falls back to AI-generated
+ * samples only when the active provider isn't configured at all.
  */
 export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeadsResult> {
   if (!(await hasFeature("discovery"))) {
@@ -64,7 +67,25 @@ export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeads
   // not the real gate.
   const maxAllowed = await getMaxBuyLeadsCount();
   const criteria: BuyCriteria = { ...rawCriteria, count: Math.max(1, Math.min(rawCriteria.count, maxAllowed)) };
-  if (brightDataConfigured) {
+  const provider = await getActiveLeadProvider();
+
+  if (provider === "anysite" && anysiteConfigured) {
+    const r = await searchAnysiteUsers({ role: [criteria.role, criteria.industry].filter(Boolean).join(" ").trim(), locations: criteria.locations, count: criteria.count });
+    if (r.ok && r.prospects.length) {
+      const prospects: GeneratedProspect[] = r.prospects
+        .filter((p) => !criteria.seniority || criteria.seniority === "Any" || p.seniority === criteria.seniority)
+        .map((p) => ({
+          full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
+          title: p.title, seniority: p.seniority, company_name: p.company_name,
+          industry: criteria.industry || "", website_url: "", linkedin: p.linkedin,
+          location: p.location, email: "",
+        }));
+      return enrichWithAnysiteEmails(prospects, criteria.requireVerifiedEmail);
+    }
+    return { ok: false, prospects: [], error: r.error || "No prospects found." };
+  }
+
+  if (provider === "bright_data" && brightDataConfigured) {
     const r = await brightDataSearchPeople(criteria);
     if (r.ok && r.prospects.length) {
       const prospects: GeneratedProspect[] = r.prospects.map((p) => ({
@@ -82,12 +103,37 @@ export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeads
       }));
       return enrichAndFilterProspects(prospects, criteria.requireVerifiedEmail);
     }
-    // Bright Data configured but failed → surface the error rather than faking data.
+    // Configured but failed → surface the error rather than faking data.
     return { ok: false, prospects: [], error: r.error || "No prospects found." };
   }
-  // No Bright Data key → AI samples.
+
+  // Active provider isn't configured (missing API key) → AI samples, clearly labeled as such.
   const ai = await generateSampleProspects(criteria);
   return { ...ai, source: "ai" };
+}
+
+/** Anysite-only enrichment path — email lookup via Anysite's own endpoint,
+ *  no Bright Data calls at all (so switching providers actually switches
+ *  which vendor's credits get spent, with nothing silently mixed in). Company
+ *  website is left empty ("Not available") rather than resolved via Bright Data. */
+async function enrichWithAnysiteEmails(rawProspects: GeneratedProspect[], requireVerifiedEmail?: boolean): Promise<BuyLeadsResult> {
+  let prospects = rawProspects;
+  const urls = prospects.map((p) => p.linkedin).filter((u): u is string => Boolean(u));
+  if (urls.length) {
+    console.log(`[buy-leads/anysite] Enriching ${urls.length} profiles with Anysite email lookup…`);
+    const found = await findEmailsByLinkedIn(urls);
+    prospects = prospects.map((p) => {
+      const hit = p.linkedin ? found.get(p.linkedin) : undefined;
+      return hit?.ok ? { ...p, email: hit.email || p.email, emailVerificationStatus: hit.email ? "valid" : p.emailVerificationStatus } : p;
+    });
+  }
+  if (requireVerifiedEmail) {
+    prospects = prospects.filter((p) => p.email && p.emailVerificationStatus);
+  }
+  if (!prospects.length) {
+    return { ok: false, prospects: [], error: requireVerifiedEmail ? "No prospects with a verified email found. Try broader criteria or turn off that filter." : "No prospects found." };
+  }
+  return { ok: true, source: "anysite", prospects };
 }
 
 /**
@@ -273,14 +319,30 @@ export async function searchPeopleAtCompanies(rawCriteria: CompanyPeopleCriteria
   }
   const maxAllowed = await getMaxBuyLeadsCount();
   const count = Math.max(1, Math.min(rawCriteria.count, maxAllowed));
-
-  if (!brightDataConfigured) {
-    return { ok: false, prospects: [], error: "Lead discovery requires Bright Data to be configured." };
-  }
-  // Department has no dedicated query field in Bright Data's SERP-based search —
+  // Department has no dedicated query field in either provider's search —
   // fold it into the same free-text "role" term the way job title already works,
   // rather than inventing a filter the data source can't actually apply.
   const role = [rawCriteria.role, rawCriteria.department].filter(Boolean).join(" ").trim();
+  const provider = await getActiveLeadProvider();
+
+  if (provider === "anysite" && anysiteConfigured) {
+    const r = await searchAnysiteUsers({ role, locations: rawCriteria.locations, count, companyNames: rawCriteria.companyNames });
+    if (!r.ok || !r.prospects.length) {
+      return { ok: false, prospects: [], error: r.error || "No prospects found at the selected companies." };
+    }
+    const prospects: GeneratedProspect[] = r.prospects
+      .filter((p) => !rawCriteria.seniority || rawCriteria.seniority === "Any" || p.seniority === rawCriteria.seniority)
+      .map((p) => ({
+        full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
+        title: p.title, seniority: p.seniority, company_name: p.company_name,
+        industry: "", website_url: "", linkedin: p.linkedin, location: p.location, email: "",
+      }));
+    return enrichWithAnysiteEmails(prospects, rawCriteria.requireVerifiedEmail);
+  }
+
+  if (!brightDataConfigured) {
+    return { ok: false, prospects: [], error: "Lead discovery requires the active provider to be configured." };
+  }
   const r = await brightDataSearchPeople({
     role,
     locations: rawCriteria.locations,

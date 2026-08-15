@@ -9,6 +9,7 @@ import {
 } from "@/lib/queries/platform-overview";
 import { getVendorSubscriptions } from "@/lib/queries/platform-vendor-subscriptions";
 import { getAiProviderStatus } from "@/lib/queries/ai-provider-settings";
+import { getLeadProviderStatus } from "@/lib/queries/lead-provider-settings";
 import { getEmailPromoCodes } from "@/lib/queries/admin-promo-codes";
 import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach-accounts";
 import { getFeatureKillSwitches } from "@/lib/queries/feature-kill-switches";
@@ -24,6 +25,7 @@ export default async function AdminPage() {
     leadArchive,
     vendorSubscriptions,
     aiProviderStatus,
+    leadProviderStatus,
     trendData,
     attentionWorkspaces,
     promoCodes,
@@ -37,6 +39,7 @@ export default async function AdminPage() {
     getPlatformLeadArchive(),
     getVendorSubscriptions(),
     getAiProviderStatus(),
+    getLeadProviderStatus(),
     getPlatformOverviewTrend(),
     getWorkspacesNeedingAttention(),
     getEmailPromoCodes(),
@@ -54,6 +57,7 @@ export default async function AdminPage() {
       leadArchive={leadArchive}
       vendorSubscriptions={vendorSubscriptions}
       aiProviderStatus={aiProviderStatus}
+      leadProviderStatus={leadProviderStatus}
       trendData={trendData}
       attentionWorkspaces={attentionWorkspaces}
       promoCodes={promoCodes}

@@ -5,7 +5,7 @@ import {
   X, Search, Megaphone, Video, FileSpreadsheet, Pencil, ShoppingCart,
   ArrowLeft, ArrowRight, Loader2, Check, CheckCircle2, AlertCircle, AlertTriangle,
   Upload, Plus, Trash2, Users2, Link2, RefreshCw, ExternalLink, Sparkles,
-  Building2, User, X as XIcon,
+  Building2, User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +16,8 @@ import { bulkInsertLeads, type LeadRow } from "@/lib/queries/leads";
 import { importLinkedInLeads, hasLinkedInAccount } from "@/lib/leads/linkedin-import";
 import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outreach-accounts";
 import {
-  searchBuyLeads, searchCompanies, searchPeopleAtCompanies, purchaseCompanyWiseLeads,
-  type GeneratedProspect, type GeneratedCompany, type CompanyPeopleCriteria,
+  searchBuyLeads, searchPeopleAtCompanies, purchaseCompanyWiseLeads,
+  type GeneratedProspect, type CompanyPeopleCriteria,
 } from "@/lib/leads/buy-leads";
 import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
 import { MultiLocationInput } from "@/components/leads/location-search-input";
@@ -161,6 +161,16 @@ export function parseCsv(text: string): CsvRow[] {
 
 let _mid = 0;
 const newManual = (): ManualLead => ({ id: `m${++_mid}`, name: "", title: "", url: "" });
+
+type CompanyEntry = { id: string; name: string; website: string; websiteEdited: boolean };
+const newCompanyEntry = (): CompanyEntry => ({ id: `c${++_mid}`, name: "", website: "", websiteEdited: false });
+/** company.com from "Company Name, Inc." — a starting suggestion only; the
+ *  user can always overwrite it, tracked via websiteEdited so we never
+ *  clobber a manual correction when the name changes afterward. */
+function suggestWebsite(name: string): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+  return slug ? `${slug}.com` : "";
+}
 const manualInvalidCount = (rows: ManualLead[]) => rows.filter((m) => !m.url.trim() && (m.name.trim() || m.title.trim())).length;
 
 const newEntry = (): ManualEntry => ({
@@ -210,48 +220,22 @@ export function AddLeadsWizard({
     companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true,
   });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
-  const [buySource, setBuySource] = useState<"brightdata" | "ai" | null>(null);
+  const [buySource, setBuySource] = useState<"brightdata" | "anysite" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
   // Per-request cap: at most 100, further capped by what's left on the plan this cycle.
   const [maxBuyCount, setMaxBuyCount] = useState(100);
 
   // Buy Leads has two tabs: Individual Leads (the flow above, unchanged) and
-  // Company-wise Leads (same shape as Individual, plus a Company picker that's
-  // live-searched from the Industry/Location — never a hardcoded list).
+  // Company-wise Leads — user types the company (with a website suggestion),
+  // picks a location, sets a count, and finds real people at that company.
   const [buyMode, setBuyMode] = useState<"individual" | "company">("individual");
+  const [companies, setCompanies] = useState<CompanyEntry[]>([newCompanyEntry()]);
   const [companyForm, setCompanyForm] = useState({
-    industry: "", locations: [] as string[], companySize: "Any",
-    role: "", seniority: "Any", requireVerifiedEmail: false, count: 25,
+    locations: [] as string[], requireVerifiedEmail: false, count: 25,
   });
-  const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
-  // Live company suggestions for the selected industry/location — refetched
-  // automatically, never a static/hardcoded list. Most-relevant-first, as
-  // returned by the search — there's no real "popularity" ranking to fabricate.
-  const [companyOptions, setCompanyOptions] = useState<GeneratedCompany[] | null>(null);
-  const [companyOptionsSource, setCompanyOptionsSource] = useState<"brightdata" | "ai" | null>(null);
-  const [companyOptionsLoading, setCompanyOptionsLoading] = useState(false);
   const [companyProspects, setCompanyProspects] = useState<GeneratedProspect[] | null>(null);
   const [selectedProspects, setSelectedProspects] = useState<Set<number>>(new Set());
   const [peopleLoading, setPeopleLoading] = useState(false);
-
-  // Refetch live company suggestions whenever industry/location/size changes —
-  // debounced so it doesn't fire on every keystroke-driven location update.
-  useEffect(() => {
-    /* eslint-disable-next-line react-hooks/set-state-in-effect -- clears stale suggestions the instant the user leaves Company-wise mode or clears the industry, not a render-triggered sync */
-    if (!open || buyMode !== "company" || !companyForm.industry) { setCompanyOptions(null); return; }
-    const t = setTimeout(() => {
-      setCompanyOptionsLoading(true);
-      searchCompanies({ industry: companyForm.industry, locations: companyForm.locations, companySize: companyForm.companySize, count: 50 })
-        .then((res) => {
-          setCompanyOptions(res.ok ? res.companies : []);
-          setCompanyOptionsSource(res.ok ? (res.source ?? null) : null);
-        })
-        .catch(() => setCompanyOptions([]))
-        .finally(() => setCompanyOptionsLoading(false));
-    }, 500);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- locations is a new array each render; JSON-stringify would be noisier than just accepting the extra debounce cycle
-  }, [open, buyMode, companyForm.industry, companyForm.locations.join(","), companyForm.companySize]);
 
   // Import
   const [pending, start] = useTransition();
@@ -347,8 +331,8 @@ export function AddLeadsWizard({
     setBuy({ industry: "", role: "", locations: [], count: 10, companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true });
     setBuyResults(null); setBuySource(null); setBuyLoading(false);
     setBuyMode("individual");
-    setCompanyForm({ industry: "", locations: [], companySize: "Any", role: "", seniority: "Any", requireVerifiedEmail: false, count: 25 });
-    setSelectedCompanies(new Set()); setCompanyOptions(null); setCompanyOptionsSource(null); setCompanyOptionsLoading(false);
+    setCompanies([newCompanyEntry()]);
+    setCompanyForm({ locations: [], requireVerifiedEmail: false, count: 25 });
     setCompanyProspects(null); setSelectedProspects(new Set()); setPeopleLoading(false);
     setSummary(null); setImportError(null);
   }
@@ -358,18 +342,19 @@ export function AddLeadsWizard({
       manual.some((m) => m.name || m.title || m.url) ||
       entries.some(entryStarted) || buyResults !== null ||
       buy.industry !== "" || buy.role !== "" || buy.locations.length > 0 ||
-      companyProspects !== null || selectedCompanies.size > 0 || companyForm.industry !== "";
+      companyProspects !== null || companies.some((c) => c.name.trim());
   }
 
-  // ---- Company-wise Leads: find people at the selected companies ----
+  // ---- Company-wise Leads: find people at the named companies ----
   function runFindProspects() {
     setStep2Error(null);
     setPeopleLoading(true);
     setCompanyProspects(null);
+    const named = companies.filter((c) => c.name.trim());
+    const websiteByName = new Map(named.map((c) => [c.name.trim().toLowerCase(), c.website.trim()]));
     const criteria: CompanyPeopleCriteria = {
-      companyNames: [...selectedCompanies],
-      role: companyForm.role,
-      seniority: companyForm.seniority === "Any" ? undefined : companyForm.seniority,
+      companyNames: named.map((c) => c.name.trim()),
+      role: "",
       locations: companyForm.locations,
       count: companyForm.count,
       requireVerifiedEmail: companyForm.requireVerifiedEmail,
@@ -377,8 +362,15 @@ export function AddLeadsWizard({
     searchPeopleAtCompanies(criteria)
       .then((res) => {
         if (!res.ok) { setStep2Error(res.error || "Could not find people at these companies."); return; }
-        setCompanyProspects(res.prospects);
-        setSelectedProspects(new Set(res.prospects.map((_, i) => i)));
+        // Carry the user-entered website through — the search only returns
+        // company_name, and a real website makes Account matching at purchase
+        // time much more reliable than name-only.
+        const prospects = res.prospects.map((p) => {
+          const website = websiteByName.get(p.company_name.trim().toLowerCase());
+          return website ? { ...p, website_url: website } : p;
+        });
+        setCompanyProspects(prospects);
+        setSelectedProspects(new Set(prospects.map((_, i) => i)));
       })
       .catch((e) => setStep2Error(e instanceof Error ? e.message : "Search failed"))
       .finally(() => setPeopleLoading(false));
@@ -569,9 +561,11 @@ export function AddLeadsWizard({
       }));
     } else if (isBuy) {
       skipped = 0;
-      // Real (Bright Data) prospects carry a LinkedIn URL; AI samples carry a placeholder
-      // website. Neither carries an email, so they're never accidentally auto-emailed.
-      const buyLabel = buySource === "brightdata" ? "Purchased Leads (BILEADS Kit)" : "Purchased Leads (sample)";
+      // Real prospects (from whichever provider is active) carry a LinkedIn URL;
+      // AI samples carry a placeholder website. Neither carries an unverified email.
+      const buyLabel = buySource === "brightdata" ? "Purchased Leads (BILEADS Kit)"
+        : buySource === "anysite" ? "Purchased Leads (Anysite)"
+        : "Purchased Leads (sample)";
       payload = (buyResults ?? []).map((p) => ({
         full_name: (p.full_name || "").slice(0, 150) || null,
         first_name: (p.first_name || "").slice(0, 100) || null,
@@ -738,13 +732,10 @@ export function AddLeadsWizard({
                   />
                 ) : (
                   <CompanyWiseLeadsFlow
+                    companies={companies}
+                    setCompanies={setCompanies}
                     form={companyForm}
                     setForm={setCompanyForm}
-                    companyOptions={companyOptions}
-                    companyOptionsSource={companyOptionsSource}
-                    companyOptionsLoading={companyOptionsLoading}
-                    selected={selectedCompanies}
-                    setSelected={setSelectedCompanies}
                     prospects={companyProspects}
                     peopleLoading={peopleLoading}
                     onFindProspects={runFindProspects}
@@ -791,7 +782,7 @@ export function AddLeadsWizard({
             ) : isCompanyBuy ? (
               <CompanyBuyReview
                 prospects={(companyProspects ?? []).filter((_, i) => selectedProspects.has(i))}
-                companyCount={selectedCompanies.size}
+                companyCount={companies.filter((c) => c.name.trim()).length}
                 maxCount={maxBuyCount}
               />
             ) : isBuy ? (
@@ -1302,13 +1293,13 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
   buy: BuyState;
   setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;
-  source: "brightdata" | "ai" | null;
+  source: "brightdata" | "anysite" | "ai" | null;
   loading: boolean;
   onGenerate: () => void;
   error: string | null;
   maxCount: number;
 }) {
-  const isReal = source === "brightdata";
+  const isReal = source === "brightdata" || source === "anysite";
   // Initialized once from buy.count — BuyForm unmounts whenever the user leaves
   // the Buy Leads source/step, so a fresh mount always picks up the latest value
   // (e.g. after the plan-cap clamp on wizard open) without needing a sync effect.
@@ -1420,7 +1411,7 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
         <div>
           <p className="font-bold text-slate-900 text-base mb-3 uppercase tracking-wider">What you&apos;ll get</p>
           <ul className="space-y-3 text-base text-slate-600">
-            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Name, job title, company and LinkedIn URL from real public profiles via BILEADS Kit.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Name, job title, company and LinkedIn URL from real public profiles.</li>
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Seniority estimated from each person&apos;s real job title.</li>
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Work email included when found — flagged as verified or catch-all, never guessed silently.</li>
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
@@ -1484,23 +1475,16 @@ function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; cr
 // ============================================================================
 // Company-wise Leads — same shape as Individual Leads, plus a Company field
 // that's live-searched from the Industry/Location (never a hardcoded list).
-type CompanyWiseForm = {
-  industry: string; locations: string[]; companySize: string;
-  role: string; seniority: string; requireVerifiedEmail: boolean; count: number;
-};
+type CompanyWiseForm = { locations: string[]; requireVerifiedEmail: boolean; count: number };
 
 function CompanyWiseLeadsFlow({
-  form, setForm, companyOptions, companyOptionsSource, companyOptionsLoading,
-  selected, setSelected, prospects, peopleLoading, onFindProspects,
+  companies, setCompanies, form, setForm, prospects, peopleLoading, onFindProspects,
   selectedProspects, setSelectedProspects, maxCount, error, clearError,
 }: {
+  companies: CompanyEntry[];
+  setCompanies: (c: CompanyEntry[]) => void;
   form: CompanyWiseForm;
   setForm: (f: CompanyWiseForm) => void;
-  companyOptions: GeneratedCompany[] | null;
-  companyOptionsSource: "brightdata" | "ai" | null;
-  companyOptionsLoading: boolean;
-  selected: Set<string>;
-  setSelected: (s: Set<string>) => void;
   prospects: GeneratedProspect[] | null;
   peopleLoading: boolean;
   onFindProspects: () => void;
@@ -1510,22 +1494,25 @@ function CompanyWiseLeadsFlow({
   error: string | null;
   clearError: () => void;
 }) {
-  const [companyQuery, setCompanyQuery] = useState("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [companySizeBuckets, setCompanySizeBuckets] = useState(FALLBACK_COMPANY_SIZE_BUCKETS);
-  const [seniorityLevels, setSeniorityLevels] = useState(FALLBACK_SENIORITY_LEVELS);
   const [countDraft, setCountDraft] = useState(String(form.count));
   const [showResults, setShowResults] = useState(prospects !== null);
-  useEffect(() => {
-    getPicklistValues("lead_company_size").then(setCompanySizeBuckets).catch(() => {});
-    getPicklistValues("lead_seniority").then(setSeniorityLevels).catch(() => {});
-  }, []);
 
-  function toggleCompany(name: string) {
-    const next = new Set(selected);
-    if (next.has(name)) next.delete(name); else next.add(name);
-    setSelected(next);
+  function updateCompany(id: string, patch: Partial<CompanyEntry>) {
+    setCompanies(companies.map((c) => {
+      if (c.id !== id) return c;
+      const next = { ...c, ...patch };
+      // Only auto-fill the website from the name if the user hasn't manually
+      // edited it themselves — a manual correction is never overwritten.
+      if ("name" in patch && !c.websiteEdited) next.website = suggestWebsite(next.name);
+      return next;
+    }));
   }
+  function updateWebsite(id: string, website: string) {
+    setCompanies(companies.map((c) => (c.id === id ? { ...c, website, websiteEdited: true } : c)));
+  }
+  function addCompany() { setCompanies([...companies, newCompanyEntry()]); }
+  function removeCompany(id: string) { setCompanies(companies.length === 1 ? [newCompanyEntry()] : companies.filter((c) => c.id !== id)); }
+
   function toggleProspect(i: number) {
     const next = new Set(selectedProspects);
     if (next.has(i)) next.delete(i); else next.add(i);
@@ -1541,14 +1528,14 @@ function CompanyWiseLeadsFlow({
     if (n !== form.count) setForm({ ...form, count: n });
   }
 
-  const visibleOptions = (companyOptions ?? []).filter((c) => !companyQuery.trim() || c.name.toLowerCase().includes(companyQuery.toLowerCase()));
+  const namedCount = companies.filter((c) => c.name.trim()).length;
 
   if (showResults) {
     return (
       <div className="space-y-4">
         {peopleLoading ? (
           <div className="flex items-center justify-center gap-2 py-16 text-slate-500 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Finding people at {[...selected].join(", ")}…
+            <Loader2 className="h-4 w-4 animate-spin" /> Finding people at {companies.filter((c) => c.name.trim()).map((c) => c.name).join(", ")}…
           </div>
         ) : (
           <>
@@ -1556,12 +1543,12 @@ function CompanyWiseLeadsFlow({
               <p className="text-sm text-slate-600">
                 {prospects?.length ?? 0} prospects found. <span className="font-medium text-slate-900">{selectedProspects.size} selected</span>.
               </p>
-              <button onClick={() => setShowResults(false)} className="text-xs text-blue-600 hover:underline">Adjust filters</button>
+              <button onClick={() => setShowResults(false)} className="text-xs text-blue-600 hover:underline">Adjust search</button>
             </div>
             <CompanyProspectsTable prospects={prospects ?? []} selected={selectedProspects} onToggle={toggleProspect} onToggleAll={toggleAllProspects} />
             {error && <ErrorNote text={error} />}
             {!error && (prospects?.length ?? 0) === 0 && (
-              <div className="text-center py-6 text-sm text-slate-500">No prospects found for these filters. Go back and broaden your criteria.</div>
+              <div className="text-center py-6 text-sm text-slate-500">No prospects found at these companies. Go back and check the company names, or broaden the location/count.</div>
             )}
           </>
         )}
@@ -1572,91 +1559,41 @@ function CompanyWiseLeadsFlow({
   return (
     <div className="grid lg:grid-cols-[1.3fr_1fr] gap-8">
       <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-base font-semibold text-slate-800 mb-2">Industry</label>
-            <Select value={form.industry} onChange={(e) => { setForm({ ...form, industry: e.target.value }); setSelected(new Set()); }} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
-              <option value="">Any industry</option>
-              {LINKEDIN_INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
-            </Select>
+        <div>
+          <label className="block text-base font-semibold text-slate-800 mb-2">Company</label>
+          <div className="space-y-3">
+            {companies.map((c) => (
+              <div key={c.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+                <Input
+                  value={c.name}
+                  onChange={(e) => updateCompany(c.id, { name: e.target.value })}
+                  placeholder="e.g. Microsoft"
+                  leftIcon={<Building2 className="h-4 w-4" />}
+                  className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+                />
+                <Input
+                  value={c.website}
+                  onChange={(e) => updateWebsite(c.id, e.target.value)}
+                  placeholder="company website, e.g. microsoft.com"
+                  className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+                />
+                <button
+                  onClick={() => removeCompany(c.id)}
+                  aria-label="Remove company"
+                  className="justify-self-start sm:justify-self-center p-2 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
           </div>
-          <div>
-            <label className="block text-base font-semibold text-slate-800 mb-2">Job title / role</label>
-            <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
-              <option value="">Any role</option>
-              {COMMON_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-            </Select>
-          </div>
+          <Button variant="outline" size="sm" onClick={addCompany} className="mt-2"><Plus className="h-4 w-4" /> Add another company</Button>
+          <p className="text-xs text-slate-400 mt-1.5">The website is suggested from the company name — fix it if it&apos;s wrong.</p>
         </div>
 
         <div>
           <label className="block text-base font-semibold text-slate-800 mb-2">Location</label>
-          <MultiLocationInput value={form.locations} onChange={(v) => { setForm({ ...form, locations: v }); setSelected(new Set()); }} />
-        </div>
-
-        <div className="relative">
-          <label className="block text-base font-semibold text-slate-800 mb-2">Company</label>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {[...selected].map((name) => (
-              <span key={name} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full bg-blue-50 text-sm text-blue-700">
-                {name}
-                <button onClick={() => toggleCompany(name)} aria-label={`Remove ${name}`} className="p-0.5 rounded-full hover:bg-blue-100">
-                  <XIcon className="h-3.5 w-3.5" />
-                </button>
-              </span>
-            ))}
-          </div>
-          <Input
-            value={companyQuery}
-            onChange={(e) => { setCompanyQuery(e.target.value); setDropdownOpen(true); }}
-            onFocus={() => setDropdownOpen(true)}
-            onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
-            placeholder={form.industry ? "Search or pick a company…" : "Choose an industry first"}
-            disabled={!form.industry}
-            leftIcon={<Building2 className="h-4 w-4" />}
-            className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
-          />
-          {dropdownOpen && form.industry && (
-            <div className="absolute z-10 mt-1 w-full max-h-64 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
-              {companyOptionsLoading ? (
-                <div className="flex items-center gap-2 px-3 py-3 text-sm text-slate-500"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Finding companies…</div>
-              ) : visibleOptions.length === 0 ? (
-                <div className="px-3 py-3 text-sm text-slate-400">No companies found for this industry/location.</div>
-              ) : (
-                visibleOptions.map((c) => (
-                  <button
-                    key={c.name}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => { toggleCompany(c.name); setCompanyQuery(""); }}
-                    className={cn("w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50", selected.has(c.name) && "bg-blue-50/60")}
-                  >
-                    <span className="font-medium text-slate-900">{c.name}</span>
-                    <span className="text-xs text-slate-400">{c.location || ""}</span>
-                    {selected.has(c.name) && <Check className="h-3.5 w-3.5 text-blue-600" />}
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-          <p className="text-xs text-slate-400 mt-1.5">Live results for your industry &amp; location — most relevant first, not a fixed list.</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-base font-semibold text-slate-800 mb-2">Company size / headcount</label>
-            <Select value={form.companySize} onChange={(e) => setForm({ ...form, companySize: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
-              <option value="Any">Any size</option>
-              {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
-            </Select>
-          </div>
-          <div>
-            <label className="block text-base font-semibold text-slate-800 mb-2">Seniority level</label>
-            <Select value={form.seniority} onChange={(e) => setForm({ ...form, seniority: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
-              <option value="Any">Any seniority</option>
-              {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
-            </Select>
-          </div>
+          <MultiLocationInput value={form.locations} onChange={(v) => setForm({ ...form, locations: v })} />
         </div>
 
         <label className="flex items-center gap-3 text-base text-slate-800 cursor-pointer">
@@ -1665,7 +1602,7 @@ function CompanyWiseLeadsFlow({
         </label>
 
         <div className="max-w-[220px]">
-          <label className="block text-base font-semibold text-slate-800 mb-2">How many (max {maxCount})</label>
+          <label className="block text-base font-semibold text-slate-800 mb-2">How many leads (max {maxCount})</label>
           <Input
             type="text"
             inputMode="numeric"
@@ -1680,20 +1617,14 @@ function CompanyWiseLeadsFlow({
 
         <Button
           onClick={() => { clearError(); onFindProspects(); setShowResults(true); }}
-          disabled={peopleLoading || selected.size === 0}
+          disabled={peopleLoading || namedCount === 0}
           size="lg"
           className="shadow-md"
         >
           {peopleLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</> : <><Sparkles className="h-4 w-4" /> Find Prospects</>}
         </Button>
 
-        {selected.size === 0 && <p className="text-xs text-slate-400">Pick at least one company above to continue.</p>}
-        {companyOptions && companyOptionsSource === "ai" && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <span>Couldn&apos;t reach the data provider, so these company suggestions are <span className="font-semibold">AI-generated samples</span> — not verified.</span>
-          </div>
-        )}
+        {namedCount === 0 && <p className="text-xs text-slate-400">Enter at least one company to continue.</p>}
         {error && <ErrorNote text={error} />}
       </div>
 
@@ -1701,14 +1632,14 @@ function CompanyWiseLeadsFlow({
         <div>
           <p className="font-bold text-slate-900 text-base mb-3 uppercase tracking-wider">What you&apos;ll get</p>
           <ul className="space-y-3 text-base text-slate-600">
-            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Real people working at the company(ies) you pick, from real public profiles.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Real people working at the company(ies) you enter, from real public profiles.</li>
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Each lead is linked to that company&apos;s Account record automatically.</li>
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Work email included when found — flagged as verified or catch-all, never guessed silently.</li>
           </ul>
         </div>
         <div className="pt-3 border-t border-amber-200/70">
           <p className="text-sm font-bold uppercase tracking-wider text-slate-800 mb-1.5">Not available from this source</p>
-          <p className="text-sm text-slate-600 leading-relaxed">Company revenue and exact headcount aren&apos;t reliably available — Company size above is a search filter, not a verified field.</p>
+          <p className="text-sm text-slate-600 leading-relaxed">Company revenue and exact headcount aren&apos;t reliably available for every company.</p>
         </div>
       </div>
     </div>
@@ -1774,7 +1705,7 @@ function CompanyBuyReview({ prospects, companyCount, maxCount }: { prospects: Ge
         <div><p className="text-2xl font-bold text-slate-900">{maxCount.toLocaleString()}</p><p className="text-xs text-slate-500 mt-1">Remaining this cycle</p></div>
       </div>
       <div className="bg-blue-50/60 border border-blue-100 rounded-lg p-3 text-sm text-slate-600">
-        Source: <span className="font-medium text-slate-900">Company-wise Leads (BILEADS Kit)</span>. Each person will be linked to their Account/Company, and preserves the search criteria used to find them.
+        Source: <span className="font-medium text-slate-900">Company-wise Leads</span>. Each person will be linked to their Account/Company, and preserves the search criteria used to find them.
       </div>
       <CompanyProspectsTable prospects={prospects} selected={new Set(prospects.map((_, i) => i))} onToggle={() => {}} onToggleAll={() => {}} readOnly />
     </div>

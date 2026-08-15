@@ -1,13 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle, ShieldAlert } from "lucide-react";
+import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle, ShieldAlert, Users } from "lucide-react";
 import { platformAdminSignOut } from "@/lib/queries/platform-admin";
 import { OverviewTab } from "@/components/admin/overview-tab";
 import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
 import { AdminLeadArchiveView } from "@/components/admin/lead-archive-view";
 import { VendorSubscriptionsTab } from "@/components/admin/vendor-subscriptions-tab";
 import { AiProviderTab } from "@/components/admin/ai-provider-tab";
+import { LeadProviderTab } from "@/components/admin/lead-provider-tab";
 import { PromoCodesTab } from "@/components/admin/promo-codes-tab";
 import { FeatureKillSwitchesTab } from "@/components/admin/feature-kill-switches-tab";
 import { WhatsAppConnectorView } from "@/components/settings/connectors-view";
@@ -23,6 +24,7 @@ import type {
 import type { LeadArchiveRow } from "@/lib/queries/lead-import-archive";
 import type { VendorSubscriptionRow } from "@/lib/queries/platform-vendor-subscriptions";
 import type { AiProviderStatus } from "@/lib/queries/ai-provider-settings";
+import type { LeadProviderStatus } from "@/lib/queries/lead-provider-settings";
 import type { EmailPromoCodeRow } from "@/lib/queries/admin-promo-codes";
 import { LogoMark } from "@/components/brand/logo";
 
@@ -33,6 +35,7 @@ const TABS = [
   { id: "leads", label: "Leads Archive", icon: Archive },
   { id: "vendors", label: "Our Vendor Subscriptions", icon: Plug },
   { id: "ai-provider", label: "AI Provider", icon: Sparkles },
+  { id: "lead-provider", label: "Lead Provider", icon: Users },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "feature-access", label: "Feature Access", icon: ShieldAlert },
 ] as const;
@@ -44,6 +47,7 @@ export function AdminDashboard({
   leadArchive,
   vendorSubscriptions,
   aiProviderStatus,
+  leadProviderStatus,
   trendData,
   attentionWorkspaces,
   promoCodes,
@@ -57,6 +61,7 @@ export function AdminDashboard({
   leadArchive: (LeadArchiveRow & { workspace_name: string | null })[];
   vendorSubscriptions: VendorSubscriptionRow[];
   aiProviderStatus: AiProviderStatus;
+  leadProviderStatus: LeadProviderStatus;
   trendData: PlatformOverviewTrendPoint[];
   attentionWorkspaces: WorkspaceAttentionItem[];
   promoCodes: EmailPromoCodeRow[];
@@ -178,6 +183,7 @@ export function AdminDashboard({
         {tab === "leads" && <AdminLeadArchiveView rows={leadArchive} />}
         {tab === "vendors" && <VendorSubscriptionsTab rows={vendorSubscriptions} />}
         {tab === "ai-provider" && <AiProviderTab status={aiProviderStatus} />}
+        {tab === "lead-provider" && <LeadProviderTab status={leadProviderStatus} />}
         {tab === "whatsapp" && (
           <WhatsAppConnectorView isSuperAdmin whatsappAccounts={whatsappAccounts} connectorReady={unipileConfigured} />
         )}
