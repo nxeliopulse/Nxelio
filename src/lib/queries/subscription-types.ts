@@ -49,6 +49,11 @@ export interface Subscription {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   stripe_price_id: string | null;
+  /** True once cancellation is scheduled (Stripe's cancel_at_period_end) —
+   *  status stays "active"/"trialing" until the period actually ends. */
+  cancel_at_period_end: boolean;
+  /** Set once Stripe actually deletes the subscription (customer.subscription.deleted). */
+  canceled_at: string | null;
   created_at: string;
 }
 
@@ -85,6 +90,36 @@ export function isLowOnLeads(sub: Subscription): boolean {
 
 export function totalLeadsAvailable(sub: Subscription): number {
   return sub.leads_remaining;
+}
+
+/**
+ * Maps a raw Stripe subscription status string to our local
+ * SubscriptionStatus. This used to be duplicated (and had silently
+ * diverged) between src/app/api/billing/webhook/route.ts and
+ * src/app/checkout-return/route.ts — the webhook copy mapped
+ * incomplete/incomplete_expired to "past_due", the checkout-return copy
+ * didn't and fell through to "active" instead. Both now import this one
+ * function so the same Stripe status always produces the same local
+ * status regardless of which code path processed it. Kept param-typed as
+ * `string` rather than importing Stripe's own type, so this file (used by
+ * both server and client code) stays framework-free.
+ */
+export function mapStripeStatus(status: string): SubscriptionStatus {
+  switch (status) {
+    case "trialing":
+      return "trialing";
+    case "active":
+      return "active";
+    case "past_due":
+    case "unpaid":
+    case "incomplete":
+    case "incomplete_expired":
+      return "past_due";
+    case "canceled":
+      return "canceled";
+    default:
+      return "active";
+  }
 }
 
 // ── Promotions ────────────────────────────────────────────────────────────────

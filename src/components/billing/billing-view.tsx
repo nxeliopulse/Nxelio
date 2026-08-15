@@ -166,6 +166,8 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
   const [cancelOpen, setCancelOpen] = useState(false);
   const [checkoutPending, startCheckout] = useTransition();
   const [portalPending, startPortal] = useTransition();
+  const [cancelPending, startCancel] = useTransition();
+  const [cancelModalError, setCancelModalError] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successPlanName, setSuccessPlanName] = useState("");
@@ -186,6 +188,9 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
   const low           = isLow(credRemaining, credTotal);
   const daysLeft      = trialDaysLeft(sub?.trial_ends_at ?? null);
   const hasPortal     = Boolean(sub?.stripe_customer_id);
+  const cancelAtPeriodEnd = sub?.cancel_at_period_end ?? false;
+  const periodEndDate = sub?.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : null;
+  const canCancel     = Boolean(sub?.stripe_subscription_id) && status !== "canceled";
 
   const leadsRemaining = sub?.leads_remaining ?? 0;
   const leadsTotal     = sub?.leads_total     ?? 0;
@@ -231,6 +236,32 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
       const json = await res.json();
       if (!res.ok || json.error) { setCheckoutError(json.error ?? "Portal failed"); return; }
       window.location.href = json.url;
+    });
+  }
+
+  /** Calls Stripe directly (cancel_at_period_end) — doesn't depend on the
+   *  hosted Customer Portal being configured, unlike goPortal() above.
+   *  Error/loading state stays inside the cancel modal so a failure can't
+   *  be missed the way a page-top banner can once the modal has closed. */
+  function confirmCancel() {
+    setCancelModalError(null);
+    startCancel(async () => {
+      const res = await fetch("/api/billing/cancel", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || json.error) { setCancelModalError(json.error ?? "Couldn't cancel — please try again."); return; }
+      setCancelOpen(false);
+      router.refresh();
+    });
+  }
+
+  function resumeSubscription() {
+    setCancelModalError(null);
+    startCancel(async () => {
+      const res = await fetch("/api/billing/resume", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || json.error) { setCancelModalError(json.error ?? "Couldn't resume — please try again."); return; }
+      setCancelOpen(false);
+      router.refresh();
     });
   }
 
@@ -333,6 +364,15 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                 </span>
                 {status === "trialing" && daysLeft > 0 && (
                   <span className="text-xs text-blue-100">{daysLeft} days left</span>
+                )}
+                {cancelAtPeriodEnd && (
+                  <button
+                    onClick={() => setCancelOpen(true)}
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/20 text-red-100 ring-1 ring-red-300/40 hover:bg-red-500/30"
+                    title="Click to resume"
+                  >
+                    Cancels {periodEndDate ?? "soon"}
+                  </button>
                 )}
               </div>
               <h2 className="text-4xl font-bold">
@@ -715,24 +755,53 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
       </Modal>
 
       {/* ── Cancel modal ──────────────────────────────────────── */}
-      <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancel subscription" description="Your plan stays active until the end of the current period" size="sm">
+      <Modal
+        open={cancelOpen}
+        onClose={() => { setCancelOpen(false); setCancelModalError(null); }}
+        title={cancelAtPeriodEnd ? "Cancellation scheduled" : "Cancel subscription"}
+        description={cancelAtPeriodEnd ? "You can resume any time before the period ends" : "Your plan stays active until the end of the current period"}
+        size="sm"
+      >
         <div className="p-5 space-y-4">
-          <p className="text-sm text-slate-600">
-            {status === "trialing"
-              ? "You're on a free trial — nothing to cancel. Your trial will expire naturally."
-              : hasPortal
-              ? "You can cancel directly from the billing portal. Your access continues until the period ends."
-              : `To cancel, email support@leadpro.ai and we'll process it promptly.`}
-          </p>
+          {cancelAtPeriodEnd ? (
+            <p className="text-sm text-slate-600">
+              Your subscription is set to cancel on <span className="font-semibold text-slate-900">{periodEndDate ?? "the end of this period"}</span>.
+              You'll keep full access until then. Changed your mind?
+            </p>
+          ) : canCancel ? (
+            <p className="text-sm text-slate-600">
+              {status === "trialing"
+                ? "You won't be charged. Canceling now ends your trial immediately and your card will not be charged when the trial would have ended."
+                : `You'll keep access until ${periodEndDate ?? "the end of the current period"}, then your subscription will end.`}
+            </p>
+          ) : (
+            <p className="text-sm text-slate-600">
+              To cancel, email support@leadpro.ai and we'll process it promptly.
+            </p>
+          )}
+
+          {cancelModalError && (
+            <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2.5">
+              <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700">{cancelModalError}</p>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setCancelOpen(false)}>Close</Button>
-            {status !== "trialing" && hasPortal && (
-              <Button variant="danger" onClick={() => { setCancelOpen(false); goPortal(); }} disabled={portalPending}>
-                {portalPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Open billing portal
+            <Button variant="outline" onClick={() => { setCancelOpen(false); setCancelModalError(null); }}>Close</Button>
+            {cancelAtPeriodEnd && (
+              <Button onClick={resumeSubscription} disabled={cancelPending}>
+                {cancelPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Resume subscription
               </Button>
             )}
-            {status !== "trialing" && !hasPortal && (
+            {!cancelAtPeriodEnd && canCancel && (
+              <Button variant="danger" onClick={confirmCancel} disabled={cancelPending}>
+                {cancelPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Confirm cancel
+              </Button>
+            )}
+            {!cancelAtPeriodEnd && !canCancel && (
               <a href="mailto:support@leadpro.ai?subject=Cancel subscription">
                 <Button variant="danger">Email support</Button>
               </a>

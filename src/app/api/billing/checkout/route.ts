@@ -101,6 +101,10 @@ export async function POST(req: NextRequest) {
         stripeCustomerId:     sub.stripe_customer_id ?? String(updated.customer),
         stripeSubscriptionId: updated.id,
         stripePriceId:        priceId,
+        // An upgrade implies the subscription isn't scheduled to cancel —
+        // reflect Stripe's own fields either way rather than assuming.
+        cancelAtPeriodEnd:    updated.cancel_at_period_end,
+        canceledAt:           updated.canceled_at ? new Date(updated.canceled_at * 1000) : null,
       });
 
       if (promo?.redemptionId) {

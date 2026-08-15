@@ -15,7 +15,12 @@
     "test:ai-dashboard": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-ai-dashboard.mjs",
     "test:ai-contextual": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-ai-contextual.mjs",
     "test:feature-kill-switches": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-feature-kill-switches.mjs",
-    "test:idle-timeout": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-idle-timeout.mjs"
+    "test:idle-timeout": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-idle-timeout.mjs",
+    "test:analytics-overview": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-analytics-overview-metrics.mjs",
+    "test:prospects-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-prospects-metrics.mjs",
+    "test:engagement-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-engagement-metrics.mjs",
+    "test:pipeline-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-pipeline-metrics.mjs",
+    "test:subscription-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-subscription-metrics.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

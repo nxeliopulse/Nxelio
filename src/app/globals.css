@@ -955,3 +955,106 @@ select:focus-visible {
   box-shadow: 0 0 0 1.5px rgba(24, 167, 184, 0.3) !important;
 }
 
+/* Redesign Custom Animations */
+@keyframes drift {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.15); }
+  66% { transform: translate(-20px, 20px) scale(0.95); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes drift-reverse {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(-30px, 40px) scale(0.9); }
+  66% { transform: translate(40px, -20px) scale(1.1); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(1.5deg); }
+}
+
+@keyframes float-widget-1 {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-8px) translateX(4px); }
+}
+
+@keyframes float-widget-2 {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(6px) translateX(-6px); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes card-intro {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shine-sweep {
+  0% { left: -100%; }
+  100% { left: 200%; }
+}
+
+.animate-drift {
+  animation: drift 20s infinite ease-in-out;
+}
+
+.animate-drift-reverse {
+  animation: drift-reverse 25s infinite ease-in-out;
+}
+
+.animate-float-slow {
+  animation: float-slow 5s infinite ease-in-out;
+}
+
+.animate-float-w1 {
+  animation: float-widget-1 6s infinite ease-in-out;
+}
+
+.animate-float-w2 {
+  animation: float-widget-2 7s infinite ease-in-out;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 35s linear infinite;
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 45s linear infinite;
+}
+
+.animate-card-intro {
+  animation: card-intro 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(20px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.08), 0 10px 25px rgba(15, 23, 42, 0.04) !important;
+}
+
+.glass-widget {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 12px 30px rgba(30, 20, 90, 0.06) !important;
+}
+
+

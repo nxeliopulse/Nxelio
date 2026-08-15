@@ -121,16 +121,28 @@ function LoginForm() {
 
         {/* Email */}
         <div>
-          <label className={LABEL}>Email</label>
-          <input
-            type="email"
-            placeholder="you@company.com"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            {...INPUT}
-            onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(122,143,255,.4)"; }}
-            onBlur={(e)  => { e.currentTarget.style.boxShadow = "none"; }}
-          />
+          <label className={LABEL}>Email Address</label>
+          <div className="relative">
+            <input
+              type="email"
+              placeholder="you@company.com"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              {...INPUT}
+              style={{ ...INPUT.style, paddingLeft: "2.6rem" }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#18A7B8";
+                e.currentTarget.style.boxShadow = "0 0 0 4px rgba(24, 167, 184, 0.15)";
+                e.currentTarget.style.background = "#FFFFFF";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#E2E8F0";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.background = "#F8FAFC";
+              }}
+            />
+            <Mail className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-colors" />
+          </div>
         </div>
 
         {/* Password */}
@@ -151,12 +163,21 @@ function LoginForm() {
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               {...INPUT}
-              style={{ ...INPUT.style, paddingRight: "2.75rem" }}
-              onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(122,143,255,.4)"; }}
-              onBlur={(e)  => { e.currentTarget.style.boxShadow = "none"; }}
+              style={{ ...INPUT.style, paddingLeft: "2.6rem", paddingRight: "2.75rem" }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#18A7B8";
+                e.currentTarget.style.boxShadow = "0 0 0 4px rgba(24, 167, 184, 0.15)";
+                e.currentTarget.style.background = "#FFFFFF";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#E2E8F0";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.background = "#F8FAFC";
+              }}
             />
+            <Eye className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-colors" />
             <button type="button" onClick={() => setShowPass(!showPass)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors text-slate-400 hover:text-slate-600">
+              className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors text-slate-400 hover:text-slate-600 p-1">
               {showPass ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
             </button>
           </div>
@@ -164,13 +185,13 @@ function LoginForm() {
 
         {/* Submit */}
         <button type="submit" disabled={!valid || loading}
-          className="w-full py-2.5 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow:"0 4px 20px rgba(24,167,184,.3)" }}>
+          className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all transform active:scale-[0.99] hover:opacity-95 hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ background:"linear-gradient(135deg, #18A7B8 0%, #7E57C2 100%)", boxShadow:"0 6px 24px rgba(24,167,184,.35)" }}>
           {loading ? "Signing in…" : "Sign In"}
         </button>
 
         {/* Switch */}
-        <p className="text-center text-xs text-slate-500">
+        <p className="text-center text-xs text-slate-500 pt-1">
           New on our platform?{" "}
           <Link href="/signup" className="font-bold hover:underline" style={{ color:"#18A7B8" }}>
             Create an Account

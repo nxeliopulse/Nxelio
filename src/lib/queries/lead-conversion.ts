@@ -7,7 +7,7 @@ import { getLeadDetail } from "@/lib/queries/lead-detail";
 import { findMatchingAccount, createAccount, type AccountRow } from "@/lib/queries/accounts";
 import { findMatchingContact, createContact, type ContactRow } from "@/lib/queries/contacts";
 import { updateLead } from "@/lib/queries/leads";
-import type { OpportunityStage } from "@/lib/opportunities";
+import { resolveLeadAttribution, type OpportunityStage } from "@/lib/opportunities";
 
 /** Auto-matches an in-progress lead against existing Accounts/Contacts, for the Convert Lead modal's pre-fill. */
 export async function getConversionMatches(leadId: string): Promise<{ account: AccountRow | null; contact: ContactRow | null }> {
@@ -68,7 +68,10 @@ export async function convertLead(input: ConvertLeadInput): Promise<ConvertLeadR
   // 3. Optionally create the Opportunity, linked to both.
   let opportunityId: string | null = null;
   if (input.opportunity) {
-    const { data: user } = await supabase.auth.getUser();
+    const [{ data: user }, attribution] = await Promise.all([
+      supabase.auth.getUser(),
+      resolveLeadAttribution(supabase, input.leadId),
+    ]);
     const { data: opp, error: oppError } = await supabase
       .from("opportunities")
       .insert({
@@ -83,6 +86,9 @@ export async function convertLead(input: ConvertLeadInput): Promise<ConvertLeadR
         stage: input.opportunity.stage,
         expected_close_date: input.opportunity.expectedCloseDate,
         owner_id: user.user?.id ?? null,
+        source: (lead as { source?: string | null }).source ?? null,
+        campaign_id: attribution.campaignId,
+        segment_id: attribution.segmentId,
       })
       .select("id")
       .single();

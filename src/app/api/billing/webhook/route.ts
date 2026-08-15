@@ -14,34 +14,25 @@ import {
   workspaceByStripeCustomer,
   type PlanId,
   type BillingInterval,
-  type SubscriptionStatus,
 } from "@/lib/queries/subscriptions";
+import { mapStripeStatus } from "@/lib/queries/subscription-types";
 import { stripe, PRICE_ID_TO_PLAN, PLAN_CREDITS, PLAN_LEADS } from "@/lib/stripe";
 import { finalizePendingPromotion } from "@/lib/queries/promotions";
 import type Stripe from "stripe";
 
-// Map Stripe subscription status → our status
-function mapStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
-  switch (status) {
-    case "trialing":            return "trialing";
-    case "active":               return "active";
-    case "past_due":
-    case "unpaid":
-    case "incomplete":
-    case "incomplete_expired":  return "past_due";
-    case "canceled":             return "canceled";
-    default:                     return "active";
-  }
-}
-
-// Extract our planId + billingInterval from the Stripe subscription's price
-function resolvePlan(sub: Stripe.Subscription): { planId: PlanId; billingInterval: BillingInterval; priceId: string } {
+// Extract our planId + billingInterval from the Stripe subscription's
+// price. Returns null when the price isn't in STRIPE_PRICE_IDS — e.g. a
+// subscription still on a retired/legacy price from before a pricing
+// update. Callers must NOT default this to "basic": doing so previously
+// silently downgraded real Pro/Starter subscribers (still correctly
+// billing at their original price in Stripe) to Basic-tier credits/
+// features on the very next webhook event, purely because the price ID
+// wasn't recognized — a real, live bug, not a hypothetical.
+function resolvePlan(sub: Stripe.Subscription): { planId: PlanId; billingInterval: BillingInterval; priceId: string } | null {
   const priceId = sub.items.data[0]?.price.id ?? "";
   const mapped = PRICE_ID_TO_PLAN[priceId];
-  if (mapped) {
-    return { planId: mapped.planId as PlanId, billingInterval: mapped.interval as BillingInterval, priceId };
-  }
-  return { planId: "basic", billingInterval: "monthly", priceId };
+  if (!mapped) return null;
+  return { planId: mapped.planId as PlanId, billingInterval: mapped.interval as BillingInterval, priceId };
 }
 
 function customerId(sub: Stripe.Subscription): string {
@@ -59,14 +50,42 @@ async function upsertFromSubscription(sub: Stripe.Subscription) {
   const workspaceId = await resolveWorkspace(sub);
   if (!workspaceId) return;
 
-  const { planId, billingInterval, priceId } = resolvePlan(sub);
+  const resolved = resolvePlan(sub);
   const item = sub.items.data[0];
+
+  if (!resolved) {
+    // Unrecognized price (legacy/retired) — sync status/dates/cancellation
+    // only. Never touch plan_id/credits_total/leads_total here: we don't
+    // know what plan this price maps to, so guessing "basic" would corrupt
+    // a real paying customer's entitlements. Logged loudly so this is
+    // visible and the subscription can be migrated to a current price.
+    console.error(
+      `[billing/webhook] Unrecognized Stripe price "${item?.price.id}" on subscription ${sub.id} ` +
+      `(workspace ${workspaceId}) — likely a retired/legacy price. Plan/credits left untouched; ` +
+      `only status and period dates were synced. Migrate this subscription to a current STRIPE_PRICE_IDS entry.`
+    );
+    const admin = createAdminClient();
+    await admin.from("subscriptions").update({
+      status:               mapStripeStatus(sub.status),
+      current_period_start: new Date(item.current_period_start * 1000).toISOString(),
+      current_period_end:   new Date(item.current_period_end * 1000).toISOString(),
+      trial_ends_at:        sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+      stripe_customer_id:   customerId(sub),
+      stripe_subscription_id: sub.id,
+      cancel_at_period_end: sub.cancel_at_period_end,
+      canceled_at:          sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
+      updated_at:           new Date().toISOString(),
+    }).eq("workspace_id", workspaceId);
+    return;
+  }
+
+  const { planId, billingInterval, priceId } = resolved;
 
   await syncSubscriptionFromStripe({
     workspaceId,
     planId,
     billingInterval,
-    status:               mapStatus(sub.status),
+    status:               mapStripeStatus(sub.status),
     creditsTotal:         PLAN_CREDITS[planId] ?? PLAN_CREDITS.basic,
     leadsTotal:           PLAN_LEADS[planId] ?? 0,
     currentPeriodStart:   new Date(item.current_period_start * 1000),
@@ -75,6 +94,8 @@ async function upsertFromSubscription(sub: Stripe.Subscription) {
     stripeCustomerId:     customerId(sub),
     stripeSubscriptionId: sub.id,
     stripePriceId:        priceId,
+    cancelAtPeriodEnd:    sub.cancel_at_period_end,
+    canceledAt:           sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
   });
 
   await finalizePendingPromotion(workspaceId, { stripeSubscriptionId: sub.id });
@@ -121,7 +142,7 @@ export async function POST(req: NextRequest) {
         if (workspaceId) {
           const admin = createAdminClient();
           await admin.from("subscriptions")
-            .update({ status: "canceled", updated_at: new Date().toISOString() })
+            .update({ status: "canceled", cancel_at_period_end: false, canceled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
             .eq("workspace_id", workspaceId);
         }
         break;
@@ -137,7 +158,10 @@ export async function POST(req: NextRequest) {
           const subId = typeof subRef === "string" ? subRef : subRef.id;
           const sub = await stripe().subscriptions.retrieve(subId);
           const workspaceId = await resolveWorkspace(sub);
-          if (workspaceId) await resetCycleCredits(workspaceId);
+          // invoice.id as the idempotency key — Stripe can redeliver this
+          // exact event, and without a key tied to this specific invoice,
+          // a redelivery would grant a second free cycle refill.
+          if (workspaceId) await resetCycleCredits(workspaceId, invoice.id);
           await upsertFromSubscription(sub);
         }
         break;

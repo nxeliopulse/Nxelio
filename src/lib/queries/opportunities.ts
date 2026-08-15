@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
-import { CLOSED_STAGES, type OpportunityRow, type OpportunityStage, type PipelineStats } from "@/lib/opportunities";
+import { CLOSED_STAGES, resolveLeadAttribution, type OpportunityRow, type OpportunityStage, type PipelineStats } from "@/lib/opportunities";
 
 export async function getOpportunities(): Promise<OpportunityRow[]> {
   const supabase = await createClient();
@@ -105,6 +105,10 @@ export interface CreateOpportunityInput {
 export async function createOpportunityFromLead(input: CreateOpportunityInput): Promise<OpportunityRow> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const [{ data: leadRow }, attribution] = await Promise.all([
+    supabase.from("leads").select("source").eq("id", input.leadId).single(),
+    resolveLeadAttribution(supabase, input.leadId),
+  ]);
 
   const { data, error } = await supabase
     .from("opportunities")
@@ -119,6 +123,9 @@ export async function createOpportunityFromLead(input: CreateOpportunityInput): 
       expected_close_date: input.expectedCloseDate || null,
       notes: input.notes ?? null,
       owner_id: user?.id ?? null,
+      source: (leadRow as { source: string | null } | null)?.source ?? null,
+      campaign_id: attribution.campaignId,
+      segment_id: attribution.segmentId,
     })
     .select()
     .single();
