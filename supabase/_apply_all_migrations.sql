@@ -4476,7 +4476,122 @@ END $$;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS discovered_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_leads_discovered_account ON leads(discovered_account_id);
 
--- >>> FILE: 0121_lead_provider_settings.sql
+-- >>> FILE: 0121_analytics_overview.sql
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS segment_id UUID REFERENCES segments(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_opportunities_campaign ON opportunities(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_opportunities_segment ON opportunities(segment_id);
+
+-- >>> FILE: 0122_opportunity_loss_reason.sql
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS loss_reason TEXT
+  CHECK (loss_reason IS NULL OR loss_reason IN ('Price', 'Competitor', 'No Budget', 'No Decision', 'Timing', 'Poor Fit', 'Lost Contact', 'Other'));
+
+-- >>> FILE: 0123_subscription_cancellation.sql
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS canceled_at TIMESTAMPTZ;
+
+-- >>> FILE: 0124_reset_cycle_idempotency.sql
+CREATE OR REPLACE FUNCTION reset_subscription_cycle(p_workspace_id UUID, p_idempotency_key TEXT DEFAULT NULL)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_sub  subscriptions%ROWTYPE;
+  v_plan subscription_plans%ROWTYPE;
+BEGIN
+  SELECT * INTO v_sub FROM subscriptions WHERE workspace_id = p_workspace_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  IF p_idempotency_key IS NOT NULL AND v_sub.last_synced_resource_version = p_idempotency_key THEN
+    RETURN;
+  END IF;
+
+  SELECT * INTO v_plan FROM subscription_plans WHERE id = v_sub.plan_id;
+
+  UPDATE subscriptions SET
+    credits_remaining            = v_plan.credits_per_cycle,
+    credits_total                = v_plan.credits_per_cycle,
+    leads_remaining               = v_plan.leads_per_cycle,
+    leads_total                   = v_plan.leads_per_cycle,
+    current_period_start         = now(),
+    current_period_end           = CASE
+                                      WHEN v_sub.billing_interval = 'annual'
+                                      THEN now() + INTERVAL '1 year'
+                                      ELSE now() + INTERVAL '30 days'
+                                    END,
+    low_balance_notified_at      = NULL,
+    status                        = 'active',
+    last_synced_resource_version = COALESCE(p_idempotency_key, v_sub.last_synced_resource_version),
+    updated_at                    = now()
+  WHERE workspace_id = p_workspace_id;
+
+  INSERT INTO credit_ledger (workspace_id, subscription_id, operation_type, credits_delta, resource_type, status, metadata)
+  VALUES (p_workspace_id, v_sub.id, 'cycle_reset', v_plan.credits_per_cycle, 'credits',
+          'completed', jsonb_build_object('plan', v_plan.id, 'interval', v_sub.billing_interval, 'idempotency_key', p_idempotency_key));
+
+  IF v_plan.leads_per_cycle > 0 THEN
+    INSERT INTO credit_ledger (workspace_id, subscription_id, operation_type, credits_delta, resource_type, status, metadata)
+    VALUES (p_workspace_id, v_sub.id, 'cycle_reset', v_plan.leads_per_cycle, 'leads',
+            'completed', jsonb_build_object('plan', v_plan.id, 'interval', v_sub.billing_interval, 'idempotency_key', p_idempotency_key));
+  END IF;
+END;
+$$;
+
+-- >>> FILE: 0125_fix_trial_expiry_false_cancel.sql
+CREATE OR REPLACE FUNCTION deduct_credits(
+  p_workspace_id    UUID,
+  p_operation_type  TEXT,
+  p_amount          INTEGER DEFAULT 1,
+  p_lead_id         UUID    DEFAULT NULL,
+  p_campaign_id     UUID    DEFAULT NULL,
+  p_metadata        JSONB   DEFAULT '{}'
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_sub  subscriptions%ROWTYPE;
+  v_bal  INTEGER;
+BEGIN
+  SELECT * INTO v_sub
+  FROM subscriptions WHERE workspace_id = p_workspace_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'No subscription found');
+  END IF;
+
+  IF v_sub.status NOT IN ('active','trialing') THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Subscription not active', 'status', v_sub.status);
+  END IF;
+
+  IF v_sub.status = 'trialing'
+     AND v_sub.trial_ends_at IS NOT NULL
+     AND v_sub.trial_ends_at < now() THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Trial period has ended — please refresh in a moment while your subscription syncs.');
+  END IF;
+
+  IF v_sub.credits_remaining < p_amount THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Insufficient credits',
+                              'remaining', v_sub.credits_remaining);
+  END IF;
+
+  v_bal := v_sub.credits_remaining - p_amount;
+
+  UPDATE subscriptions
+  SET credits_remaining = v_bal, updated_at = now()
+  WHERE id = v_sub.id;
+
+  INSERT INTO credit_ledger
+    (workspace_id, subscription_id, operation_type, credits_delta,
+     lead_id, campaign_id, status, metadata)
+  VALUES
+    (p_workspace_id, v_sub.id, p_operation_type, -p_amount,
+     p_lead_id, p_campaign_id, 'completed', p_metadata);
+
+  RETURN jsonb_build_object('ok', true, 'remaining', v_bal, 'deducted', p_amount);
+END;
+$$;
+
+-- >>> FILE: 0126_lead_provider_settings.sql
 CREATE TABLE IF NOT EXISTS lead_provider_settings (
   id               INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- single-row table
   active_provider  TEXT NOT NULL DEFAULT 'bright_data' CHECK (active_provider IN ('anysite', 'bright_data')),
