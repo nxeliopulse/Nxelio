@@ -160,75 +160,35 @@ export interface SyncPayload {
   canceledAt: Date | null;
 }
 
+/**
+ * Delegates the whole read-decide-write-ledger sequence to the
+ * sync_subscription_from_stripe() RPC, which does it atomically under a row
+ * lock. Doing this in application code (separate select + upsert + ledger
+ * insert) used to race against itself: cancel/resume/checkout all call Stripe
+ * directly and then sync themselves, while Stripe's own webhook fires and
+ * syncs the same change independently around the same time — two unlocked
+ * read-then-writes for one real change could double-grant a plan-change's
+ * credits/ledger entry or clobber a concurrent credit spend.
+ */
 export async function syncSubscriptionFromStripe(payload: SyncPayload): Promise<void> {
   const admin = createAdminClient();
-
-  const { data: existing } = await admin
-    .from("subscriptions")
-    .select("credits_remaining, credits_total, leads_remaining, leads_total, plan_id")
-    .eq("workspace_id", payload.workspaceId)
-    .single();
-
-  const planChanged = existing && existing.plan_id !== payload.planId;
-  const creditsRemaining = planChanged || !existing
-    ? payload.creditsTotal
-    : existing.credits_remaining;
-  const leadsRemaining = planChanged || !existing
-    ? payload.leadsTotal
-    : existing.leads_remaining;
-
-  await admin.from("subscriptions").upsert(
-    {
-      workspace_id:              payload.workspaceId,
-      plan_id:                   payload.planId,
-      billing_interval:          payload.billingInterval,
-      status:                    payload.status,
-      credits_remaining:         creditsRemaining,
-      credits_total:             payload.creditsTotal,
-      leads_remaining:           leadsRemaining,
-      leads_total:               payload.leadsTotal,
-      trial_ends_at:             payload.trialEndsAt?.toISOString() ?? null,
-      current_period_start:      payload.currentPeriodStart.toISOString(),
-      current_period_end:        payload.currentPeriodEnd.toISOString(),
-      stripe_customer_id:     payload.stripeCustomerId,
-      stripe_subscription_id: payload.stripeSubscriptionId,
-      stripe_price_id:        payload.stripePriceId,
-      cancel_at_period_end:   payload.cancelAtPeriodEnd,
-      canceled_at:            payload.canceledAt?.toISOString() ?? null,
-    },
-    { onConflict: "workspace_id" }
-  );
-
-  if (planChanged) {
-    const { data: sub } = await admin
-      .from("subscriptions")
-      .select("id")
-      .eq("workspace_id", payload.workspaceId)
-      .single();
-
-    if (sub) {
-      await admin.from("credit_ledger").insert({
-        workspace_id:    payload.workspaceId,
-        subscription_id: sub.id,
-        operation_type:  "plan_change",
-        credits_delta:   payload.creditsTotal,
-        resource_type:   "credits",
-        status:          "completed",
-        metadata:        { from: existing?.plan_id, to: payload.planId },
-      });
-      if (payload.leadsTotal > 0) {
-        await admin.from("credit_ledger").insert({
-          workspace_id:    payload.workspaceId,
-          subscription_id: sub.id,
-          operation_type:  "plan_change",
-          credits_delta:   payload.leadsTotal,
-          resource_type:   "leads",
-          status:          "completed",
-          metadata:        { from: existing?.plan_id, to: payload.planId },
-        });
-      }
-    }
-  }
+  const { error } = await admin.rpc("sync_subscription_from_stripe", {
+    p_workspace_id:           payload.workspaceId,
+    p_plan_id:                payload.planId,
+    p_billing_interval:       payload.billingInterval,
+    p_status:                 payload.status,
+    p_credits_total:          payload.creditsTotal,
+    p_leads_total:            payload.leadsTotal,
+    p_current_period_start:   payload.currentPeriodStart.toISOString(),
+    p_current_period_end:     payload.currentPeriodEnd.toISOString(),
+    p_trial_ends_at:          payload.trialEndsAt?.toISOString() ?? null,
+    p_stripe_customer_id:     payload.stripeCustomerId,
+    p_stripe_subscription_id: payload.stripeSubscriptionId,
+    p_stripe_price_id:        payload.stripePriceId,
+    p_cancel_at_period_end:   payload.cancelAtPeriodEnd,
+    p_canceled_at:            payload.canceledAt?.toISOString() ?? null,
+  });
+  if (error) console.error("[syncSubscriptionFromStripe] RPC failed:", error.message);
 }
 
 /**
@@ -239,7 +199,8 @@ export async function syncSubscriptionFromStripe(payload: SyncPayload): Promise<
  */
 export async function resetCycleCredits(workspaceId: string, idempotencyKey?: string): Promise<void> {
   const admin = createAdminClient();
-  await admin.rpc("reset_subscription_cycle", { p_workspace_id: workspaceId, p_idempotency_key: idempotencyKey ?? null });
+  const { error } = await admin.rpc("reset_subscription_cycle", { p_workspace_id: workspaceId, p_idempotency_key: idempotencyKey ?? null });
+  if (error) console.error("[resetCycleCredits] RPC failed:", error.message);
 }
 
 export async function workspaceByStripeCustomer(

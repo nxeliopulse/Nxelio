@@ -57,7 +57,11 @@ export async function GET(req: NextRequest) {
       expand: ["subscription"],
     });
 
-    if (session.payment_status === "paid" && session.subscription) {
+    // "no_payment_required" is Stripe's real payment_status for a Checkout
+    // Session with nothing due today — exactly the Basic plan's 7-day trial
+    // signup. Gating on "paid" alone skipped the immediate sync for every
+    // trial signup, the one plan this app actually offers a trial on.
+    if ((session.payment_status === "paid" || session.payment_status === "no_payment_required") && session.subscription) {
       const stripeSub    = session.subscription as Stripe.Subscription;
       const stripeCustomerId = typeof session.customer === "string" ? session.customer : session.customer?.id ?? profile.workspace_id;
       const priceId       = stripeSub.items.data[0]?.price.id ?? "";

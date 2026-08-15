@@ -101,6 +101,10 @@ export async function POST(req: NextRequest) {
         stripeCustomerId:     sub.stripe_customer_id ?? String(updated.customer),
         stripeSubscriptionId: updated.id,
         stripePriceId:        priceId,
+        // Preserve the real trial end date — omitting this previously wiped
+        // trial_ends_at to null even for a customer still actually trialing
+        // (the Upgrade button has no trialing gate, so this is reachable).
+        trialEndsAt:          updated.trial_end ? new Date(updated.trial_end * 1000) : null,
         // An upgrade implies the subscription isn't scheduled to cancel —
         // reflect Stripe's own fields either way rather than assuming.
         cancelAtPeriodEnd:    updated.cancel_at_period_end,
