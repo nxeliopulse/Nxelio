@@ -18,6 +18,7 @@ interface OverviewSearchParams {
   industry?: string;
   source?: string;
   stage?: string;
+  gran?: string;
 }
 
 export default async function AnalyticsOverviewPage({ searchParams }: { searchParams: Promise<OverviewSearchParams> }) {
@@ -35,6 +36,7 @@ export default async function AnalyticsOverviewPage({ searchParams }: { searchPa
     industry: sp.industry,
     source: sp.source,
     stage: sp.stage as OverviewFilters["stage"],
+    granularityOverride: sp.gran === "daily" || sp.gran === "weekly" || sp.gran === "monthly" ? sp.gran : undefined,
   };
 
   const [data, { data: campaignsData }, { data: segmentsData }, { data: leadsForFacets }, users] = await Promise.all([

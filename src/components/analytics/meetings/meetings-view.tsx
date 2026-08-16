@@ -1,9 +1,12 @@
 import type { MeetingsAnalyticsData, MeetingsFilters } from "@/lib/queries/analytics-meetings";
+import { AiInsightsPanel } from "@/components/analytics/ai-insights-panel";
 import { MeetingsFilterBar } from "@/components/analytics/meetings/meetings-filter-bar";
 import { QualificationBreakdown } from "@/components/analytics/meetings/qualification-breakdown";
 import { RevenueFunnel } from "@/components/analytics/overview/revenue-funnel";
 import { KpiCard, formatNumber } from "@/components/analytics/overview/kpi-card";
 import { AnalyticsEmptyState } from "@/components/analytics/overview/analytics-empty-state";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { DonutChartWidget } from "@/components/analytics/widgets/DonutChartWidget";
 
 export function MeetingsView({ data, filters, ownerNames }: { data: MeetingsAnalyticsData; filters: MeetingsFilters; ownerNames: Record<string, string> }) {
   const { kpis, qualification } = data;
@@ -28,19 +31,27 @@ export function MeetingsView({ data, filters, ownerNames }: { data: MeetingsAnal
             <KpiCard label="Opportunity-Generating" value={formatNumber(kpis.opportunityGeneratingMeetings)} href="/opportunities" />
           </div>
 
-          <RevenueFunnel
-            stages={data.funnel}
-            title="Meeting Funnel"
-            stageHref={{ replies: "/inbox", meeting_booked: "/meetings", meeting_completed: "/meetings", qualified: "/leads", opportunity: "/opportunities" }}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-[65%_35%] gap-4">
+            <RevenueFunnel
+              stages={data.funnel}
+              title="Meeting Funnel"
+              stageHref={{ replies: "/inbox", meeting_booked: "/meetings", meeting_completed: "/meetings", qualified: "/leads", opportunity: "/opportunities" }}
+            />
+            <Card className="h-full">
+              <CardHeader className="pb-0 border-0"><CardTitle className="text-sm">Meetings by Outcome</CardTitle></CardHeader>
+              <DonutChartWidget config={{ chartType: "donut", title: "Meetings by Outcome" }} data={data.byOutcome.map((s) => ({ label: s.label, value: s.count }))} />
+            </Card>
+          </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <KpiCard label="Qualified" value={formatNumber(qualification.qualifiedCount)} href="/leads" />
-            <KpiCard label="Qualification Rate" value={`${qualification.qualificationRate}%`} />
+            <KpiCard label="Qualification Rate" value={`${qualification.qualificationRate}%`} detail="of completed meetings" />
             <KpiCard label="Avg. Time to Qualify" value={qualification.averageDaysToQualify != null ? `${qualification.averageDaysToQualify}d` : "—"} />
           </div>
 
           <QualificationBreakdown bySource={qualification.bySource} byOwner={qualification.byOwner} byIndustry={qualification.byIndustry} ownerNames={ownerNames} />
+
+          <AiInsightsPanel area="meetings" insights={data.aiInsights} heading="AI Meeting Insights" />
         </>
       )}
     </div>

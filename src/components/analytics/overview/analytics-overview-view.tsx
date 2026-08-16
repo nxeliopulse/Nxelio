@@ -45,16 +45,16 @@ export function AnalyticsOverviewView({ data, filters, campaigns, segments, indu
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <KpiCard label="Total Prospects" value={formatNumber(kpis.totalProspects.value)} changePercent={kpis.totalProspects.changePercent} href="/leads" />
+            <KpiCard label="New Prospects" value={formatNumber(kpis.totalProspects.value)} changePercent={kpis.totalProspects.changePercent} href="/leads" />
             <KpiCard label="Replies Received" value={formatNumber(kpis.replies.value)} detail={`${kpis.replies.replyRate}% reply rate`} href="/activities/emails" />
-            <KpiCard label="Meetings Booked" value={formatNumber(kpis.meetings.value)} changePercent={kpis.meetings.changePercent} href="/meetings" />
-            <KpiCard label="Qualified Prospects" value={formatNumber(kpis.qualified.value)} href="/leads" />
-            <KpiCard label="Open Pipeline" value={formatCurrency(kpis.openPipeline.value)} changePercent={kpis.openPipeline.changePercent} href="/opportunities" />
+            <KpiCard label="Meetings Booked" value={formatNumber(kpis.meetings.value)} changePercent={kpis.meetings.changePercent} detail={`${kpis.meetings.completedCount} completed`} href="/meetings" />
+            <KpiCard label="Qualified Prospects" value={formatNumber(kpis.qualified.value)} detail={`${kpis.qualified.conversionRate}% of new prospects`} href="/analytics/meetings" />
+            <KpiCard label="Open Pipeline" value={formatCurrency(kpis.openPipeline.value)} changePercent={kpis.openPipeline.changePercent} detail={`${kpis.openPipeline.openCount} open opportunities`} href="/opportunities" />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <KpiCard label="Closed-Won Revenue" value={formatCurrency(kpis.closedWonRevenue.value)} changePercent={kpis.closedWonRevenue.changePercent} href="/opportunities" />
+            <KpiCard label="Closed-Won Revenue" value={formatCurrency(kpis.closedWonRevenue.value)} changePercent={kpis.closedWonRevenue.changePercent} detail={`${kpis.closedWonRevenue.wonCount} won deals`} href="/opportunities" />
             <KpiCard label="Win Rate" value={`${kpis.winRate.value}%`} detail={`${kpis.winRate.won} won / ${kpis.winRate.lost} lost`} href="/opportunities" />
-            <KpiCard label="Forecast (Weighted)" value={formatCurrency(kpis.weightedForecast.value)} changePercent={kpis.weightedForecast.changePercent} />
+            <KpiCard label="Forecast (Weighted)" value={formatCurrency(kpis.weightedForecast.value)} changePercent={kpis.weightedForecast.changePercent} href="/analytics/pipeline" />
             <KpiCard
               label="Active Campaigns"
               value={formatNumber(kpis.activeCampaigns.active)}
@@ -70,7 +70,7 @@ export function AnalyticsOverviewView({ data, filters, campaigns, segments, indu
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-1"><RevenueTrendChart points={data.revenueTrend} /></div>
+            <div className="lg:col-span-1"><RevenueTrendChart points={data.revenueTrend} granularity={data.granularity} /></div>
             <div className="lg:col-span-1"><TopCampaignsTable campaigns={data.topCampaigns} /></div>
             <div className="lg:col-span-1"><AiInsightsPanel insights={data.aiInsights} /></div>
           </div>

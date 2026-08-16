@@ -13,6 +13,7 @@ export function ForecastCategories({ rows }: { rows: ForecastCategoryRow[] }) {
           <div key={r.category} className="text-center">
             <p className="text-[10px] text-slate-400">{r.category}</p>
             <p className="text-xs font-bold text-slate-700">{formatCurrency(r.value)}</p>
+            <p className="text-[10px] text-slate-400">{formatCurrency(r.weightedValue)} weighted &middot; {r.dealCount} deals</p>
           </div>
         ))}
       </div>

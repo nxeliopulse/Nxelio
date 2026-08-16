@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveDateRangePreset, bucketDateRange, type DateRangePreset, type DateRange } from "@/lib/analytics/overview-metrics";
 import { classifyReplyHeuristic, dayHourBucket, HOUR_BLOCK_LABELS, DAY_LABELS, type ReplyClassification } from "@/lib/analytics/engagement-metrics";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
+import { filterAndRecordRecommendations } from "@/lib/queries/ai-recommendations";
 
 export interface EngagementFilters {
   dateRange: DateRangePreset;
@@ -32,7 +33,15 @@ export interface SubjectRow {
   sent: number;
   openRate: number;
   replyRate: number;
+  positiveReplyRate: number;
   meetingsGenerated: number;
+}
+
+export interface EngagementAiInsight {
+  id: string;
+  title: string;
+  ctaLabel: string;
+  ctaHref: string;
 }
 
 export interface HeatmapCell {
@@ -80,6 +89,7 @@ export interface EngagementAnalyticsData {
   heatmap: HeatmapCell[];
   replyClassification: ReplyClassificationRow[];
   funnel: FunnelStage[];
+  aiInsights: EngagementAiInsight[];
   bounceWarning: string | null;
   lastUpdatedAt: string;
 }
@@ -111,17 +121,31 @@ export async function getEngagementAnalytics(filters: EngagementFilters): Promis
     .in("activity_type", ["EMAIL_SENT", "EMAIL_OPENED", "EMAIL_CLICKED", "EMAIL_REPLIED", "EMAIL_BOUNCED", "EMAIL_UNSUBSCRIBED", "LINKEDIN_AUTO_ASK_CONTACT_INFO"]);
   if (filters.campaignId) activitiesQuery = activitiesQuery.eq("metadata->>campaign_id", filters.campaignId);
 
-  const [{ data: activityData }, { data: campaignsData }, { data: repliesInboxData }, { data: meetingsData }] = await Promise.all([
+  const [{ data: activityData }, { data: campaignsData }, { data: repliesInboxData }, { data: meetingsData }, { data: oppsData }] = await Promise.all([
     activitiesQuery,
     supabase.from("campaigns").select("id, campaign_name, subject"),
     supabase.from("inbox_messages").select("lead_id, campaign_id, body, created_at").eq("direction", "inbound").gte("created_at", range.from.toISOString()).lte("created_at", range.to.toISOString()),
     supabase.from("meetings").select("lead_id"),
+    supabase.from("opportunities").select("lead_id"),
   ]);
 
   const activities = (activityData as { lead_id: string; activity_type: string; created_at: string; metadata: { campaign_id?: string } | null }[]) || [];
   const campaigns = (campaignsData as { id: string; campaign_name: string; subject: string | null }[]) || [];
   const inboundReplies = (repliesInboxData as { lead_id: string | null; campaign_id: string | null; body: string | null; created_at: string }[]) || [];
   const meetingLeadIds = new Set(((meetingsData as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);
+  const oppLeadIds = new Set(((oppsData as { lead_id: string | null }[]) || []).map((o) => o.lead_id).filter(Boolean) as string[]);
+
+  // Per-campaign positive-reply count, for the Subject Line table's Positive
+  // Reply Rate column — reuses the same rule-based classifier as the
+  // headline Positive Replies KPI, keyed by inbox_messages.campaign_id.
+  const positiveRepliesByCampaign = new Map<string, number>();
+  for (const r of inboundReplies) {
+    if (!r.campaign_id) continue;
+    const cls = classifyReplyHeuristic(r.body || "");
+    if (cls === "Positive" || cls === "Meeting Request") {
+      positiveRepliesByCampaign.set(r.campaign_id, (positiveRepliesByCampaign.get(r.campaign_id) || 0) + 1);
+    }
+  }
 
   const sentRows = activities.filter((a) => a.activity_type === "EMAIL_SENT");
   const openedRows = activities.filter((a) => a.activity_type === "EMAIL_OPENED");
@@ -178,10 +202,22 @@ export async function getEngagementAnalytics(filters: EngagementFilters): Promis
   const linkedinAttempts = linkedinRows.length;
   const linkedinLeadIds = new Set(linkedinRows.map((a) => a.lead_id));
   const byChannel: ChannelRow[] = [
-    { channel: "Email", attempts: emailAttempts, replyRate: rate(emailReplies, deliveredCount), meetings: Array.from(emailOppLeadIds).filter((id) => meetingLeadIds.has(id)).length, opportunityConversion: 0 },
+    {
+      channel: "Email",
+      attempts: emailAttempts,
+      replyRate: rate(emailReplies, deliveredCount),
+      meetings: Array.from(emailOppLeadIds).filter((id) => meetingLeadIds.has(id)).length,
+      opportunityConversion: rate(Array.from(new Set(sentRows.map((a) => a.lead_id))).filter((id) => oppLeadIds.has(id)).length, emailAttempts),
+    },
   ];
   if (linkedinAttempts > 0) {
-    byChannel.push({ channel: "LinkedIn", attempts: linkedinAttempts, replyRate: 0, meetings: Array.from(linkedinLeadIds).filter((id) => meetingLeadIds.has(id)).length, opportunityConversion: 0 });
+    byChannel.push({
+      channel: "LinkedIn",
+      attempts: linkedinAttempts,
+      replyRate: 0,
+      meetings: Array.from(linkedinLeadIds).filter((id) => meetingLeadIds.has(id)).length,
+      opportunityConversion: rate(Array.from(linkedinLeadIds).filter((id) => oppLeadIds.has(id)).length, linkedinAttempts),
+    });
   }
 
   // Subject Line Performance — campaigns.subject is one subject per
@@ -214,6 +250,7 @@ export async function getEngagementAnalytics(filters: EngagementFilters): Promis
         sent,
         openRate: rate(openedByCampaign.get(c.id)?.size || 0, sent),
         replyRate: rate(repliedByCampaign.get(c.id)?.size || 0, sent),
+        positiveReplyRate: rate(positiveRepliesByCampaign.get(c.id) || 0, sent),
         meetingsGenerated: meetingsByCampaign.get(c.id) || 0,
       };
     })
@@ -242,6 +279,8 @@ export async function getEngagementAnalytics(filters: EngagementFilters): Promis
   }
 
   // Engagement funnel
+  const repliedLeadIdsSet = new Set(repliedRows.map((a) => a.lead_id));
+  const meetingFromReplyLeadIds = Array.from(repliedLeadIdsSet).filter((id) => meetingLeadIds.has(id));
   const funnelCounts = [
     { key: "sent", label: "Sent", count: sentCount },
     { key: "delivered", label: "Delivered", count: deliveredCount },
@@ -249,7 +288,8 @@ export async function getEngagementAnalytics(filters: EngagementFilters): Promis
     { key: "clicked", label: "Clicked", count: uniqueClicks },
     { key: "replied", label: "Replied", count: uniqueReplies },
     { key: "positive_reply", label: "Positive Reply", count: positiveReplies },
-    { key: "meeting", label: "Meeting", count: Array.from(new Set(repliedRows.map((a) => a.lead_id))).filter((id) => meetingLeadIds.has(id)).length },
+    { key: "meeting", label: "Meeting", count: meetingFromReplyLeadIds.length },
+    { key: "opportunity", label: "Opportunity", count: meetingFromReplyLeadIds.filter((id) => oppLeadIds.has(id)).length },
   ];
   const funnel: FunnelStage[] = funnelCounts.map((f, i) => ({
     ...f,
@@ -258,6 +298,18 @@ export async function getEngagementAnalytics(filters: EngagementFilters): Promis
 
   const bounceRateValue = rate(bouncedRows.length, sentCount);
   const bounceWarning = bounceRateValue > 5 ? `Bounce rate is ${bounceRateValue}% for the selected period — review your send list.` : null;
+
+  const aiInsights: EngagementAiInsight[] = [];
+  if (bounceRateValue > 5) {
+    aiInsights.push({ id: "high_bounce", title: `Bounce rate is ${bounceRateValue}% — above the healthy 5% threshold.`, ctaLabel: "Review Sends", ctaHref: "/activities/emails" });
+  }
+  const topSubject = subjectPerformance[0];
+  if (topSubject && topSubject.replyRate > 0) {
+    aiInsights.push({ id: "top_subject", title: `"${topSubject.subject}" has the highest reply rate at ${topSubject.replyRate}%.`, ctaLabel: "View Subject Lines", ctaHref: "/campaigns" });
+  }
+  if (rate(uniqueReplies, deliveredCount) === 0 && deliveredCount > 0) {
+    aiInsights.push({ id: "no_replies", title: "No replies recorded in the selected period.", ctaLabel: "Review Sends", ctaHref: "/activities/emails" });
+  }
 
   return {
     hasAnyData: sentCount > 0 || campaigns.length > 0,
@@ -278,6 +330,7 @@ export async function getEngagementAnalytics(filters: EngagementFilters): Promis
     heatmap,
     replyClassification,
     funnel,
+    aiInsights: await filterAndRecordRecommendations("engagement", aiInsights),
     bounceWarning,
     lastUpdatedAt: new Date().toISOString(),
   };

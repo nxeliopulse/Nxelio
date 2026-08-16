@@ -14,6 +14,7 @@ export function ChannelPerformanceTable({ rows }: { rows: ChannelRow[] }) {
             <DataTableTh className="text-right">Attempts</DataTableTh>
             <DataTableTh className="text-right">Reply Rate</DataTableTh>
             <DataTableTh className="text-right">Meetings</DataTableTh>
+            <DataTableTh className="text-right">Opportunity Conversion</DataTableTh>
           </tr>
         </DataTableHead>
         <DataTableBody>
@@ -23,6 +24,7 @@ export function ChannelPerformanceTable({ rows }: { rows: ChannelRow[] }) {
               <DataTableTd className="text-right">{formatNumber(r.attempts)}</DataTableTd>
               <DataTableTd className="text-right">{r.replyRate}%</DataTableTd>
               <DataTableTd className="text-right">{formatNumber(r.meetings)}</DataTableTd>
+              <DataTableTd className="text-right">{r.opportunityConversion}%</DataTableTd>
             </DataTableRow>
           ))}
         </DataTableBody>

@@ -12,6 +12,7 @@ import {
 } from "@/lib/analytics/overview-metrics";
 import { AI_SCORE_BANDS, buyingIntentFromScore, classifyEngagement, type EngagementLevel } from "@/lib/analytics/prospects-metrics";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
+import { filterAndRecordRecommendations } from "@/lib/queries/ai-recommendations";
 
 const HIGH_PRIORITY_SCORE_THRESHOLD = 75;
 const CONTACTED_ACTIVITY_TYPES = ["EMAIL_SENT"];
@@ -121,10 +122,12 @@ export interface ProspectsAnalyticsData {
     aiScoredProspects: KpiValue;
     highPriorityProspects: { count: number; thresholdText: string };
     qualifiedProspects: KpiValue;
+    averageAiScore: { value: number };
   };
   growth: GrowthPoint[];
   bySource: SourceSlice[];
   byIndustry: IndustrySlice[];
+  byCountry: SourceSlice[];
   scoreDistribution: ScoreBandRow[];
   byCompanySize: CompanySizeSlice[];
   topProspects: TopProspectRow[];
@@ -223,9 +226,11 @@ export async function getProspectsAnalytics(filters: ProspectsFilters): Promise<
   const granularity = bucketDateRange(range);
   const growth = buildGrowthSeries(leads, range, granularity);
 
-  // ── By Source / By Industry ─────────────────────────────────────────────
+  // ── By Source / By Industry / By Country (Geography) ────────────────────
   const bySource = groupAndRank(leads, (l) => l.source);
   const byIndustry = groupAndRank(leads, (l) => l.industry);
+  const byCountry = groupAndRank(leads, (l) => l.country);
+  const averageAiScore = leads.length ? Math.round((leads.reduce((s, l) => s + (l.lead_score || 0), 0) / leads.length) * 10) / 10 : 0;
 
   // ── AI Score Distribution ────────────────────────────────────────────────
   const scoreDistribution: ScoreBandRow[] = AI_SCORE_BANDS.map((band) => {
@@ -296,14 +301,16 @@ export async function getProspectsAnalytics(filters: ProspectsFilters): Promise<
       aiScoredProspects: { value: aiScored.length, changePercent: null },
       highPriorityProspects: { count: highPriority.length, thresholdText: `AI Score ≥ ${HIGH_PRIORITY_SCORE_THRESHOLD}` },
       qualifiedProspects: { value: qualifiedInRange.length, changePercent: prevQualifiedCount != null ? percentChange(qualifiedInRange.length, prevQualifiedCount) : null },
+      averageAiScore: { value: averageAiScore },
     },
     growth,
     bySource,
     byIndustry,
+    byCountry,
     scoreDistribution,
     byCompanySize,
     topProspects,
-    aiInsights: aiInsights.slice(0, 5),
+    aiInsights: await filterAndRecordRecommendations("prospects", aiInsights),
     lastUpdatedAt: new Date().toISOString(),
   };
 }

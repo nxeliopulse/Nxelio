@@ -20,7 +20,8 @@
     "test:prospects-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-prospects-metrics.mjs",
     "test:engagement-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-engagement-metrics.mjs",
     "test:pipeline-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-pipeline-metrics.mjs",
-    "test:subscription-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-subscription-metrics.mjs"
+    "test:subscription-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-subscription-metrics.mjs",
+    "test:report-schedules": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-report-schedules.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

@@ -55,6 +55,8 @@ interface SendArgs {
   /** Optional extra recipients — supported by Brevo's API directly. */
   cc?: string[];
   bcc?: string[];
+  /** Optional file attachments — Brevo expects base64 `content`, no data: URI prefix. */
+  attachments?: { filename: string; contentBase64: string }[];
 }
 
 function toHtml(html?: string, text?: string): string {
@@ -64,7 +66,7 @@ function toHtml(html?: string, text?: string): string {
   );
 }
 
-async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo, cc, bcc }: SendArgs): Promise<SendResult> {
+async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo, cc, bcc, attachments }: SendArgs): Promise<SendResult> {
   const effectiveReplyTo = replyTo || REPLY_TO_EMAIL;
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -86,6 +88,7 @@ async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo, 
       ...(tags && tags.length ? { tags } : {}),
       ...(cc && cc.length ? { cc: cc.map((email) => ({ email })) } : {}),
       ...(bcc && bcc.length ? { bcc: bcc.map((email) => ({ email })) } : {}),
+      ...(attachments && attachments.length ? { attachment: attachments.map((a) => ({ name: a.filename, content: a.contentBase64 })) } : {}),
     }),
   });
 

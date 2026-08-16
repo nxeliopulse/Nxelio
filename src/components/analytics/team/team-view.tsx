@@ -29,6 +29,7 @@ export function TeamView({ data }: { data: TeamAnalyticsData }) {
             <KpiCard label="Opportunities" value={formatNumber(kpis.opportunities)} href="/opportunities" />
             <KpiCard label="Pipeline Generated" value={formatCurrency(kpis.pipelineGenerated)} />
             <KpiCard label="Revenue Won" value={formatCurrency(kpis.revenueWon)} />
+            <KpiCard label="Tasks Completed" value={formatNumber(kpis.tasksCompleted)} />
           </div>
 
           <RepLeaderboardTable rows={data.leaderboard} />

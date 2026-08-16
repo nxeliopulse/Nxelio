@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { resolveDateRangePreset, type DateRangePreset, type DateRange } from "@/lib/analytics/overview-metrics";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
+import { filterAndRecordRecommendations } from "@/lib/queries/ai-recommendations";
 
 export interface MeetingsFilters {
   dateRange: DateRangePreset;
@@ -22,6 +23,18 @@ export interface QualificationByDimensionRow {
   qualificationRate: number;
 }
 
+export interface MeetingOutcomeSlice {
+  label: string;
+  count: number;
+}
+
+export interface MeetingsAiInsight {
+  id: string;
+  title: string;
+  ctaLabel: string;
+  ctaHref: string;
+}
+
 export interface MeetingsAnalyticsData {
   hasAnyData: boolean;
   kpis: {
@@ -40,6 +53,8 @@ export interface MeetingsAnalyticsData {
     byOwner: QualificationByDimensionRow[];
     byIndustry: QualificationByDimensionRow[];
   };
+  byOutcome: MeetingOutcomeSlice[];
+  aiInsights: MeetingsAiInsight[];
   lastUpdatedAt: string;
 }
 
@@ -121,24 +136,48 @@ export async function getMeetingsAnalytics(filters: MeetingsFilters): Promise<Me
       .sort((a, b) => b.qualified - a.qualified);
   }
 
+  const cancelledCount = meetings.filter((m) => m.status === "canceled").length;
+  const byOutcome: MeetingOutcomeSlice[] = [
+    { label: "Completed", count: completedMeetings.length },
+    { label: "Cancelled", count: cancelledCount },
+    { label: "Scheduled", count: meetings.filter((m) => m.status !== "completed" && m.status !== "canceled").length },
+  ].filter((s) => s.count > 0);
+
+  const aiInsights: MeetingsAiInsight[] = [];
+  // Qualification Rate = Qualified / Completed Meetings (not / Booked) —
+  // a meeting that hasn't happened yet can't have been qualified from.
+  const qualificationRate = completedMeetings.length ? Math.round((qualifiedLeadIds.size / completedMeetings.length) * 1000) / 10 : 0;
+  if (meetings.length > 5 && cancelledCount / meetings.length > 0.25) {
+    aiInsights.push({ id: "high_cancel", title: `${Math.round((cancelledCount / meetings.length) * 100)}% of meetings were cancelled in this period.`, ctaLabel: "Review Meetings", ctaHref: "/meetings" });
+  }
+  const topSource = [...groupByDimension((l) => l.source)].sort((a, b) => b.qualificationRate - a.qualificationRate)[0];
+  if (topSource && topSource.qualified > 0) {
+    aiInsights.push({ id: "top_source", title: `${topSource.label} has the highest qualification rate at ${topSource.qualificationRate}%.`, ctaLabel: "View Leads", ctaHref: "/leads" });
+  }
+  if (completedMeetings.length > 0 && qualifiedLeadIds.size === 0) {
+    aiInsights.push({ id: "no_qualified", title: "No completed meetings resulted in a qualified prospect this period.", ctaLabel: "Review Meetings", ctaHref: "/meetings" });
+  }
+
   return {
     hasAnyData: meetings.length > 0,
     kpis: {
       meetingsBooked: meetings.length,
       completed: completedMeetings.length,
-      cancelled: meetings.filter((m) => m.status === "canceled").length,
+      cancelled: cancelledCount,
       qualifiedMeetings: qualifiedLeadIds.size,
       opportunityGeneratingMeetings: meetingLeadIds.filter((id) => oppLeadIds.has(id)).length,
     },
     funnel,
     qualification: {
       qualifiedCount: qualifiedLeadIds.size,
-      qualificationRate: meetingLeadIds.length ? Math.round((qualifiedLeadIds.size / meetingLeadIds.length) * 1000) / 10 : 0,
+      qualificationRate,
       averageDaysToQualify,
       bySource: groupByDimension((l) => l.source),
       byOwner: groupByDimension((l) => l.owner_id),
       byIndustry: groupByDimension((l) => l.industry),
     },
+    byOutcome,
+    aiInsights: await filterAndRecordRecommendations("meetings", aiInsights),
     lastUpdatedAt: new Date().toISOString(),
   };
 }

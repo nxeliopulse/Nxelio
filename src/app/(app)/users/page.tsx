@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUsers, getRoles, getCurrentUserProfile } from "@/lib/queries/users";
 import { getPicklistCategories } from "@/lib/queries/picklists";
+import { listSalesQuotas } from "@/lib/queries/sales-quotas";
 import { AdministrationView } from "@/components/administration/administration-view";
 
 export default async function UsersPage() {
@@ -17,7 +18,10 @@ export default async function UsersPage() {
     redirect("/dashboard");
   }
 
-  const picklistCategories = await getPicklistCategories().catch(() => []);
+  const [picklistCategories, salesQuotas] = await Promise.all([
+    getPicklistCategories().catch(() => []),
+    listSalesQuotas().catch(() => []),
+  ]);
 
   return (
     <AdministrationView
@@ -26,6 +30,7 @@ export default async function UsersPage() {
       isAdmin={isAdmin}
       currentUserId={p?.user_id ?? null}
       picklistCategories={picklistCategories}
+      salesQuotas={salesQuotas}
     />
   );
 }

@@ -84,6 +84,7 @@ export function ReportBuilderDrawer({
   initialChartType?: ChartType;
 }) {
   const [name, setName] = useState(editReport?.name ?? "");
+  const [description, setDescription] = useState(editReport?.description ?? "");
   const [dataSource, setDataSource] = useState<ReportDataSource>(editReport?.dataSource ?? "leads");
   const [metricType, setMetricType] = useState<"count" | "sum" | "avg">(editReport?.metric.type ?? "count");
   const [metricColumn, setMetricColumn] = useState<string>(editReport?.metric.type !== "count" ? editReport?.metric.column ?? "" : "");
@@ -158,6 +159,7 @@ export function ReportBuilderDrawer({
     return {
       folderId: editReport?.folderId ?? null,
       name: name || "Untitled report",
+      description: description || null,
       dataSource,
       metric,
       groupBy: chartType === "comparator" || chartType === "cohort" ? null : groupBy || null,
@@ -203,6 +205,7 @@ export function ReportBuilderDrawer({
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the form to the report being edited (or blank) each time the drawer opens
     setName(editReport?.name ?? "");
+    setDescription(editReport?.description ?? "");
     setDataSource(editReport?.dataSource ?? "leads");
     setMetricType(editReport?.metric.type ?? "count");
     setMetricColumn(editReport?.metric.type !== "count" ? editReport?.metric.column ?? "" : "");
@@ -267,6 +270,11 @@ export function ReportBuilderDrawer({
         <div>
           <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Title</label>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Deals by stage" />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Description <span className="font-normal text-slate-400">(optional)</span></label>
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this report shows" />
         </div>
 
         <div>
@@ -459,14 +467,17 @@ export function ReportBuilderDrawer({
                   onChange={(e) => setRules((rs) => rs.map((r) => (r.id === rule.id ? { ...r, operator: e.target.value as FilterCondition["operator"] } : r)))}
                 >
                   <option value="eq">equals</option>
+                  <option value="neq">not equals</option>
+                  <option value="contains">contains</option>
                   <option value="gt">greater than</option>
                   <option value="lt">less than</option>
+                  <option value="between">between</option>
                 </Select>
                 <Input
                   className="flex-1"
                   value={rule.value}
                   onChange={(e) => setRules((rs) => rs.map((r) => (r.id === rule.id ? { ...r, value: e.target.value } : r)))}
-                  placeholder="Value"
+                  placeholder={rule.operator === "between" ? "min|max" : "Value"}
                 />
                 <button
                   type="button"

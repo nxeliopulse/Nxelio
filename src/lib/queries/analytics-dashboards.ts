@@ -1,5 +1,14 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
+
+export type DashboardVisibility = "private" | "workspace";
+
+export interface DashboardGlobalFilters {
+  dateRange?: string;
+  customFrom?: string;
+  customTo?: string;
+}
 
 export interface DashboardSummary {
   id: string;
@@ -10,6 +19,9 @@ export interface DashboardSummary {
   isSystem: boolean;
   sortOrder: number;
   updatedAt: string;
+  visibility: DashboardVisibility;
+  createdBy: string | null;
+  globalFilters: DashboardGlobalFilters;
 }
 
 export interface DashboardWidget {
@@ -37,7 +49,12 @@ interface DashboardRow {
   is_system: boolean;
   sort_order: number;
   updated_at: string;
+  visibility: DashboardVisibility;
+  created_by: string | null;
+  global_filters: DashboardGlobalFilters | null;
 }
+
+const DASHBOARD_COLUMNS = "id, folder_id, name, description, icon, is_system, sort_order, updated_at, visibility, created_by, global_filters";
 
 function rowToSummary(r: DashboardRow): DashboardSummary {
   return {
@@ -49,6 +66,9 @@ function rowToSummary(r: DashboardRow): DashboardSummary {
     isSystem: r.is_system,
     sortOrder: r.sort_order,
     updatedAt: r.updated_at,
+    visibility: r.visibility,
+    createdBy: r.created_by,
+    globalFilters: r.global_filters ?? {},
   };
 }
 
@@ -82,7 +102,7 @@ export async function listDashboards(folderId?: string | null): Promise<Dashboar
   const supabase = await createClient();
   let query = supabase
     .from("analytics_dashboards")
-    .select("id, folder_id, name, description, icon, is_system, sort_order, updated_at")
+    .select(DASHBOARD_COLUMNS)
     .order("sort_order");
   if (folderId !== undefined) {
     query = folderId === null ? query.is("folder_id", null) : query.eq("folder_id", folderId);
@@ -100,7 +120,7 @@ export async function getDashboardWithWidgets(id: string): Promise<DashboardWith
   const [{ data: dash, error: dashErr }, { data: widgets, error: widgetErr }] = await Promise.all([
     supabase
       .from("analytics_dashboards")
-      .select("id, folder_id, name, description, icon, is_system, sort_order, updated_at")
+      .select(DASHBOARD_COLUMNS)
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -114,11 +134,19 @@ export async function getDashboardWithWidgets(id: string): Promise<DashboardWith
   return { ...rowToSummary(dash as DashboardRow), widgets: ((widgets ?? []) as WidgetRow[]).map(rowToWidget) };
 }
 
-export async function createDashboard(input: { name: string; folderId: string | null; description?: string; icon?: string }): Promise<{ id: string } | null> {
+export async function createDashboard(input: { name: string; folderId: string | null; description?: string; icon?: string; visibility?: DashboardVisibility }): Promise<{ id: string } | null> {
   const supabase = await createClient();
+  const ctx = await getAnalyticsContext();
   const { data, error } = await supabase
     .from("analytics_dashboards")
-    .insert({ name: input.name, folder_id: input.folderId, description: input.description ?? null, icon: input.icon ?? null })
+    .insert({
+      name: input.name,
+      folder_id: input.folderId,
+      description: input.description ?? null,
+      icon: input.icon ?? null,
+      visibility: input.visibility ?? "workspace",
+      created_by: ctx.userId,
+    })
     .select("id")
     .single();
   if (error) {
@@ -126,6 +154,26 @@ export async function createDashboard(input: { name: string; folderId: string | 
     return null;
   }
   return { id: data.id };
+}
+
+export async function updateDashboardVisibility(id: string, visibility: DashboardVisibility): Promise<boolean> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("analytics_dashboards").update({ visibility }).eq("id", id);
+  if (error) {
+    console.error("[analytics-dashboards] updateDashboardVisibility failed:", error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function updateDashboardGlobalFilters(id: string, filters: DashboardGlobalFilters): Promise<boolean> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("analytics_dashboards").update({ global_filters: filters }).eq("id", id);
+  if (error) {
+    console.error("[analytics-dashboards] updateDashboardGlobalFilters failed:", error.message);
+    return false;
+  }
+  return true;
 }
 
 export async function updateDashboard(id: string, input: { name?: string; folderId?: string | null; description?: string | null; icon?: string | null }): Promise<boolean> {

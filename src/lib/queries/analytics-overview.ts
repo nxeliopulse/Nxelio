@@ -39,6 +39,9 @@ export interface OverviewFilters {
   industry?: string;
   source?: string;
   stage?: OpportunityStage;
+  /** User-selected override for the Revenue Trend chart's bucket size —
+   *  otherwise auto-computed from the date range span (bucketDateRange). */
+  granularityOverride?: "daily" | "weekly" | "monthly";
 }
 
 export interface KpiValue {
@@ -52,6 +55,10 @@ export interface FunnelStage {
   label: string;
   count: number;
   conversionPercent: number;
+  /** Prior-stage count minus this stage's count, and that as a % of the
+   *  prior stage — 0/0 for the first stage, which has no "prior." */
+  dropOffCount: number;
+  dropOffPercent: number;
 }
 
 export interface PipelineStageSlice {
@@ -101,10 +108,10 @@ export interface OverviewData {
   kpis: {
     totalProspects: KpiValue;
     replies: KpiValue & { replyRate: number };
-    meetings: KpiValue;
-    qualified: KpiValue;
-    openPipeline: KpiValue;
-    closedWonRevenue: KpiValue;
+    meetings: KpiValue & { completedCount: number };
+    qualified: KpiValue & { conversionRate: number };
+    openPipeline: KpiValue & { openCount: number };
+    closedWonRevenue: KpiValue & { wonCount: number };
     winRate: { value: number; won: number; lost: number };
     weightedForecast: KpiValue;
     activeCampaigns: { active: number; paused: number; needsAttention: number };
@@ -250,10 +257,16 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
     { key: "opportunities_created", label: "Opportunities Created", count: opportunitiesCreatedCount },
     { key: "closed_won", label: "Closed Won", count: closedWonCohortCount },
   ];
-  const funnel: FunnelStage[] = funnelCounts.map((stage, i) => ({
-    ...stage,
-    conversionPercent: i === 0 ? 100 : calcStageConversion(stage.count, funnelCounts[i - 1].count),
-  }));
+  const funnel: FunnelStage[] = funnelCounts.map((stage, i) => {
+    const prevCount = i === 0 ? stage.count : funnelCounts[i - 1].count;
+    const dropOffCount = i === 0 ? 0 : Math.max(0, prevCount - stage.count);
+    return {
+      ...stage,
+      conversionPercent: i === 0 ? 100 : calcStageConversion(stage.count, prevCount),
+      dropOffCount,
+      dropOffPercent: i === 0 || prevCount === 0 ? 0 : Math.round((dropOffCount / prevCount) * 1000) / 10,
+    };
+  });
 
   // Resolve which lead ids belong to the owner scope once, up front —
   // meetings/lead_activities have no owner_id of their own, so every
@@ -307,7 +320,9 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
     repliesQuery,
     deliveredQuery,
   ]);
-  const meetingsInRangeCount = (meetingsInRangeRes.data || []).length;
+  const meetingsInRangeRows = (meetingsInRangeRes.data as { id: string; lead_id: string | null; status: string }[]) || [];
+  const meetingsInRangeCount = meetingsInRangeRows.length;
+  const meetingsCompletedCount = meetingsInRangeRows.filter((m) => m.status === "completed").length;
   const prevMeetingsCount = "count" in prevMeetingsRes ? prevMeetingsRes.count ?? null : null;
   const repliesCount = (repliesRes.data || []).length;
   const deliveredCount = (deliveredRes.data || []).length;
@@ -413,7 +428,7 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
 
   // ── Revenue Trend: Closed-Won vs Weighted Forecast, bucketed by the
   // granularity resolver (daily/weekly/monthly by range length). ──────────
-  const granularity = bucketDateRange(range);
+  const granularity = filters.granularityOverride ?? bucketDateRange(range);
   const revenueTrend = buildRevenueTrend(won, openOpps, range, granularity);
 
   // ── Top Performing Campaigns: attribute each all-time opportunity back to
@@ -448,10 +463,10 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
     kpis: {
       totalProspects: { value: leads.length, previousValue: prevLeadsCount, changePercent: percentChange(leads.length, prevLeadsCount ?? 0) },
       replies: { value: repliesCount, previousValue: null, changePercent: null, replyRate: calcReplyRate(repliesCount, deliveredCount) },
-      meetings: { value: meetingsInRangeCount, previousValue: prevMeetingsCount, changePercent: percentChange(meetingsInRangeCount, prevMeetingsCount ?? 0) },
-      qualified: { value: qualifiedLeadCount, previousValue: null, changePercent: null },
-      openPipeline: { value: openPipelineValue, previousValue: openPipelinePrevValue, changePercent: openPipelinePrevValue !== null ? percentChange(openPipelineValue, openPipelinePrevValue) : null },
-      closedWonRevenue: { value: sum(won), previousValue: comparisonRange ? sum(prevWon) : null, changePercent: comparisonRange ? percentChange(sum(won), sum(prevWon)) : null },
+      meetings: { value: meetingsInRangeCount, previousValue: prevMeetingsCount, changePercent: percentChange(meetingsInRangeCount, prevMeetingsCount ?? 0), completedCount: meetingsCompletedCount },
+      qualified: { value: qualifiedLeadCount, previousValue: null, changePercent: null, conversionRate: leads.length > 0 ? Math.round((qualifiedLeadCount / leads.length) * 1000) / 10 : 0 },
+      openPipeline: { value: openPipelineValue, previousValue: openPipelinePrevValue, changePercent: openPipelinePrevValue !== null ? percentChange(openPipelineValue, openPipelinePrevValue) : null, openCount: openOpps.length },
+      closedWonRevenue: { value: sum(won), previousValue: comparisonRange ? sum(prevWon) : null, changePercent: comparisonRange ? percentChange(sum(won), sum(prevWon)) : null, wonCount: won.length },
       winRate: { value: calcWinRate(won.length, lost.length), won: won.length, lost: lost.length },
       weightedForecast: { value: weightedForecastValue, previousValue: weightedForecastPrevValue, changePercent: weightedForecastPrevValue !== null ? percentChange(weightedForecastValue, weightedForecastPrevValue) : null },
       activeCampaigns: { active: activeCampaigns.length, paused: pausedCampaigns.length, needsAttention },
@@ -513,9 +528,10 @@ async function buildTopCampaigns(
   if (campaigns.length === 0) return [];
   const campaignIds = campaigns.map((c) => c.id);
 
-  const [{ data: enrollments }, { data: replyActivities }] = await Promise.all([
+  const [{ data: enrollments }, { data: replyActivities }, { data: meetingRows }] = await Promise.all([
     supabase.from("campaign_enrollments").select("campaign_id, lead_id").in("campaign_id", campaignIds),
     supabase.from("lead_activities").select("lead_id, metadata").eq("activity_type", "EMAIL_REPLIED"),
+    supabase.from("meetings").select("lead_id"),
   ]);
   const enrollmentRows = (enrollments as { campaign_id: string; lead_id: string }[]) || [];
   const leadIdsByCampaign = new Map<string, Set<string>>();
@@ -525,6 +541,10 @@ async function buildTopCampaigns(
   }
 
   const replyLeadIds = new Set(((replyActivities as { lead_id: string }[]) || []).map((r) => r.lead_id));
+  // Meetings have no campaign_id of their own — attribute a meeting back to
+  // a campaign via the enrolled-lead set built above (same approach as
+  // replies/qualified below), rather than leaving this permanently at 0.
+  const meetingLeadIdSet = new Set(((meetingRows as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);
 
   let leadStatusByCampaign = new Map<string, { id: string; status: string }[]>();
   const allEnrolledLeadIds = Array.from(new Set(enrollmentRows.map((e) => e.lead_id)));
@@ -546,6 +566,7 @@ async function buildTopCampaigns(
   const rows: TopCampaignRow[] = campaigns.map((c) => {
     const leadIds = leadIdsByCampaign.get(c.id) ?? new Set<string>();
     const replies = Array.from(leadIds).filter((id) => replyLeadIds.has(id)).length;
+    const meetings = Array.from(leadIds).filter((id) => meetingLeadIdSet.has(id)).length;
     const qualified = (leadStatusByCampaign.get(c.id) || []).filter((l) => l.status === "Qualified" || l.status === "Converted").length;
     const opps = oppsByCampaign.get(c.id) || [];
     const won = opps.filter((o) => o.stage === "won");
@@ -553,7 +574,7 @@ async function buildTopCampaigns(
       id: c.id,
       name: c.campaign_name,
       replies,
-      meetings: 0, // meetings aren't linked to a campaign_id directly in this schema
+      meetings,
       qualified,
       opportunities: opps.length,
       pipeline: sum(opps.filter((o) => !CLOSED_STAGES.includes(o.stage))),

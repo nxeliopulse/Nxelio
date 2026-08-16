@@ -12,16 +12,18 @@ export function AttributionTable({ title, rows }: { title: string; rows: Attribu
           <tr>
             <DataTableTh>{title.replace("Revenue by ", "")}</DataTableTh>
             <DataTableTh className="text-right">Deals</DataTableTh>
+            <DataTableTh className="text-right">Win Rate</DataTableTh>
             <DataTableTh className="text-right">Open Pipeline</DataTableTh>
             <DataTableTh className="text-right">Won Revenue</DataTableTh>
           </tr>
         </DataTableHead>
         <DataTableBody>
-          {rows.length === 0 && <DataTableEmpty colSpan={4}>No data yet.</DataTableEmpty>}
+          {rows.length === 0 && <DataTableEmpty colSpan={5}>No data yet.</DataTableEmpty>}
           {rows.slice(0, 10).map((r) => (
             <DataTableRow key={r.label}>
               <DataTableTd className="font-medium">{r.label}</DataTableTd>
               <DataTableTd className="text-right">{formatNumber(r.dealCount)}</DataTableTd>
+              <DataTableTd className="text-right">{r.winRate}%</DataTableTd>
               <DataTableTd className="text-right">{formatCurrency(r.openPipeline)}</DataTableTd>
               <DataTableTd className="text-right font-bold text-slate-900">{formatCurrency(r.wonRevenue)}</DataTableTd>
             </DataTableRow>

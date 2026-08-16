@@ -20,10 +20,12 @@ export function RepLeaderboardTable({ rows }: { rows: RepLeaderboardRow[] }) {
             <DataTableTh className="text-right">Pipeline</DataTableTh>
             <DataTableTh className="text-right">Revenue</DataTableTh>
             <DataTableTh className="text-right">Win Rate</DataTableTh>
+            <DataTableTh className="text-right">Target</DataTableTh>
+            <DataTableTh className="text-right">Attainment</DataTableTh>
           </tr>
         </DataTableHead>
         <DataTableBody>
-          {rows.length === 0 && <DataTableEmpty colSpan={10}>No rep activity yet.</DataTableEmpty>}
+          {rows.length === 0 && <DataTableEmpty colSpan={12}>No rep activity yet.</DataTableEmpty>}
           {rows.map((r) => (
             <DataTableRow key={r.userId}>
               <DataTableTd className="font-semibold text-slate-900">{r.name}</DataTableTd>
@@ -36,6 +38,12 @@ export function RepLeaderboardTable({ rows }: { rows: RepLeaderboardRow[] }) {
               <DataTableTd className="text-right">{formatCurrency(r.pipeline)}</DataTableTd>
               <DataTableTd className="text-right font-bold text-slate-900">{formatCurrency(r.revenue)}</DataTableTd>
               <DataTableTd className="text-right">{r.winRate}%</DataTableTd>
+              <DataTableTd className="text-right text-slate-500">{r.target != null ? formatCurrency(r.target) : "—"}</DataTableTd>
+              <DataTableTd className="text-right">
+                {r.attainmentPercent != null ? (
+                  <span className={r.attainmentPercent >= 100 ? "font-bold text-emerald-600" : ""}>{r.attainmentPercent}%</span>
+                ) : "—"}
+              </DataTableTd>
             </DataTableRow>
           ))}
         </DataTableBody>

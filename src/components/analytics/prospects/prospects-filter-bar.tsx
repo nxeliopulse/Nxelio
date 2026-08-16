@@ -5,6 +5,13 @@ import { Download, X, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ProspectsFilters, ProspectsAnalyticsData } from "@/lib/queries/analytics-prospects";
 import type { DateRangePreset, ComparisonMode } from "@/lib/analytics/overview-metrics";
+import { AI_SCORE_BANDS } from "@/lib/analytics/prospects-metrics";
+
+// Buying Intent has no independent field in this schema — it's the same AI
+// score bands used for scoring (see prospects-metrics.ts's buyingIntentFromScore
+// doc comment). This dropdown is a labeled convenience over the existing
+// aiScoreMin/aiScoreMax filters, not a second underlying signal.
+const BUYING_INTENT_OPTIONS = AI_SCORE_BANDS;
 
 const RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
   { value: "today", label: "Today" },
@@ -57,6 +64,15 @@ export function ProspectsFilterBar({ filters, sources, industries, companySizes,
   function clear() {
     setPending({ dateRange: "last_30_days", comparison: "previous_period" });
     router.push(pathname);
+  }
+
+  function saveView() {
+    localStorage.setItem("analytics_prospects_saved_view", new URLSearchParams(window.location.search).toString());
+  }
+
+  function setBuyingIntent(label: string) {
+    const band = BUYING_INTENT_OPTIONS.find((b) => b.label === label);
+    setPending({ ...pending, aiScoreMin: band?.min, aiScoreMax: band?.max });
   }
 
   function exportCsv() {
@@ -113,6 +129,14 @@ export function ProspectsFilterBar({ filters, sources, industries, companySizes,
         <option value="">All Segments</option>
         {segments.map((s) => <option key={s.id} value={s.id}>{s.segment_name}</option>)}
       </select>
+      <select
+        className={SELECT_CLASS}
+        value={BUYING_INTENT_OPTIONS.find((b) => b.min === pending.aiScoreMin && b.max === pending.aiScoreMax)?.label ?? ""}
+        onChange={(e) => setBuyingIntent(e.target.value)}
+      >
+        <option value="">All Buying Intent</option>
+        {BUYING_INTENT_OPTIONS.map((b) => <option key={b.label} value={b.label}>{b.label} Intent</option>)}
+      </select>
 
       <div className="flex items-center gap-1.5 ml-auto">
         <span className="text-[11px] text-slate-400 mr-1 hidden lg:inline">
@@ -121,6 +145,7 @@ export function ProspectsFilterBar({ filters, sources, industries, companySizes,
         <Button size="sm" variant="ghost" onClick={() => router.refresh()} title="Refresh"><RefreshCw className="h-3.5 w-3.5" /></Button>
         <Button size="sm" onClick={apply}>Apply</Button>
         <Button size="sm" variant="outline" onClick={clear}><X className="h-3.5 w-3.5" /> Clear</Button>
+        <Button size="sm" variant="outline" onClick={saveView}>Save View</Button>
         <Button size="sm" variant="outline" onClick={exportCsv}><Download className="h-3.5 w-3.5" /> Export</Button>
       </div>
     </div>

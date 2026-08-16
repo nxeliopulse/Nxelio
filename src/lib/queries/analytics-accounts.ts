@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CLOSED_STAGES, type OpportunityStage } from "@/lib/opportunities";
 import { isStalled } from "@/lib/analytics/pipeline-metrics";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
+import { filterAndRecordRecommendations } from "@/lib/queries/ai-recommendations";
 
 interface AccountRow {
   id: string;
@@ -45,6 +46,17 @@ export interface StalledAccountRow {
   daysStalled: number;
 }
 
+export interface AccountsFilters {
+  industry?: string;
+}
+
+export interface AccountsAiInsight {
+  id: string;
+  title: string;
+  ctaLabel: string;
+  ctaHref: string;
+}
+
 export interface AccountsAnalyticsData {
   hasAnyData: boolean;
   kpis: {
@@ -53,6 +65,10 @@ export interface AccountsAnalyticsData {
     accountsWithOpenOpportunities: number;
     accountsWithNoActivity: number;
     averageEngagementScore: number;
+    totalPipeline: number;
+    closedWonRevenue: number;
+    averageRevenuePerAccount: number;
+    accountsAtRisk: number;
   };
   byIndustry: AccountBreakdownRow[];
   bySize: AccountSizeSlice[];
@@ -60,6 +76,7 @@ export interface AccountsAnalyticsData {
   byRevenue: TopAccountRow[];
   stalledAccounts: StalledAccountRow[];
   topEngaged: (TopAccountRow & { score: number })[];
+  aiInsights: AccountsAiInsight[];
   lastUpdatedAt: string;
 }
 
@@ -72,12 +89,14 @@ function sizeLabelFor(employees: number | null): string {
   return "1000+";
 }
 
-export async function getAccountsAnalytics(): Promise<AccountsAnalyticsData> {
+export async function getAccountsAnalytics(filters: AccountsFilters = {}): Promise<AccountsAnalyticsData> {
   const supabase = await createClient();
   await getAnalyticsContext();
   const now = new Date();
 
-  const { data: accountsData } = await supabase.from("accounts").select("id, account_name, account_owner, industry, employees, created_at, updated_at");
+  let accountsQuery = supabase.from("accounts").select("id, account_name, account_owner, industry, employees, created_at, updated_at");
+  if (filters.industry) accountsQuery = accountsQuery.eq("industry", filters.industry);
+  const { data: accountsData } = await accountsQuery;
   const accounts = (accountsData as AccountRow[]) || [];
   const accountIds = accounts.map((a) => a.id);
 
@@ -163,6 +182,25 @@ export async function getAccountsAnalytics(): Promise<AccountsAnalyticsData> {
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
 
+  const totalPipeline = accountScores.reduce((s, a) => s + a.openOpps.reduce((sum, o) => sum + Number(o.deal_value || 0), 0), 0);
+  const closedWonRevenue = accountScores.reduce((s, a) => s + a.accOpps.filter((o) => o.stage === "won").reduce((sum, o) => sum + Number(o.deal_value || 0), 0), 0);
+  // "At risk" — has open pipeline but every one of those deals is stalled
+  // (same signal already used for the Stalled Accounts table), reused here
+  // as this schema's risk proxy rather than a separate, undocumented score.
+  const accountsAtRisk = stalledAccounts.length;
+
+  const aiInsights: AccountsAiInsight[] = [];
+  if (noActivityAccounts.length > 0) {
+    aiInsights.push({ id: "no_activity", title: `${noActivityAccounts.length} accounts have no contacts or opportunities at all.`, ctaLabel: "View Accounts", ctaHref: "/accounts" });
+  }
+  if (stalledAccounts.length > 0) {
+    aiInsights.push({ id: "at_risk", title: `${stalledAccounts.length} accounts have open opportunities with no activity for 14+ days.`, ctaLabel: "Review At-Risk Accounts", ctaHref: "/accounts" });
+  }
+  const topRevenueAccount = byRevenue[0];
+  if (topRevenueAccount) {
+    aiInsights.push({ id: "top_account", title: `${topRevenueAccount.name} is your highest-revenue account at $${Math.round(topRevenueAccount.value).toLocaleString()}.`, ctaLabel: "View Account", ctaHref: "/accounts" });
+  }
+
   return {
     hasAnyData: accounts.length > 0,
     kpis: {
@@ -171,6 +209,10 @@ export async function getAccountsAnalytics(): Promise<AccountsAnalyticsData> {
       accountsWithOpenOpportunities: withOpenOpps.length,
       accountsWithNoActivity: noActivityAccounts.length,
       averageEngagementScore: accountScores.length ? Math.round(accountScores.reduce((s, a) => s + a.score, 0) / accountScores.length) : 0,
+      totalPipeline,
+      closedWonRevenue,
+      averageRevenuePerAccount: accounts.length ? Math.round(closedWonRevenue / accounts.length) : 0,
+      accountsAtRisk,
     },
     byIndustry,
     bySize,
@@ -178,6 +220,7 @@ export async function getAccountsAnalytics(): Promise<AccountsAnalyticsData> {
     byRevenue,
     stalledAccounts,
     topEngaged,
+    aiInsights: await filterAndRecordRecommendations("accounts", aiInsights),
     lastUpdatedAt: new Date().toISOString(),
   };
 }

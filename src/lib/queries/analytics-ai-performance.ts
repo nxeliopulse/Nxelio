@@ -4,6 +4,8 @@ import { AI_SCORE_BANDS } from "@/lib/analytics/prospects-metrics";
 import { calcReplyRate, calcWinRate } from "@/lib/analytics/overview-metrics";
 import { CLOSED_STAGES, type OpportunityStage } from "@/lib/opportunities";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
+import { getSubscription } from "@/lib/queries/subscriptions";
+import { getRecommendationAdoption } from "@/lib/queries/ai-recommendations";
 
 // The real AI feature_key values this app charges credits under (see
 // src/lib/ai/actions.ts's chargeCredits() call sites, plus ai_assistant/
@@ -59,15 +61,28 @@ export interface AiPerformanceData {
   hasAnyData: boolean;
   kpis: {
     aiCreditsUsed: number;
+    creditsRemaining: number | null;
     aiAssistedProspects: number;
     aiAssistedMeetings: number;
     aiInfluencedPipeline: number;
     aiInfluencedRevenue: number;
+    enrichmentSuccessRate: number;
+  };
+  /** Recommendation lifecycle across the 8 analytics pages that surface AI
+   *  Insights (migration 0130) — how many were ever surfaced, how many the
+   *  user accepted vs dismissed, and the resulting rates. */
+  recommendations: {
+    totalSurfaced: number;
+    accepted: number;
+    dismissed: number;
+    adoptionRatePercent: number;
+    outcomeRatePercent: number | null;
   };
   scoreBandOutcomes: ScoreBandOutcomeRow[];
   featureUsage: FeatureUsageRow[];
   aiAssistedFunnel: FunnelStage[];
   comparison: AiComparisonMetric[];
+  avgDealSizeComparison: { aiAssisted: number; nonAiAssisted: number };
   insights: AiInsight[];
   lastUpdatedAt: string;
 }
@@ -76,12 +91,16 @@ export async function getAiPerformanceAnalytics(): Promise<AiPerformanceData> {
   const supabase = await createClient();
   await getAnalyticsContext();
 
-  const [{ data: leadsData }, { data: creditData }] = await Promise.all([
-    supabase.from("leads").select("id, lead_score, status, created_at"),
+  const [{ data: leadsData }, { data: creditData }, subscription, recommendations] = await Promise.all([
+    supabase.from("leads").select("id, lead_score, status, created_at, industry, linkedin, website_url"),
     supabase.from("credit_transactions").select("feature_key, amount").eq("type", "debit").in("feature_key", AI_FEATURE_KEYS),
+    getSubscription(),
+    getRecommendationAdoption(),
   ]);
-  const leads = (leadsData as { id: string; lead_score: number; status: string; created_at: string }[]) || [];
+  const leads = (leadsData as { id: string; lead_score: number; status: string; created_at: string; industry: string | null; linkedin: string | null; website_url: string | null }[]) || [];
   const credits = (creditData as { feature_key: string | null; amount: number }[]) || [];
+  const enrichedCount = leads.filter((l) => l.industry && (l.linkedin || l.website_url)).length;
+  const enrichmentSuccessRate = leads.length ? Math.round((enrichedCount / leads.length) * 1000) / 10 : 0;
 
   const aiAssistedLeadIds = leads.filter((l) => (l.lead_score || 0) > 0).map((l) => l.id);
   const nonAiLeadIds = leads.filter((l) => !(l.lead_score > 0)).map((l) => l.id);
@@ -107,29 +126,38 @@ export async function getAiPerformanceAnalytics(): Promise<AiPerformanceData> {
   const sentLeadIds = new Set(activities.filter((a) => a.activity_type === "EMAIL_SENT").map((a) => a.lead_id));
   const repliedLeadIds = new Set(activities.filter((a) => a.activity_type === "EMAIL_REPLIED").map((a) => a.lead_id));
 
+  const leadById = new Map(leads.map((l) => [l.id, l]));
   function groupMetrics(ids: string[]) {
     const sent = ids.filter((id) => sentLeadIds.has(id)).length;
     const replied = ids.filter((id) => repliedLeadIds.has(id)).length;
     const meetings = ids.filter((id) => meetingLeadIds.has(id)).length;
+    const qualified = ids.filter((id) => leadById.get(id)?.status === "Qualified" || leadById.get(id)?.status === "Converted").length;
     const opps = ids.flatMap((id) => oppsByLead.get(id) ?? []);
-    const won = opps.filter((o) => o.stage === "won").length;
+    const won = opps.filter((o) => o.stage === "won");
     const lost = opps.filter((o) => o.stage === "lost").length;
     return {
       replyRate: calcReplyRate(replied, sent || ids.length || 1),
       meetingRate: ids.length ? Math.round((meetings / ids.length) * 1000) / 10 : 0,
       opportunityRate: ids.length ? Math.round((opps.length / ids.length) * 1000) / 10 : 0,
-      winRate: calcWinRate(won, lost),
+      winRate: calcWinRate(won.length, lost),
+      qualificationRate: ids.length ? Math.round((qualified / ids.length) * 1000) / 10 : 0,
+      avgDealSize: won.length ? Math.round(won.reduce((s, o) => s + Number(o.deal_value || 0), 0) / won.length) : 0,
     };
   }
 
   const aiMetrics = groupMetrics(aiAssistedLeadIds);
   const nonAiMetrics = groupMetrics(nonAiLeadIds);
+  // Percentage-rate metrics only — avgDealSize is a dollar figure and would
+  // break the shared 0-100% axis if mixed into this same chart, so it's
+  // surfaced separately below.
   const comparison: AiComparisonMetric[] = [
     { metric: "Reply Rate", aiAssisted: aiMetrics.replyRate, nonAiAssisted: nonAiMetrics.replyRate },
     { metric: "Meeting Rate", aiAssisted: aiMetrics.meetingRate, nonAiAssisted: nonAiMetrics.meetingRate },
+    { metric: "Qualification Rate", aiAssisted: aiMetrics.qualificationRate, nonAiAssisted: nonAiMetrics.qualificationRate },
     { metric: "Opportunity Rate", aiAssisted: aiMetrics.opportunityRate, nonAiAssisted: nonAiMetrics.opportunityRate },
     { metric: "Win Rate", aiAssisted: aiMetrics.winRate, nonAiAssisted: nonAiMetrics.winRate },
   ];
+  const avgDealSizeComparison = { aiAssisted: aiMetrics.avgDealSize, nonAiAssisted: nonAiMetrics.avgDealSize };
 
   // Score band outcomes (reuses the same bands as Prospects Analytics)
   const scoreBandOutcomes: ScoreBandOutcomeRow[] = AI_SCORE_BANDS.map((band) => {
@@ -185,15 +213,19 @@ export async function getAiPerformanceAnalytics(): Promise<AiPerformanceData> {
     hasAnyData: leads.length > 0,
     kpis: {
       aiCreditsUsed,
+      creditsRemaining: subscription?.credits_remaining ?? null,
       aiAssistedProspects: aiAssistedLeadIds.length,
       aiAssistedMeetings: aiAssistedLeadIds.filter((id) => meetingLeadIds.has(id)).length,
       aiInfluencedPipeline,
       aiInfluencedRevenue,
+      enrichmentSuccessRate,
     },
+    recommendations,
     scoreBandOutcomes,
     featureUsage,
     aiAssistedFunnel,
     comparison,
+    avgDealSizeComparison,
     insights: insights.slice(0, 5),
     lastUpdatedAt: new Date().toISOString(),
   };
