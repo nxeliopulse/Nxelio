@@ -1,5 +1,5 @@
-import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function CampaignsLoading() {
-  return <PageSkeleton variant="list" />;
+  return <LoadingSpinner />;
 }
