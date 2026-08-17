@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type Provider = "google" | "linkedin_oidc";
+type Provider = "google";
 
 interface OAuthButtonsProps {
   /** Label shown above the divider — defaults to "Or continue with" */
@@ -21,15 +21,6 @@ function GoogleIcon() {
   );
 }
 
-/** The real LinkedIn "in" glyph (standard brand mark), no background — the circular button itself supplies the #0A66C2 fill. */
-function LinkedInGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 448 512" fill="white" xmlns="http://www.w3.org/2000/svg">
-      <path d="M100.28 448H7.4V148.9h92.88zM53.79 108.1C24.09 108.1 0 83.5 0 53.8a53.79 53.79 0 0 1 107.58 0c0 29.7-24.1 54.3-53.79 54.3zM447.9 448h-92.68V302.4c0-34.7-.7-79.2-48.29-79.2-48.29 0-55.69 37.7-55.69 76.7V448h-92.78V148.9h89.08v40.8h1.3c12.4-23.5 42.69-48.3 87.88-48.3 94 0 111.28 61.9 111.28 142.3z"/>
-    </svg>
-  );
-}
-
 export function OAuthButtons({ label = "or" }: OAuthButtonsProps) {
   const [loadingProvider, setLoadingProvider] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +33,6 @@ export function OAuthButtons({ label = "or" }: OAuthButtonsProps) {
       provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
-        scopes: provider === "linkedin_oidc" ? "openid profile email" : undefined,
       },
     });
     if (oauthError) {
@@ -51,8 +41,6 @@ export function OAuthButtons({ label = "or" }: OAuthButtonsProps) {
     }
     // On success the browser is redirected — no need to clear loading state
   }
-
-  const circleBase = "h-9 w-9 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100";
 
   return (
     <div className="space-y-2.5">
@@ -63,34 +51,18 @@ export function OAuthButtons({ label = "or" }: OAuthButtonsProps) {
         <div className="flex-1 h-px bg-slate-200" />
       </div>
 
-      {/* Circular provider buttons */}
-      <div className="flex items-center justify-center gap-4">
-        <button
-          type="button"
-          aria-label="Continue with Google"
-          disabled={!!loadingProvider}
-          onClick={() => signInWith("google")}
-          className={circleBase}
-          style={{ background: "white", border: "1.5px solid #E2E8F0" }}
-        >
-          {loadingProvider === "google"
-            ? <span className="h-4 w-4 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
-            : <GoogleIcon />}
-        </button>
-
-        <button
-          type="button"
-          aria-label="Continue with LinkedIn"
-          disabled={!!loadingProvider}
-          onClick={() => signInWith("linkedin_oidc")}
-          className={circleBase}
-          style={{ background: "#0A66C2" }}
-        >
-          {loadingProvider === "linkedin_oidc"
-            ? <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-            : <LinkedInGlyph />}
-        </button>
-      </div>
+      <button
+        type="button"
+        disabled={!!loadingProvider}
+        onClick={() => signInWith("google")}
+        className="w-full flex items-center justify-center gap-2.5 h-10 rounded-lg text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+        style={{ background: "white", border: "1.5px solid #E2E8F0" }}
+      >
+        {loadingProvider === "google"
+          ? <span className="h-4 w-4 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
+          : <GoogleIcon />}
+        Continue with Google
+      </button>
 
       {error && (
         <p className="text-center text-xs rounded-xl px-3 py-2"
