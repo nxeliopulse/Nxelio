@@ -39,14 +39,14 @@ export function AuthSplitCard({
           </div>
 
           <div
-            className="hidden lg:flex lg:w-[46%] relative items-center justify-center p-10 overflow-hidden flex-shrink-0"
+            className="hidden lg:flex lg:w-[46%] relative items-center justify-center p-6 overflow-hidden flex-shrink-0"
             style={{ background: "linear-gradient(160deg, #4F5FEF 0%, #3D4FEA 100%)" }}
           >
             <div
               className="absolute inset-0"
               style={{ background: "radial-gradient(circle at 30% 25%, rgba(255,255,255,.10), transparent 55%), radial-gradient(circle at 75% 80%, rgba(255,255,255,.08), transparent 50%)" }}
             />
-            <div className="relative z-10 w-full max-w-[280px]">{illustration}</div>
+            <div className="relative z-10 w-full max-w-[420px]">{illustration}</div>
           </div>
         </div>
       </div>

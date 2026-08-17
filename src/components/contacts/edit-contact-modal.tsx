@@ -342,7 +342,7 @@ export function EditContactModal({
       <div className="fixed inset-0 bg-black/45 backdrop-blur-xs z-50 transition-opacity" onClick={onClose} />
 
       {/* Right side drawer */}
-      <div className="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[760px] bg-white shadow-2xl border-l border-slate-200 flex flex-col h-screen animate-in slide-in-from-right duration-250">
+      <div className="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[900px] bg-white shadow-2xl border-l border-slate-200 flex flex-col h-screen animate-in slide-in-from-right duration-250">
 
         {/* Header */}
         <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex-shrink-0 flex items-center justify-between">

@@ -6,7 +6,6 @@ import { Eye, EyeOff, AlertCircle, User, Mail } from "lucide-react";
 import { signUpDirect } from "@/lib/queries/auth";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { AuthSplitCard, FIELD_LABEL, UNDERLINE_INPUT, UNDERLINE_INPUT_STYLE, authInputFocus, authInputBlur, RadioToggle, AuthButtonRow } from "@/components/auth/auth-split-card";
-import { SignupIllustration } from "@/components/auth/auth-illustrations";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -34,7 +33,13 @@ export default function SignupPage() {
       pageLabel="Sign Up"
       heading={["Welcome to Nxelio Nurture.", "Sign up to get started."]}
       subheading="7-day free trial — card required, no charge until day 7"
-      illustration={<SignupIllustration />}
+      illustration={
+        <img
+          src="/signup-illustration.svg"
+          alt="Sign up illustration"
+          className="w-full h-auto"
+        />
+      }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (

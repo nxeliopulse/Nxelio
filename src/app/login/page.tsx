@@ -8,7 +8,6 @@ import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { sendVerificationCode } from "@/lib/queries/email-verification";
 import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { AuthSplitCard, FIELD_LABEL, UNDERLINE_INPUT, UNDERLINE_INPUT_STYLE, authInputFocus, authInputBlur, RadioToggle, AuthButtonRow } from "@/components/auth/auth-split-card";
-import { SigninIllustration } from "@/components/auth/auth-illustrations";
 
 function LoginForm() {
   const router  = useRouter();
@@ -95,7 +94,13 @@ function LoginForm() {
       pageLabel="Sign In"
       heading={["Welcome back to Nxelio Nurture.", "Sign in to see the latest updates."]}
       subheading="Enter your details to proceed further"
-      illustration={<SigninIllustration />}
+      illustration={
+        <img
+          src="/login-illustration.svg"
+          alt="Sign in illustration"
+          className="w-full h-auto"
+        />
+      }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
