@@ -47,7 +47,11 @@ export function RevenueFunnel({
               key={stage.key}
               href={stageHref[stage.key] ?? "/leads"}
               className="flex items-center gap-3 group py-1 rounded-lg hover:bg-slate-50 px-1.5 -mx-1.5"
-              title={`${stage.label}: ${formatNumber(stage.count)}${i > 0 ? ` (${stage.conversionPercent}% of previous stage)` : ""}`}
+              title={
+                i === 0
+                  ? `${stage.label}: ${formatNumber(stage.count)}`
+                  : `${stage.label}: ${formatNumber(stage.count)} (${stage.conversionPercent}% of ${stages[i - 1].label}) — dropped off: ${formatNumber(Math.max(0, stages[i - 1].count - stage.count))} (${Math.max(0, 100 - stage.conversionPercent)}%)`
+              }
             >
               <span className="text-xs font-semibold text-slate-500 w-36 flex-shrink-0 truncate">{stage.label}</span>
               <div className="flex-1 h-6 bg-slate-100 rounded-md overflow-hidden">

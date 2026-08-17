@@ -140,7 +140,11 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
 
   const hasSearchResults = searchResults.leads.length > 0 || searchResults.campaigns.length > 0;
 
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
   async function handleLogout() {
+    setLoggingOut(true);
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
@@ -390,7 +394,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
               </div>
               <div className="p-1 border-t border-slate-100">
                 <button
-                  onClick={handleLogout}
+                  onClick={() => { setOpen(false); setLogoutConfirmOpen(true); }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50"
                 >
                   <LogOut className="h-4 w-4" /> Log out
@@ -400,6 +404,34 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
           )}
         </div>
       </div>
+
+      <Modal open={logoutConfirmOpen} onClose={() => setLogoutConfirmOpen(false)} size="sm">
+        <div className="p-8 flex flex-col items-center text-center">
+          <div className="h-16 w-16 rounded-full bg-indigo-50 flex items-center justify-center mb-5">
+            <LogOut className="h-7 w-7 text-indigo-600" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Are You Sure You Want To Log Out?</h2>
+          <p className="text-sm text-slate-500 mb-6">
+            Your data will be safe. Once you log in, you can view your data.
+          </p>
+          <div className="flex items-center gap-3 w-full">
+            <button
+              onClick={() => setLogoutConfirmOpen(false)}
+              disabled={loggingOut}
+              className="flex-1 py-2.5 rounded-full text-sm font-semibold border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="flex-1 py-2.5 rounded-full text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-70"
+            >
+              {loggingOut ? "Logging out…" : "Log Out"}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={createOpen} onClose={() => { setCreateOpen(false); setCreateError(null); }} title="Create workspace" description="Start a brand-new, separate company account. You'll need to set up billing for it separately." size="sm">
         <div className="p-5 space-y-3">

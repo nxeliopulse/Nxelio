@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calcWinRate } from "@/lib/analytics/overview-metrics";
 import { CLOSED_STAGES, type OpportunityStage } from "@/lib/opportunities";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
+import { getActiveQuotasByUser } from "@/lib/queries/sales-quotas";
 
 export interface RepLeaderboardRow {
   userId: string;
@@ -16,6 +17,10 @@ export interface RepLeaderboardRow {
   pipeline: number;
   revenue: number;
   winRate: number;
+  /** Null when no per-rep quota (sales_quotas, keyed by user_id) covers today —
+   *  set one under Administration → Sales Quotas to populate this. */
+  target: number | null;
+  attainmentPercent: number | null;
 }
 
 export interface ActivityBreakdownRow {
@@ -35,6 +40,7 @@ export interface TeamAnalyticsData {
     opportunities: number;
     pipelineGenerated: number;
     revenueWon: number;
+    tasksCompleted: number;
   };
   leaderboard: RepLeaderboardRow[];
   activityBreakdown: ActivityBreakdownRow[];
@@ -76,6 +82,18 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
     activities = (acts as typeof activities) || [];
     meetingLeadIds = new Set(((meetings as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);
   }
+  // Tasks Completed — this schema has no generic task system, only
+  // per-contact and per-account task lists (contact_tasks/account_tasks),
+  // so this is the sum of both, scoped to visible reps' assignments.
+  let contactTasksQuery = supabase.from("contact_tasks").select("id", { count: "exact", head: true }).eq("status", "done");
+  let accountTasksQuery = supabase.from("account_tasks").select("id", { count: "exact", head: true }).eq("status", "done");
+  if (visibleUserIds) {
+    contactTasksQuery = contactTasksQuery.in("assigned_to", visibleUserIds);
+    accountTasksQuery = accountTasksQuery.in("assigned_to", visibleUserIds);
+  }
+  const [{ count: contactTasksDone }, { count: accountTasksDone }] = await Promise.all([contactTasksQuery, accountTasksQuery]);
+  const tasksCompleted = (contactTasksDone ?? 0) + (accountTasksDone ?? 0);
+
   let oppsQuery = supabase.from("opportunities").select("owner_id, deal_value, stage");
   if (visibleUserIds) oppsQuery = oppsQuery.in("owner_id", visibleUserIds);
   const { data: oppsData } = await oppsQuery;
@@ -88,6 +106,7 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
   const sentLeadIds = new Set(activities.filter((a) => a.activity_type === "EMAIL_SENT").map((a) => a.lead_id));
   const repliedLeadIds = new Set(activities.filter((a) => a.activity_type === "EMAIL_REPLIED").map((a) => a.lead_id));
   const leadById = new Map(leads.map((l) => [l.id, l]));
+  const quotasByUser = await getActiveQuotasByUser(new Date());
 
   const leaderboard: RepLeaderboardRow[] = users.map((u) => {
     const ownLeadIds = leads.filter((l) => l.owner_id === u.user_id).map((l) => l.id);
@@ -99,6 +118,8 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
     const won = opps.filter((o) => o.stage === "won");
     const lost = opps.filter((o) => o.stage === "lost");
     const open = opps.filter((o) => !CLOSED_STAGES.includes(o.stage));
+    const revenue = won.reduce((s, o) => s + Number(o.deal_value || 0), 0);
+    const quota = quotasByUser.get(u.user_id);
     return {
       userId: u.user_id,
       name: u.full_name,
@@ -109,8 +130,10 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
       qualified,
       opportunities: opps.length,
       pipeline: open.reduce((s, o) => s + Number(o.deal_value || 0), 0),
-      revenue: won.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+      revenue,
       winRate: calcWinRate(won.length, lost.length),
+      target: quota?.targetAmount ?? null,
+      attainmentPercent: quota && quota.targetAmount > 0 ? Math.round((revenue / quota.targetAmount) * 1000) / 10 : null,
     };
   }).sort((a, b) => b.revenue - a.revenue);
 
@@ -158,6 +181,7 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
       opportunities: Array.from(oppsByOwner.values()).reduce((s, arr) => s + arr.length, 0),
       pipelineGenerated: Array.from(oppsByOwner.values()).flat().filter((o) => !CLOSED_STAGES.includes(o.stage)).reduce((s, o) => s + Number(o.deal_value || 0), 0),
       revenueWon: Array.from(oppsByOwner.values()).flat().filter((o) => o.stage === "won").reduce((s, o) => s + Number(o.deal_value || 0), 0),
+      tasksCompleted,
     },
     leaderboard,
     activityBreakdown,

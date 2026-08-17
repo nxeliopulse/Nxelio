@@ -13,6 +13,7 @@ export function StageDetailTable({ rows }: { rows: StageDetailRow[] }) {
             <DataTableTh>Stage</DataTableTh>
             <DataTableTh className="text-right">Deals</DataTableTh>
             <DataTableTh className="text-right">Total Amount</DataTableTh>
+            <DataTableTh className="text-right">% of Pipeline</DataTableTh>
             <DataTableTh className="text-right">Average Amount</DataTableTh>
             <DataTableTh className="text-right">Weighted Value</DataTableTh>
             <DataTableTh className="text-right">Average Age</DataTableTh>
@@ -24,6 +25,7 @@ export function StageDetailTable({ rows }: { rows: StageDetailRow[] }) {
               <DataTableTd className="font-semibold">{r.label}</DataTableTd>
               <DataTableTd className="text-right">{formatNumber(r.count)}</DataTableTd>
               <DataTableTd className="text-right">{formatCurrency(r.totalAmount)}</DataTableTd>
+              <DataTableTd className="text-right">{r.percentOfPipeline}%</DataTableTd>
               <DataTableTd className="text-right">{formatCurrency(r.averageAmount)}</DataTableTd>
               <DataTableTd className="text-right">{formatCurrency(r.weightedValue)}</DataTableTd>
               <DataTableTd className="text-right">{r.averageAgeDays}d</DataTableTd>

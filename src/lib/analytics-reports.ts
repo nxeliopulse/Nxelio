@@ -10,7 +10,7 @@ export type MetricDefinition =
   | { type: "sum"; column: string }
   | { type: "avg"; column: string };
 
-export type FilterOperator = "eq" | "in" | "date_range" | "gt" | "lt";
+export type FilterOperator = "eq" | "neq" | "contains" | "in" | "date_range" | "gt" | "lt" | "between";
 
 export interface FilterCondition {
   field: string;

@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import type { EngagementAnalyticsData, EngagementFilters } from "@/lib/queries/analytics-engagement";
+import { AiInsightsPanel } from "@/components/analytics/ai-insights-panel";
 import { EngagementFilterBar } from "@/components/analytics/engagement/engagement-filter-bar";
 import { EngagementTrendChart } from "@/components/analytics/engagement/engagement-trend-chart";
 import { ChannelPerformanceTable } from "@/components/analytics/engagement/channel-performance-table";
@@ -9,7 +10,7 @@ import { ReplyClassificationPanel } from "@/components/analytics/engagement/repl
 import { RevenueFunnel } from "@/components/analytics/overview/revenue-funnel";
 import { KpiCard, formatNumber } from "@/components/analytics/overview/kpi-card";
 import { AnalyticsEmptyState } from "@/components/analytics/overview/analytics-empty-state";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function EngagementView({
   data,
@@ -70,8 +71,10 @@ export function EngagementView({
           <RevenueFunnel
             stages={data.funnel}
             title="Engagement Funnel"
-            stageHref={{ sent: "/activities/emails", delivered: "/activities/emails", opened: "/activities/emails", clicked: "/activities/emails", replied: "/inbox", positive_reply: "/inbox", meeting: "/meetings" }}
+            stageHref={{ sent: "/activities/emails", delivered: "/activities/emails", opened: "/activities/emails", clicked: "/activities/emails", replied: "/inbox", positive_reply: "/inbox", meeting: "/meetings", opportunity: "/opportunities" }}
           />
+
+          <AiInsightsPanel area="engagement" insights={data.aiInsights} heading="AI Engagement Insights" />
         </>
       )}
     </div>

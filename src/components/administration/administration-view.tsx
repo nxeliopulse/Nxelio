@@ -1,17 +1,20 @@
 "use client";
 import { useState } from "react";
-import { Users2, ListChecks, Sliders } from "lucide-react";
+import { Users2, ListChecks, Sliders, Target } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { UsersView } from "@/components/users/users-view";
 import { PicklistsManager } from "@/components/administration/picklists-manager";
 import { CustomFieldsBuilder } from "@/components/administration/custom-fields-builder";
+import { SalesQuotasManager } from "@/components/administration/sales-quotas-manager";
 import type { UserWithRole } from "@/lib/queries/users";
 import type { PicklistCategoryRow } from "@/lib/picklists";
+import type { SalesQuotaRow } from "@/lib/queries/sales-quotas";
 
 const TABS = [
   { id: "users", label: "User Management", icon: <Users2 className="h-4 w-4" /> },
   { id: "picklists", label: "Picklists", icon: <ListChecks className="h-4 w-4" /> },
   { id: "custom-fields", label: "Custom Fields", icon: <Sliders className="h-4 w-4" /> },
+  { id: "sales-quotas", label: "Sales Quotas", icon: <Target className="h-4 w-4" /> },
 ] as const;
 
 interface Props {
@@ -20,9 +23,10 @@ interface Props {
   isAdmin: boolean;
   currentUserId: string | null;
   picklistCategories: PicklistCategoryRow[];
+  salesQuotas: SalesQuotaRow[];
 }
 
-export function AdministrationView({ users, roles, isAdmin, currentUserId, picklistCategories }: Props) {
+export function AdministrationView({ users, roles, isAdmin, currentUserId, picklistCategories, salesQuotas }: Props) {
   const [active, setActive] = useState<(typeof TABS)[number]["id"]>("users");
 
   return (
@@ -46,6 +50,7 @@ export function AdministrationView({ users, roles, isAdmin, currentUserId, pickl
       {active === "users" && <UsersView users={users} roles={roles} isAdmin={isAdmin} currentUserId={currentUserId} />}
       {active === "picklists" && <PicklistsManager categories={picklistCategories} />}
       {active === "custom-fields" && <CustomFieldsBuilder />}
+      {active === "sales-quotas" && <SalesQuotasManager quotas={salesQuotas} users={users} />}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { AnalyticsEmptyState } from "@/components/analytics/overview/analytics-e
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function AiPerformanceView({ data }: { data: AiPerformanceData }) {
-  const { kpis } = data;
+  const { kpis, recommendations } = data;
   return (
     <div className="space-y-4">
       <div>
@@ -25,8 +25,10 @@ export function AiPerformanceView({ data }: { data: AiPerformanceData }) {
         <AnalyticsEmptyState />
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             <KpiCard label="AI Credits Used" value={formatNumber(kpis.aiCreditsUsed)} href="/billing" />
+            <KpiCard label="Credits Remaining" value={kpis.creditsRemaining != null ? formatNumber(kpis.creditsRemaining) : "—"} href="/billing" />
+            <KpiCard label="Enrichment Success Rate" value={`${kpis.enrichmentSuccessRate}%`} href="/leads" />
             <KpiCard label="AI-Assisted Prospects" value={formatNumber(kpis.aiAssistedProspects)} href="/leads" />
             <KpiCard label="AI-Assisted Meetings" value={formatNumber(kpis.aiAssistedMeetings)} href="/meetings" />
             <KpiCard label="AI-Influenced Pipeline" value={formatCurrency(kpis.aiInfluencedPipeline)} href="/opportunities" />
@@ -40,7 +42,33 @@ export function AiPerformanceView({ data }: { data: AiPerformanceData }) {
             <FeatureUsageTable rows={data.featureUsage} />
           </div>
 
+          <div className="grid grid-cols-2 gap-3 max-w-md">
+            <KpiCard label="Avg Deal Size (AI-Assisted)" value={formatCurrency(data.avgDealSizeComparison.aiAssisted)} />
+            <KpiCard label="Avg Deal Size (Non-AI)" value={formatCurrency(data.avgDealSizeComparison.nonAiAssisted)} />
+          </div>
+
           <RevenueFunnel stages={data.aiAssistedFunnel} title="AI-Assisted Funnel" />
+
+          <Card className="p-5">
+            <CardHeader className="p-0 border-0 mb-3">
+              <CardTitle className="text-sm">Recommendation Adoption</CardTitle>
+            </CardHeader>
+            {recommendations.totalSurfaced === 0 ? (
+              <p className="text-xs text-slate-400 italic">No AI Insights have been surfaced yet across the analytics pages.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <KpiCard label="Recommendations Surfaced" value={formatNumber(recommendations.totalSurfaced)} />
+                  <KpiCard label="Accepted" value={formatNumber(recommendations.accepted)} />
+                  <KpiCard label="Dismissed" value={formatNumber(recommendations.dismissed)} />
+                  <KpiCard label="Adoption Rate" value={`${recommendations.adoptionRatePercent}%`} detail="Accepted / surfaced" />
+                </div>
+                <p className="text-xs text-slate-400 mt-3">
+                  Outcome Rate (accepted vs. dismissed, of decisions made): {recommendations.outcomeRatePercent != null ? `${recommendations.outcomeRatePercent}%` : "No decisions yet"}
+                </p>
+              </>
+            )}
+          </Card>
 
           {data.insights.length > 0 && (
             <Card className="p-5">

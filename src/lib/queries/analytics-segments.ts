@@ -3,17 +3,21 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveDateRangePreset, calcReplyRate, calcQualificationRate, type DateRangePreset } from "@/lib/analytics/overview-metrics";
 import { CLOSED_STAGES, type OpportunityStage } from "@/lib/opportunities";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
+import { filterAndRecordRecommendations } from "@/lib/queries/ai-recommendations";
 
 export interface SegmentsFilters {
   dateRange: DateRangePreset;
   customFrom?: string;
   customTo?: string;
+  segmentType?: string;
+  status?: string;
 }
 
 export interface SegmentPerformanceRow {
   id: string;
   name: string;
   type: string;
+  status: string;
   matchingProspects: number;
   eligibleProspects: number;
   campaigns: number;
@@ -23,6 +27,13 @@ export interface SegmentPerformanceRow {
   opportunities: number;
   pipeline: number;
   revenue: number;
+}
+
+export interface SegmentsAiInsight {
+  id: string;
+  title: string;
+  ctaLabel: string;
+  ctaHref: string;
 }
 
 export interface SegmentFunnelStage {
@@ -40,9 +51,15 @@ export interface SegmentsAnalyticsData {
     staticSegments: number;
     averageSegmentSize: number;
     activeCampaignsUsingSegments: number;
+    activeSegmentMembers: number;
+    avgReplyRate: number;
+    meetingsGenerated: number;
+    opportunitiesGenerated: number;
+    pipelineGenerated: number;
   };
   performance: SegmentPerformanceRow[];
   funnel: SegmentFunnelStage[];
+  aiInsights: SegmentsAiInsight[];
   lastUpdatedAt: string;
 }
 
@@ -54,8 +71,12 @@ export async function getSegmentsAnalytics(filters: SegmentsFilters): Promise<Se
     ? { from: new Date(filters.customFrom), to: new Date(filters.customTo) }
     : resolveDateRangePreset(filters.dateRange === "custom" ? "last_30_days" : filters.dateRange, now);
 
+  let segmentsQuery = supabase.from("segments").select("id, segment_name, segment_type, status");
+  if (filters.segmentType) segmentsQuery = segmentsQuery.eq("segment_type", filters.segmentType);
+  if (filters.status) segmentsQuery = segmentsQuery.eq("status", filters.status);
+
   const [{ data: segmentsData }, { data: membersData }, { data: campaignsData }] = await Promise.all([
-    supabase.from("segments").select("id, segment_name, segment_type, status"),
+    segmentsQuery,
     supabase.from("segment_members").select("segment_id, lead_id"),
     supabase.from("campaigns").select("id, campaign_name, segment_id, status"),
   ]);
@@ -117,6 +138,7 @@ export async function getSegmentsAnalytics(filters: SegmentsFilters): Promise<Se
       id: s.id,
       name: s.segment_name,
       type: s.segment_type,
+      status: s.status,
       matchingProspects: memberIds.length,
       eligibleProspects: eligible.length,
       campaigns: (campaignsBySegment.get(s.id) || []).length,
@@ -156,6 +178,25 @@ export async function getSegmentsAnalytics(filters: SegmentsFilters): Promise<Se
   }));
 
   const activeCampaignsUsingSegments = new Set(campaigns.filter((c) => c.status === "Active" && c.segment_id).map((c) => c.segment_id)).size;
+  const activeSegmentMembers = performance.reduce((s, r) => s + r.eligibleProspects, 0);
+  const avgReplyRate = performance.length ? Math.round((performance.reduce((s, r) => s + r.replyRate, 0) / performance.length) * 10) / 10 : 0;
+  const meetingsGenerated = allMemberLeadIds.filter((id) => meetingLeadIds.has(id)).length;
+  const opportunitiesGenerated = performance.reduce((s, r) => s + r.opportunities, 0);
+  const pipelineGenerated = performance.reduce((s, r) => s + r.pipeline, 0);
+
+  const aiInsights: SegmentsAiInsight[] = [];
+  const topByRevenue = [...performance].sort((a, b) => b.revenue - a.revenue)[0];
+  if (topByRevenue && topByRevenue.revenue > 0) {
+    aiInsights.push({ id: "top_segment", title: `${topByRevenue.name} generated $${Math.round(topByRevenue.revenue).toLocaleString()} in closed revenue — your top-performing segment.`, ctaLabel: "View Segment", ctaHref: "/segments" });
+  }
+  const noCampaignSegments = performance.filter((r) => r.campaigns === 0).length;
+  if (noCampaignSegments > 0) {
+    aiInsights.push({ id: "unused_segments", title: `${noCampaignSegments} segment${noCampaignSegments === 1 ? "" : "s"} ${noCampaignSegments === 1 ? "has" : "have"} no campaign using ${noCampaignSegments === 1 ? "it" : "them"} yet.`, ctaLabel: "View Segments", ctaHref: "/segments" });
+  }
+  const lowReplySegments = performance.filter((r) => r.matchingProspects >= 10 && r.replyRate === 0).length;
+  if (lowReplySegments > 0) {
+    aiInsights.push({ id: "no_replies", title: `${lowReplySegments} segment${lowReplySegments === 1 ? "" : "s"} with 10+ members ${lowReplySegments === 1 ? "has" : "have"} recorded zero replies.`, ctaLabel: "Review Segments", ctaHref: "/segments" });
+  }
 
   return {
     hasAnyData: segments.length > 0,
@@ -165,9 +206,15 @@ export async function getSegmentsAnalytics(filters: SegmentsFilters): Promise<Se
       staticSegments: segments.filter((s) => s.segment_type === "Static").length,
       averageSegmentSize: segments.length ? Math.round(members.length / segments.length) : 0,
       activeCampaignsUsingSegments,
+      activeSegmentMembers,
+      avgReplyRate,
+      meetingsGenerated,
+      opportunitiesGenerated,
+      pipelineGenerated,
     },
     performance,
     funnel,
+    aiInsights: await filterAndRecordRecommendations("segments", aiInsights),
     lastUpdatedAt: new Date().toISOString(),
   };
 }

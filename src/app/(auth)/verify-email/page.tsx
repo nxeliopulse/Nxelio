@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Mail, AlertCircle, Check, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { sendVerificationCode, verifyEmailCode } from "@/lib/queries/email-verification";
 
 const CODE_LENGTH = 6;
@@ -77,9 +77,10 @@ function VerifyEmailForm() {
   return (
     <div>
       <div className="flex justify-center mb-6">
-        <div className="h-16 w-16 rounded-2xl flex items-center justify-center"
+        <div className="h-20 w-20 rounded-2xl flex items-center justify-center"
           style={{ background: "linear-gradient(135deg,rgba(24,167,184,.18),rgba(126,87,194,.18))", border: "1.5px solid rgba(24,167,184,.3)" }}>
-          <Mail className="h-7 w-7" style={{ color: "#4dd6e5" }} />
+          {/* eslint-disable-next-line @next/next/no-img-element -- self-animating SVG; Next/Image's optimizations don't apply to it */}
+          <img src="/fingerprint-verification.svg" alt="Verifying" className="h-12 w-12" />
         </div>
       </div>
 

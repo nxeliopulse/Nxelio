@@ -1,18 +1,17 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { LayoutDashboard, FileText, Database, Sparkles, Eye, EyeOff, Gauge, Users, PieChart, Megaphone, Mail, CalendarCheck, GitBranch, DollarSign, Building2, Bot, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAssistant } from "@/components/layout/assistant-context";
-import { FolderTree } from "@/components/analytics/folder-tree";
 import { OpenTabsStrip } from "@/components/analytics/open-tabs-strip";
-import type { FolderRow } from "@/lib/queries/analytics-folders";
 import type { DashboardSummary } from "@/lib/queries/analytics-dashboards";
 import type { ReportDefinition } from "@/lib/analytics-reports";
 
 const RAIL_ITEMS = [
   { key: "overview", label: "Overview", icon: Gauge, href: "/analytics/overview" },
+  { key: "dashboards", label: "Dashboards", icon: LayoutDashboard, href: "/analytics?type=dashboard" },
   { key: "prospects", label: "Prospects", icon: Users, href: "/analytics/prospects" },
   { key: "segments", label: "Segments", icon: PieChart, href: "/analytics/segments" },
   { key: "campaigns", label: "Campaigns", icon: Megaphone, href: "/analytics/campaigns" },
@@ -23,25 +22,22 @@ const RAIL_ITEMS = [
   { key: "accounts", label: "Accounts", icon: Building2, href: "/analytics/accounts" },
   { key: "ai-performance", label: "AI Performance", icon: Bot, href: "/analytics/ai-performance" },
   { key: "team", label: "Team", icon: Trophy, href: "/analytics/team" },
-  { key: "dashboards", label: "Dashboards", icon: LayoutDashboard, href: "/analytics?type=dashboard" },
   { key: "reports", label: "Reports", icon: FileText, href: "/analytics?type=report" },
   { key: "data", label: "Data", icon: Database, href: "/analytics/data" },
 ];
 
 export function AnalyticsShell({
   children,
-  dashboardFolders,
-  reportFolders,
   dashboards,
   reports,
 }: {
   children: React.ReactNode;
-  dashboardFolders: FolderRow[];
-  reportFolders: FolderRow[];
   dashboards: DashboardSummary[];
   reports: ReportDefinition[];
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const typeParam = searchParams.get("type");
   const { toggle } = useAssistant();
   const [viewerMode, setViewerMode] = useState(false);
 
@@ -64,7 +60,8 @@ export function AnalyticsShell({
                 item.key === "ai-performance" ? pathname.startsWith("/analytics/ai-performance") :
                 item.key === "team" ? pathname.startsWith("/analytics/team") :
                 item.key === "data" ? pathname.startsWith("/analytics/data") :
-                pathname === "/analytics" && item.href.includes(item.key === "dashboards" ? "dashboard" : "report");
+                item.key === "dashboards" ? pathname === "/analytics" && typeParam === "dashboard" :
+                pathname === "/analytics" && typeParam === "report";
               return (
                 <Link
                   key={item.key}
@@ -86,15 +83,6 @@ export function AnalyticsShell({
               <Sparkles className="h-4 w-4" />
               AI Assistant
             </button>
-          </div>
-
-          <div>
-            <p className="px-2.5 text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">Dashboards</p>
-            <FolderTree type="dashboard" folders={dashboardFolders} />
-          </div>
-          <div>
-            <p className="px-2.5 text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">Reports</p>
-            <FolderTree type="report" folders={reportFolders} />
           </div>
         </div>
       )}

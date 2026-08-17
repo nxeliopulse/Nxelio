@@ -612,6 +612,21 @@ export function LeadDetailView({
                 <p className="text-slate-500 dark:text-slate-500 font-medium">Source</p>
                 <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.source || "Google"}</p>
               </div>
+              <div className="flex justify-between items-center text-xs py-1">
+                <p className="text-slate-500 dark:text-slate-500 font-medium">LinkedIn</p>
+                {lead.linkedin ? (
+                  <a
+                    href={lead.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1"
+                  >
+                    View Profile <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <p className="text-slate-400 dark:text-slate-600 font-semibold">—</p>
+                )}
+              </div>
               {lead.message && (
                 <div className="pt-2 text-xs border-t border-slate-100 dark:border-slate-800/80">
                   <p className="text-slate-500 dark:text-slate-500 font-medium mb-1">About</p>

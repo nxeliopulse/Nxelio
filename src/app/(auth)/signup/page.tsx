@@ -7,7 +7,7 @@ import { signUpDirect } from "@/lib/queries/auth";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 
 const INPUT = {
-  className: "w-full px-3.5 py-2.5 rounded-xl text-sm text-slate-800 placeholder-slate-400 outline-none transition-all duration-200",
+  className: "w-full px-3.5 py-2.5 rounded-lg text-sm text-slate-800 placeholder-slate-400 outline-none transition-all duration-200",
   style: {
     background: "#F8FAFC",
     border: "1.5px solid #E2E8F0",
@@ -49,14 +49,14 @@ export default function SignupPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-black text-slate-900 mb-0.5">Sign up</h1>
-      <p className="text-xs mb-3.5 text-slate-500">
+      <h1 className="text-2xl font-black text-slate-900 mb-1">Sign up</h1>
+      <p className="text-sm mb-6 text-slate-500">
         7-day free trial — card required, no charge until day 7
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-2.5">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
+          <div className="flex items-start gap-2 rounded-lg p-3 text-sm"
             style={{ background:"rgba(244,81,30,.08)", border:"1.5px solid rgba(244,81,30,.25)", color:"#c2410c" }}>
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0"/>
             <span>{error}</span>
@@ -161,7 +161,7 @@ export default function SignupPage() {
 
         {/* Submit */}
         <button type="submit" disabled={!valid || loading}
-          className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all transform active:scale-[0.99] hover:opacity-95 hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full py-2.5 rounded-lg font-bold text-sm text-white transition-all transform active:scale-[0.99] hover:opacity-95 hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background:"linear-gradient(135deg, #18A7B8 0%, #7E57C2 100%)", boxShadow:"0 6px 24px rgba(24,167,184,.35)" }}>
           {loading ? "Creating account…" : "Sign Up"}
         </button>

@@ -1,3 +1,5 @@
+"use client";
+import { useState } from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
@@ -11,17 +13,40 @@ const STATUS_STYLE: Record<string, string> = {
   Draft: "text-slate-400 bg-slate-50",
 };
 
+const RANK_OPTIONS: { value: keyof CampaignPerformanceRow; label: string }[] = [
+  { value: "revenue", label: "Revenue" },
+  { value: "pipeline", label: "Pipeline" },
+  { value: "replyRate", label: "Reply Rate" },
+  { value: "meetings", label: "Meetings" },
+  { value: "opportunities", label: "Opportunities" },
+];
+
+/** Campaign Performance table — server pre-sorts by revenue, the Rank By
+ *  selector re-sorts the already-fetched rows client-side. */
 export function CampaignPerformanceTable({ rows }: { rows: CampaignPerformanceRow[] }) {
+  const [rankBy, setRankBy] = useState<keyof CampaignPerformanceRow>("revenue");
+  const sorted = [...rows].sort((a, b) => Number(b[rankBy]) - Number(a[rankBy]));
+
   return (
     <Card>
-      <CardHeader className="pb-0 border-0"><CardTitle className="text-sm">Campaign Performance</CardTitle></CardHeader>
+      <CardHeader className="pb-0 border-0 flex-row items-center justify-between">
+        <CardTitle className="text-sm">Campaign Performance</CardTitle>
+        <select
+          className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          value={rankBy}
+          onChange={(e) => setRankBy(e.target.value as keyof CampaignPerformanceRow)}
+        >
+          {RANK_OPTIONS.map((o) => <option key={o.value} value={o.value}>Rank by {o.label}</option>)}
+        </select>
+      </CardHeader>
       <DataTable>
         <DataTableHead>
           <tr>
             <DataTableTh>Campaign</DataTableTh>
             <DataTableTh>Segment</DataTableTh>
+            <DataTableTh className="text-right">Enrolled</DataTableTh>
             <DataTableTh className="text-right">Sent</DataTableTh>
-            <DataTableTh className="text-right">Delivered</DataTableTh>
+            <DataTableTh className="text-right">Delivery Rate</DataTableTh>
             <DataTableTh className="text-right">Open Rate</DataTableTh>
             <DataTableTh className="text-right">Click Rate</DataTableTh>
             <DataTableTh className="text-right">Reply Rate</DataTableTh>
@@ -34,15 +59,16 @@ export function CampaignPerformanceTable({ rows }: { rows: CampaignPerformanceRo
           </tr>
         </DataTableHead>
         <DataTableBody>
-          {rows.length === 0 && <DataTableEmpty colSpan={13}>No campaigns exist yet.</DataTableEmpty>}
-          {rows.map((c) => (
+          {sorted.length === 0 && <DataTableEmpty colSpan={14}>No campaigns exist yet.</DataTableEmpty>}
+          {sorted.map((c) => (
             <DataTableRow key={c.id}>
               <DataTableTd className="font-semibold text-slate-900">
                 <Link href={`/campaigns/${c.id}`} className="hover:underline">{c.name}</Link>
               </DataTableTd>
               <DataTableTd>{c.segment || "—"}</DataTableTd>
+              <DataTableTd className="text-right">{formatNumber(c.enrolled)}</DataTableTd>
               <DataTableTd className="text-right">{formatNumber(c.sent)}</DataTableTd>
-              <DataTableTd className="text-right">{formatNumber(c.delivered)}</DataTableTd>
+              <DataTableTd className="text-right">{c.deliveryRate}%</DataTableTd>
               <DataTableTd className="text-right">{c.openRate}%</DataTableTd>
               <DataTableTd className="text-right">{c.clickRate}%</DataTableTd>
               <DataTableTd className="text-right">{c.replyRate}%</DataTableTd>

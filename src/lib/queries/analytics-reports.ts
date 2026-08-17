@@ -1,5 +1,5 @@
 "use server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import {
   REPORT_DATA_SOURCES,
   type ReportDefinition,
@@ -60,6 +60,12 @@ function applyFilters(query: any, dataSource: ReportDefinition["dataSource"], fi
       case "eq":
         query = query.eq(f.field, f.value);
         break;
+      case "neq":
+        query = query.neq(f.field, f.value);
+        break;
+      case "contains":
+        query = query.ilike(f.field, `%${f.value}%`);
+        break;
       case "in":
         query = query.in(f.field, f.value as string[]);
         break;
@@ -74,6 +80,14 @@ function applyFilters(query: any, dataSource: ReportDefinition["dataSource"], fi
       case "lt":
         query = query.lt(f.field, f.value);
         break;
+      case "between": {
+        // Same "min|max" string convention already used elsewhere in this
+        // app (e.g. the AI segment builder's between operator).
+        const [min, max] = String(f.value).split("|");
+        if (min) query = query.gte(f.field, min);
+        if (max) query = query.lte(f.field, max);
+        break;
+      }
     }
   }
   return query;
@@ -136,13 +150,14 @@ function aggregate(
   return { rows: resultRows, total: rows.length, generatedAt: new Date().toISOString() };
 }
 
-async function execute(def: ReportDefinition): Promise<ReportResult> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function execute(def: ReportDefinition, client?: any): Promise<ReportResult> {
   const meta = REPORT_DATA_SOURCES[def.dataSource];
   const groupBy = def.groupBy && meta.fields.some((f) => f.key === def.groupBy && f.groupable) ? def.groupBy : null;
   const metricColumn = def.metric.type !== "count" ? def.metric.column : null;
   const metricCol = metricColumn && meta.fields.some((f) => f.key === metricColumn && f.sumable) ? metricColumn : null;
 
-  const supabase = await createClient();
+  const supabase = client ?? (await createClient());
   const cols = Array.from(new Set([groupBy, metricCol, "id"].filter(Boolean) as string[])).join(",");
   let query = supabase.from(meta.table).select(cols);
   query = applyFilters(query, def.dataSource, def.filters);
@@ -158,6 +173,20 @@ async function execute(def: ReportDefinition): Promise<ReportResult> {
 /** Runs a saved report definition against real Supabase tables. */
 export async function runReport(def: ReportDefinition): Promise<ReportResult> {
   return execute(def);
+}
+
+/** Used only by the report-schedules cron (migration 0131), which has no
+ *  user session to scope RLS by — runs with the service-role client instead,
+ *  against a report definition it already loaded for a known workspace. */
+export async function runReportAsAdmin(def: ReportDefinition): Promise<ReportResult> {
+  return execute(def, createAdminClient());
+}
+
+export async function getReportById(id: string): Promise<ReportDefinition | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.from("analytics_reports").select(REPORT_COLUMNS).eq("id", id).maybeSingle();
+  if (error || !data) return null;
+  return rowToDefinition(data as ReportRow);
 }
 
 /** Same execution path, used by the builder's live-preview panel before a
