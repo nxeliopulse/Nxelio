@@ -149,6 +149,46 @@ export async function createContact(payload: Partial<ContactRow>) {
   return data;
 }
 
+/** Mirror of leads.ts's LEAD_TO_CONTACT_FIELD, reversed — a converted lead and
+ *  its contact are the same person, so an edit on either side should keep
+ *  both in sync, not just Lead → Contact. */
+const CONTACT_TO_LEAD_FIELD: Partial<Record<keyof ContactRow, string>> = {
+  email: "email",
+  phone: "phone",
+  linkedin: "linkedin",
+  job_title: "job_title",
+  twitter: "twitter_handle",
+  mailing_street: "street_address",
+  mailing_city: "city",
+  mailing_state: "state",
+  mailing_country: "country",
+  mailing_zip: "postal_code",
+};
+
+async function syncConvertedLead(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  contactId: string,
+  payload: Partial<ContactRow>
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  for (const [contactField, leadField] of Object.entries(CONTACT_TO_LEAD_FIELD)) {
+    if (contactField in payload) patch[leadField] = payload[contactField as keyof ContactRow];
+  }
+  if ("first_name" in payload || "last_name" in payload) {
+    const { data: current } = await supabase.from("contacts").select("first_name, last_name").eq("id", contactId).single();
+    const first = payload.first_name ?? current?.first_name ?? "";
+    const last = payload.last_name ?? current?.last_name ?? "";
+    patch.full_name = `${first} ${last}`.trim() || null;
+  }
+  if (!Object.keys(patch).length) return;
+
+  const { data: leads } = await supabase.from("leads").select("id").eq("converted_contact_id", contactId);
+  if (!leads?.length) return;
+  await supabase.from("leads").update(patch).in("id", leads.map((l) => l.id));
+  revalidatePath("/leads");
+  for (const l of leads) revalidatePath(`/leads/${l.id}`);
+}
+
 export async function updateContact(id: string, payload: Partial<ContactRow>) {
   assertValidContactPhoneFields(payload);
   const supabase = await createClient();
@@ -162,6 +202,10 @@ export async function updateContact(id: string, payload: Partial<ContactRow>) {
   revalidatePath(`/contacts/${id}`);
   if (payload.account_id) revalidatePath(`/accounts/${payload.account_id}`);
   await logAudit({ action: "contact.updated", entityType: "contact", entityId: id, metadata: payload as Record<string, unknown> });
+
+  // Best-effort — a sync failure here should never roll back or block the
+  // contact's own save (mirrors leads.ts's syncConvertedRecords).
+  await syncConvertedLead(supabase, id, payload).catch(() => {});
 }
 
 export async function deleteContact(id: string) {

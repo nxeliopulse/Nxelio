@@ -22,6 +22,43 @@ function assertValidLeadPhone(payload: Partial<LeadRow>) {
   }
 }
 
+/** Non-throwing lookup so callers (the edit form) can check up front and show
+ *  a friendly popup, instead of relying on updateLead's throw — a thrown
+ *  Server Action error surfaces as a full route-level error screen here,
+ *  not an inline message, so the UI should never let it get that far. */
+export async function findLeadByPhone(
+  phone: string | null | undefined,
+  excludeId?: string
+): Promise<{ id: string; full_name: string | null } | null> {
+  if (!phone) return null;
+  const supabase = await createClient();
+  let query = supabase.from("leads").select("id, full_name").eq("phone", phone).limit(1);
+  if (excludeId) query = query.neq("id", excludeId);
+  const { data } = await query.maybeSingle();
+  return data ?? null;
+}
+
+/** A phone number identifies one real person — reject saving it onto a second
+ *  lead. `excludeId` lets updateLead re-save a lead's own unchanged number.
+ *  Kept as a last-resort safety net (e.g. for the AI tool path) — the edit
+ *  form itself should never reach this, since it pre-checks via
+ *  findLeadByPhone() and shows a popup before ever calling updateLead. */
+async function assertPhoneNotTaken(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  phone: string | null | undefined,
+  excludeId?: string
+) {
+  if (!phone) return;
+  let query = supabase.from("leads").select("id, full_name").eq("phone", phone).limit(1);
+  if (excludeId) query = query.neq("id", excludeId);
+  const { data } = await query.maybeSingle();
+  if (data) {
+    throw new Error(
+      `This phone number is already used by another lead${data.full_name ? ` (${data.full_name})` : ""}.`
+    );
+  }
+}
+
 export interface LeadRow {
   id: string;
   full_name: string | null;
@@ -154,6 +191,7 @@ export async function getDistinctLeadValues(
 export async function createLead(payload: Partial<LeadRow>) {
   assertValidLeadPhone(payload);
   const supabase = await createClient();
+  await assertPhoneNotTaken(supabase, payload.phone);
   const { data, error } = await supabase.from("leads").insert(payload).select().single();
   if (error) throw error;
   revalidatePath("/leads");
@@ -171,6 +209,9 @@ export async function createLead(payload: Partial<LeadRow>) {
 export async function updateLead(id: string, payload: Partial<LeadRow>, opts?: { allowConvertedStatus?: boolean }) {
   assertValidLeadPhone(payload);
   const supabase = await createClient();
+  if (Object.prototype.hasOwnProperty.call(payload, "phone")) {
+    await assertPhoneNotTaken(supabase, payload.phone, id);
+  }
 
   if (payload.status !== undefined && !opts?.allowConvertedStatus) {
     const { data: current } = await supabase.from("leads").select("status").eq("id", id).single();

@@ -595,7 +595,7 @@ export function LeadDetailView({
                 <p className="text-slate-800 dark:text-slate-700 font-bold text-emerald-600">
                   {opportunities.length > 0
                     ? money(opportunities.reduce((acc, o) => acc + Number(o.deal_value || 0), 0))
-                    : "$25,11,145"}
+                    : "—"}
                 </p>
               </div>
               <div className="flex justify-between items-center text-xs py-1">

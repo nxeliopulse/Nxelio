@@ -246,6 +246,114 @@ export async function getSegmentFunnel(rule: Group): Promise<{ label: string; va
   return steps;
 }
 
+export interface SegmentPreviewBundle {
+  preview: SegmentPreview;
+  samples: { id: string; name: string; title: string | null; company: string | null; score: number; country: string | null }[];
+  breakdown: { industries: { name: string; value: number }[]; countries: { name: string; value: number }[] };
+  trend: { date: string; count: number }[];
+  funnel: { label: string; value: number }[];
+  /** Per-child running match count, in the SAME order as rule.children (only
+   *  meaningful for an "ALL" root — see getSegmentFunnel's doc comment). */
+  stepCounts: number[];
+}
+
+/**
+ * Everything the segment builder's live preview shows, computed from a
+ * SINGLE fetch of the leads table instead of the 5-6 independent full-table
+ * fetch-and-filter passes previewSegment/getSamplePreviewLeads/
+ * getSegmentBreakdown/getSegmentTrend/getSegmentFunnel/stepCounts used to run
+ * in parallel on every keystroke — that redundancy (not a missing index;
+ * there's no WHERE clause to index against a dynamic rule tree) is what made
+ * opening a segment feel slow as the leads table grew. Same math as those
+ * functions, just evaluated once over one in-memory array.
+ */
+export async function getSegmentPreviewBundle(rule: Group, days: number = 30): Promise<SegmentPreviewBundle> {
+  const empty: SegmentPreviewBundle = {
+    preview: { matched: 0, suppressed: 0, eligible: 0, companies: 0, avgScore: 0 },
+    samples: [], breakdown: { industries: [], countries: [] }, trend: [], funnel: [], stepCounts: rule.children.map(() => 0),
+  };
+  if (!hasAnyComplete(rule)) return empty;
+
+  const supabase = await createClient();
+  const [{ data: leads }, { count: totalCount }] = await Promise.all([
+    supabase.from("leads").select(LEAD_MATCH_FIELDS),
+    supabase.from("leads").select("id", { count: "exact", head: true }),
+  ]);
+  const allLeads = (leads || []) as MatchLead[];
+  const total = totalCount || 0;
+
+  const matched = allLeads.filter((l) => leadMatchesTree(l, rule));
+  const suppressedCount = matched.filter(isSuppressed).length;
+  const companies = new Set(matched.map((l) => l.company_name).filter((v): v is string => Boolean(v))).size;
+  const avgScore = matched.length ? Math.round(matched.reduce((sum, l) => sum + (l.lead_score || 0), 0) / matched.length) : 0;
+  const preview: SegmentPreview = { matched: matched.length, suppressed: suppressedCount, eligible: matched.length - suppressedCount, companies, avgScore };
+
+  const samples = matched
+    .filter((l) => !isSuppressed(l))
+    .slice(0, 5)
+    .map((l) => ({ id: l.id, name: l.full_name || l.company_name || "—", title: l.job_title, company: l.company_name, score: l.lead_score, country: (l.country as string | null) ?? null }));
+
+  let breakdown: SegmentPreviewBundle["breakdown"] = { industries: [], countries: [] };
+  if (matched.length) {
+    const bucket = (key: "industry" | "country") => {
+      const counts = new Map<string, number>();
+      for (const l of matched) {
+        const v = (l[key] as string | null) || "Unknown";
+        counts.set(v, (counts.get(v) || 0) + 1);
+      }
+      const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+      const top = sorted.slice(0, 4).map(([n, c]) => ({ name: n, value: Math.round((c / matched.length) * 100) }));
+      const restCount = sorted.slice(4).reduce((sum, [, c]) => sum + c, 0);
+      if (restCount > 0) top.push({ name: "Other", value: Math.round((restCount / matched.length) * 100) });
+      return top;
+    };
+    breakdown = { industries: bucket("industry"), countries: bucket("country") };
+  }
+
+  const matchedDates = matched.map((l) => new Date(l.created_at as string).getTime()).filter((t) => !Number.isNaN(t));
+  const now = new Date();
+  const trend: { date: string; count: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(now);
+    day.setDate(now.getDate() - i);
+    day.setHours(23, 59, 59, 999);
+    trend.push({
+      date: day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      count: matchedDates.filter((t) => t <= day.getTime()).length,
+    });
+  }
+
+  let funnel: { label: string; value: number }[];
+  let stepCounts: number[];
+  if (rule.operator !== "ALL") {
+    funnel = [{ label: "Total Prospects", value: total }, { label: "Final Segment", value: matched.length }];
+    stepCounts = rule.children.map(() => matched.length);
+  } else {
+    funnel = [{ label: "Total Prospects", value: total }];
+    const completeChildren = rule.children.filter(hasAnyComplete);
+    const steps: number[] = [];
+    for (let i = 0; i < completeChildren.length; i++) {
+      const partial: Group = { type: "group", operator: "ALL", children: completeChildren.slice(0, i + 1) };
+      const count = allLeads.filter((l) => leadMatchesTree(l, partial)).length;
+      steps.push(count);
+      const child = completeChildren[i];
+      const stepLabel = child.type === "condition"
+        ? `After ${SEGMENT_FIELDS.find((f) => f.key === child.field)?.label || child.field}`
+        : `After Group ${i + 1}`;
+      funnel.push({ label: i === completeChildren.length - 1 ? "Final Segment" : stepLabel, value: count });
+    }
+    if (funnel.length === 1) funnel.push({ label: "Final Segment", value: 0 });
+    // Map step results back onto rule.children's original indices/order —
+    // completeChildren may be a filtered subset if some children are incomplete.
+    stepCounts = rule.children.map((c) => {
+      const idx = completeChildren.indexOf(c);
+      return idx === -1 ? 0 : steps[idx];
+    });
+  }
+
+  return { preview, samples, breakdown, trend, funnel, stepCounts };
+}
+
 /**
  * Creates a "Static" segment from an explicit, manually-picked set of leads
  * (e.g. the leads table's bulk "Create segment" action) — no rules, membership

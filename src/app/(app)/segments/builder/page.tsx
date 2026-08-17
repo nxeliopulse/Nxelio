@@ -43,11 +43,7 @@ import {
   createSegment,
   updateSegment,
   getSegmentWithRules,
-  previewSegment,
-  getSamplePreviewLeads,
-  getSegmentBreakdown,
-  getSegmentTrend,
-  getSegmentFunnel,
+  getSegmentPreviewBundle,
   duplicateSegment,
   archiveSegment,
   deleteSegment,
@@ -240,18 +236,7 @@ export default function SegmentBuilderPage() {
     }
     setCounting(true);
     try {
-      const [p, s, b, t, f, steps] = await Promise.all([
-        previewSegment(root),
-        getSamplePreviewLeads(root),
-        getSegmentBreakdown(root),
-        getSegmentTrend(root, days),
-        getSegmentFunnel(root),
-        Promise.all(
-          root.children.map((_, idx) =>
-            previewSegment({ type: "group", operator: root.operator, children: root.children.slice(0, idx + 1) }).then((r) => r.matched)
-          )
-        ),
-      ]);
+      const { preview: p, samples: s, breakdown: b, trend: t, funnel: f, stepCounts: steps } = await getSegmentPreviewBundle(root, days);
       setPreview(p);
       setSamples(s);
       setBreakdown(b);
@@ -281,13 +266,23 @@ export default function SegmentBuilderPage() {
     if (!name.trim()) { setError("Segment name is required"); return; }
     const ruleErrors = validateRuleTree(root);
     if (ruleErrors.length) { setError(ruleErrors[0]); return; }
+    // A Static segment's membership is a fixed hand-picked list (see
+    // createStaticSegment) — but this builder only ever edits a rule tree.
+    // If the user has actually built a real rule here, this is now a
+    // rule-driven segment regardless of what segment_type it loaded with,
+    // otherwise a Static segment silently keeps its OLD stale membership
+    // forever (materializeSegmentMembers skips recompute for "Static").
+    // A segment with no rule at all (e.g. just renaming a true Static list)
+    // keeps its original type untouched.
+    const effectiveType = hasAnyComplete(root) ? "Dynamic" : type;
     start(async () => {
       try {
-        if (editId) await updateSegment(editId, name.trim(), description, type, root, targetStatus);
-        else await createSegment(name.trim(), description, type, root, targetStatus);
+        if (editId) await updateSegment(editId, name.trim(), description, effectiveType, root, targetStatus);
+        else await createSegment(name.trim(), description, effectiveType, root, targetStatus);
         setStatus(targetStatus);
         toast(targetStatus === "Draft" ? "Draft saved" : "Segment published", "success");
         router.push("/segments");
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to save");
       }

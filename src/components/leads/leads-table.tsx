@@ -175,11 +175,21 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       return;
     }
 
+    const proceed = await confirm({
+      title: "Find company name?",
+      message: "This looks up the company using AI and will use 1 AI credit. Continue?",
+      confirmLabel: "Use 1 credit",
+    });
+    if (!proceed) return;
+
     setFindingCompanyId(l.id);
     try {
       const res = await findAndSaveLeadCompany(l.id, l.linkedin, l.full_name);
       if (res.ok && res.companyName) {
-        toast(`Saved company "${res.companyName}" for ${l.full_name || "lead"}.`, "success");
+        const creditsNote = res.creditsRemaining !== undefined
+          ? ` Used ${res.creditsUsed ?? 1} AI credit — ${res.creditsRemaining} remaining this cycle.`
+          : "";
+        toast(`Saved company "${res.companyName}" for ${l.full_name || "lead"}.${creditsNote}`, "success");
         start(() => {
           router.refresh();
         });
@@ -214,14 +224,22 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       return;
     }
 
-    // Limit to max 10 leads per batch for ultra-fast execution
-    const leadsToProcess = leadsWithLinkedin.slice(0, 10).map((l) => ({ id: l.id, linkedin: l.linkedin, full_name: l.full_name }));
-    const hasMore = leadsWithLinkedin.length > 10;
+    // Limit to max 25 leads per batch for fast, boundeded execution
+    const BATCH_SIZE = 25;
+    const leadsToProcess = leadsWithLinkedin.slice(0, BATCH_SIZE).map((l) => ({ id: l.id, linkedin: l.linkedin, full_name: l.full_name }));
+    const hasMore = leadsWithLinkedin.length > BATCH_SIZE;
+
+    const proceed = await confirm({
+      title: "Find company names?",
+      message: `This looks up companies using AI for ${leadsToProcess.length} lead${leadsToProcess.length === 1 ? "" : "s"} and will use up to ${leadsToProcess.length} AI credits (1 per lead). Continue?`,
+      confirmLabel: `Use up to ${leadsToProcess.length} credits`,
+    });
+    if (!proceed) return;
 
     setIsBulkFindingCompany(true);
     toast(
       hasMore
-        ? `Finding company names for 10 leads simultaneously...`
+        ? `Finding company names for ${leadsToProcess.length} leads simultaneously...`
         : `Finding company names for ${leadsToProcess.length} lead(s) simultaneously...`,
       "info"
     );
@@ -235,10 +253,13 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
       const data = await response.json();
 
       if (data.ok && data.successCount > 0) {
+        const creditsNote = typeof data.creditsUsed === "number"
+          ? ` Used ${data.creditsUsed} AI credit${data.creditsUsed === 1 ? "" : "s"}${typeof data.creditsRemaining === "number" ? ` — ${data.creditsRemaining} remaining this cycle.` : "."}`
+          : "";
         toast(
-          hasMore
+          (hasMore
             ? `Finished! Updated ${data.successCount} company name(s). Click Play again for remaining leads.`
-            : `Finished! Successfully updated ${data.successCount} company name(s).`,
+            : `Finished! Successfully updated ${data.successCount} company name(s).`) + creditsNote,
           "success"
         );
         start(() => {

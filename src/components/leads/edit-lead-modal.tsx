@@ -5,7 +5,7 @@ import { Lock, X, User, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
-import { updateLead, updateLeadStatus, type LeadRow } from "@/lib/queries/leads";
+import { updateLead, updateLeadStatus, findLeadByPhone, type LeadRow } from "@/lib/queries/leads";
 import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { useLeadInActiveCampaign } from "@/lib/leads/use-lead-in-active-campaign";
@@ -92,6 +92,19 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
       setError("Phone number isn't valid for the selected country.");
       return;
     }
+
+    const normalizedPhone = form.phone.trim() ? formatPhoneForStorage(form.phone, phoneCountry) : null;
+    if (normalizedPhone && normalizedPhone !== lead.phone) {
+      const conflict = await findLeadByPhone(normalizedPhone, lead.id);
+      if (conflict) {
+        toast(
+          `This phone number is already used by another lead${conflict.full_name ? ` (${conflict.full_name})` : ""}. You cannot use the same phone number for two leads.`,
+          "error"
+        );
+        return;
+      }
+    }
+
     // Status changes need a reason, logged separately from the rest of the
     // form — collect it before touching anything, so canceling here aborts
     // the whole save rather than silently dropping just the status change.
@@ -116,7 +129,7 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
         full_name: form.full_name.trim() || null,
         company_name: form.company_name.trim() || null,
         email: form.email.trim() || null,
-        phone: form.phone.trim() ? formatPhoneForStorage(form.phone, phoneCountry) : null,
+        phone: normalizedPhone,
         website_url: form.website_url.trim() || null,
         linkedin: form.linkedin.trim() || null,
         industry: form.industry || null,

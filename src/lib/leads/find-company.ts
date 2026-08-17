@@ -2,12 +2,15 @@
 import { brightDataSerp, brightDataConfigured, withRetry } from "@/lib/leads/bright-data";
 import { aiChat, aiConfigured } from "@/lib/ai/client";
 import { updateLead } from "@/lib/queries/leads";
+import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
+
+const COMPANY_LOOKUP_OPERATION = "company_name_lookup";
 
 export async function findAndSaveLeadCompany(
   leadId: string,
   linkedinUrl: string | null,
   fullName?: string | null
-): Promise<{ ok: boolean; companyName?: string; error?: string }> {
+): Promise<{ ok: boolean; companyName?: string; error?: string; creditsUsed?: number; creditsRemaining?: number }> {
   if (!linkedinUrl || !linkedinUrl.trim()) {
     return { ok: false, error: "No LinkedIn URL available for this lead." };
   }
@@ -19,6 +22,13 @@ export async function findAndSaveLeadCompany(
   const hasAi = await aiConfigured().catch(() => false);
   if (!hasAi) {
     return { ok: false, error: "AI provider is not configured." };
+  }
+
+  // Same "check before you spend" gate as every other AI action in this app
+  // (see assertCredits in ai/actions.ts) — never runs the paid lookup for a
+  // workspace that can't afford it.
+  if (!(await canAfford(1))) {
+    return { ok: false, error: "You're out of AI credits for this billing cycle. Upgrade your plan for more." };
   }
 
   try {
@@ -87,7 +97,19 @@ export async function findAndSaveLeadCompany(
     // Save verified company name to Supabase lead row
     await updateLead(leadId, { company_name: cleaned });
 
-    return { ok: true, companyName: cleaned };
+    // Best-effort post-success deduction — mirrors chargeCredits() in
+    // ai/actions.ts: a deduction failure here should never hide a result the
+    // user already got real API/AI cost value for.
+    let creditsRemaining: number | undefined;
+    try {
+      const deductRes = await deductCredits(COMPANY_LOOKUP_OPERATION, 1, { leadId });
+      if (deductRes.ok) creditsRemaining = deductRes.remaining;
+      else console.error("[find-company/credits] deduct failed:", deductRes.error);
+    } catch (err) {
+      console.error("[find-company/credits] deduct threw:", err);
+    }
+
+    return { ok: true, companyName: cleaned, creditsUsed: 1, creditsRemaining };
   } catch (err) {
     if (err instanceof Error) {
       if (err.name === "AbortError" || err.message.toLowerCase().includes("aborted")) {
