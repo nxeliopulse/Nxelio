@@ -77,7 +77,7 @@ export default function SignupPage() {
         />
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {error && (
           <div className="flex items-start gap-2 rounded-lg p-3 text-sm"
             style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
