@@ -1057,4 +1057,51 @@ select:focus-visible {
   box-shadow: 0 12px 30px rgba(30, 20, 90, 0.06) !important;
 }
 
+/* --- OUTLINED INPUT STYLES OVERRIDE --- */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]),
+textarea,
+select {
+  border: 1px solid var(--border) !important;
+  outline: none !important;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, background-color 0.15s ease-in-out !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):hover:not(:disabled),
+textarea:hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: #94a3b8 !important; /* hover:border-slate-400 */
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):hover:not(:disabled),
+html.dark textarea:hover:not(:disabled),
+html.dark select:hover:not(:disabled) {
+  border-color: #475569 !important; /* slate-600 in dark mode */
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):focus,
+textarea:focus,
+select:focus {
+  border-color: #4f46e5 !important; /* Brand purple / Indigo-600 */
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25) !important; /* Subtle purple focus ring */
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+}
+
+/* Error states */
+.border-red-500,
+[class*="border-red-"] {
+  border-color: #ef4444 !important;
+}
+.border-red-500:focus,
+[class*="border-red-"]:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25) !important;
+}
+
+
 

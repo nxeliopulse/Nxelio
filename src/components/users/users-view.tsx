@@ -286,17 +286,10 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
           {error && <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{error}</span></div>}
           {success && <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{success}</span></div>}
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name *</label>
-            <Input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="John Smith" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email *</label>
-            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@nxelio.ai" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Role *</label>
-            <Select value={form.roleId} onChange={(e) => setForm({ ...form, roleId: Number(e.target.value) })}>
+          <Input label="Full Name *" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="John Smith" />
+          <Input type="email" label="Email *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@nxelio.ai" />
+          <div className="space-y-1.5">
+            <Select label="Role *" value={form.roleId} onChange={(e) => setForm({ ...form, roleId: Number(e.target.value) })}>
               {roles.map((r) => <option key={r.role_id} value={r.role_id}>{r.role_name}</option>)}
             </Select>
             {selectedRole?.role_description && <p className="text-xs text-slate-500 mt-2">{selectedRole.role_description}</p>}
