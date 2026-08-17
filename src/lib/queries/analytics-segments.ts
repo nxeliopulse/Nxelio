@@ -100,7 +100,7 @@ export async function getSegmentsAnalytics(filters: SegmentsFilters): Promise<Se
   let leadRows: { id: string; status: string; do_not_contact: boolean | null; email_opt_out: boolean | null }[] = [];
   let activities: { lead_id: string; activity_type: string }[] = [];
   let meetingLeadIds = new Set<string>();
-  let oppsByLead = new Map<string, { deal_value: number; stage: OpportunityStage }[]>();
+  const oppsByLead = new Map<string, { deal_value: number; stage: OpportunityStage }[]>();
   if (allMemberLeadIds.length) {
     const [{ data: leads }, { data: acts }, { data: meetings }, { data: opps }] = await Promise.all([
       supabase.from("leads").select("id, status, do_not_contact, email_opt_out").in("id", allMemberLeadIds),

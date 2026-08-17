@@ -265,7 +265,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
             <Card
               key={t.label}
               onClick={() => {
-                setCardFilter(t.key as any);
+                setCardFilter(t.key as typeof cardFilter);
                 setPage(0);
               }}
               className={cn(

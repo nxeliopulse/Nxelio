@@ -30,7 +30,7 @@ export interface RecordLayoutProps {
   moreMenu?: React.ReactNode;
   pipelineBar?: React.ReactNode;
   layoutConfig?: LayoutConfig;
-  record?: Record<string, any>;
+  record?: Record<string, unknown>;
   tabs: TabItem[];
   defaultTabId?: string;
   sidebar?: React.ReactNode;

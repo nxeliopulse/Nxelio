@@ -75,6 +75,7 @@ function WelcomeBanner() {
 
   useEffect(() => {
     if (params.get("welcome") === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reacts to a one-time URL param set by the redirect after signup/checkout, then strips it
       setVisible(true);
       setWasTrial(params.get("trial") === "1");
       router.replace("/dashboard", { scroll: false });
@@ -166,6 +167,7 @@ export function DashboardView({
   // Deferring the chart's first render to after mount sidesteps it entirely.
   const [chartsMounted, setChartsMounted] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-mounted flag, needed to defer chart measurement past first paint (see comment above)
     setChartsMounted(true);
   }, []);
 
@@ -248,7 +250,7 @@ export function DashboardView({
           Hello, {firstName}! 👋
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Here is what's happening in your pipeline this month.
+          Here is what&apos;s happening in your pipeline this month.
         </p>
       </div>
 

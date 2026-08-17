@@ -96,6 +96,7 @@ export function ConvertLeadModal({
 
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sets the loading flag before the async lookup below resolves
     setLoadingMatches(true);
     getConversionMatches(lead.id)
       .then(({ account, contact }) => {
@@ -113,6 +114,7 @@ export function ConvertLeadModal({
   const effectiveAccountName = accountMode === "existing" ? matchedAccount?.account_name || "" : accountName;
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- refreshes the suggested deal name once the matched account resolves; oppName stays user-editable afterward
     setOppName(effectiveAccountName ? `${effectiveAccountName} - New Deal` : "New Deal");
   }, [effectiveAccountName, open]);
 

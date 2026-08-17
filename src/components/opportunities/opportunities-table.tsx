@@ -267,7 +267,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
             <Card
               key={t.label}
               onClick={() => {
-                setTileFilter(t.key as any);
+                setTileFilter(t.key as typeof tileFilter);
                 setPage(0);
               }}
               className={cn(

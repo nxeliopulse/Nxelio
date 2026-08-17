@@ -305,7 +305,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
             <MoreHorizontal className="h-4 w-4" />
           </button>
           {moreMenuOpen && (
-            <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50 text-slate-900 p-1">
+            <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1.5 w-60 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50 text-slate-900 p-1">
               <Link
                 href="/billing"
                 onClick={() => setMoreMenuOpen(false)}
@@ -331,6 +331,30 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
               >
                 <PlayCircle className="h-4 w-4 text-slate-400" /> Replay product tour
               </button>
+              <button
+                onClick={() => { setMoreMenuOpen(false); onToggleAssistant?.(); }}
+                className="sm:hidden w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <Sparkles className="h-4 w-4 text-purple-500" /> AI Assistant
+              </button>
+              <button
+                onClick={() => { setMoreMenuOpen(false); toggleTheme(); }}
+                className="sm:hidden w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4 text-amber-500 animate-fade-in" />
+                ) : (
+                  <Moon className="h-4 w-4 text-slate-400 animate-fade-in" />
+                )}
+                {theme === "dark" ? "Light Mode" : "Dark Mode"}
+              </button>
+              <Link
+                href="/help"
+                onClick={() => setMoreMenuOpen(false)}
+                className="sm:hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <HelpCircle className="h-4 w-4 text-slate-400" /> Help & Support
+              </Link>
             </div>
           )}
         </div>
@@ -340,7 +364,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
           href="/help"
           aria-label="Help & Support"
           title="Help & Support"
-          className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+          className="hidden sm:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
           <HelpCircle className="h-4 w-4" />
         </Link>
@@ -350,7 +374,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
           href="/settings"
           aria-label="Settings"
           title="Settings"
-          className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+          className="hidden sm:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
           <Settings className="h-4 w-4" />
         </Link>
@@ -360,7 +384,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
           onClick={toggleTheme}
           aria-label={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
           title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors animate-fade-in"
+          className="hidden sm:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors animate-fade-in"
         >
           {theme === "dark" ? (
             <Sun className="h-4 w-4 text-amber-300 fill-amber-300" />
@@ -378,7 +402,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         <button
           onClick={onToggleAssistant}
           aria-label={assistantOpen ? "Close AI assistant" : "Open AI assistant"}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-[var(--primary)] bg-white hover:bg-white/90 transition-all ${
+          className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-[var(--primary)] bg-white hover:bg-white/90 transition-all ${
             assistantOpen ? "ring-2 ring-white/70" : ""
           }`}
         >

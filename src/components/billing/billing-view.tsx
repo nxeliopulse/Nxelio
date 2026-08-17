@@ -778,7 +778,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
           {cancelAtPeriodEnd ? (
             <p className="text-sm text-slate-600">
               Your subscription is set to cancel on <span className="font-semibold text-slate-900">{periodEndDate ?? "the end of this period"}</span>.
-              You'll keep full access until then. Changed your mind?
+              You&apos;ll keep full access until then. Changed your mind?
             </p>
           ) : canCancel ? (
             <p className="text-sm text-slate-600">
@@ -788,7 +788,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
             </p>
           ) : (
             <p className="text-sm text-slate-600">
-              To cancel, email support@leadpro.ai and we'll process it promptly.
+              To cancel, email support@leadpro.ai and we&apos;ll process it promptly.
             </p>
           )}
 

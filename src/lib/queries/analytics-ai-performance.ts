@@ -108,7 +108,7 @@ export async function getAiPerformanceAnalytics(): Promise<AiPerformanceData> {
 
   let activities: { lead_id: string; activity_type: string }[] = [];
   let meetingLeadIds = new Set<string>();
-  let oppsByLead = new Map<string, { deal_value: number; stage: OpportunityStage; lead_id: string }[]>();
+  const oppsByLead = new Map<string, { deal_value: number; stage: OpportunityStage; lead_id: string }[]>();
   if (allLeadIds.length) {
     const [{ data: acts }, { data: meetings }, { data: opps }] = await Promise.all([
       supabase.from("lead_activities").select("lead_id, activity_type").in("lead_id", allLeadIds).in("activity_type", ["EMAIL_SENT", "EMAIL_REPLIED"]),

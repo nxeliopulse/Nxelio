@@ -309,7 +309,11 @@ export function LeadDetailView({
         label,
         time: relativeTime(a.created_at),
         iso: a.created_at,
-        timeFormatted: new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        // Locale + timeZone pinned to match formatDate/formatDateTime — an
+        // unpinned toLocaleTimeString([], ...) uses the server's locale/zone
+        // during SSR and the visitor's during hydration, which mismatches
+        // and crashes React with a hydration error (#418).
+        timeFormatted: new Date(a.created_at).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', timeZone: "UTC" }),
       };
     }),
     {
@@ -318,7 +322,7 @@ export function LeadDetailView({
       icon: Users,
       time: relativeTime(lead.created_at),
       iso: lead.created_at,
-      timeFormatted: new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timeFormatted: new Date(lead.created_at).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', timeZone: "UTC" }),
     },
   ];
 
@@ -326,7 +330,7 @@ export function LeadDetailView({
   const groupedTimeline: Record<string, typeof timeline> = {};
   timeline.forEach((item) => {
     const dateObj = new Date(item.iso);
-    const dateStr = dateObj.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+    const dateStr = dateObj.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
     if (!groupedTimeline[dateStr]) {
       groupedTimeline[dateStr] = [];
     }

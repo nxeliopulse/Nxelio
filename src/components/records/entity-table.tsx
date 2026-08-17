@@ -11,7 +11,7 @@ import { FieldRenderer } from "./field-renderer";
 import type { FieldDefinition } from "@/core/engine/types";
 import { cn } from "@/lib/utils";
 
-export interface ColumnDef<T = any> {
+export interface ColumnDef<T = Record<string, unknown>> {
   key: string;
   label: string;
   fieldDef?: FieldDefinition;
@@ -20,7 +20,7 @@ export interface ColumnDef<T = any> {
   render?: (row: T) => React.ReactNode;
 }
 
-export interface EntityTableProps<T = Record<string, any>> {
+export interface EntityTableProps<T = Record<string, unknown>> {
   data: T[];
   columns: ColumnDef<T>[];
   rowKey?: (row: T) => string;
@@ -36,10 +36,10 @@ export interface EntityTableProps<T = Record<string, any>> {
   emptyState?: React.ReactNode;
 }
 
-export function EntityTable<T extends Record<string, any>>({
+export function EntityTable<T extends Record<string, unknown>>({
   data,
   columns: initialColumns,
-  rowKey = (row) => row.id || JSON.stringify(row),
+  rowKey = (row) => (row.id as string) || JSON.stringify(row),
   isLoading = false,
   onRowClick,
   searchPlaceholder = "Search records...",
@@ -71,7 +71,7 @@ export function EntityTable<T extends Record<string, any>>({
       if (valA === valB) return 0;
       if (valA === null || valA === undefined) return 1;
       if (valB === null || valB === undefined) return -1;
-      const cmp = valA < valB ? -1 : 1;
+      const cmp = (valA as string | number) < (valB as string | number) ? -1 : 1;
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [filteredData, sortKey, sortDir]);

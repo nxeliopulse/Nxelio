@@ -62,16 +62,28 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
   // for deliberate, explicit use via `showError()` (see /error-test).
   const [toasts, setToasts] = useState<ErrorToastItem[]>([]);
   const toastIdRef = useRef(0);
+  // Tracks the last time each distinct error (by title+message) was shown, so
+  // the same underlying error firing several times in a row (e.g. React
+  // retrying a failed hydration, or a request being retried) shows ONE toast
+  // instead of stacking duplicates on top of each other.
+  const recentErrorsRef = useRef<Map<string, number>>(new Map());
   const dismissToast = useCallback((id: number) => {
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
   const pushToast = useCallback((error: AppError) => {
+    const key = `${error.title}::${error.message}`;
+    const now = Date.now();
+    const lastShown = recentErrorsRef.current.get(key);
+    if (lastShown && now - lastShown < 6000) return;
+    recentErrorsRef.current.set(key, now);
+
     const id = ++toastIdRef.current;
     setToasts((t) => [...t.slice(-3), { id, title: error.title, message: error.message }]);
     setTimeout(() => dismissToast(id), 6000);
   }, [dismissToast]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-mounted flag, needed to avoid SSR/client render mismatches; there's no pure way to know "are we mounted" during render
     setIsMounted(true);
   }, []);
 
@@ -160,14 +172,15 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
         }
         
         return response;
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (err instanceof AppError) {
           throw err;
         }
 
         // Map network connection errors
-        const isTimeout = err.name === "AbortError" || err.message?.toLowerCase().includes("timeout");
-        const details = `URL: ${url}\nError: ${err.message || err}\nTimestamp: ${new Date().toISOString()}`;
+        const error = err instanceof Error ? err : new Error(String(err));
+        const isTimeout = error.name === "AbortError" || error.message?.toLowerCase().includes("timeout");
+        const details = `URL: ${url}\nError: ${error.message || error}\nTimestamp: ${new Date().toISOString()}`;
         
         const appError = new AppError(
           isTimeout

@@ -11,6 +11,7 @@ export function useLeadInActiveCampaign(leadId: string): boolean {
   const [inActive, setInActive] = useState(false);
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the previous lead's stale result immediately while the new lookup for `leadId` is in flight
     setInActive(false);
     getCampaignsForLead(leadId)
       .then((campaigns) => { if (!cancelled) setInActive(campaigns.some((c) => c.status === "Active")); })

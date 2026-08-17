@@ -184,7 +184,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
             <Card
               key={r.role}
               onClick={() => {
-                setCardFilter((prev) => prev === r.key ? "all" : (r.key as any));
+                setCardFilter((prev) => prev === r.key ? "all" : (r.key as typeof cardFilter));
                 setPage(0);
               }}
               className={cn(

@@ -14,6 +14,16 @@ const STATUS_STYLE: Record<string, string> = {
 
 type SortKey = keyof Pick<SegmentPerformanceRow, "replyRate" | "meetingRate" | "qualificationRate" | "opportunities" | "pipeline" | "revenue">;
 
+function SortableTh({ label, sortKeyVal, onSort }: { label: string; sortKeyVal: SortKey; onSort: (key: SortKey) => void }) {
+  return (
+    <DataTableTh className="text-right">
+      <button onClick={() => onSort(sortKeyVal)} className="inline-flex items-center gap-1 hover:text-slate-900">
+        {label} <ArrowUpDown className="h-3 w-3" />
+      </button>
+    </DataTableTh>
+  );
+}
+
 /** Segment Performance Table (doc §8) — user-selectable sort across all
  *  segments serves as this phase's "compare 2-5 audiences" — a dedicated
  *  multi-select comparison widget is deferred to a later pass. */
@@ -25,16 +35,6 @@ export function SegmentPerformanceTable({ rows }: { rows: SegmentPerformanceRow[
   function toggleSort(key: SortKey) {
     if (key === sortKey) setSortDesc(!sortDesc);
     else { setSortKey(key); setSortDesc(true); }
-  }
-
-  function SortableTh({ label, sortKeyVal }: { label: string; sortKeyVal: SortKey }) {
-    return (
-      <DataTableTh className="text-right">
-        <button onClick={() => toggleSort(sortKeyVal)} className="inline-flex items-center gap-1 hover:text-slate-900">
-          {label} <ArrowUpDown className="h-3 w-3" />
-        </button>
-      </DataTableTh>
-    );
   }
 
   return (
@@ -49,12 +49,12 @@ export function SegmentPerformanceTable({ rows }: { rows: SegmentPerformanceRow[
             <DataTableTh className="text-right">Matching</DataTableTh>
             <DataTableTh className="text-right">Eligible</DataTableTh>
             <DataTableTh className="text-right">Campaigns</DataTableTh>
-            <SortableTh label="Reply Rate" sortKeyVal="replyRate" />
-            <SortableTh label="Meeting Rate" sortKeyVal="meetingRate" />
-            <SortableTh label="Qualification Rate" sortKeyVal="qualificationRate" />
-            <SortableTh label="Opportunities" sortKeyVal="opportunities" />
-            <SortableTh label="Pipeline" sortKeyVal="pipeline" />
-            <SortableTh label="Revenue" sortKeyVal="revenue" />
+            <SortableTh label="Reply Rate" sortKeyVal="replyRate" onSort={toggleSort} />
+            <SortableTh label="Meeting Rate" sortKeyVal="meetingRate" onSort={toggleSort} />
+            <SortableTh label="Qualification Rate" sortKeyVal="qualificationRate" onSort={toggleSort} />
+            <SortableTh label="Opportunities" sortKeyVal="opportunities" onSort={toggleSort} />
+            <SortableTh label="Pipeline" sortKeyVal="pipeline" onSort={toggleSort} />
+            <SortableTh label="Revenue" sortKeyVal="revenue" onSort={toggleSort} />
           </tr>
         </DataTableHead>
         <DataTableBody>

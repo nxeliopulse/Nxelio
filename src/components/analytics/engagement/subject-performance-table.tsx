@@ -8,6 +8,16 @@ import type { SubjectRow } from "@/lib/queries/analytics-engagement";
 
 type SortKey = keyof Pick<SubjectRow, "sent" | "openRate" | "replyRate" | "positiveReplyRate" | "meetingsGenerated">;
 
+function SortableTh({ label, sortKeyVal, onSort }: { label: string; sortKeyVal: SortKey; onSort: (key: SortKey) => void }) {
+  return (
+    <DataTableTh className="text-right">
+      <button onClick={() => onSort(sortKeyVal)} className="inline-flex items-center gap-1 hover:text-slate-900">
+        {label} <ArrowUpDown className="h-3 w-3" />
+      </button>
+    </DataTableTh>
+  );
+}
+
 /** Subject Line Performance (doc §9) — one row per campaign's fixed subject
  *  line, since this schema tracks one subject per campaign rather than
  *  per-message subject variants. Server pre-sorts by reply rate; column
@@ -22,16 +32,6 @@ export function SubjectPerformanceTable({ rows }: { rows: SubjectRow[] }) {
     else { setSortKey(key); setSortDesc(true); }
   }
 
-  function SortableTh({ label, sortKeyVal }: { label: string; sortKeyVal: SortKey }) {
-    return (
-      <DataTableTh className="text-right">
-        <button onClick={() => toggleSort(sortKeyVal)} className="inline-flex items-center gap-1 hover:text-slate-900">
-          {label} <ArrowUpDown className="h-3 w-3" />
-        </button>
-      </DataTableTh>
-    );
-  }
-
   return (
     <Card>
       <CardHeader className="pb-0 border-0"><CardTitle className="text-sm">Subject Line Performance</CardTitle></CardHeader>
@@ -39,11 +39,11 @@ export function SubjectPerformanceTable({ rows }: { rows: SubjectRow[] }) {
         <DataTableHead>
           <tr>
             <DataTableTh>Subject</DataTableTh>
-            <SortableTh label="Sent" sortKeyVal="sent" />
-            <SortableTh label="Open Rate" sortKeyVal="openRate" />
-            <SortableTh label="Reply Rate" sortKeyVal="replyRate" />
-            <SortableTh label="Positive Reply Rate" sortKeyVal="positiveReplyRate" />
-            <SortableTh label="Meetings Generated" sortKeyVal="meetingsGenerated" />
+            <SortableTh label="Sent" sortKeyVal="sent" onSort={toggleSort} />
+            <SortableTh label="Open Rate" sortKeyVal="openRate" onSort={toggleSort} />
+            <SortableTh label="Reply Rate" sortKeyVal="replyRate" onSort={toggleSort} />
+            <SortableTh label="Positive Reply Rate" sortKeyVal="positiveReplyRate" onSort={toggleSort} />
+            <SortableTh label="Meetings Generated" sortKeyVal="meetingsGenerated" onSort={toggleSort} />
           </tr>
         </DataTableHead>
         <DataTableBody>

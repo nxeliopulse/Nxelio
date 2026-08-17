@@ -53,6 +53,7 @@ export function LocationAutocomplete({
 
   // Sync state with parent value updates
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resyncs the editable local buffer when the parent resets `value` externally (e.g. form clear/reset)
     setInputValue(value || "");
   }, [value]);
 

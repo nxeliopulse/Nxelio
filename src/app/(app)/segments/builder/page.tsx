@@ -164,8 +164,17 @@ export default function SegmentBuilderPage() {
   const [distinctValues, setDistinctValues] = useState<Record<string, string[]>>({});
   const [owners, setOwners] = useState<{ id: string; name: string }[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- seeds the clock on mount, then keeps it ticking; there's no pure way to read the current time during render
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-mounted flag, needed to avoid SSR/client render mismatches; there's no pure way to know "are we mounted" during render
     setMounted(true);
     (async () => {
       try {
@@ -368,8 +377,13 @@ export default function SegmentBuilderPage() {
     return [first, mid1, mid2, last];
   }, [funnelSteps]);
 
+  // `now` is read from state (updated by the effect below) rather than calling
+  // Date.now() directly here, since reading the clock during render is an
+  // impure operation that can produce a different result each time React
+  // re-renders this component.
   function formatRelativeTime(iso: string): string {
-    const diffMs = Date.now() - new Date(iso).getTime();
+    if (now === null) return "";
+    const diffMs = now - new Date(iso).getTime();
     const mins = Math.floor(diffMs / 60_000);
     if (mins < 1) return "just now";
     if (mins < 60) return `${mins} min ago`;
@@ -377,7 +391,7 @@ export default function SegmentBuilderPage() {
     if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
     const days = Math.floor(hours / 24);
     if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
-    return new Date(iso).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+    return new Date(iso).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   }
 
   return (

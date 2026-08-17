@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 export interface FormRendererProps {
   fields?: FieldDefinition[];
   sections?: SectionDefinition[];
-  initialValues?: Record<string, any>;
-  onSubmit: (values: Record<string, any>) => void | Promise<void>;
+  initialValues?: Record<string, unknown>;
+  onSubmit: (values: Record<string, unknown>) => void | Promise<void>;
   onCancel?: () => void;
   submitLabel?: string;
   isSubmitting?: boolean;
@@ -27,10 +27,10 @@ export function FormRenderer({
   isSubmitting = false,
   className,
 }: FormRendererProps) {
-  const [formState, setFormState] = useState<Record<string, any>>(initialValues);
+  const [formState, setFormState] = useState<Record<string, unknown>>(initialValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleFieldChange = (fieldName: string, value: any) => {
+  const handleFieldChange = (fieldName: string, value: unknown) => {
     setFormState((prev) => ({ ...prev, [fieldName]: value }));
     if (errors[fieldName]) {
       setErrors((prev) => {
