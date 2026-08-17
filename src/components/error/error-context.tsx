@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { AlertCircle, X } from "lucide-react";
 import { ErrorView } from "./error-view";
 
 export interface AppErrorOptions {
@@ -43,9 +44,32 @@ export function useErrorHandler(): ErrorContextValue {
   return context;
 }
 
+interface ErrorToastItem {
+  id: number;
+  title: string;
+  message: string;
+}
+
 export function ErrorProvider({ children }: { children: React.ReactNode }) {
   const [activeError, setActiveError] = useState<AppError | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+
+  // Background/network errors surface as a small dismissible toast instead
+  // of replacing the whole app — a single failed fetch anywhere (even on an
+  // unrelated widget) used to tear down the entire page with a full-screen
+  // "Application Exception" screen, which is far more disruptive than the
+  // error usually warrants. `activeError`/`ErrorView` above stays available
+  // for deliberate, explicit use via `showError()` (see /error-test).
+  const [toasts, setToasts] = useState<ErrorToastItem[]>([]);
+  const toastIdRef = useRef(0);
+  const dismissToast = useCallback((id: number) => {
+    setToasts((t) => t.filter((x) => x.id !== id));
+  }, []);
+  const pushToast = useCallback((error: AppError) => {
+    const id = ++toastIdRef.current;
+    setToasts((t) => [...t.slice(-3), { id, title: error.title, message: error.message }]);
+    setTimeout(() => dismissToast(id), 6000);
+  }, [dismissToast]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -120,18 +144,16 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
           const errorDetails = mapErrorDetails(response.status, response.statusText, url);
           const appError = new AppError(errorDetails);
           
-          // Determine if we should show the full screen error
-          // 401 and 403 are critical; 500 is critical.
-          // 404 is ignored for suggestion/autocomplete APIs to prevent locking user interface
+          // 404 is ignored for suggestion/autocomplete APIs to prevent toast spam.
           const isSilent = url.includes("/suggest") || url.includes("/search") || url.includes("/autocomplete");
-          
+
           if (
             response.status === 401 ||
             response.status === 403 ||
             response.status === 500 ||
             (!isSilent && response.status === 404)
           ) {
-            setActiveError(appError);
+            pushToast(appError);
           }
           
           throw appError;
@@ -163,10 +185,9 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
               }
         );
 
-        // Network connection issues are critical, show global error
         const isSilent = url.includes("/suggest") || url.includes("/search") || url.includes("/autocomplete");
         if (!isSilent) {
-          setActiveError(appError);
+          pushToast(appError);
         }
 
         throw appError;
@@ -175,7 +196,7 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
 
     // 2. Catch all global uncaught errors and rejections
     const handleGlobalError = (event: ErrorEvent) => {
-      // Don't show full page error for simple styling or third-party extension issues
+      // Don't toast for simple styling or third-party extension issues
       if (
         event.message?.includes("ResizeObserver") ||
         event.filename?.includes("chrome-extension")
@@ -190,8 +211,8 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
         message: "A runtime error occurred in the application. We are looking into it.",
         technicalDetails: details + (event.error?.stack ? `\nStack:\n${event.error.stack}` : ""),
       });
-      
-      setActiveError(appError);
+
+      pushToast(appError);
     };
 
     const handlePromiseRejection = (event: PromiseRejectionEvent) => {
@@ -208,7 +229,7 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
         technicalDetails: details + (reason?.stack ? `\nStack:\n${reason.stack}` : ""),
       });
 
-      setActiveError(appError);
+      pushToast(appError);
     };
 
     window.addEventListener("error", handleGlobalError);
@@ -219,6 +240,7 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("error", handleGlobalError);
       window.removeEventListener("unhandledrejection", handlePromiseRejection);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pushToast's identity is stable (useCallback with a stable dep), and this effect must only attach the window listeners/fetch patch once
   }, []);
 
   const showError = (error: AppError | Error | string) => {
@@ -254,10 +276,12 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
     clearError,
   };
 
-  // Render original tree or Error page
-  if (isMounted && activeError) {
-    return (
-      <ErrorContext.Provider value={value}>
+  // The full-page ErrorView is now only for deliberate showError() calls
+  // (see /error-test) — background/network errors above use the toast stack
+  // instead, rendered alongside the app rather than replacing it.
+  return (
+    <ErrorContext.Provider value={value}>
+      {isMounted && activeError ? (
         <ErrorView
           errorCode={activeError.code}
           errorTitle={activeError.title}
@@ -270,9 +294,30 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
             clearError();
           }}
         />
-      </ErrorContext.Provider>
-    );
-  }
+      ) : (
+        children
+      )}
 
-  return <ErrorContext.Provider value={value}>{children}</ErrorContext.Provider>;
+      {/* Background-error toast stack — matches the app's normal toast style. */}
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-4 z-[100] space-y-2 w-[min(92vw,380px)] pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            role="status"
+            style={{ animation: "lp-toast-in .22s ease-out" }}
+            className="pointer-events-auto flex items-start gap-2.5 bg-white border border-red-200 shadow-lg shadow-slate-900/5 rounded-xl px-3.5 py-3"
+          >
+            <AlertCircle className="h-4.5 w-4.5 text-red-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800 leading-snug">{t.title}</p>
+              <p className="text-xs text-slate-500 leading-snug mt-0.5">{t.message}</p>
+            </div>
+            <button onClick={() => dismissToast(t.id)} aria-label="Dismiss" className="p-0.5 rounded text-slate-300 hover:text-slate-500 flex-shrink-0">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </ErrorContext.Provider>
+  );
 }

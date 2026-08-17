@@ -158,6 +158,7 @@ export function NotificationsBell({ className }: { className?: string }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
+        aria-label={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
         className={cn(
           "relative flex items-center justify-center transition-colors",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-1 focus-visible:ring-offset-[#1e242b]",

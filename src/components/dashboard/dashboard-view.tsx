@@ -9,7 +9,7 @@ import {
   Search, Settings, Bell, ArrowUpRight, User, Target, Crown,
 } from "lucide-react";
 import {
-  Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis
+  Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,42 @@ function money(n: number): string {
 
 function formatStat(n: number): string {
   return Math.round(n).toLocaleString("en-US");
+}
+
+/** Real trend badge shared by the 4 KPI cards — was previously hardcoded
+ *  per card (e.g. always "-4.2%" regardless of actual data). `null` means
+ *  there's no prior-month figure to compare against. */
+function TrendBadge({ pct, fallbackLabel }: { pct: number | null; fallbackLabel: string }) {
+  if (pct === null) {
+    return (
+      <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded">
+        {fallbackLabel}
+      </span>
+    );
+  }
+  const positive = pct >= 0;
+  return (
+    <span
+      className={cn(
+        "text-[10px] font-bold px-2 py-0.5 rounded",
+        positive
+          ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400"
+          : "bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400"
+      )}
+    >
+      {(positive ? "+" : "") + pct.toFixed(1) + "%"}
+    </span>
+  );
+}
+
+/** Shown instead of a bare, values-all-zero chart — Recharts still draws
+ *  axes even with no bars, which reads as broken rather than "no data yet". */
+function EmptyChartState({ label }: { label: string }) {
+  return (
+    <div className="h-full w-full flex items-center justify-center text-center px-4">
+      <p className="text-sm text-slate-400">{label}</p>
+    </div>
+  );
 }
 
 // Welcome banner (shown once after checkout completes)
@@ -124,6 +160,15 @@ export function DashboardView({
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const [activeDateRange, setActiveDateRange] = useState("Last 30 Days");
 
+  // Recharts' ResponsiveContainer measures its parent's real pixel size via
+  // ResizeObserver, which isn't available yet during SSR/first paint — that
+  // mismatch is what throws the "width(-1) and height(-1)" console warnings.
+  // Deferring the chart's first render to after mount sidesteps it entirely.
+  const [chartsMounted, setChartsMounted] = useState(false);
+  useEffect(() => {
+    setChartsMounted(true);
+  }, []);
+
   const dateRangeOptions = [
     "Today",
     "Yesterday",
@@ -218,21 +263,30 @@ export function DashboardView({
           {/* Card 1: Total Revenue (Highlight Indigo/Blue) */}
           <Card className="bg-indigo-600 dark:bg-indigo-700 text-white p-5 rounded-2xl border-none shadow-md flex flex-col justify-between min-h-[160px] relative overflow-hidden">
             <div className="flex justify-between items-start">
-              <span className="text-xs font-semibold opacity-90 uppercase tracking-wider">Total revenue</span>
-              <button 
-                onClick={() => router.push("/opportunities")} 
+              <span className="text-xs font-semibold opacity-90 uppercase tracking-wider">This month&apos;s revenue</span>
+              <button
+                onClick={() => router.push("/opportunities")}
+                aria-label="View opportunities"
                 className="p-1.5 bg-white/15 hover:bg-white/25 rounded-full transition-colors text-white"
               >
                 <ArrowUpRight className="h-4 w-4" />
               </button>
             </div>
             <div className="mt-4 space-y-1">
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight">{money(stats.pipeline.wonValue)}</h2>
-              <div className="flex items-center gap-1">
+              {/* Shows this calendar month's won revenue — matching what the
+                  "vs last month" badge actually measures. Previously this
+                  showed the all-time won total next to a monthly % change,
+                  which could produce a huge, misleading swing (e.g. -95%)
+                  whenever the all-time total didn't move much month to month. */}
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight">{money(stats.revenueThisMonth)}</h2>
+              <div className="flex items-center gap-1 flex-wrap">
                 <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded">
-                  {stats.revenueTrendPct !== null ? (stats.revenueTrendPct >= 0 ? "+" : "") + stats.revenueTrendPct.toFixed(1) + "%" : "+14.0%"}
+                  {stats.revenueTrendPct !== null ? (stats.revenueTrendPct >= 0 ? "+" : "") + stats.revenueTrendPct.toFixed(1) + "%" : "New"}
                 </span>
-                <span className="text-[10px] opacity-80">This month vs last</span>
+                {/* Raw last-month figure alongside the % — a big swing (e.g.
+                    -95%) is self-explanatory once you can see the prior-month
+                    baseline was itself small, rather than reading as a bug. */}
+                <span className="text-[10px] opacity-80">vs {money(stats.revenueLastMonth)} last month</span>
               </div>
             </div>
           </Card>
@@ -241,8 +295,9 @@ export function DashboardView({
           <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex flex-col justify-between min-h-[160px]">
             <div className="flex justify-between items-start">
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total deals</span>
-              <button 
-                onClick={() => router.push("/opportunities")} 
+              <button
+                onClick={() => router.push("/opportunities")}
+                aria-label="View opportunities"
                 className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-slate-400"
               >
                 <ArrowUpRight className="h-4 w-4" />
@@ -253,9 +308,7 @@ export function DashboardView({
                 {stats.pipeline.wonCount + stats.pipeline.openCount}
               </h2>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded">
-                  -4.2%
-                </span>
+                <TrendBadge pct={stats.dealsCreatedTrendPct} fallbackLabel="New" />
                 <span className="text-[10px] text-slate-400">Active in pipeline</span>
               </div>
             </div>
@@ -265,8 +318,9 @@ export function DashboardView({
           <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex flex-col justify-between min-h-[160px]">
             <div className="flex justify-between items-start">
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total prospects</span>
-              <button 
-                onClick={() => router.push("/leads")} 
+              <button
+                onClick={() => router.push("/leads")}
+                aria-label="View prospects"
                 className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-slate-400"
               >
                 <ArrowUpRight className="h-4 w-4" />
@@ -277,9 +331,7 @@ export function DashboardView({
                 {formatStat(stats.totalLeads)}
               </h2>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded">
-                  +4.8%
-                </span>
+                <TrendBadge pct={stats.leadsDelta ?? null} fallbackLabel="New" />
                 <span className="text-[10px] text-slate-400">Registered leads</span>
               </div>
             </div>
@@ -289,8 +341,9 @@ export function DashboardView({
           <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs flex flex-col justify-between min-h-[160px]">
             <div className="flex justify-between items-start">
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pipeline value</span>
-              <button 
-                onClick={() => router.push("/opportunities")} 
+              <button
+                onClick={() => router.push("/opportunities")}
+                aria-label="View opportunities"
                 className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-500 dark:text-slate-400"
               >
                 <ArrowUpRight className="h-4 w-4" />
@@ -301,9 +354,7 @@ export function DashboardView({
                 {money(stats.pipeline.openValue)}
               </h2>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded">
-                  +5.6%
-                </span>
+                <TrendBadge pct={stats.pipelineValueTrendPct} fallbackLabel="New" />
                 <span className="text-[10px] text-slate-400">Expected future revenue</span>
               </div>
             </div>
@@ -320,14 +371,14 @@ export function DashboardView({
                 <p className="text-xs text-slate-400 mt-0.5">This month vs last</p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <ul className="flex items-center gap-1 bg-slate-50 dark:bg-[var(--muted)] border dark:border-slate-800 rounded-xl p-1 text-[10px] font-bold">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <ul className="flex items-center gap-0.5 sm:gap-1 bg-slate-50 dark:bg-[var(--muted)] border dark:border-slate-800 rounded-xl p-1 text-[9px] sm:text-[10px] font-bold flex-shrink-0">
                   {["weekly", "monthly", "yearly"].map((t) => (
                     <li key={t}>
                       <button
                         onClick={() => setTimeframe(t as "weekly" | "monthly" | "yearly")}
                         className={cn(
-                          "py-1 px-3 rounded-lg capitalize transition-all",
+                          "py-1 px-1.5 sm:px-3 rounded-lg capitalize transition-all whitespace-nowrap",
                           timeframe === t
                             ? "bg-indigo-600 text-white shadow-3xs"
                             : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
@@ -339,8 +390,9 @@ export function DashboardView({
                   ))}
                 </ul>
 
-                <button 
+                <button
                   onClick={() => router.push("/analytics")}
+                  aria-label="View full analytics"
                   className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full text-slate-500 dark:text-slate-400"
                 >
                   <ArrowUpRight className="h-4 w-4" />
@@ -349,15 +401,28 @@ export function DashboardView({
             </div>
 
             <div className="h-[240px] w-full mt-4 pr-1">
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={activeChartData} margin={{ top: 10, right: 10, left: -25, bottom: 5 }}>
-                  <XAxis dataKey="day" stroke="#a1a1aa" fontSize={9} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#a1a1aa" fontSize={9} tickLine={false} axisLine={false} />
-                  <Tooltip formatter={(v) => money(Number(v))} />
-                  <Bar dataKey="Revenue" name="Revenue Won" fill="#4f46e5" radius={[5, 5, 0, 0]} barSize={14} />
-                  <Bar dataKey="Pipeline" name="Open Pipeline" fill="#60a5fa" radius={[5, 5, 0, 0]} barSize={14} />
-                </BarChart>
-              </ResponsiveContainer>
+              {activeChartTotal === 0 ? (
+                <EmptyChartState
+                  label={
+                    timeframe === "weekly"
+                      ? "No revenue or pipeline activity recorded this week yet."
+                      : timeframe === "monthly"
+                      ? "No revenue or pipeline activity recorded this month yet."
+                      : "No revenue or pipeline activity recorded this year yet."
+                  }
+                />
+              ) : chartsMounted ? (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={activeChartData} margin={{ top: 10, right: 10, left: -25, bottom: 5 }}>
+                    <XAxis dataKey="day" stroke="#a1a1aa" fontSize={9} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#a1a1aa" fontSize={9} tickLine={false} axisLine={false} />
+                    <Tooltip formatter={(v) => money(Number(v))} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8} />
+                    <Bar dataKey="Revenue" name="Revenue Won" fill="#4f46e5" radius={[5, 5, 0, 0]} barSize={14} />
+                    <Bar dataKey="Pipeline" name="Open Pipeline" fill="#60a5fa" radius={[5, 5, 0, 0]} barSize={14} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : null}
             </div>
           </Card>
         </div>
@@ -412,8 +477,9 @@ export function DashboardView({
                 <p className="text-xs text-slate-400 mt-0.5">This month vs last</p>
               </div>
 
-              <button 
+              <button
                 onClick={() => router.push("/leads")}
+                aria-label="View prospects"
                 className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full text-slate-500 dark:text-slate-400"
               >
                 <ArrowUpRight className="h-4 w-4" />
@@ -421,30 +487,32 @@ export function DashboardView({
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-around gap-6 py-2">
-              
+
               {/* Donut Chart Portion */}
               <div className="h-[150px] w-[150px] relative flex items-center justify-center flex-shrink-0">
-                <ResponsiveContainer width="100%" height={150}>
-                  <PieChart>
-                    <Pie
-                      data={donutData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={68}
-                      paddingAngle={3}
-                      dataKey="value"
-                      stroke="none"
-                      startAngle={90}
-                      endAngle={-270}
-                    >
-                      {donutData.map((entry, idx) => (
-                        <Cell key={`cell-${idx}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                
+                {chartsMounted && (
+                  <ResponsiveContainer width="100%" height={150}>
+                    <PieChart>
+                      <Pie
+                        data={donutData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={68}
+                        paddingAngle={3}
+                        dataKey="value"
+                        stroke="none"
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        {donutData.map((entry, idx) => (
+                          <Cell key={`cell-${idx}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4">
                   <span className="text-xl font-black text-slate-900 dark:text-white leading-none mb-1">{topSource?.value ?? 0}%</span>
                   <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider text-center max-w-[80px] truncate leading-tight">
@@ -454,14 +522,14 @@ export function DashboardView({
               </div>
 
               {/* Custom Legend Portion */}
-              <div className="grid grid-cols-2 gap-x-12 gap-y-3 font-semibold text-xs min-w-[240px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 font-semibold text-xs w-full sm:min-w-[240px]">
                 {donutData.slice(0, 6).map((d, i) => (
-                  <div key={i} className="flex justify-between items-center gap-4">
-                    <div className="flex items-center gap-2.5">
+                  <div key={i} className="flex justify-between items-center gap-4 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                      <span className="text-slate-500 dark:text-slate-400 truncate max-w-[100px]">{d.name}</span>
+                      <span className="text-slate-500 dark:text-slate-400 truncate max-w-[140px] sm:max-w-[100px]" title={d.name}>{d.name}</span>
                     </div>
-                    <span className="text-slate-950 dark:text-white font-bold ml-auto">{d.value}%</span>
+                    <span className="text-slate-950 dark:text-white font-bold ml-auto flex-shrink-0">{d.value}%</span>
                   </div>
                 ))}
               </div>

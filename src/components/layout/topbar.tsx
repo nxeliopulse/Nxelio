@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ChevronDown, LogOut, User as UserIcon, Settings, Menu, Sparkles,
   Phone, ShoppingBag, HelpCircle, PlayCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2,
-  Building2, Check, Plus, Sun, Moon
+  Building2, Check, Plus, Sun, Moon, X, MoreHorizontal,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { globalSearch, type GlobalSearchResult } from "@/lib/queries/global-search";
@@ -14,6 +14,7 @@ import { NotificationsBell } from "./notifications-bell";
 import { useSidebar } from "./sidebar-context";
 import { Modal } from "@/components/ui/modal";
 import { getStoredAppearance, applyTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 interface TopbarProps {
   userName?: string;
@@ -56,6 +57,9 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const parts = userName.trim().split(/\s+/);
   const initials = parts.length > 1
     ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
@@ -99,6 +103,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreMenuOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -158,14 +163,23 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* Hamburger — mobile/tablet only */}
         <button
           onClick={toggleMobile}
-          className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 text-white/80 flex-shrink-0"
+          className={cn("lg:hidden p-1.5 rounded-lg hover:bg-white/10 text-white/80 flex-shrink-0", mobileSearchOpen && "hidden")}
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
         </button>
 
+        {/* Search toggle — phones only; sm+ shows the input directly */}
+        <button
+          onClick={() => setMobileSearchOpen((v) => !v)}
+          className="sm:hidden p-1.5 rounded-lg hover:bg-white/10 text-white/80 flex-shrink-0"
+          aria-label={mobileSearchOpen ? "Close search" : "Search"}
+        >
+          {mobileSearchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+        </button>
+
         {/* Global search — leads & campaigns, live as you type */}
-        <div className="hidden sm:block relative flex-1 max-w-sm" ref={searchRef}>
+        <div className={cn("relative flex-1 max-w-sm", mobileSearchOpen ? "block" : "hidden sm:block")} ref={searchRef}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60 pointer-events-none" />
           <input
             type="text"
@@ -244,7 +258,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* Upgrade pill */}
         <Link
           href="/billing"
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/12 hover:bg-white/20 text-xs font-semibold text-white transition-colors"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/12 hover:bg-white/20 text-xs font-semibold text-white transition-colors"
         >
           <ArrowUpRight className="h-3.5 w-3.5 text-amber-300" />
           <span>Upgrade</span>
@@ -253,6 +267,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* Calling / Phone icon */}
         <button
           onClick={() => router.push("/meetings")}
+          aria-label="Phone / Calling"
           title="Phone / Calling"
           className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
@@ -262,6 +277,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* App Marketplace icon */}
         <button
           onClick={() => router.push("/settings?section=email")}
+          aria-label="App Marketplace & Integrations"
           title="App Marketplace & Integrations"
           className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
@@ -271,15 +287,58 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* Replay product tour */}
         <button
           onClick={() => router.push("/dashboard?tour=dashboard")}
+          aria-label="Replay product tour"
           title="Replay product tour"
           className="hidden md:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
           <PlayCircle className="h-4 w-4" />
         </button>
 
+        {/* "More" menu — below md, Upgrade/Phone/Marketplace/Tour above have
+            nowhere to go, so they were simply vanishing with no fallback. */}
+        <div className="relative md:hidden" ref={moreRef}>
+          <button
+            onClick={() => setMoreMenuOpen((v) => !v)}
+            aria-label="More actions"
+            className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+          {moreMenuOpen && (
+            <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50 text-slate-900 p-1">
+              <Link
+                href="/billing"
+                onClick={() => setMoreMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <ArrowUpRight className="h-4 w-4 text-amber-500" /> Upgrade
+              </Link>
+              <button
+                onClick={() => { setMoreMenuOpen(false); router.push("/meetings"); }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <Phone className="h-4 w-4 text-slate-400" /> Phone / Calling
+              </button>
+              <button
+                onClick={() => { setMoreMenuOpen(false); router.push("/settings?section=email"); }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <ShoppingBag className="h-4 w-4 text-slate-400" /> Marketplace & Integrations
+              </button>
+              <button
+                onClick={() => { setMoreMenuOpen(false); router.push("/dashboard?tour=dashboard"); }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <PlayCircle className="h-4 w-4 text-slate-400" /> Replay product tour
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Help icon */}
         <Link
           href="/help"
+          aria-label="Help & Support"
           title="Help & Support"
           className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
@@ -289,6 +348,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* Settings gear icon ⚙️ */}
         <Link
           href="/settings"
+          aria-label="Settings"
           title="Settings"
           className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
         >
@@ -298,6 +358,7 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* Dark/Light mode theme toggle */}
         <button
           onClick={toggleTheme}
+          aria-label={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
           title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
           className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors animate-fade-in"
         >
