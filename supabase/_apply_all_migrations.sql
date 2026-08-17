@@ -4976,7 +4976,7 @@ GRANT EXECUTE ON FUNCTION sync_subscription_from_stripe(
   UUID, TEXT, TEXT, TEXT, INTEGER, INTEGER, TIMESTAMPTZ, TIMESTAMPTZ, TIMESTAMPTZ, TEXT, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ
 ) TO service_role;
 
--- >>> FILE: 0127_lead_provider_settings.sql
+-- >>> FILE: 0133_lead_provider_settings.sql
 CREATE TABLE IF NOT EXISTS lead_provider_settings (
   id               INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- single-row table
   active_provider  TEXT NOT NULL DEFAULT 'bright_data' CHECK (active_provider IN ('anysite', 'bright_data')),
@@ -4989,3 +4989,367 @@ VALUES (1, 'bright_data')
 ON CONFLICT (id) DO NOTHING;
 
 ALTER TABLE lead_provider_settings ENABLE ROW LEVEL SECURITY;
+
+-- >>> FILE: 0127_opportunity_stage_history.sql
+-- ============================================================================
+-- 0127_opportunity_stage_history.sql
+--
+-- Phase 2 item: real stage-to-stage conversion tracking for Pipeline
+-- Analytics. Until now, "Stage Conversion" was approximated as "reached
+-- this stage or later" (a waterfall proxy, documented in analytics-pipeline.ts)
+-- because there was no history of when an opportunity actually moved between
+-- stages. This adds a real, trigger-populated log, so future stage moves are
+-- captured going forward with zero app-code changes needed to keep logging.
+--
+-- Existing opportunities get a one-row backfill (their current stage, at the
+-- closest real timestamp available) — this is NOT a reconstruction of their
+-- real history (that data was never captured), it's a starting point so every
+-- opportunity has at least one row and the trigger's future data builds on
+-- a complete base.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS opportunity_stage_history (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id   UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  opportunity_id UUID NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+  from_stage     TEXT,
+  to_stage       TEXT NOT NULL,
+  changed_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_opp_stage_history_opp ON opportunity_stage_history (opportunity_id, changed_at);
+CREATE INDEX IF NOT EXISTS idx_opp_stage_history_workspace ON opportunity_stage_history (workspace_id, changed_at);
+
+-- SECURITY DEFINER so the log write never depends on the acting user's own
+-- grants on this table (which intentionally has no INSERT policy for
+-- authenticated users below — same "system writes, users only read" pattern
+-- as credit_ledger/promotion_redemptions).
+CREATE OR REPLACE FUNCTION log_opportunity_stage_change()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    INSERT INTO opportunity_stage_history (workspace_id, opportunity_id, from_stage, to_stage, changed_at)
+    VALUES (NEW.workspace_id, NEW.id, NULL, NEW.stage, now());
+  ELSIF (TG_OP = 'UPDATE') AND (NEW.stage IS DISTINCT FROM OLD.stage) THEN
+    INSERT INTO opportunity_stage_history (workspace_id, opportunity_id, from_stage, to_stage, changed_at)
+    VALUES (NEW.workspace_id, NEW.id, OLD.stage, NEW.stage, now());
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_opportunity_stage_history ON opportunities;
+CREATE TRIGGER trg_opportunity_stage_history
+  AFTER INSERT OR UPDATE ON opportunities
+  FOR EACH ROW EXECUTE FUNCTION log_opportunity_stage_change();
+
+-- Backfill — one row per existing opportunity with no history yet.
+INSERT INTO opportunity_stage_history (workspace_id, opportunity_id, from_stage, to_stage, changed_at)
+SELECT o.workspace_id, o.id, NULL, o.stage, COALESCE(o.closed_at, o.updated_at, o.created_at)
+FROM opportunities o
+WHERE o.workspace_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM opportunity_stage_history h WHERE h.opportunity_id = o.id);
+
+ALTER TABLE opportunity_stage_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS opportunity_stage_history_read ON opportunity_stage_history;
+CREATE POLICY opportunity_stage_history_read
+  ON opportunity_stage_history FOR SELECT USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+-- Deliberately no INSERT/UPDATE/DELETE policy for authenticated users — the
+-- SECURITY DEFINER trigger above is the only writer.
+
+-- >>> FILE: 0128_sales_quotas.sql
+-- ============================================================================
+-- 0128_sales_quotas.sql
+--
+-- Phase 2 item: a real Target/Quota data model, unlocking Pipeline Coverage,
+-- Quota Attainment, and Gap-to-Target on Revenue Analytics, plus a
+-- Target/Attainment% column on the Team leaderboard. A quota is either
+-- per-rep (user_id set) or a whole-workspace target (user_id NULL) for a
+-- given period.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS sales_quotas (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id   UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id        UUID REFERENCES users(user_id) ON DELETE CASCADE,
+  period_start   DATE NOT NULL,
+  period_end     DATE NOT NULL,
+  target_amount  NUMERIC(14,2) NOT NULL CHECK (target_amount >= 0),
+  quota_type     TEXT NOT NULL DEFAULT 'revenue' CHECK (quota_type IN ('revenue', 'pipeline')),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (period_end >= period_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_quotas_workspace_period ON sales_quotas (workspace_id, period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_sales_quotas_user ON sales_quotas (user_id);
+
+DROP TRIGGER IF EXISTS trg_sales_quotas_updated ON sales_quotas;
+CREATE TRIGGER trg_sales_quotas_updated
+  BEFORE UPDATE ON sales_quotas
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE sales_quotas ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS sales_quotas_read ON sales_quotas;
+CREATE POLICY sales_quotas_read
+  ON sales_quotas FOR SELECT USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+
+-- Only Super Admins (role_id = 1, this app's existing admin check — see
+-- getAnalyticsContext()'s isAdmin) may set targets for the team.
+DROP POLICY IF EXISTS sales_quotas_admin_write ON sales_quotas;
+CREATE POLICY sales_quotas_admin_write
+  ON sales_quotas FOR ALL USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid() AND role_id = 1)
+  ) WITH CHECK (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid() AND role_id = 1)
+  );
+
+-- >>> FILE: 0129_pipeline_snapshots.sql
+-- ============================================================================
+-- 0129_pipeline_snapshots.sql
+--
+-- Phase 2 item: daily pipeline snapshots, unlocking a real Pipeline Trend
+-- chart and Forecast Accuracy/Slippage on Revenue Analytics. Until now,
+-- "Pipeline Trend" had no historical series to draw from — pipeline value is
+-- only ever queried live, as of right now. One row per workspace per day
+-- gives a genuine time series going forward.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS pipeline_snapshots (
+  id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id             UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  snapshot_date            DATE NOT NULL,
+  total_pipeline_value     NUMERIC(14,2) NOT NULL DEFAULT 0,
+  weighted_pipeline_value  NUMERIC(14,2) NOT NULL DEFAULT 0,
+  open_deal_count          INT NOT NULL DEFAULT 0,
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (workspace_id, snapshot_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_snapshots_workspace_date ON pipeline_snapshots (workspace_id, snapshot_date);
+
+ALTER TABLE pipeline_snapshots ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS pipeline_snapshots_read ON pipeline_snapshots;
+CREATE POLICY pipeline_snapshots_read
+  ON pipeline_snapshots FOR SELECT USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+-- Deliberately no INSERT/UPDATE/DELETE policy for authenticated users — only
+-- the protected cron route (using the service-role client) writes here, same
+-- "system writes, users only read" pattern as opportunity_stage_history.
+
+-- Optional Supabase pg_cron setup (replace URL and secret storage for the deployment):
+-- SELECT cron.schedule('nxelio-pipeline-snapshot-daily', '5 0 * * *',
+--   $$SELECT net.http_get(url := 'https://YOUR_APP_URL/api/analytics/pipeline-snapshot/cron',
+--     headers := jsonb_build_object('Authorization', 'Bearer YOUR_PIPELINE_SNAPSHOT_CRON_SECRET'));$$);
+
+-- >>> FILE: 0130_ai_recommendations.sql
+-- ============================================================================
+-- 0130_ai_recommendations.sql
+--
+-- Phase 2 item: turns the AI Insights already computed across 8 analytics
+-- pages (Prospects, Segments, Campaigns, Engagement, Meetings, Pipeline,
+-- Revenue, Accounts) from stateless, recomputed-every-page-load text into a
+-- tracked recommendation lifecycle — surfaced once, then accepted/dismissed
+-- by a user, unlocking a real Recommendation Adoption Rate and (proxy)
+-- Outcome Rate on AI Performance Analytics.
+--
+-- ai_recommendations: one row per distinct insight ever surfaced, keyed by a
+-- stable fingerprint ("<area>:<insight id>") so re-computing the same
+-- insight on a later page load bumps last_seen_at instead of duplicating.
+-- ai_recommendation_actions: an append-only log of every accept/dismiss, for
+-- audit/history — ai_recommendations.status holds the current state.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ai_recommendations (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id   UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  source_area    TEXT NOT NULL,
+  fingerprint    TEXT NOT NULL,
+  title          TEXT NOT NULL,
+  cta_label      TEXT NOT NULL,
+  cta_href       TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'accepted', 'dismissed')),
+  first_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actioned_at    TIMESTAMPTZ,
+  actioned_by    UUID REFERENCES users(user_id),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (workspace_id, fingerprint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_recommendations_workspace ON ai_recommendations (workspace_id, status);
+
+DROP TRIGGER IF EXISTS trg_ai_recommendations_updated ON ai_recommendations;
+CREATE TRIGGER trg_ai_recommendations_updated
+  BEFORE UPDATE ON ai_recommendations
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE IF NOT EXISTS ai_recommendation_actions (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  recommendation_id UUID NOT NULL REFERENCES ai_recommendations(id) ON DELETE CASCADE,
+  workspace_id      UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id           UUID REFERENCES users(user_id),
+  action            TEXT NOT NULL CHECK (action IN ('accepted', 'dismissed')),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_recommendation_actions_rec ON ai_recommendation_actions (recommendation_id);
+
+ALTER TABLE ai_recommendations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_recommendation_actions ENABLE ROW LEVEL SECURITY;
+
+-- Any workspace member can read, record a sighting, or act on a
+-- recommendation — insights are shown to whoever views the analytics page,
+-- not just admins.
+DROP POLICY IF EXISTS ai_recommendations_read ON ai_recommendations;
+CREATE POLICY ai_recommendations_read
+  ON ai_recommendations FOR SELECT USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS ai_recommendations_write ON ai_recommendations;
+CREATE POLICY ai_recommendations_write
+  ON ai_recommendations FOR INSERT WITH CHECK (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS ai_recommendations_update ON ai_recommendations;
+CREATE POLICY ai_recommendations_update
+  ON ai_recommendations FOR UPDATE USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  ) WITH CHECK (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS ai_recommendation_actions_read ON ai_recommendation_actions;
+CREATE POLICY ai_recommendation_actions_read
+  ON ai_recommendation_actions FOR SELECT USING (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS ai_recommendation_actions_write ON ai_recommendation_actions;
+CREATE POLICY ai_recommendation_actions_write
+  ON ai_recommendation_actions FOR INSERT WITH CHECK (
+    workspace_id IN (SELECT workspace_id FROM users WHERE user_id = auth.uid())
+  );
+
+-- >>> FILE: 0131_report_schedules.sql
+-- ============================================================================
+-- 0131_report_schedules.sql
+--
+-- Phase 2 item: scheduled CSV email export for the Custom Reports engine
+-- (analytics_reports, migration 0089). PDF/Excel export is explicitly out of
+-- scope here — this schema has no PDF/Excel-generation library installed
+-- yet, and adding one is a dependency decision, not something to slip in
+-- silently inside an analytics feature.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS report_schedules (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id   UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  report_id      UUID NOT NULL REFERENCES analytics_reports(id) ON DELETE CASCADE,
+  recipients     TEXT[] NOT NULL,
+  frequency      TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly')),
+  day_of_week    INT CHECK (day_of_week BETWEEN 0 AND 6),   -- 0=Sunday, only used when frequency='weekly'
+  day_of_month   INT CHECK (day_of_month BETWEEN 1 AND 28), -- capped at 28 so every month has this day; only used when frequency='monthly'
+  hour_utc       INT NOT NULL DEFAULT 8 CHECK (hour_utc BETWEEN 0 AND 23),
+  is_active      BOOLEAN NOT NULL DEFAULT true,
+  last_sent_at   TIMESTAMPTZ,
+  created_by     UUID REFERENCES users(user_id) ON DELETE SET NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_report_schedules_workspace ON report_schedules (workspace_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_report_schedules_report ON report_schedules (report_id);
+
+DROP TRIGGER IF EXISTS trg_report_schedules_updated ON report_schedules;
+CREATE TRIGGER trg_report_schedules_updated
+  BEFORE UPDATE ON report_schedules
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+ALTER TABLE report_schedules ENABLE ROW LEVEL SECURITY;
+
+-- Same workspace-scoped, all-member CRUD convention as analytics_reports
+-- itself (0089) — anyone who can see/build a report can schedule it.
+DROP POLICY IF EXISTS ws_select_report_schedules ON report_schedules;
+CREATE POLICY ws_select_report_schedules ON report_schedules FOR SELECT TO authenticated
+  USING (workspace_id = get_current_workspace_id());
+
+DROP POLICY IF EXISTS ws_insert_report_schedules ON report_schedules;
+CREATE POLICY ws_insert_report_schedules ON report_schedules FOR INSERT TO authenticated
+  WITH CHECK (workspace_id = get_current_workspace_id());
+
+DROP POLICY IF EXISTS ws_update_report_schedules ON report_schedules;
+CREATE POLICY ws_update_report_schedules ON report_schedules FOR UPDATE TO authenticated
+  USING (workspace_id = get_current_workspace_id());
+
+DROP POLICY IF EXISTS ws_delete_report_schedules ON report_schedules;
+CREATE POLICY ws_delete_report_schedules ON report_schedules FOR DELETE TO authenticated
+  USING (workspace_id = get_current_workspace_id());
+
+-- Optional Supabase pg_cron setup (replace URL and secret storage for the deployment):
+-- SELECT cron.schedule('nxelio-report-schedules-hourly', '0 * * * *',
+--   $$SELECT net.http_get(url := 'https://YOUR_APP_URL/api/analytics/report-schedules/cron',
+--     headers := jsonb_build_object('Authorization', 'Bearer YOUR_REPORT_SCHEDULE_CRON_SECRET'));$$);
+
+-- >>> FILE: 0132_dashboard_sharing.sql
+-- ============================================================================
+-- 0132_dashboard_sharing.sql
+--
+-- Phase 2 item: dashboard sharing/visibility (private vs. shared with the
+-- whole workspace) and a persisted global date-range filter applied across
+-- every non-system widget on a dashboard.
+--
+-- Widget resize is NOT a schema change — analytics_dashboard_widgets already
+-- has width/height (migration 0089); this phase wires an actual UI control
+-- to the width column (the only dimension the current 12-col grid renders).
+-- ============================================================================
+
+ALTER TABLE analytics_dashboards ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'workspace' CHECK (visibility IN ('private', 'workspace'));
+ALTER TABLE analytics_dashboards ADD COLUMN IF NOT EXISTS global_filters JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+-- Tighten analytics_dashboards' SELECT/UPDATE/DELETE policies (from 0089's
+-- generic per-table loop) to also respect visibility: a private dashboard
+-- is invisible to, and un-editable by, anyone but its creator.
+DROP POLICY IF EXISTS ws_select_analytics_dashboards ON analytics_dashboards;
+CREATE POLICY ws_select_analytics_dashboards ON analytics_dashboards FOR SELECT TO authenticated
+  USING (workspace_id = get_current_workspace_id() AND (visibility = 'workspace' OR created_by = auth.uid()));
+
+DROP POLICY IF EXISTS ws_update_analytics_dashboards ON analytics_dashboards;
+CREATE POLICY ws_update_analytics_dashboards ON analytics_dashboards FOR UPDATE TO authenticated
+  USING (workspace_id = get_current_workspace_id() AND (visibility = 'workspace' OR created_by = auth.uid()));
+
+DROP POLICY IF EXISTS ws_delete_analytics_dashboards ON analytics_dashboards;
+CREATE POLICY ws_delete_analytics_dashboards ON analytics_dashboards FOR DELETE TO authenticated
+  USING (workspace_id = get_current_workspace_id() AND (visibility = 'workspace' OR created_by = auth.uid()));
+
+-- Widgets follow their parent dashboard's visibility.
+DROP POLICY IF EXISTS ws_select_analytics_dashboard_widgets ON analytics_dashboard_widgets;
+CREATE POLICY ws_select_analytics_dashboard_widgets ON analytics_dashboard_widgets FOR SELECT TO authenticated
+  USING (
+    workspace_id = get_current_workspace_id()
+    AND EXISTS (SELECT 1 FROM analytics_dashboards d WHERE d.id = dashboard_id AND (d.visibility = 'workspace' OR d.created_by = auth.uid()))
+  );
+
+DROP POLICY IF EXISTS ws_update_analytics_dashboard_widgets ON analytics_dashboard_widgets;
+CREATE POLICY ws_update_analytics_dashboard_widgets ON analytics_dashboard_widgets FOR UPDATE TO authenticated
+  USING (
+    workspace_id = get_current_workspace_id()
+    AND EXISTS (SELECT 1 FROM analytics_dashboards d WHERE d.id = dashboard_id AND (d.visibility = 'workspace' OR d.created_by = auth.uid()))
+  );
+
+DROP POLICY IF EXISTS ws_delete_analytics_dashboard_widgets ON analytics_dashboard_widgets;
+CREATE POLICY ws_delete_analytics_dashboard_widgets ON analytics_dashboard_widgets FOR DELETE TO authenticated
+  USING (
+    workspace_id = get_current_workspace_id()
+    AND EXISTS (SELECT 1 FROM analytics_dashboards d WHERE d.id = dashboard_id AND (d.visibility = 'workspace' OR d.created_by = auth.uid()))
+  );
