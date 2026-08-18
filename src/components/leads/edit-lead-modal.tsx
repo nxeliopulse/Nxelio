@@ -163,13 +163,13 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
   if (!open) return null;
 
   return (
-    <>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/45 backdrop-blur-xs z-50 transition-opacity" onClick={onClose} />
+      <div className="lp-anim-fade fixed inset-0 bg-black/45 backdrop-blur-xs transition-opacity" onClick={onClose} />
 
-      {/* Right side drawer */}
-      <div className="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[720px] bg-white dark:bg-slate-950 shadow-2xl border-l border-slate-200 dark:border-slate-850 flex flex-col h-screen animate-in slide-in-from-right duration-250">
-        
+      {/* Centered dialog */}
+      <div className="lp-anim-scale relative w-full sm:w-[720px] max-w-[95vw] max-h-[90vh] bg-white dark:bg-slate-950 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-850 flex flex-col overflow-hidden">
+
         {/* Header */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 flex-shrink-0 flex items-center justify-between">
           <div>
@@ -354,6 +354,6 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
           </Button>
         </div>
       </div>
-    </>
+    </div>
   );
 }

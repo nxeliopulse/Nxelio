@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import {
   Pencil, MoreHorizontal, Mail, Building2, ExternalLink,
   Download, RefreshCw, ChevronDown, Star, Send, Share2, Heart, Plus, Paperclip,
-  Calendar, ArrowLeft, Clock, FileText, PhoneCall,
+  Calendar, ArrowLeft, Clock, FileText, PhoneCall, X,
   File as FileIcon, UserPlus, Users, Users2, CalendarPlus, ListTodo, ArrowUpDown,
   Briefcase,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
 import { EditAccountModal, type AccountOwnerOption } from "@/components/accounts/edit-account-modal";
 import { EditContactModal } from "@/components/contacts/edit-contact-modal";
@@ -80,6 +81,7 @@ export function AccountDetailView({
   const [isStarred, setIsStarred] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("activities");
   const [activitySort, setActivitySort] = useState<"newest" | "oldest">("newest");
+  const [viewingActivity, setViewingActivity] = useState<{ label: string; detail: string; time: string; icon: React.ComponentType<{ className?: string }>; color: string } | null>(null);
   const attachRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -441,7 +443,14 @@ export function AccountDetailView({
                       </div>
                       <div className="space-y-2">
                         {activityGroups[dateStr].map((item, i) => (
-                          <Card key={i} className="p-3 bg-slate-50/50 dark:bg-[var(--muted)] border-slate-100 dark:border-slate-800/80 shadow-none rounded-lg">
+                          <Card
+                            key={i}
+                            onClick={item.detail ? () => setViewingActivity({ ...item, detail: item.detail as string }) : undefined}
+                            className={cn(
+                              "p-3 bg-slate-50/50 dark:bg-[var(--muted)] border-slate-100 dark:border-slate-800/80 shadow-none rounded-lg",
+                              item.detail && "cursor-pointer hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors"
+                            )}
+                          >
                             <div className="flex items-start gap-3">
                               <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white", item.color)}>
                                 <item.icon className="h-4 w-4" />
@@ -451,6 +460,9 @@ export function AccountDetailView({
                                 {item.detail && <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-0.5 line-clamp-2">{item.detail}</p>}
                                 <p className="text-[10px] text-slate-400 mt-0.5">{formatDateTime(item.time)}</p>
                               </div>
+                              {item.detail && (
+                                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5">View</span>
+                              )}
                             </div>
                           </Card>
                         ))}
@@ -557,6 +569,30 @@ export function AccountDetailView({
         accountId={account.id}
         defaultTo={accountEmail}
       />
+
+      {/* Shows the full, untruncated detail/reason for an activity entry (note body,
+          meeting description, call notes) when the 2-line preview cuts it off. */}
+      <Modal open={!!viewingActivity} onClose={() => setViewingActivity(null)} size="sm">
+        {viewingActivity && (
+          <div className="p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className={cn("h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 text-white", viewingActivity.color)}>
+                <viewingActivity.icon className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">{viewingActivity.label}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(viewingActivity.time)}</p>
+              </div>
+              <button onClick={() => setViewingActivity(null)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--muted)] flex-shrink-0" aria-label="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[var(--muted)] p-3.5 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-600">
+              {viewingActivity.detail}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

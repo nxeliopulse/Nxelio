@@ -3,6 +3,7 @@ import { getLeads } from "@/lib/queries/leads";
 import { MeetingsView } from "@/components/meetings/meetings-view";
 import { hasFeature } from "@/lib/queries/subscriptions";
 import { LockedFeature } from "@/components/billing/locked-feature";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function MeetingsPage() {
   if (!(await hasFeature("meetings"))) return <LockedFeature feature="Meetings" />;
@@ -13,5 +14,7 @@ export default async function MeetingsPage() {
     company_name: l.company_name,
     email: l.email,
   }));
-  return <MeetingsView meetings={meetings} leads={leadOptions} />;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return <MeetingsView meetings={meetings} leads={leadOptions} userEmail={user?.email || ""} />;
 }

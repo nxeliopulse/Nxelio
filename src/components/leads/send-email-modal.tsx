@@ -1,6 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Send, Sparkles, Loader2, AlertCircle, Info, CheckCircle2, X, Lock } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Send, Sparkles, Loader2, AlertCircle, Info, CheckCircle2, X, Lock, Pencil } from "lucide-react";
 import { useFeatureKillSwitch } from "@/lib/hooks/use-feature-kill-switch";
 import { Modal } from "@/components/ui/modal";
 import { Input, Textarea } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { sendLeadEmail, hasSentEmailToLead } from "@/lib/email/actions";
 import { generateLeadOutreach } from "@/lib/ai/actions";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { useFeedback } from "@/components/ui/feedback";
+import { isValidEmail, EMAIL_ERROR } from "@/lib/validation";
 
 interface Props {
   open: boolean;
@@ -24,10 +25,18 @@ export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: P
   const { enabled: sendEmailEnabled } = useFeatureKillSwitch("send_email");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [toEmail, setToEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [alreadySent, setAlreadySent] = useState(false);
+  // Requires clicking Send twice when this lead's already been emailed before —
+  // first click shows the warning as an error instead of silently sending again.
+  const [resendConfirmed, setResendConfirmed] = useState(false);
+  const toEmailRef = useRef<HTMLInputElement>(null);
+  // Guards against a send firing twice — `sending` (React state) can't close this
+  // gap on its own since a second click can land before the disabled button re-renders.
+  const sendInFlightRef = useRef(false);
 
   // AI draft — asking for the user's own instruction before generating,
   // instead of always writing the same generic sequence-opener text.
@@ -43,12 +52,14 @@ export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: P
       // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the form each time the modal reopens, not a mount-only init
       setSubject("");
       setBody("");
+      setToEmail(leadEmail || "");
       setError(null);
+      setResendConfirmed(false);
       setDraftPromptOpen(false);
       setDraftInstruction("");
       hasSentEmailToLead(leadId).then(setAlreadySent).catch(() => setAlreadySent(false));
     }
-  }, [open, leadId]);
+  }, [open, leadId, leadEmail]);
 
   async function runDraft(instruction?: string) {
     setDrafting(true);
@@ -75,14 +86,36 @@ export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: P
   }
 
   async function handleSend() {
+    // A ref (not `sending` state) closes the double-click race: state only
+    // takes effect on the next render, so two clicks close together could
+    // both pass the disabled check and fire two real sends for one email.
+    if (sendInFlightRef.current) {
+      setError("Already sending this email — please wait for it to finish.");
+      return;
+    }
     setError(null);
     if (!subject.trim() || !body.trim()) {
       setError("Subject and body are required");
       return;
     }
+    const to = toEmail.trim();
+    if (!to) {
+      setError("Enter a recipient email address.");
+      return;
+    }
+    if (!isValidEmail(to)) {
+      setError(EMAIL_ERROR);
+      return;
+    }
+    if (alreadySent && !resendConfirmed) {
+      setError("You've already sent this lead an email. Click Send email again to send another anyway.");
+      setResendConfirmed(true);
+      return;
+    }
+    sendInFlightRef.current = true;
     setSending(true);
     try {
-      const res = await sendLeadEmail(leadId, subject.trim(), body.trim());
+      const res = await sendLeadEmail(leadId, subject.trim(), body.trim(), to);
       if (!res.ok) {
         setError(res.error || "Send failed");
         return;
@@ -98,11 +131,12 @@ export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: P
       setError(err instanceof Error ? err.message : "Send failed");
     } finally {
       setSending(false);
+      sendInFlightRef.current = false;
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={`Email ${leadName}`} description={leadEmail || "No email on file"} size="md" variant="side">
+    <Modal open={open} onClose={onClose} title={`Email ${leadName}`} description={leadEmail || "No email on file"} size="md">
       <div className="p-5 space-y-4">
         {alreadySent && (
           <Badge variant="info" className="inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> You already sent this lead an email</Badge>
@@ -114,9 +148,24 @@ export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: P
           </div>
         )}
 
-        <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1.5">
           <Info className="h-3.5 w-3.5 flex-shrink-0" />
-          To: {leadEmail || "—"}
+          <span className="flex-shrink-0 font-medium">To:</span>
+          <input
+            ref={toEmailRef}
+            value={toEmail}
+            onChange={(e) => setToEmail(e.target.value)}
+            placeholder="Recipient email address"
+            className="flex-1 min-w-0 bg-white border border-blue-200 rounded-md px-2 py-1 text-blue-800 placeholder-blue-300 outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+          />
+          <button
+            type="button"
+            onClick={() => toEmailRef.current?.focus()}
+            title="Edit recipient email"
+            className="flex-shrink-0 text-blue-400 hover:text-blue-600 p-0.5"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
         </div>
 
         <div>
@@ -212,7 +261,7 @@ export function SendEmailModal({ open, onClose, leadId, leadEmail, leadName }: P
         <Button variant="outline" onClick={onClose} disabled={sending}>Cancel</Button>
         <Button
           onClick={handleSend}
-          disabled={!sendEmailEnabled || sending || !leadEmail}
+          disabled={!sendEmailEnabled || sending || !toEmail.trim()}
           title={!sendEmailEnabled ? "Sending email has been temporarily disabled by the administrator." : undefined}
         >
           {sending
