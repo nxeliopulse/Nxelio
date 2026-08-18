@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, User, Mail } from "lucide-react";
@@ -14,9 +14,22 @@ export default function SignupPage() {
   const [error, setError]       = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
   const [agreed, setAgreed]     = useState(false);
+  // Shown exactly once, right after a brand-new account is created — never
+  // on login or any later visit, since it's driven directly by the signup
+  // success path rather than a persisted flag.
+  const [showWelcome, setShowWelcome] = useState(false);
+  const welcomeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (welcomeTimeoutRef.current) clearTimeout(welcomeTimeoutRef.current);
+  }, []);
 
   const passOk = form.password.length >= 8;
   const valid  = form.fullName.trim() !== "" && form.email.includes("@") && passOk && agreed;
+
+  function goToVerify() {
+    router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,7 +38,30 @@ export default function SignupPage() {
     const result = await signUpDirect({ email: form.email, password: form.password, fullName: form.fullName });
     setLoading(false);
     if (!result.ok) { setError(result.error || "Signup failed"); return; }
-    router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
+    setShowWelcome(true);
+    welcomeTimeoutRef.current = setTimeout(goToVerify, 3200);
+  }
+
+  if (showWelcome) {
+    return (
+      <div className="force-light-theme min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 sm:p-8">
+        <div className="flex items-center gap-1.5 mb-6">
+          <span className="h-2.5 w-2.5 rotate-45 bg-indigo-600 rounded-[2px] flex-shrink-0" />
+          <span className="text-sm font-semibold text-indigo-600">Welcome</span>
+        </div>
+        <div className="bg-white rounded-2xl border-2 border-indigo-300 shadow-sm p-10 flex flex-col items-center max-w-md w-full">
+          <img src="/welcome-animation.svg" alt="Welcome" className="w-full max-w-xs h-auto" />
+          <p className="text-sm text-slate-500 mt-6 text-center">Your account is ready. Setting up your workspace…</p>
+          <button
+            type="button"
+            onClick={goToVerify}
+            className="mt-6 px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -41,7 +77,7 @@ export default function SignupPage() {
         />
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {error && (
           <div className="flex items-start gap-2 rounded-lg p-3 text-sm"
             style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
