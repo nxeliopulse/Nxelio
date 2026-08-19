@@ -248,6 +248,15 @@ const RATE_LIMITS: Record<string, { windowMs: number; max: number }> = {
   assistant: { windowMs: 60_000, max: 20 }, // 20 messages / minute
   landing: { windowMs: 60_000, max: 10 },   // 10 messages / minute (unauthenticated)
   support: { windowMs: 60_000, max: 20 },
+  // Each request can enrich up to 25 leads via a paid external search + AI
+  // call — capped low since the per-request batch size already does most of
+  // the work; this just stops looping the endpoint to blow past that cap.
+  findCompaniesBulk: { windowMs: 60_000, max: 5 },
+  // Nominatim's usage policy caps external callers at ~1 request/second for
+  // the WHOLE app (not per user) — heavier automated use risks Nominatim
+  // blocking our server's IP entirely. Called with one fixed key regardless
+  // of caller, so this is a true app-wide gate, not a per-user one.
+  geoLookup: { windowMs: 1_000, max: 1 },
 };
 
 const buckets = new Map<string, RateBucket>();

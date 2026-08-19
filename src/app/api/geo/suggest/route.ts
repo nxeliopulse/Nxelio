@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { rateLimit } from "@/lib/ai/security";
 
 export async function GET(request: NextRequest) {
   const type = request.nextUrl.searchParams.get("type")?.trim();
@@ -7,6 +8,12 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get("state")?.trim();
 
   if (!q || q.length < 2) {
+    return NextResponse.json({ results: [] });
+  }
+
+  // Same app-wide Nominatim rate gate as /api/geo/search — shares the fixed
+  // "nominatim" key so both routes count against the one ~1 req/sec budget.
+  if (!rateLimit("nominatim", "geoLookup").allowed) {
     return NextResponse.json({ results: [] });
   }
 

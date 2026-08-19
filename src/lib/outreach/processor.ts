@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { substituteMergeTags } from "@/lib/email/merge-tags";
 import { sendEmail as brevoSendEmail } from "@/lib/email/resend";
 import { isSuppressed } from "@/lib/segments";
+import { consumeSendQuota } from "@/lib/outreach/send-quota";
 import {
   unipileConfigured,
   unipileSendEmail,
@@ -89,6 +90,17 @@ export async function processDueJobs(limit = 25): Promise<ProcessResult> {
     }
 
     const outcome = await executeJob(db, job, lead);
+
+    // Daily send limit reached (Settings > Email / LinkedIn — same gate the
+    // campaign sender already applies before each send, see
+    // campaign-scheduler.ts) — retry this exact job tomorrow rather than
+    // advancing the sequence, so the step is delayed, not silently dropped.
+    if (outcome.status === "deferred") {
+      await db.from("outreach_jobs").update({ run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), updated_at: nowIso }).eq("id", job.id);
+      result.skipped++;
+      continue;
+    }
+
     await logActivity(db, job, outcome.status, outcome.detail);
 
     if (outcome.status === "sent") {
@@ -103,14 +115,15 @@ export async function processDueJobs(limit = 25): Promise<ProcessResult> {
       await db.from("outreach_jobs").update({ status: "failed", last_error: outcome.detail, updated_at: nowIso }).eq("id", job.id);
       result.failed++;
     }
-    // every outcome advances the sequence so one step never strands the lead
+    // every outcome (other than a deferred retry, handled above) advances the
+    // sequence so one step never strands the lead
     await scheduleNextStep(db, job);
   }
 
   return result;
 }
 
-interface ExecOutcome { status: "sent" | "failed" | "skipped"; detail: string }
+interface ExecOutcome { status: "sent" | "failed" | "skipped" | "deferred"; detail: string }
 
 async function executeJob(db: Db, job: JobRow, lead: Record<string, unknown>): Promise<ExecOutcome> {
   const mergeLead = {
@@ -120,8 +133,24 @@ async function executeJob(db: Db, job: JobRow, lead: Record<string, unknown>): P
     email: (lead.email as string) ?? null,
     interest_area: (lead.interest_area as string) ?? null,
   };
+  // Only an email step's body can end up sent as HTML (via Unipile — see
+  // below); LinkedIn messages are always plain text. Checked on the
+  // TEMPLATE (before merge-tag substitution) so a lead's own data can't
+  // change this, and so lead-controlled values get escaped whenever they're
+  // about to land in HTML.
+  const bodyIsHtml = job.channel === "email" && /<[a-z][\s\S]*>/i.test(job.body || "");
   const subject = substituteMergeTags(job.subject || "", mergeLead);
-  const body = substituteMergeTags(job.body || "", mergeLead);
+  const body = substituteMergeTags(job.body || "", mergeLead, undefined, { escapeValues: bodyIsHtml });
+
+  // Daily sending limit (Settings > Email / LinkedIn, opt-in) — the campaign
+  // sender already checks this before each send (campaign-scheduler.ts); this
+  // job queue is the other of the app's two sending systems and needs the
+  // same gate. No limit configured for this channel → always granted, i.e.
+  // unchanged behavior.
+  const granted = await consumeSendQuota(db, job.workspace_id, job.channel, 1);
+  if (granted < 1) {
+    return { status: "deferred", detail: "Daily send limit reached — retrying tomorrow" };
+  }
 
   // Resolve the sending account (the job's, or the first connected one for the channel).
   const account = await resolveAccount(db, job);

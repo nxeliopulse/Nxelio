@@ -928,7 +928,14 @@ export default function CampaignBuilderPage() {
               (or a sample one), like the newsletter builder's Preview. */}
           {showPreview && (() => {
             const previewLead = audienceLeads[0] || { full_name: "Alex Morgan", company_name: "Acme Inc", industry: "Technology", email: "alex@acme-inc.example.com" };
+            // Plain JSX text (subject, LinkedIn body) auto-escapes, so those must
+            // stay unescaped here or entities would show literally (e.g. "&amp;").
+            // The email body below renders via dangerouslySetInnerHTML, so ITS
+            // merge-tag values must be escaped — a lead's own name/company data
+            // (from a public capture form) could otherwise inject a script into
+            // this preview for whoever on the team opens it.
             const tag = (s: string) => substituteMergeTags(s, previewLead, senderName);
+            const tagHtml = (s: string) => substituteMergeTags(s, previewLead, senderName, { escapeValues: true });
             return (
               <div className="fixed inset-0 z-50 bg-white flex flex-col">
                 <div className="px-6 sm:px-10 py-4 border-b border-slate-100 flex-shrink-0 flex items-center justify-between">
@@ -967,7 +974,7 @@ export default function CampaignBuilderPage() {
                               </div>
                               <div
                                 className="p-4 text-sm text-slate-700 [&_a]:text-blue-600 [&_a]:underline"
-                                dangerouslySetInnerHTML={{ __html: tag(s.body) || "<span class='text-slate-400 italic'>Empty</span>" }}
+                                dangerouslySetInnerHTML={{ __html: tagHtml(s.body) || "<span class='text-slate-400 italic'>Empty</span>" }}
                               />
                             </div>
                           )}

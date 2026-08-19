@@ -1,5 +1,6 @@
 "use server";
 import { aiChat, aiJson, aiConfigured } from "./client";
+import { scanPrompt } from "@/lib/ai/security";
 import { getLeadById, updateLead, getDistinctLeadValues } from "@/lib/queries/leads";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { NEWSLETTER_IMAGE_TOPICS, pickImageForTopic } from "@/lib/newsletter-image-topics";
@@ -386,9 +387,11 @@ Use 8-12 blocks total, and include AT LEAST one "banner" and at least two "secti
 // ============================================================================
 export async function improveEmail(currentBody: string, instruction: string): Promise<string> {
   await assertCredits();
+  const scan = scanPrompt(instruction);
+  if (scan.blocked) throw new Error("This instruction can't be processed — please rephrase it.");
   const result = await aiChat({
     system: "You are an expert sales copywriter. Rewrite the email per the instruction. Keep merge tags like {{firstName}}. Return only the rewritten email body, no preamble.",
-    prompt: `Current email:\n${currentBody}\n\nInstruction: ${instruction}`,
+    prompt: `Current email:\n${currentBody}\n\nInstruction: ${scan.safeText}`,
     temperature: 0.7,
   });
   await chargeCredits("email_improvement", 1);
@@ -408,6 +411,8 @@ export interface ComposeDraftContext {
 
 export async function generateComposeEmail(instruction: string, context?: ComposeDraftContext): Promise<{ subject: string; body: string }> {
   await assertCredits();
+  const scan = scanPrompt(instruction);
+  if (scan.blocked) throw new Error("This instruction can't be processed — please rephrase it.");
   const isReply = Boolean(context?.originalBody);
   const system = `You are an expert professional email writer inside a CRM inbox. Write clear, polite, concise business emails. ${isReply ? "You are drafting a REPLY — stay on-topic with the original message." : ""} Return ONLY valid JSON.`;
 
@@ -415,7 +420,7 @@ export async function generateComposeEmail(instruction: string, context?: Compos
     ? `\nOriginal message from ${context?.replyingToName || "the sender"}, subject "${context?.originalSubject || ""}":\n"""${context?.originalBody}"""\n`
     : "";
 
-  const prompt = `${threadBlock}Write ${isReply ? "a reply" : "an email"} based on this instruction: "${instruction || "Write a clear, friendly, professional email"}"${context?.recipientEmail ? `\nRecipient: ${context.recipientEmail}` : ""}
+  const prompt = `${threadBlock}Write ${isReply ? "a reply" : "an email"} based on this instruction: "${scan.safeText || "Write a clear, friendly, professional email"}"${context?.recipientEmail ? `\nRecipient: ${context.recipientEmail}` : ""}
 
 Return JSON in exactly this shape:
 { "subject": "...", "body": "..." }`;
@@ -483,6 +488,9 @@ function sanitizeRuleNode(node: unknown): RuleNode | null {
 
 export async function generateSegmentRules(prompt: string): Promise<SegmentRuleGenerationResult> {
   await assertCredits();
+  const scan = scanPrompt(prompt);
+  if (scan.blocked) throw new Error("This request can't be processed — please rephrase it.");
+  const safePrompt = scan.safeText;
 
   // A live field catalog — real fields, real operators, and real vocabulary
   // (picklist / distinct values already on leads) — so the model is grounded
@@ -547,7 +555,7 @@ Return JSON in exactly this shape:
 
   const raw = await aiJson<{ rule: unknown; confidence?: number; unsupported?: string[] }>({
     system,
-    prompt: `Convert this into a rule tree: "${prompt}"`,
+    prompt: `Convert this into a rule tree: "${safePrompt}"`,
     temperature: 0.3,
   });
   await chargeCredits("segment_rule_generation", 1);
