@@ -178,8 +178,15 @@ export function AccountDetailView({
       label: `${c.author_name || "Unknown"} logged a call — ${c.outcome}`,
       detail: c.notes,
       time: c.call_time,
-      icon: PhoneCall,
+      icon: Briefcase,
       color: "bg-green-600",
+    })),
+    ...deals.map((d) => ({
+      label: `Deal created: ${d.name}`,
+      detail: d.deal_value ? `$${d.deal_value.toLocaleString()}` : null,
+      time: d.created_at,
+      icon: Briefcase,
+      color: "bg-purple-500",
     })),
   ].sort((a, b) => (activitySort === "newest" ? 1 : -1) * (new Date(b.time).getTime() - new Date(a.time).getTime()));
 
@@ -327,9 +334,13 @@ export function AccountDetailView({
               <InfoRow label="Ownership" value={account.ownership} />
             </div>
 
-            {(account.ticker_symbol || account.description) && (
+            {(account.ticker_symbol || account.account_site || account.parent_account || account.account_number || account.sic_code || account.description) && (
               <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
                 <InfoRow label="Ticker symbol" value={account.ticker_symbol} />
+                <InfoRow label="Account Site" value={account.account_site} />
+                <InfoRow label="Parent Account" value={account.parent_account} />
+                <InfoRow label="Account Number" value={account.account_number} />
+                <InfoRow label="SIC Code" value={account.sic_code} />
                 {account.description && <InfoBlock label="Description" value={account.description} />}
               </div>
             )}

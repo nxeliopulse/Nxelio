@@ -26,6 +26,9 @@ export interface AccountRow {
   account_name: string;
   account_owner: string | null;
   parent_account_id: string | null;
+  account_site: string | null;
+  parent_account: string | null;
+  account_number: string | null;
   phone: string | null;
   fax: string | null;
   website: string | null;

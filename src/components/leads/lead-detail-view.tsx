@@ -604,10 +604,19 @@ export function LeadDetailView({
                   {meetings.length > 0 ? formatDate(meetings[0].start_at) : "27 Sep 2025, 11:45 PM"}
                 </p>
               </div>
-              <div className="flex justify-between items-center text-xs py-1">
-                <p className="text-slate-500 dark:text-slate-500 font-medium">Follow Up</p>
-                <p className="text-slate-800 dark:text-slate-700 font-semibold">27 Sep 2025</p>
-              </div>
+              {campaignLocked && (() => {
+                const activeCampaign = campaigns.find((c) => c.status === "Active" && c.next_follow_up_at);
+                if (!activeCampaign) return null;
+                return (
+                  <div className="flex justify-between items-center text-xs py-1">
+                    <p className="text-slate-500 dark:text-slate-500 font-medium">Follow Up</p>
+                    <p className="text-slate-800 dark:text-slate-700 font-semibold text-right">
+                      {formatDateTime(activeCampaign.next_follow_up_at!)}
+                      <span className="block text-[10px] text-slate-400 font-normal">{activeCampaign.campaign_name}</span>
+                    </p>
+                  </div>
+                );
+              })()}
               <div className="flex justify-between items-center text-xs py-1">
                 <p className="text-slate-500 dark:text-slate-500 font-medium">Source</p>
                 <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.source || "Google"}</p>
@@ -627,6 +636,58 @@ export function LeadDetailView({
                   <p className="text-slate-400 dark:text-slate-600 font-semibold">—</p>
                 )}
               </div>
+              {lead.website_url && (
+                <div className="flex justify-between items-center text-xs py-1">
+                  <p className="text-slate-500 dark:text-slate-500 font-medium">Website</p>
+                  <a href={lead.website_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1">
+                    {lead.website_url} <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
+              {lead.industry && (
+                <div className="flex justify-between items-center text-xs py-1">
+                  <p className="text-slate-500 dark:text-slate-500 font-medium">Industry</p>
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.industry}</p>
+                </div>
+              )}
+              {lead.interest_area && (
+                <div className="flex justify-between items-center text-xs py-1">
+                  <p className="text-slate-500 dark:text-slate-500 font-medium">Interest Area</p>
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.interest_area}</p>
+                </div>
+              )}
+              {lead.job_title && (
+                <div className="flex justify-between items-center text-xs py-1">
+                  <p className="text-slate-500 dark:text-slate-500 font-medium">Job Title</p>
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.job_title}</p>
+                </div>
+              )}
+              {lead.seniority && (
+                <div className="flex justify-between items-center text-xs py-1">
+                  <p className="text-slate-500 dark:text-slate-500 font-medium">Seniority</p>
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.seniority}</p>
+                </div>
+              )}
+              {lead.company_size && (
+                <div className="flex justify-between items-center text-xs py-1">
+                  <p className="text-slate-500 dark:text-slate-500 font-medium">Company Size</p>
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.company_size}</p>
+                </div>
+              )}
+              {lead.twitter_handle && (
+                <div className="flex justify-between items-center text-xs py-1">
+                  <p className="text-slate-500 dark:text-slate-500 font-medium">Twitter / X Handle</p>
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.twitter_handle}</p>
+                </div>
+              )}
+              {(lead.state || lead.country || lead.postal_code) && (
+                <div className="flex justify-between items-center text-xs py-1">
+                  <p className="text-slate-500 dark:text-slate-500 font-medium">State / Country / Postal</p>
+                  <p className="text-slate-800 dark:text-slate-700 font-semibold text-right">
+                    {[lead.state, lead.country, lead.postal_code].filter(Boolean).join(", ")}
+                  </p>
+                </div>
+              )}
               {lead.message && (
                 <div className="pt-2 text-xs border-t border-slate-100 dark:border-slate-800/80">
                   <p className="text-slate-500 dark:text-slate-500 font-medium mb-1">About</p>

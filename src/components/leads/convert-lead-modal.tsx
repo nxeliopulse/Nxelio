@@ -308,6 +308,27 @@ export function ConvertLeadModal({
                     </div>
                   </div>
                 )}
+                {contactMode === "existing" && matchedContact && (
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1 animate-in fade-in duration-200">
+                    <div>
+                      <label className={labelStyle}>First Name</label>
+                      <input className={`${fieldStyle} bg-slate-50 dark:bg-slate-800/60 cursor-not-allowed`} value={matchedContact.first_name} disabled readOnly />
+                    </div>
+                    <div>
+                      <label className={labelStyle}>Last Name</label>
+                      <input className={`${fieldStyle} bg-slate-50 dark:bg-slate-800/60 cursor-not-allowed`} value={matchedContact.last_name} disabled readOnly />
+                    </div>
+                    <div>
+                      <label className={labelStyle}>Email</label>
+                      <input className={`${fieldStyle} bg-slate-50 dark:bg-slate-800/60 cursor-not-allowed`} value={matchedContact.email || ""} disabled readOnly />
+                    </div>
+                    <div>
+                      <label className={labelStyle}>Phone</label>
+                      <input className={`${fieldStyle} bg-slate-50 dark:bg-slate-800/60 cursor-not-allowed`} value={matchedContact.phone || ""} disabled readOnly />
+                    </div>
+                    <p className="text-xs text-slate-400 sm:col-span-4 -mt-1">Linking to an existing contact — these fields come from that record and can&apos;t be edited here.</p>
+                  </div>
+                )}
               </div>
 
               {/* Step 3: Opportunity Selection */}

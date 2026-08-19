@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import DOMPurify from "isomorphic-dompurify";
 import { Crown, Building2, UserCheck, Users2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,15 @@ import {
   RelatedRecordsCard, FieldRenderer, type RelatedRecordItem,
 } from "@/components/records";
 import type { FieldDefinition } from "@/core/engine/types";
+
+/** Description comes from the same rich-text editor used for notes elsewhere
+ *  (add-deal-modal.tsx) — it's stored as HTML, so it must be sanitized and
+ *  rendered as HTML rather than escaped plain text, or literal tags show up
+ *  on screen. */
+const NOTES_SANITIZE_OPTS = { ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "span", "h1", "h2", "h3"], ALLOWED_ATTR: ["href", "target", "rel", "style"] };
+function safeNotesHtml(html: string): string {
+  return DOMPurify.sanitize(html, NOTES_SANITIZE_OPTS);
+}
 
 function stageBadgeVariant(stage: OpportunityStage): "default" | "blue" | "purple" | "warning" | "success" | "danger" {
   switch (stage) {
@@ -195,7 +205,16 @@ export function OpportunityDetailView({
                 <FieldRow label="Industry" value={account?.industry || null} />
                 <FieldRow label="Company Size" value={account?.employees ? <FieldRenderer definition={employeesFieldDef} value={account.employees} /> : null} />
                 <FieldRow label="Location" value={location} />
-                <FieldRow label="Description" value={opportunity.notes} className="md:col-span-2" />
+                <FieldRow label="Deal Source" value={opportunity.source} />
+                <FieldRow label="Priority" value={opportunity.priority} />
+                <FieldRow label="Tags" value={opportunity.tags} />
+                <FieldRow label="Project" value={opportunity.projects} />
+                <FieldRow label="Follow Up Date" value={opportunity.follow_up_date ? <FieldRenderer definition={dateFieldDef} value={opportunity.follow_up_date} /> : null} />
+                <FieldRow
+                  label="Description"
+                  value={opportunity.notes ? <div className="[&_p]:my-0 [&_a]:text-blue-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: safeNotesHtml(opportunity.notes) }} /> : null}
+                  className="md:col-span-2"
+                />
               </InfoGrid>
             )}
           </DetailCard>

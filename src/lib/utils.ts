@@ -6,16 +6,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Locale-pinned date formatting. Always pass dates through these helpers in
- * components that server-render: bare `toLocaleDateString()` uses the server's
- * locale on SSR and the visitor's locale on hydration, which causes React
- * hydration mismatches (e.g. "6/1/2026" vs "01/06/2026").
+ * Locale- AND timezone-pinned date formatting. Always pass dates through
+ * these helpers in components that server-render: bare `toLocaleDateString()`
+ * uses the server's locale/timezone on SSR and the visitor's on hydration,
+ * which causes React hydration mismatches (e.g. "6/1/2026" vs "01/06/2026",
+ * or a date landing on a different day near midnight if the server and
+ * visitor are in different timezones). Pinning both makes the string
+ * identical between server render and client hydration.
  */
 export function formatDate(date: string | Date | null | undefined) {
   if (!date) return "—";
   const d = typeof date === "string" ? new Date(date) : date;
   if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
 export function formatDateTime(date: string | Date | null | undefined) {
@@ -25,6 +28,7 @@ export function formatDateTime(date: string | Date | null | undefined) {
   return d.toLocaleString("en-US", {
     month: "short", day: "numeric", year: "numeric",
     hour: "numeric", minute: "2-digit", hour12: true,
+    timeZone: "UTC",
   });
 }
 

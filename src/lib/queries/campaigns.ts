@@ -55,6 +55,9 @@ export interface LeadCampaignSummary {
   campaign_name: string;
   status: string;
   approval_status: string;
+  /** Earliest still-pending outreach_jobs.run_at for this lead in this
+   *  campaign — the real "next follow-up" date, null if nothing is queued. */
+  next_follow_up_at: string | null;
 }
 
 /** Every campaign that has actually sent this lead something — derived from
@@ -72,11 +75,22 @@ export async function getCampaignsForLead(leadId: string): Promise<LeadCampaignS
   const campaignIds = [...new Set((rows || []).map((r) => r.campaign_id as string))];
   if (!campaignIds.length) return [];
 
-  const { data: campaigns } = await supabase
-    .from("campaigns")
-    .select("id, campaign_name, status, approval_status")
-    .in("id", campaignIds);
-  return (campaigns as LeadCampaignSummary[]) || [];
+  const [{ data: campaigns }, { data: enrollments }] = await Promise.all([
+    supabase.from("campaigns").select("id, campaign_name, status, approval_status").in("id", campaignIds),
+    supabase
+      .from("campaign_enrollments")
+      .select("campaign_id, next_execution_at")
+      .eq("lead_id", leadId)
+      .in("campaign_id", campaignIds)
+      .not("next_execution_at", "is", null),
+  ]);
+
+  const nextByCampaign = new Map<string, string>((enrollments || []).map((e) => [e.campaign_id as string, e.next_execution_at as string]));
+
+  return ((campaigns as Omit<LeadCampaignSummary, "next_follow_up_at">[]) || []).map((c) => ({
+    ...c,
+    next_follow_up_at: nextByCampaign.get(c.id) || null,
+  }));
 }
 
 /** Count of follow-up steps queued but not yet sent for this campaign. */
