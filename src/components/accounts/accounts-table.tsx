@@ -5,7 +5,8 @@ import Link from "next/link";
 import {
   Search, Plus, ChevronDown, Building2, ArrowUpDown, ArrowUp, ArrowDown, Settings2,
   Phone, Globe, MessageSquare, Eye, MoreVertical, Star, Calendar, Filter, Grid, List,
-  Pencil, RefreshCw, Download, FileText, FileSpreadsheet, Upload
+  Pencil, RefreshCw, Download, FileText, FileSpreadsheet, Upload,
+  CheckCircle2, UserPlus, Award, XCircle, type LucideIcon
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,10 @@ function accountTypeColor(value: string | null): string {
 export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[]; owners?: AccountOwnerOption[] }) {
   const { toast } = useFeedback();
   const router = useRouter();
-  const [nowMs] = useState(() => Date.now());
+  // Stat-card click filter — same pattern as the Prospects screen's cardFilter:
+  // a separate layer on top of the toolbar filters, so clicking a card narrows
+  // the table without the cards' own counts (based on `filtered`) collapsing.
+  const [cardFilter, setCardFilter] = useState<"all" | "Active" | "Prospect" | "Customer" | "Inactive">("all");
 
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -240,6 +244,15 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
     );
   });
 
+  // Narrows `filtered` further by whichever stat card is active. Kept separate
+  // from `filtered` so the cards' own counts always reflect the toolbar filters
+  // only, never the card selection itself.
+  const cardFiltered = filtered.filter((a) => {
+    if (cardFilter === "all") return true;
+    if (cardFilter === "Customer") return a.account_type === "Customer";
+    return a.account_status === cardFilter;
+  });
+
   /** Ordered coldest→hottest so ascending reads like a plain numeric scale (Cold, Warm, Hot)
    *  and descending flips to hottest-first; accounts with no rating rank lowest (sort first
    *  ascending, last descending) — same convention as every other column's empty values. */
@@ -304,14 +317,14 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
 
   // Apply sorting — per-column header arrows and the "Sort By" toolbar dropdown both just
   // drive sortKey/sortDir, so there is exactly one sort mechanism to keep in sync.
-  const sorted = [...filtered].sort((a, b) => (sortKey ? compareAccounts(a, b, sortKey, sortDir) : 0));
+  const sorted = [...cardFiltered].sort((a, b) => (sortKey ? compareAccounts(a, b, sortKey, sortDir) : 0));
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const paged = sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
-  const toggleAll = () => setSelected(selected.length === filtered.length ? [] : filtered.map((a) => a.id));
+  const toggleAll = () => setSelected(selected.length === cardFiltered.length ? [] : cardFiltered.map((a) => a.id));
 
   function openAccount(id: string) {
     router.push(`/accounts/${id}`);
@@ -448,39 +461,40 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
       </div>
 
       {(() => {
-        // "vs last 30 days" is computed from created_at, which is the only
-        // historical signal we actually have (no snapshot/audit table tracks
-        // status changes over time). For "Total" this is an exact comparison.
-        // For status/type-based counts it's an approximation — an account
-        // could have changed status since it was created — but it's a real,
-        // derived number rather than a fabricated one.
-        const cutoff = nowMs - 30 * 24 * 60 * 60 * 1000;
-        const pctChange = (matches: (a: AccountRow) => boolean) => {
-          const current = filtered.filter(matches).length;
-          const previous = filtered.filter((a) => matches(a) && new Date(a.created_at).getTime() <= cutoff).length;
-          if (previous === 0) return current > 0 ? 100 : 0;
-          return Math.round(((current - previous) / previous) * 100);
-        };
-        const cards = [
-          { label: "Total Accounts", value: filtered.length, pct: pctChange(() => true) },
-          { label: "Active Accounts", value: filtered.filter((a) => a.account_status === "Active").length, pct: pctChange((a) => a.account_status === "Active") },
-          { label: "Prospect Accounts", value: filtered.filter((a) => a.account_status === "Prospect").length, pct: pctChange((a) => a.account_status === "Prospect") },
-          { label: "Customer Accounts", value: filtered.filter((a) => a.account_type === "Customer").length, pct: pctChange((a) => a.account_type === "Customer") },
-          { label: "Inactive Accounts", value: filtered.filter((a) => a.account_status === "Inactive").length, pct: pctChange((a) => a.account_status === "Inactive") },
+        const cards: { label: string; value: number; icon: LucideIcon; accent: string; key: typeof cardFilter; ring: string; bg: string }[] = [
+          { label: "Total Accounts", value: filtered.length, icon: Building2, accent: "bg-amber-500", key: "all", ring: "ring-amber-500", bg: "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]" },
+          { label: "Active Accounts", value: filtered.filter((a) => a.account_status === "Active").length, icon: CheckCircle2, accent: "bg-emerald-500", key: "Active", ring: "ring-emerald-500", bg: "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" },
+          { label: "Prospect Accounts", value: filtered.filter((a) => a.account_status === "Prospect").length, icon: UserPlus, accent: "bg-blue-500", key: "Prospect", ring: "ring-blue-500", bg: "bg-blue-500/[0.04] dark:bg-blue-500/[0.08]" },
+          { label: "Customer Accounts", value: filtered.filter((a) => a.account_type === "Customer").length, icon: Award, accent: "bg-violet-500", key: "Customer", ring: "ring-violet-500", bg: "bg-violet-500/[0.04] dark:bg-violet-500/[0.08]" },
+          { label: "Inactive Accounts", value: filtered.filter((a) => a.account_status === "Inactive").length, icon: XCircle, accent: "bg-slate-400 dark:bg-slate-600", key: "Inactive", ring: "ring-slate-400", bg: "bg-slate-400/[0.06] dark:bg-slate-500/[0.1]" },
         ];
         return (
-          <Card className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800 mb-5 overflow-hidden">
-            {cards.map((s) => (
-              <div key={s.label} className="p-4 sm:p-5 min-w-0">
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
-                <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">{s.value.toLocaleString()}</p>
-                <p className={cn("text-[11px] font-semibold mt-1 flex items-center gap-0.5", s.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                  {s.pct >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                  {Math.abs(s.pct)}% vs last 30 days
-                </p>
-              </div>
-            ))}
-          </Card>
+          <div data-tour-id="accounts-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+            {cards.map((s) => {
+              const Icon = s.icon;
+              const active = cardFilter === s.key;
+              return (
+                <Card
+                  key={s.label}
+                  onClick={() => { setCardFilter(active ? "all" : s.key); setPage(0); }}
+                  className={cn(
+                    "p-4 sm:p-5 flex items-center gap-3 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
+                    active
+                      ? `ring-2 ${s.ring} ${s.bg} border-transparent shadow-xs`
+                      : "bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800"
+                  )}
+                >
+                  <span className={cn("h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0", s.accent)}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500 dark:text-slate-500 truncate">{s.label}</p>
+                    <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{s.value.toLocaleString()}</p>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
         );
       })()}
 
@@ -757,7 +771,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
         {/* Count Chip — matches leads-table.tsx's bordered icon+count pill */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">
           <Building2 className="h-3.5 w-3.5 text-slate-400" />
-          <span>{filtered.length} Account{filtered.length === 1 ? "" : "s"}</span>
+          <span>{cardFiltered.length} Account{cardFiltered.length === 1 ? "" : "s"}</span>
         </div>
 
         {/* Sort By Dropdown Button */}
@@ -896,7 +910,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                   <DataTableTh className="w-10 px-3 py-2.5">
                     <input
                       type="checkbox"
-                      checked={selected.length === filtered.length && filtered.length > 0}
+                      checked={selected.length === cardFiltered.length && cardFiltered.length > 0}
                       onChange={toggleAll}
                       className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
                     />
@@ -1291,7 +1305,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
 
       {/* Pagination component */}
       <div className="mt-5">
-        <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={(p) => setPage(p - 1)} />
+        <Pagination page={safePage + 1} totalPages={pageCount} pageSize={PAGE_SIZE} totalItems={cardFiltered.length} onPageChange={(p) => setPage(p - 1)} />
       </div>
 
       {/* Modal overlays */}
