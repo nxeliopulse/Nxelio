@@ -10,6 +10,7 @@ import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
+import { isValidEmail } from "@/lib/validation";
 
 export async function getEmailStatus() {
   return { configured: emailConfigured, domainVerified: emailDomainVerified };
@@ -37,15 +38,31 @@ export interface SendLeadEmailResult {
  * Sends an email to a lead via Brevo and logs it as an outbound message
  * in the inbox thread so it shows up in conversation history.
  */
-export async function sendLeadEmail(leadId: string, subject: string, body: string): Promise<SendLeadEmailResult> {
+export async function sendLeadEmail(leadId: string, subject: string, body: string, toEmailOverride?: string): Promise<SendLeadEmailResult> {
   if (!(await isFeatureEnabledForCurrentUser("send_email"))) {
     return { ok: false, error: "Sending email has been temporarily disabled by the administrator." };
   }
   const lead = await getLeadById(leadId);
   if (!lead) return { ok: false, error: "Lead not found" };
-  if (!lead.email) return { ok: false, error: "This lead has no email address" };
 
-  if (await isBlocked(lead.email)) {
+  // Whoever's composing may have edited the To address for this one send —
+  // that overrides the lead's stored email, but still needs its own validity
+  // and blocklist checks since it's no longer necessarily the lead's own address.
+  const recipientEmail = (toEmailOverride?.trim() || lead.email || "").trim();
+  if (!recipientEmail) return { ok: false, error: "This lead has no email address" };
+  if (!isValidEmail(recipientEmail)) return { ok: false, error: "That doesn't look like a valid email address" };
+
+  // A prior send to this lead's own address bounced (leads.email_bounced, set by
+  // the Brevo webhook — see src/app/api/brevo/webhook/route.ts). Campaign sends
+  // already refuse to retry a bounced address via isSuppressed(); this one-off
+  // compose path never did. Only blocks resending to the SAME address that
+  // bounced — editing the To field to a different address is exactly the fix
+  // we're asking for, so that's allowed straight through.
+  if (lead.email_bounced && recipientEmail.toLowerCase() === (lead.email || "").trim().toLowerCase()) {
+    return { ok: false, error: "This email address bounced last time. Update it to a different email address before sending again." };
+  }
+
+  if (await isBlocked(recipientEmail)) {
     return { ok: false, error: "This recipient is on your blocklist" };
   }
 
@@ -78,7 +95,7 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
     .maybeSingle();
 
   const result = await sendEmail({
-    to: lead.email,
+    to: recipientEmail,
     subject: finalSubject,
     text: finalBody,
     fromName,
@@ -98,12 +115,23 @@ export async function sendLeadEmail(leadId: string, subject: string, body: strin
     is_read: true,
   });
 
+  // Also log an EMAIL_SENT activity — campaign sends already do this
+  // (campaign-scheduler.ts), but this one-off compose path never did, so a
+  // manually-sent email silently never appeared on the lead's Activities tab
+  // and was invisible to every "contacted" / engagement analytics query that
+  // reads lead_activities for activity_type = EMAIL_SENT.
+  await supabase.from("lead_activities").insert({
+    lead_id: leadId,
+    activity_type: "EMAIL_SENT",
+    metadata: { subject: finalSubject, body: finalBody, to: recipientEmail },
+  });
+
   revalidatePath("/inbox");
   revalidatePath(`/leads/${leadId}`);
 
   await notifyCurrentUser({
     type: "email",
-    title: `Email sent to ${lead.full_name || lead.company_name || lead.email}`,
+    title: `Email sent to ${lead.full_name || lead.company_name || recipientEmail}`,
     message: finalSubject,
     link: `/leads/${leadId}`,
   });

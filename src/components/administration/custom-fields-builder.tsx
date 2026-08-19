@@ -26,10 +26,14 @@ export function CustomFieldsBuilder() {
   const schema = getObjectSchema(selectedObject) || CRMObjectRegistry.lead;
   const [fields, setFields] = useState<FieldDefinition[]>(Object.values(schema.fields));
 
-  // Sync schema fields when object selection changes
+  // Sync schema fields when object selection changes. Not a pure derivation
+  // (handleAddField accumulates local, unsaved fields on top of the schema
+  // baseline), so switching objects needs to reset that local list back to
+  // the new object's schema fields.
   useEffect(() => {
     const targetSchema = getObjectSchema(selectedObject);
     if (targetSchema) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets local unsaved field edits when the selected object changes
       setFields(Object.values(targetSchema.fields));
     }
   }, [selectedObject]);

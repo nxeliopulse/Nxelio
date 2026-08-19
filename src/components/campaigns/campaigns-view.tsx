@@ -437,7 +437,7 @@ export function CampaignsView({
           return (
             <Card
               key={s.label}
-              onClick={clickable ? () => { setCardFilter((prev) => prev === s.key ? "all" : (s.key as any)); } : undefined}
+              onClick={clickable ? () => { setCardFilter((prev) => prev === s.key ? "all" : (s.key as typeof cardFilter)); } : undefined}
               className={cn(
                 "p-4 sm:p-5 flex items-center gap-3",
                 clickable && "cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",

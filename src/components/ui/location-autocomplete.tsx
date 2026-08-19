@@ -34,6 +34,7 @@ interface LocationAutocompleteProps {
   className?: string;
   countryContext?: string;
   stateContext?: string;
+  label?: string;
 }
 
 export function LocationAutocomplete({
@@ -44,6 +45,7 @@ export function LocationAutocomplete({
   className = "",
   countryContext = "",
   stateContext = "",
+  label,
 }: LocationAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
@@ -53,6 +55,7 @@ export function LocationAutocomplete({
 
   // Sync state with parent value updates
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resyncs the editable local buffer when the parent resets `value` externally (e.g. form clear/reset)
     setInputValue(value || "");
   }, [value]);
 
@@ -131,6 +134,7 @@ export function LocationAutocomplete({
         placeholder={placeholder}
         autoComplete="off"
         className={className}
+        label={label}
       />
       {open && suggestions.length > 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg max-h-52 overflow-y-auto">

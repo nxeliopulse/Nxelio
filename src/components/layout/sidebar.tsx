@@ -197,11 +197,6 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
             suppressHydrationWarning
             className={cn("flex items-center gap-2.5 group w-full", collapsed && "justify-center")}
           >
-            <span className="relative h-9 w-9 rounded-xl bg-white flex items-center justify-center font-bold flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
-              <LogoMark className="h-full w-full transition-opacity duration-200 group-hover:opacity-0" />
-              <PanelLeftClose className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", collapsed && "hidden")} />
-              <PanelLeftOpen className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", !collapsed && "hidden")} />
-            </span>
             {!collapsed && (
               <span className="flex flex-col leading-tight whitespace-nowrap text-left">
                 <span className="font-bold text-white text-[15px] tracking-tight">
@@ -210,6 +205,11 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
                 <span className="text-[11px] text-white/80 font-bold uppercase tracking-wider mt-0.5">AI NURTURE</span>
               </span>
             )}
+            <span className="relative h-9 w-9 rounded-xl bg-white flex items-center justify-center font-bold flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
+              <LogoMark className="h-full w-full transition-opacity duration-200 group-hover:opacity-0" />
+              <PanelLeftClose className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", collapsed && "hidden")} />
+              <PanelLeftOpen className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", !collapsed && "hidden")} />
+            </span>
           </button>
         </div>
 

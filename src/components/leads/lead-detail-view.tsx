@@ -6,12 +6,14 @@ import {
   ArrowLeft, X, Mail, Phone, Globe, Calendar, Star, Send, Building2,
   Target, Users, BarChart3, FileDown, MailOpen, Lock, ThumbsUp,
   Mouse, Briefcase, Pencil, CalendarDays, ChevronDown, ChevronUp, Paperclip, Trash2,
-  RefreshCw, Sparkles, Filter, CheckCircle2, UserCheck, Plus, ExternalLink, History as HistoryIcon, Megaphone,
+  RefreshCw, Sparkles, Filter, CheckCircle2, UserCheck, Plus, ExternalLink, History as HistoryIcon, Megaphone, Info,
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
+import { Textarea } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
 import { ProspectScoreTab } from "@/components/leads/tabs/prospect-score";
 import { SendEmailModal } from "@/components/leads/send-email-modal";
@@ -27,6 +29,7 @@ import type { LeadCampaignSummary } from "@/lib/queries/campaigns";
 import { createLeadNote, deleteLeadNote, type LeadNoteRow } from "@/lib/queries/lead-notes";
 import { formatDate, formatDateTime, cn } from "@/lib/utils";
 import { allowedNextStatuses, isManualStatusTransitionAllowed, statusTransitionError } from "@/lib/leads/status-flow";
+import { notifyUser } from "@/lib/queries/notifications";
 
 function money(n: number): string {
   return "$" + Math.round(n).toLocaleString("en-US");
@@ -36,6 +39,18 @@ function money(n: number): string {
 function initialsFor(name: string | null | undefined): string {
   if (!name) return "—";
   return name.split(" ").filter(Boolean).map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+}
+
+/** Same real status vocabulary/colors as the Prospects table's StatusPill. */
+const STATUS_PILL_STYLE: Record<string, string> = {
+  New: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400",
+  Contacted: "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400",
+  Qualified: "bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400",
+  Nurturing: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400",
+  Converted: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400",
+};
+function statusPillStyle(status: string): string {
+  return STATUS_PILL_STYLE[status] || "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-600";
 }
 
 export interface Activity {
@@ -130,7 +145,12 @@ export function LeadDetailView({
   // Tab controls & state
   const [activeTab, setActiveTab] = useState<"activities" | "notes" | "calls" | "email">("activities");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [viewingEmail, setViewingEmail] = useState<{ subject?: string; body?: string; to?: string; sentAt: string } | null>(null);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState("");
+  const [statusReason, setStatusReason] = useState("");
+  const [notifyOwner, setNotifyOwner] = useState(true);
+  const [statusSaving, setStatusSaving] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   // Priority/Tags/Projects — persisted on the lead row itself (see
   // 0117_lead_tags_priority_projects.sql). Previously these were fake:
@@ -217,35 +237,51 @@ export function LeadDetailView({
   const statusDeadEnd = lead.status === "Converted";
   const statusLocked = campaignLocked || statusDeadEnd;
 
-  // Update lead status — requires a reason, logged with who made the change.
-  // Rejects anything status-flow.ts doesn't allow (e.g. jumping straight to
-  // "Converted", or a status not reachable from the current one) — this is
-  // enforced again server-side in updateLeadStatus(), this is just the
-  // immediate/clear UI-level rejection.
-  const handleStatusUpdate = async (newStatus: string) => {
+  // Opens the status-change modal, pre-selecting the first status this lead is
+  // actually allowed to move to next (status-flow.ts's real transition rules).
+  const openStatusModal = () => {
     if (statusLocked) return;
-    setStatusDropdownOpen(false);
-    if (newStatus === lead.status) return;
-    if (!isManualStatusTransitionAllowed(lead.status, newStatus)) {
-      toast(statusTransitionError(lead.status, newStatus), "error");
+    const next = allowedNextStatuses(lead.status);
+    if (next.length === 0) return;
+    setPendingStatus(next[0]);
+    setStatusReason("");
+    setNotifyOwner(true);
+    setStatusModalOpen(true);
+  };
+
+  // Confirms the pending status change — requires a reason, logged with who
+  // made the change. Rejects anything status-flow.ts doesn't allow (e.g.
+  // jumping straight to "Converted") — enforced again server-side in
+  // updateLeadStatus(), this is just the immediate/clear UI-level rejection.
+  const confirmStatusChange = async () => {
+    if (!pendingStatus || pendingStatus === lead.status) { setStatusModalOpen(false); return; }
+    if (!isManualStatusTransitionAllowed(lead.status, pendingStatus)) {
+      toast(statusTransitionError(lead.status, pendingStatus), "error");
       return;
     }
-    const reason = await prompt({
-      title: `Change status to "${newStatus}"?`,
-      message: "Add a short reason for this change — it's saved to this lead's activity history.",
-      label: "Reason",
-      placeholder: "e.g. Replied to outreach and asked for a demo",
-      confirmLabel: "Update status",
-      required: true,
-    });
-    if (reason === null) return; // canceled
+    if (!statusReason.trim()) {
+      toast("Add a reason for this change.", "error");
+      return;
+    }
+    setStatusSaving(true);
     try {
-      await updateLeadStatus(lead.id, newStatus, reason);
-      setLead((l) => ({ ...l, status: newStatus }));
-      toast(`Status updated to ${newStatus}.`, "success");
+      await updateLeadStatus(lead.id, pendingStatus, statusReason.trim());
+      if (notifyOwner && lead.owner_id) {
+        await notifyUser(lead.owner_id, {
+          type: "lead_status_changed",
+          title: `${displayName || "A lead"} moved to ${pendingStatus}`,
+          message: statusReason.trim(),
+          link: `/leads/${lead.id}`,
+        });
+      }
+      setLead((l) => ({ ...l, status: pendingStatus }));
+      toast(`Status updated to ${pendingStatus}.`, "success");
+      setStatusModalOpen(false);
       router.refresh();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Couldn't update status.", "error");
+    } finally {
+      setStatusSaving(false);
     }
   };
 
@@ -309,7 +345,12 @@ export function LeadDetailView({
         label,
         time: relativeTime(a.created_at),
         iso: a.created_at,
-        timeFormatted: new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        // Locale + timeZone pinned to match formatDate/formatDateTime — an
+        // unpinned toLocaleTimeString([], ...) uses the server's locale/zone
+        // during SSR and the visitor's during hydration, which mismatches
+        // and crashes React with a hydration error (#418).
+        timeFormatted: new Date(a.created_at).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', timeZone: "UTC" }),
+        metadata: a.metadata,
       };
     }),
     {
@@ -318,7 +359,8 @@ export function LeadDetailView({
       icon: Users,
       time: relativeTime(lead.created_at),
       iso: lead.created_at,
-      timeFormatted: new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timeFormatted: new Date(lead.created_at).toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', timeZone: "UTC" }),
+      metadata: null as Record<string, unknown> | null,
     },
   ];
 
@@ -326,7 +368,7 @@ export function LeadDetailView({
   const groupedTimeline: Record<string, typeof timeline> = {};
   timeline.forEach((item) => {
     const dateObj = new Date(item.iso);
-    const dateStr = dateObj.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+    const dateStr = dateObj.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
     if (!groupedTimeline[dateStr]) {
       groupedTimeline[dateStr] = [];
     }
@@ -513,45 +555,26 @@ export function LeadDetailView({
               <Lock className="h-3.5 w-3.5 flex-shrink-0" /> Private
             </span>
 
-            <div className="relative">
-              <button
-                onClick={() => !statusLocked && setStatusDropdownOpen(!statusDropdownOpen)}
-                disabled={statusLocked}
-                title={
-                  statusDeadEnd
-                    ? "This lead is Converted — status can't be changed manually anymore."
-                    : campaignLocked
-                    ? "This lead is part of a running campaign — status is locked until it finishes or is paused."
-                    : undefined
-                }
-                className={cn(
-                  "py-1 px-3 text-xs rounded-md font-semibold flex items-center gap-1 shadow-sm transition-colors",
-                  statusLocked
-                    ? "bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                    : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
-                )}
-              >
-                {statusLocked ? <Lock className="h-3.5 w-3.5 flex-shrink-0" /> : <ThumbsUp className="h-3.5 w-3.5 flex-shrink-0" />} {lead.status || "Status"}{" "}
-                {!statusLocked && <ChevronDown className="h-3 w-3 text-emerald-100 flex-shrink-0" />}
-              </button>
-
-              {statusDropdownOpen && !statusLocked && (
-                <div className="absolute right-0 mt-1.5 w-36 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg py-1 z-50 text-xs">
-                  {allowedNextStatuses(lead.status).map((st) => (
-                    <button
-                      key={st}
-                      onClick={() => handleStatusUpdate(st)}
-                      className={cn(
-                        "w-full text-left px-3 py-2 font-medium hover:bg-slate-50 dark:hover:bg-[var(--muted)]",
-                        lead.status === st ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-600"
-                      )}
-                    >
-                      {st}
-                    </button>
-                  ))}
-                </div>
+            <button
+              onClick={openStatusModal}
+              disabled={statusLocked}
+              title={
+                statusDeadEnd
+                  ? "This lead is Converted — status can't be changed manually anymore."
+                  : campaignLocked
+                  ? "This lead is part of a running campaign — status is locked until it finishes or is paused."
+                  : undefined
+              }
+              className={cn(
+                "py-1 px-3 text-xs rounded-md font-semibold flex items-center gap-1 shadow-sm transition-colors",
+                statusLocked
+                  ? "bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
               )}
-            </div>
+            >
+              {statusLocked ? <Lock className="h-3.5 w-3.5 flex-shrink-0" /> : <ThumbsUp className="h-3.5 w-3.5 flex-shrink-0" />} {lead.status || "Status"}{" "}
+              {!statusLocked && <ChevronDown className="h-3 w-3 text-emerald-100 flex-shrink-0" />}
+            </button>
 
             {/* Quick action triggers */}
             <Button size="sm" onClick={() => setEditOpen(true)} variant="outline" className="text-xs font-semibold gap-1 py-1 px-2.5 h-auto">
@@ -601,7 +624,7 @@ export function LeadDetailView({
               <div className="flex justify-between items-center text-xs py-1">
                 <p className="text-slate-500 dark:text-slate-500 font-medium">Due Date</p>
                 <p className="text-slate-800 dark:text-slate-700 font-semibold">
-                  {meetings.length > 0 ? formatDate(meetings[0].start_at) : "27 Sep 2025, 11:45 PM"}
+                  {meetings.length > 0 ? formatDate(meetings[0].start_at) : "—"}
                 </p>
               </div>
               {campaignLocked && (() => {
@@ -621,16 +644,18 @@ export function LeadDetailView({
                 <p className="text-slate-500 dark:text-slate-500 font-medium">Source</p>
                 <p className="text-slate-800 dark:text-slate-700 font-semibold">{lead.source || "Google"}</p>
               </div>
-              <div className="flex justify-between items-center text-xs py-1">
-                <p className="text-slate-500 dark:text-slate-500 font-medium">LinkedIn</p>
+              <div className="flex justify-between items-center gap-3 text-xs py-1">
+                <p className="text-slate-500 dark:text-slate-500 font-medium flex-shrink-0">LinkedIn</p>
                 {lead.linkedin ? (
                   <a
                     href={lead.linkedin}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1"
+                    title={lead.linkedin}
+                    className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1 min-w-0"
                   >
-                    View Profile <ExternalLink className="h-3 w-3" />
+                    <span className="truncate">{lead.linkedin}</span>
+                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
                   </a>
                 ) : (
                   <p className="text-slate-400 dark:text-slate-600 font-semibold">—</p>
@@ -904,8 +929,17 @@ export function LeadDetailView({
                             {groupedTimeline[dateStr].map((item, index) => {
                               const TimelineIcon = item.icon;
                               const styleMeta = getTimelineStyle(item.label);
+                              const emailMeta = item.metadata as { subject?: string; body?: string; to?: string } | null;
+                              const hasEmailContent = Boolean(emailMeta?.body || emailMeta?.subject);
                               return (
-                                <Card key={index} className="p-3 bg-slate-50/50 dark:bg-[var(--muted)] border-slate-100 dark:border-slate-800/80 shadow-none rounded-lg">
+                                <Card
+                                  key={index}
+                                  onClick={hasEmailContent ? () => setViewingEmail({ ...emailMeta, sentAt: item.iso }) : undefined}
+                                  className={cn(
+                                    "p-3 bg-slate-50/50 dark:bg-[var(--muted)] border-slate-100 dark:border-slate-800/80 shadow-none rounded-lg",
+                                    hasEmailContent && "cursor-pointer hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors"
+                                  )}
+                                >
                                   <div className="flex items-start">
                                     <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white mr-3", styleMeta.bg)}>
                                       <TimelineIcon className="h-4 w-4" />
@@ -916,6 +950,9 @@ export function LeadDetailView({
                                       </h6>
                                       <p className="text-[10px] text-slate-400 mt-0.5">{item.timeFormatted || item.time}</p>
                                     </div>
+                                    {hasEmailContent && (
+                                      <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5">View</span>
+                                    )}
                                   </div>
                                 </Card>
                               );
@@ -990,8 +1027,8 @@ export function LeadDetailView({
                     </div>
                   </div>
 
-                  {/* Notes List */}
-                  <div className="space-y-3 pt-1">
+                  {/* Notes List — scrolls on its own once it grows past ~3 notes, so the add-note box above stays put */}
+                  <div className="space-y-3 pt-1 max-h-[260px] overflow-y-auto pr-1">
                     {notes.length === 0 ? (
                       <p className="text-xs text-slate-400 italic text-center py-6">No notes added yet.</p>
                     ) : (
@@ -1166,6 +1203,123 @@ export function LeadDetailView({
         onClose={() => setEditOpen(false)}
         lead={lead}
       />
+
+      {/* Status change — reason is logged to this lead's activity history, same as before, just a richer form. */}
+      <Modal open={statusModalOpen} onClose={() => setStatusModalOpen(false)} size="sm">
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
+              {initialsFor(displayName)}
+            </div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              {displayName} <span className="text-slate-300 dark:text-slate-600">·</span> Prospect
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Move this lead&apos;s status</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">
+              Choose the new status and let the team know why — it&apos;s logged to this lead&apos;s activity history.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[var(--muted)] p-3">
+            <span className={cn("px-3 py-1 rounded-full text-xs font-bold flex-shrink-0", statusPillStyle(lead.status))}>
+              {lead.status}
+            </span>
+            <ArrowLeft className="h-3.5 w-3.5 text-slate-300 rotate-180 flex-shrink-0" />
+            <select
+              value={pendingStatus}
+              onChange={(e) => setPendingStatus(e.target.value)}
+              className={cn("flex-1 min-w-0 px-3 py-1 rounded-full text-xs font-bold border-none outline-none cursor-pointer", statusPillStyle(pendingStatus))}
+            >
+              {allowedNextStatuses(lead.status).map((st) => (
+                <option key={st} value={st}>{st}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-600 mb-1.5">Reason <span className="text-slate-400 font-normal">(recommended)</span></label>
+            <Textarea
+              rows={2}
+              value={statusReason}
+              onChange={(e) => setStatusReason(e.target.value)}
+              placeholder="e.g. Replied to outreach and asked for a demo next week"
+            />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {["Went cold after demo", "Asked to follow up later", "Budget on hold"].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setStatusReason(r)}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-500 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {lead.owner_id && (
+            <label className="flex items-start gap-2.5 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={notifyOwner}
+                onChange={(e) => setNotifyOwner(e.target.checked)}
+                className="mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 flex-shrink-0"
+              />
+              <span className="text-xs text-amber-900 dark:text-amber-300">
+                <span className="font-bold">Notify account owner</span> — send {history?.createdByName || "the owner"} a heads-up that this lead moved to {pendingStatus || "…"}.
+              </span>
+            </label>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={() => setStatusModalOpen(false)} disabled={statusSaving}>Cancel</Button>
+            <Button onClick={confirmStatusChange} disabled={statusSaving} className="bg-teal-600 hover:bg-teal-700 text-white font-bold">
+              {statusSaving ? "Updating…" : "Update status"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Shows the actual subject/message of a "Sent email" activity when clicked —
+          styled to match the compose-email popup (blue To: box, Subject/Message layout)
+          since this is that same popup's read-only mirror. */}
+      <Modal open={!!viewingEmail} onClose={() => setViewingEmail(null)} size="sm">
+        {viewingEmail && (
+          <div className="p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="h-9 w-9 rounded-full bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+                <Send className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white truncate">{viewingEmail.subject || "(no subject)"}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {new Date(viewingEmail.sentAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })}
+                </p>
+              </div>
+              <button onClick={() => setViewingEmail(null)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-[var(--muted)] flex-shrink-0" aria-label="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-lg px-3 py-2">
+              <Info className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="font-medium flex-shrink-0">To:</span>
+              <span className="font-semibold truncate">{viewingEmail.to || "—"}</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Message</label>
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[var(--muted)] p-3.5 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-600">
+                {viewingEmail.body || "(no message body)"}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

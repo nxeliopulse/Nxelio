@@ -380,7 +380,7 @@ export function CampaignDetailView({
               return (
                 <Card
                   key={t.label}
-                  onClick={() => setActivityFilter(t.key as any)}
+                  onClick={() => setActivityFilter(t.key as typeof activityFilter)}
                   className={cn(
                     "p-4 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
                     active

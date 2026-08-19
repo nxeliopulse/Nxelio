@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 
 export interface RecordSectionProps {
   section: SectionDefinition;
-  record: Record<string, any>;
+  record: Record<string, unknown>;
   mode?: "view" | "edit";
-  onChangeField?: (fieldName: string, value: any) => void;
+  onChangeField?: (fieldName: string, value: unknown) => void;
   className?: string;
 }
 

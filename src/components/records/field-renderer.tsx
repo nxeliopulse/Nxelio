@@ -36,9 +36,9 @@ function formatCurrency(n: number | string): string {
 
 export interface FieldRendererProps {
   definition: FieldDefinition;
-  value: any;
+  value: unknown;
   mode?: "view" | "edit" | "inline";
-  onChange?: (newValue: any) => void;
+  onChange?: (newValue: unknown) => void;
   className?: string;
 }
 
@@ -56,7 +56,7 @@ export function FieldRenderer({
       case "phone":
         return (
           <PhoneFieldEditor
-            value={value ?? ""}
+            value={(value as string) ?? ""}
             onChange={onChange}
             disabled={definition.readOnly}
             className={className}
@@ -68,7 +68,7 @@ export function FieldRenderer({
         return (
           <Input
             type={definition.type === "email" ? "email" : "text"}
-            value={value ?? ""}
+            value={(value as string | number) ?? ""}
             placeholder={definition.placeholder || definition.label}
             onChange={(e) => onChange?.(e.target.value)}
             disabled={definition.readOnly}
@@ -80,7 +80,7 @@ export function FieldRenderer({
         return (
           <Input
             type="number"
-            value={value ?? ""}
+            value={(value as string | number) ?? ""}
             placeholder={definition.placeholder || definition.label}
             onChange={(e) => onChange?.(e.target.value ? parseFloat(e.target.value) : null)}
             disabled={definition.readOnly}
@@ -92,7 +92,7 @@ export function FieldRenderer({
         return (
           <Input
             type={definition.type === "date" ? "date" : "datetime-local"}
-            value={value ?? ""}
+            value={(value as string) ?? ""}
             onChange={(e) => onChange?.(e.target.value)}
             disabled={definition.readOnly}
             className={className}
@@ -102,7 +102,7 @@ export function FieldRenderer({
       case "badge":
         return (
           <select
-            value={value ?? ""}
+            value={(value as string) ?? ""}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange?.(e.target.value)}
             disabled={definition.readOnly}
             className={cn(
@@ -134,7 +134,7 @@ export function FieldRenderer({
       default:
         return (
           <Input
-            value={value ?? ""}
+            value={(value as string | number) ?? ""}
             onChange={(e) => onChange?.(e.target.value)}
             disabled={definition.readOnly}
             className={className}
@@ -152,14 +152,14 @@ export function FieldRenderer({
     case "currency":
       return (
         <span className={cn("text-sm font-medium text-slate-900 dark:text-slate-800", className)}>
-          {formatCurrency(value)}
+          {formatCurrency(value as number | string)}
         </span>
       );
 
     case "number":
       return (
         <span className={cn("text-sm font-medium text-slate-900 dark:text-slate-800", className)}>
-          {typeof value === "number" ? value.toLocaleString() : value}
+          {typeof value === "number" ? value.toLocaleString() : (value as React.ReactNode)}
         </span>
       );
 
@@ -170,7 +170,7 @@ export function FieldRenderer({
           className={cn("inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400", className)}
         >
           <Mail className="h-3.5 w-3.5 flex-shrink-0" />
-          <span className="truncate">{value}</span>
+          <span className="truncate">{value as React.ReactNode}</span>
         </a>
       );
 
@@ -181,36 +181,38 @@ export function FieldRenderer({
           className={cn("inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400", className)}
         >
           <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-          <span>{value}</span>
+          <span>{value as React.ReactNode}</span>
         </a>
       );
 
     case "url":
-    case "link":
+    case "link": {
+      const urlValue = value as string;
       return (
         <a
-          href={value.startsWith("http") ? value : `https://${value}`}
+          href={urlValue.startsWith("http") ? urlValue : `https://${urlValue}`}
           target="_blank"
           rel="noreferrer"
           className={cn("inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400", className)}
         >
-          <span className="truncate">{value}</span>
+          <span className="truncate">{urlValue}</span>
           <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
         </a>
       );
+    }
 
     case "date":
       return (
         <span className={cn("inline-flex items-center gap-1 text-sm text-slate-700 dark:text-slate-600", className)}>
           <Calendar className="h-3.5 w-3.5 text-slate-400" />
-          {formatDate(value)}
+          {formatDate(value as string | Date | null | undefined)}
         </span>
       );
 
     case "datetime":
       return (
         <span className={cn("text-sm text-slate-700 dark:text-slate-600", className)}>
-          {formatDateTime(value)}
+          {formatDateTime(value as string | Date | null | undefined)}
         </span>
       );
 
@@ -220,7 +222,7 @@ export function FieldRenderer({
       const variant = matchOpt?.variant || "default";
       return (
         <Badge variant={variant} className={className}>
-          {matchOpt?.label || value}
+          {matchOpt?.label || (value as React.ReactNode)}
         </Badge>
       );
     }

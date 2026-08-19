@@ -73,7 +73,7 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
 
   let activities: { lead_id: string; activity_type: string }[] = [];
   let meetingLeadIds = new Set<string>();
-  let oppsByOwner = new Map<string, { deal_value: number; stage: OpportunityStage }[]>();
+  const oppsByOwner = new Map<string, { deal_value: number; stage: OpportunityStage }[]>();
   if (leadIds.length) {
     const [{ data: acts }, { data: meetings }] = await Promise.all([
       supabase.from("lead_activities").select("lead_id, activity_type").in("lead_id", leadIds).in("activity_type", ["EMAIL_SENT", "EMAIL_REPLIED", "LINKEDIN_AUTO_ASK_CONTACT_INFO"]),
@@ -145,7 +145,7 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
 
   // Response Time — time from an inbound inbox message to the next outbound
   // message on the same lead (real data: inbox_messages.direction/created_at).
-  let responseTimesMinutes: number[] = [];
+  const responseTimesMinutes: number[] = [];
   if (leadIds.length) {
     const { data: inboxData } = await supabase.from("inbox_messages").select("lead_id, direction, created_at").in("lead_id", leadIds).order("created_at", { ascending: true });
     const byLead = new Map<string, { direction: string; created_at: string }[]>();

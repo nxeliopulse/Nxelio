@@ -25,6 +25,7 @@ export function IdleTimeoutProvider({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  // eslint-disable-next-line react-hooks/purity -- needs the real mount time to start the idle clock; deferring this to an effect risks the idle-check interval below racing ahead of it and firing an immediate false logout
   const lastActivityRef = useRef(Date.now());
   const lastHeartbeatRef = useRef(0);
   const loggingOutRef = useRef(false);
@@ -89,7 +90,7 @@ export function IdleTimeoutProvider({
       <Modal open={showWarning} onClose={handleActivity} title="Still there?" size="sm">
         <div className="p-5">
           <p className="text-sm text-slate-600">
-            You've been inactive for a while. For your security, you'll be signed out in{" "}
+            You&apos;ve been inactive for a while. For your security, you&apos;ll be signed out in{" "}
             <span className="font-bold text-slate-900">{mm}:{ss}</span> unless you stay active.
           </p>
         </div>

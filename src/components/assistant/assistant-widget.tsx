@@ -257,6 +257,7 @@ export function AssistantWidget({
   // item (Prospect, Contact, Campaign) side-by-side with the AI Assistant.
   useEffect(() => {
     if (expanded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets expanded mode when the route/search params change
       setExpanded(false);
       onExpandChange?.(false);
     }

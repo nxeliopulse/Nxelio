@@ -15,6 +15,16 @@ const ENGAGEMENT_STYLE: Record<string, string> = {
 const ENGAGEMENT_RANK: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
 type SortKey = "aiScore" | "buyingIntent" | "engagement" | "lastActivity";
 
+function SortableTh({ label, sortKeyVal, onSort }: { label: string; sortKeyVal: SortKey; onSort: (key: SortKey) => void }) {
+  return (
+    <DataTableTh>
+      <button onClick={() => onSort(sortKeyVal)} className="inline-flex items-center gap-1 hover:text-slate-900">
+        {label} <ArrowUpDown className="h-3 w-3" />
+      </button>
+    </DataTableTh>
+  );
+}
+
 /** Top Prospects table (doc §10) — server sorts by AI Score desc by default;
  *  the sortable-column requirement (spec) is a client-side re-sort of the
  *  same already-fetched rows, no refetch needed. */
@@ -36,16 +46,6 @@ export function TopProspectsTable({ prospects, ownerNames }: { prospects: TopPro
     return sortDesc ? -cmp : cmp;
   });
 
-  function SortableTh({ label, sortKeyVal }: { label: string; sortKeyVal: SortKey }) {
-    return (
-      <DataTableTh>
-        <button onClick={() => toggleSort(sortKeyVal)} className="inline-flex items-center gap-1 hover:text-slate-900">
-          {label} <ArrowUpDown className="h-3 w-3" />
-        </button>
-      </DataTableTh>
-    );
-  }
-
   return (
     <Card>
       <CardHeader className="pb-0 border-0">
@@ -58,10 +58,10 @@ export function TopProspectsTable({ prospects, ownerNames }: { prospects: TopPro
             <DataTableTh>Company</DataTableTh>
             <DataTableTh>Title</DataTableTh>
             <DataTableTh>Source</DataTableTh>
-            <SortableTh label="AI Score" sortKeyVal="aiScore" />
-            <SortableTh label="Buying Intent" sortKeyVal="buyingIntent" />
-            <SortableTh label="Engagement" sortKeyVal="engagement" />
-            <SortableTh label="Last Activity" sortKeyVal="lastActivity" />
+            <SortableTh label="AI Score" sortKeyVal="aiScore" onSort={toggleSort} />
+            <SortableTh label="Buying Intent" sortKeyVal="buyingIntent" onSort={toggleSort} />
+            <SortableTh label="Engagement" sortKeyVal="engagement" onSort={toggleSort} />
+            <SortableTh label="Last Activity" sortKeyVal="lastActivity" onSort={toggleSort} />
             <DataTableTh>Owner</DataTableTh>
             <DataTableTh>Status</DataTableTh>
           </tr>

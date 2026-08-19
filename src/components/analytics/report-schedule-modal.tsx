@@ -139,7 +139,7 @@ export function ReportScheduleModal({ reportId, onClose }: { reportId: string; o
             <Button size="sm" onClick={handleCreate} disabled={pending} className="w-full">
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Add Schedule
             </Button>
-            <p className="text-[11px] text-slate-400">Sends this report as a CSV file attached to an email. PDF/Excel export isn't available yet.</p>
+            <p className="text-[11px] text-slate-400">Sends this report as a CSV file attached to an email. PDF/Excel export isn&apos;t available yet.</p>
           </div>
         </div>
       </div>

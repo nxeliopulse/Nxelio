@@ -115,6 +115,34 @@ export async function notifyCurrentUser(payload: {
 }
 
 /**
+ * Notifies one specific user by id — e.g. a lead's owner, who isn't
+ * necessarily the person triggering the action (that's notifyCurrentUser's job).
+ */
+export async function notifyUser(userId: string, payload: {
+  type: string;
+  title: string;
+  message?: string;
+  link?: string;
+}) {
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("users")
+    .select("workspace_id")
+    .eq("user_id", userId)
+    .single();
+  if (!profile) return;
+  await admin.from("notifications").insert({
+    user_id: userId,
+    workspace_id: profile.workspace_id,
+    type: payload.type,
+    title: payload.title,
+    message: payload.message,
+    link: payload.link,
+  });
+  revalidatePath("/", "layout");
+}
+
+/**
  * Notifies all admins in the workspace (used for hot lead alerts, errors, etc.)
  */
 export async function notifyWorkspaceAdmins(workspaceId: string, payload: {

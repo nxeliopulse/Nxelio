@@ -3,65 +3,148 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  error?: boolean;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, leftIcon, rightIcon, ...props }, ref) => (
-    <div className="relative w-full">
-      {leftIcon && (
-        <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-          {leftIcon}
-        </div>
-      )}
-      <input
-        ref={ref}
-        suppressHydrationWarning
-        className={cn(
-          "w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)] transition",
-          leftIcon && "pl-10",
-          rightIcon && "pr-10",
-          className
+  ({ className, leftIcon, rightIcon, label, placeholder, error, ...props }, ref) => {
+    const hasLabel = Boolean(label);
+    return (
+      <div className="relative w-full">
+        {leftIcon && (
+          <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10 flex items-center justify-center">
+            {leftIcon}
+          </div>
         )}
-        {...props}
-      />
-      {rightIcon && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{rightIcon}</div>
-      )}
-    </div>
-  )
+        <input
+          ref={ref}
+          suppressHydrationWarning
+          placeholder={hasLabel ? " " : placeholder}
+          className={cn(
+            "peer w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 transition",
+            "placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600",
+            "hover:border-slate-350",
+            "disabled:opacity-50 disabled:bg-slate-50/50 disabled:hover:border-slate-200",
+            hasLabel && "placeholder-transparent focus:placeholder:text-slate-400",
+            error && "border-red-500 focus:ring-red-500/35 focus:border-red-500 hover:border-red-500",
+            leftIcon && "pl-10",
+            rightIcon && "pr-10",
+            className
+          )}
+          {...props}
+        />
+        {hasLabel && (
+          <label
+            className={cn(
+              "absolute pointer-events-none text-slate-400 transition-all duration-200 origin-left text-sm select-none",
+              "top-1/2 -translate-y-1/2",
+              leftIcon ? "left-10" : "left-3",
+              "peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:left-3 peer-focus:text-xs peer-focus:text-indigo-600 peer-focus:bg-white peer-focus:px-1",
+              "peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:-translate-y-1/2 peer-[:not(:placeholder-shown)]:left-3 peer-[:not(:placeholder-shown)]:text-xs peer-[:not(:placeholder-shown)]:bg-white peer-[:not(:placeholder-shown)]:px-1",
+              error && "text-red-500 peer-focus:text-red-500",
+              "peer-disabled:opacity-50"
+            )}
+          >
+            {label}
+          </label>
+        )}
+        {rightIcon && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 z-10 flex items-center justify-center">{rightIcon}</div>
+        )}
+      </div>
+    );
+  }
 );
 Input.displayName = "Input";
 
-export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
-  ({ className, ...props }, ref) => (
-    <textarea
-      ref={ref}
-      suppressHydrationWarning
-      className={cn(
-        "w-full min-h-[80px] rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)] transition",
-        className
-      )}
-      {...props}
-    />
-  )
+export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+  error?: boolean;
+}
+
+export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ className, label, placeholder, error, ...props }, ref) => {
+    const hasLabel = Boolean(label);
+    return (
+      <div className="relative w-full">
+        <textarea
+          ref={ref}
+          suppressHydrationWarning
+          placeholder={hasLabel ? " " : placeholder}
+          className={cn(
+            "peer w-full min-h-[80px] rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 transition",
+            "placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600",
+            "hover:border-slate-350",
+            "disabled:opacity-50 disabled:bg-slate-50/50 disabled:hover:border-slate-200",
+            hasLabel && "placeholder-transparent focus:placeholder:text-slate-400",
+            error && "border-red-500 focus:ring-red-500/35 focus:border-red-500 hover:border-red-500",
+            className
+          )}
+          {...props}
+        />
+        {hasLabel && (
+          <label
+            className={cn(
+              "absolute pointer-events-none text-slate-400 transition-all duration-200 origin-left text-sm select-none",
+              "top-3 left-3",
+              "peer-focus:top-0 peer-focus:-translate-y-1/2 peer-focus:text-xs peer-focus:text-indigo-600 peer-focus:bg-white peer-focus:px-1",
+              "peer-[:not(:placeholder-shown)]:top-0 peer-[:not(:placeholder-shown)]:-translate-y-1/2 peer-[:not(:placeholder-shown)]:text-xs peer-[:not(:placeholder-shown)]:bg-white peer-[:not(:placeholder-shown)]:px-1",
+              error && "text-red-500 peer-focus:text-red-500",
+              "peer-disabled:opacity-50"
+            )}
+          >
+            {label}
+          </label>
+        )}
+      </div>
+    );
+  }
 );
 Textarea.displayName = "Textarea";
 
-export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
-  ({ className, children, ...props }, ref) => (
-    <select
-      ref={ref}
-      suppressHydrationWarning
-      className={cn(
-        "w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)] transition",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </select>
-  )
+export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label?: string;
+  error?: boolean;
+}
+
+export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
+  ({ className, children, label, error, ...props }, ref) => {
+    const hasLabel = Boolean(label);
+    return (
+      <div className="relative w-full">
+        <select
+          ref={ref}
+          suppressHydrationWarning
+          className={cn(
+            "peer w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 transition",
+            "focus:outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600",
+            "hover:border-slate-350",
+            "disabled:opacity-50 disabled:bg-slate-50/50 disabled:hover:border-slate-200",
+            error && "border-red-500 focus:ring-red-500/35 focus:border-red-500 hover:border-red-500",
+            className
+          )}
+          {...props}
+        >
+          {children}
+        </select>
+        {hasLabel && (
+          <label
+            className={cn(
+              "absolute pointer-events-none text-slate-400 transition-all duration-200 origin-left select-none",
+              "top-0 -translate-y-1/2 left-3 text-xs bg-white px-1",
+              "peer-focus:text-indigo-600",
+              error && "text-red-500 peer-focus:text-red-500",
+              "peer-disabled:opacity-50"
+            )}
+          >
+            {label}
+          </label>
+        )}
+      </div>
+    );
+  }
 );
 Select.displayName = "Select";

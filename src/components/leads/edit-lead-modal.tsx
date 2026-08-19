@@ -1,9 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Lock, X, User, Save } from "lucide-react";
+import { X, User, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/input";
+import { Input, Select, Textarea } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
 import { updateLead, updateLeadStatus, findLeadByPhone, type LeadRow } from "@/lib/queries/leads";
 import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
@@ -158,19 +158,18 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
     }
   }
 
-  const labelStyle = "block text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-1.5";
   const fieldStyle = "w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)] transition";
 
   if (!open) return null;
 
   return (
-    <>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/45 backdrop-blur-xs z-50 transition-opacity" onClick={onClose} />
+      <div className="lp-anim-fade fixed inset-0 bg-black/45 backdrop-blur-xs transition-opacity" onClick={onClose} />
 
-      {/* Right side drawer */}
-      <div className="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[580px] bg-white dark:bg-slate-950 shadow-2xl border-l border-slate-200 dark:border-slate-850 flex flex-col h-screen animate-in slide-in-from-right duration-250">
-        
+      {/* Centered dialog */}
+      <div className="lp-anim-scale relative w-full sm:w-[880px] max-w-[95vw] max-h-[90vh] bg-white dark:bg-slate-950 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-850 flex flex-col overflow-hidden">
+
         {/* Header */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 flex-shrink-0 flex items-center justify-between">
           <div>
@@ -192,33 +191,27 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
             </p>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+            <Input label="Name *" value={form.full_name} onChange={(e) => set("full_name", e.target.value)} placeholder="Full Name" />
+            <Input label="Company *" value={form.company_name} onChange={(e) => set("company_name", e.target.value)} placeholder="Company Name" />
+            
             <div>
-              <label className={labelStyle}>Name <span className="text-red-500">*</span></label>
-              <input className={fieldStyle} value={form.full_name} onChange={(e) => set("full_name", e.target.value)} placeholder="Full Name" />
-            </div>
-            <div>
-              <label className={labelStyle}>Company <span className="text-red-500">*</span></label>
-              <input className={fieldStyle} value={form.company_name} onChange={(e) => set("company_name", e.target.value)} placeholder="Company Name" />
-            </div>
-            <div>
-              <label className={labelStyle}>
-                Email {fieldLocked("email") && <Lock className="inline h-3 w-3 text-slate-400 ml-1" />}
-              </label>
-              <input
-                type="email" className={fieldStyle} value={form.email} onChange={(e) => set("email", e.target.value)}
-                placeholder="email@example.com" disabled={fieldLocked("email")}
+              <Input
+                type="email"
+                label="Email *"
+                value={form.email}
+                onChange={(e) => set("email", e.target.value)}
+                placeholder="email@example.com"
+                disabled={fieldLocked("email")}
                 title={fieldLocked("email") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}
               />
               {fieldLocked("email") && <p className="text-[11px] text-slate-400 mt-1">Locked — only a Super Admin can edit this.</p>}
             </div>
+            
             <div>
-              <label className={labelStyle}>
-                Phone {fieldLocked("phone") && <Lock className="inline h-3 w-3 text-slate-400 ml-1" />}
-              </label>
               <fieldset disabled={fieldLocked("phone")} title={fieldLocked("phone") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}>
                 <PhoneInput
-                  label=""
+                  label="Phone *"
                   country={phoneCountry}
                   value={form.phone}
                   onCountryChange={setPhoneCountry}
@@ -228,27 +221,26 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
               </fieldset>
               {fieldLocked("phone") && <p className="text-[11px] text-slate-400 mt-1">Locked — only a Super Admin can edit this.</p>}
             </div>
+            
+            <Input label="Website" value={form.website_url} onChange={(e) => set("website_url", e.target.value)} placeholder="https://example.com" />
+            
             <div>
-              <label className={labelStyle}>Website</label>
-              <input className={fieldStyle} value={form.website_url} onChange={(e) => set("website_url", e.target.value)} placeholder="https://example.com" />
-            </div>
-            <div>
-              <label className={labelStyle}>
-                LinkedIn {fieldLocked("linkedin") && <Lock className="inline h-3 w-3 text-slate-400 ml-1" />}
-              </label>
-              <input
-                className={fieldStyle} value={form.linkedin} onChange={(e) => set("linkedin", e.target.value)}
-                placeholder="LinkedIn Profile URL" disabled={fieldLocked("linkedin")}
+              <Input
+                label="LinkedIn"
+                value={form.linkedin}
+                onChange={(e) => set("linkedin", e.target.value)}
+                placeholder="LinkedIn Profile URL"
+                disabled={fieldLocked("linkedin")}
                 title={fieldLocked("linkedin") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}
               />
               {fieldLocked("linkedin") && <p className="text-[11px] text-slate-400 mt-1">Locked — only a Super Admin can edit this.</p>}
             </div>
+            
             <div>
-              <label className={labelStyle}>
-                Industry {fieldLocked("industry") && <Lock className="inline h-3 w-3 text-slate-400 ml-1" />}
-              </label>
               <Select
-                className={fieldStyle} value={form.industry} onChange={(e) => set("industry", e.target.value)}
+                label="Industry"
+                value={form.industry}
+                onChange={(e) => set("industry", e.target.value)}
                 disabled={fieldLocked("industry")}
                 title={fieldLocked("industry") ? "Locked after its first edit — only a Super Admin can change it now." : undefined}
               >
@@ -257,17 +249,15 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
               </Select>
               {fieldLocked("industry") && <p className="text-[11px] text-slate-400 mt-1">Locked — only a Super Admin can edit this.</p>}
             </div>
+            
+            <Select label="Interest Area" value={form.interest_area} onChange={(e) => set("interest_area", e.target.value)}>
+              <option value="">— Choose Interest —</option>
+              {interestAreas.map((i) => <option key={i} value={i}>{i}</option>)}
+            </Select>
+            
             <div>
-              <label className={labelStyle}>Interest Area</label>
-              <Select className={fieldStyle} value={form.interest_area} onChange={(e) => set("interest_area", e.target.value)}>
-                <option value="">— Choose Interest —</option>
-                {interestAreas.map((i) => <option key={i} value={i}>{i}</option>)}
-              </Select>
-            </div>
-            <div>
-              <label className={labelStyle}>Status</label>
               <Select
-                className={fieldStyle}
+                label="Status"
                 value={form.status}
                 onChange={(e) => set("status", e.target.value)}
                 disabled={statusLocked}
@@ -289,73 +279,63 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
                 <p className="text-xs text-amber-600 mt-1">Locked — this lead is part of a running campaign.</p>
               )}
             </div>
-            <div>
-              <label className={labelStyle}>Job Title</label>
-              <input className={fieldStyle} value={form.job_title} onChange={(e) => set("job_title", e.target.value)} placeholder="Job Title" />
-            </div>
-            <div>
-              <label className={labelStyle}>Seniority</label>
-              <Select className={fieldStyle} value={form.seniority} onChange={(e) => set("seniority", e.target.value)}>
-                <option value="">— Choose Seniority —</option>
-                {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
-              </Select>
-            </div>
-            <div>
-              <label className={labelStyle}>Company Size</label>
-              <Select className={fieldStyle} value={form.company_size} onChange={(e) => set("company_size", e.target.value)}>
-                <option value="">— Choose Company Size —</option>
-                {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
-              </Select>
-            </div>
+            
+            <Input label="Job Title" value={form.job_title} onChange={(e) => set("job_title", e.target.value)} placeholder="Job Title" />
+            
+            <Select label="Seniority" value={form.seniority} onChange={(e) => set("seniority", e.target.value)}>
+              <option value="">— Choose Seniority —</option>
+              {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
+            </Select>
+            
+            <Select label="Company Size" value={form.company_size} onChange={(e) => set("company_size", e.target.value)}>
+              <option value="">— Choose Company Size —</option>
+              {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
+            </Select>
+            
             <div className="sm:col-span-2">
-              <label className={labelStyle}>Twitter / X Handle</label>
-              <input className={fieldStyle} value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} placeholder="@handle" />
+              <Input label="Twitter / X Handle" value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} placeholder="@handle" />
             </div>
+            
             <div className="sm:col-span-2">
-              <label className={labelStyle}>Street Address</label>
-              <input className={fieldStyle} value={form.street_address} onChange={(e) => set("street_address", e.target.value)} placeholder="123 Main St" />
+              <Input label="Street Address" value={form.street_address} onChange={(e) => set("street_address", e.target.value)} placeholder="123 Main St" />
             </div>
-            <div>
-              <label className={labelStyle}>City</label>
-              <LocationAutocomplete
-                type="city"
-                value={form.city}
-                onChange={(val) => set("city", val)}
-                placeholder="City"
-                className={fieldStyle}
-                countryContext={form.country}
-                stateContext={form.state}
-              />
-            </div>
-            <div>
-              <label className={labelStyle}>State</label>
-              <LocationAutocomplete
-                type="state"
-                value={form.state}
-                onChange={(val) => set("state", val)}
-                placeholder="State"
-                className={fieldStyle}
-                countryContext={form.country}
-              />
-            </div>
-            <div>
-              <label className={labelStyle}>Country</label>
-              <LocationAutocomplete
-                type="country"
-                value={form.country}
-                onChange={(val) => set("country", val)}
-                placeholder="Country"
-                className={fieldStyle}
-              />
-            </div>
-            <div>
-              <label className={labelStyle}>Postal Code</label>
-              <input className={fieldStyle} value={form.postal_code} onChange={(e) => set("postal_code", e.target.value)} placeholder="Postal Code" />
-            </div>
+            
+            <LocationAutocomplete
+              type="city"
+              value={form.city}
+              onChange={(val) => set("city", val)}
+              placeholder="City"
+              className={fieldStyle}
+              countryContext={form.country}
+              stateContext={form.state}
+              label="City"
+            />
+            
+            <LocationAutocomplete
+              type="state"
+              value={form.state}
+              onChange={(val) => set("state", val)}
+              placeholder="State"
+              className={fieldStyle}
+              countryContext={form.country}
+              label="State"
+            />
+            
+            <LocationAutocomplete
+              type="country"
+              value={form.country}
+              onChange={(val) => set("country", val)}
+              placeholder="Country"
+              className={fieldStyle}
+              label="Country"
+            />
+            
+            <Input label="Postal Code" value={form.postal_code} onChange={(e) => set("postal_code", e.target.value)} placeholder="Postal Code" />
+            
             <div className="sm:col-span-2">
-              <label className={labelStyle}>About (Message / Request)</label>
-              <textarea
-                className={`${fieldStyle} min-h-[90px] resize-y`}
+              <Textarea
+                label="About (Message / Request)"
+                className="min-h-[90px] resize-y"
                 value={form.message}
                 onChange={(e) => set("message", e.target.value)}
                 placeholder="Details or specific notes on this lead..."
@@ -374,6 +354,6 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
           </Button>
         </div>
       </div>
-    </>
+    </div>
   );
 }

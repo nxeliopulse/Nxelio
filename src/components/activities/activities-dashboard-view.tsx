@@ -752,7 +752,7 @@ export function ActivitiesDashboardView({
           <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 transition-opacity" onClick={() => setIsDrawerOpen(false)} />
           
           {/* Drawer container */}
-          <div className="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[500px] bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-850 flex flex-col h-screen animate-in slide-in-from-right duration-250">
+          <div className="fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[650px] bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-850 flex flex-col h-screen animate-in slide-in-from-right duration-250">
             
             {/* Header info */}
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 flex-shrink-0">

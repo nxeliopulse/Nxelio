@@ -31,6 +31,23 @@ export interface DashboardStats {
   /** Month-over-month % change; null when there's no prior-month data to compare against. */
   revenueTrendPct: number | null;
   conversionTrendPct: number | null;
+  /** Won revenue for the current calendar month — the actual number the
+   *  "Total Revenue" KPI card shows, kept in sync with revenueTrendPct so
+   *  the headline figure and its "vs last month" badge measure the same
+   *  thing (previously the card showed the all-time total next to a
+   *  monthly % change, which could show a huge, confusing swing). */
+  revenueThisMonth: number;
+  /** Last calendar month's won revenue — surfaced next to the % badge so a
+   *  large swing (e.g. -95%) is self-explanatory instead of looking like a
+   *  display bug: a tiny prior-month baseline makes a small dollar change
+   *  register as a huge percentage. */
+  revenueLastMonth: number;
+  /** Month-over-month % change in new opportunities created; null when
+   *  there's no prior-month data. */
+  dealsCreatedTrendPct: number | null;
+  /** Month-over-month % change in new pipeline value created; null when
+   *  there's no prior-month data. */
+  pipelineValueTrendPct: number | null;
   /** All-time deal count + won revenue per owner_id — names are resolved by the caller
    *  (page.tsx already fetches the real user list; join here would duplicate that lookup). */
   teamPerformance: { ownerId: string; dealsCount: number; wonValue: number }[];
@@ -97,7 +114,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     : 0;
 
   const now = new Date();
-  const months: { date: string; leads: number; hot: number; converted: number; wonValue: number; pipelineValue: number }[] = [];
+  const months: { date: string; leads: number; hot: number; converted: number; wonValue: number; pipelineValue: number; dealsCreated: number }[] = [];
   for (let i = 4; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const start = d.getTime();
@@ -118,6 +135,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       converted: monthLeads.filter((l) => l.status === "Converted").length,
       wonValue: monthWon.reduce((s, o) => s + Number(o.deal_value || 0), 0),
       pipelineValue: monthCreatedOpps.reduce((s, o) => s + Number(o.deal_value || 0), 0),
+      dealsCreated: monthCreatedOpps.length,
     });
   }
 
@@ -127,10 +145,14 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     ? Math.round(((thisMonthLeads - lastMonthLeads) / lastMonthLeads) * 1000) / 10
     : undefined;
 
-  const revenueTrendPct = pctChange(months[months.length - 1]?.wonValue ?? 0, months[months.length - 2]?.wonValue ?? 0);
+  const revenueThisMonth = months[months.length - 1]?.wonValue ?? 0;
+  const revenueLastMonth = months[months.length - 2]?.wonValue ?? 0;
+  const revenueTrendPct = pctChange(revenueThisMonth, revenueLastMonth);
   const thisMonthConvRate = thisMonthLeads ? (months[months.length - 1].converted / thisMonthLeads) * 100 : 0;
   const lastMonthConvRate = lastMonthLeads ? (months[months.length - 2].converted / lastMonthLeads) * 100 : 0;
   const conversionTrendPct = pctChange(thisMonthConvRate, lastMonthConvRate);
+  const dealsCreatedTrendPct = pctChange(months[months.length - 1]?.dealsCreated ?? 0, months[months.length - 2]?.dealsCreated ?? 0);
+  const pipelineValueTrendPct = pctChange(months[months.length - 1]?.pipelineValue ?? 0, months[months.length - 2]?.pipelineValue ?? 0);
 
   const emailsSent = (allCampaigns || []).reduce((s, c) => s + (c.sent_count || 0), 0);
   const aiScored = (leads || []).filter((l) => (l.lead_score || 0) > 0).length;
@@ -179,6 +201,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const years = new Set<number>();
   for (const o of oppRows) years.add(new Date(o.created_at).getFullYear());
   years.add(now.getFullYear());
+  // Always include last year too, even with no historical data — a single
+  // bar group ("2026" only) reads as a rendering bug (one labeled category,
+  // two grouped Revenue/Pipeline bars) rather than an actual year-over-year
+  // trend, which is the whole point of this view.
+  years.add(now.getFullYear() - 1);
   const yearly = [...years].sort().slice(-3).map((y) => {
     const yStart = new Date(y, 0, 1).getTime();
     const yEnd = new Date(y + 1, 0, 1).getTime();
@@ -272,6 +299,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     contactsSparkline,
     revenueTrendPct,
     conversionTrendPct,
+    revenueThisMonth,
+    revenueLastMonth,
+    dealsCreatedTrendPct,
+    pipelineValueTrendPct,
     teamPerformance,
   };
 }

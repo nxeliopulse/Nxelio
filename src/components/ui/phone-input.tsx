@@ -105,7 +105,7 @@ function CountryDropdown({ country, onChange }: { country: CountryCode; onChange
       <button
         type="button"
         onClick={toggleOpen}
-        className="flex items-center gap-1 h-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-400"
+        className="flex items-center gap-1 h-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-2 text-sm outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600"
       >
         <CountryFlag code={current?.code} className="h-3.5 w-5" />
         <ChevronDown className="h-3 w-3 text-slate-400" />
@@ -118,7 +118,7 @@ function CountryDropdown({ country, onChange }: { country: CountryCode; onChange
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search country or code…"
-              className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 dark:text-white px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-400"
+              className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 dark:text-white px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600"
             />
           </div>
           <div className="max-h-64 overflow-y-auto">
@@ -181,7 +181,7 @@ export function PhoneInput({ label, country, value, onCountryChange, onValueChan
           // button) still stores a properly formatted value.
           onBlur={() => { if (value.trim()) onValueChange(formatPhoneForStorage(value, country)); }}
           placeholder={examplePlaceholder(country)}
-          className={inputClassName ?? "flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-blue-400"}
+          className={inputClassName ?? "flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600"}
           aria-invalid={!valid}
         />
       </div>

@@ -116,7 +116,7 @@ export async function getCampaignsAnalytics(filters: CampaignsFilters): Promise<
   let leadStatusById = new Map<string, string>();
   let activityRows: { lead_id: string; activity_type: string; metadata: { campaign_id?: string } | null }[] = [];
   let meetingLeadIds = new Set<string>();
-  let oppsByCampaign = new Map<string, { deal_value: number; stage: OpportunityStage }[]>();
+  const oppsByCampaign = new Map<string, { deal_value: number; stage: OpportunityStage }[]>();
 
   if (allEnrolledLeadIds.length) {
     const [{ data: leadRows }, { data: acts }, { data: meetings }] = await Promise.all([

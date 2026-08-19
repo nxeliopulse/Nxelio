@@ -574,7 +574,7 @@ export function ContactsTable({ contacts, owners = [] }: { contacts: ContactRow[
             <Card
               key={s.label}
               onClick={() => {
-                setCardFilter(s.key as any);
+                setCardFilter(s.key as typeof cardFilter);
                 setPage(0);
               }}
               className={cn(

@@ -16,7 +16,7 @@ interface DrawerProps {
 /** Right-anchored drawer for build-and-preview workflows (e.g. the report
  *  builder) that need more room than the Modal primitive's max-w-5xl cap and
  *  shouldn't fully block the rest of the screen the way a centered modal does. */
-export function Drawer({ open, onClose, title, description, children, width = "560px", footer }: DrawerProps) {
+export function Drawer({ open, onClose, title, description, children, width = "680px", footer }: DrawerProps) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex justify-end">

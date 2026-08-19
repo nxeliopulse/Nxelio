@@ -1015,7 +1015,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             return (
               <Card
                 key={s.label}
-                onClick={() => handleCardFilterChange(s.key as any)}
+                onClick={() => handleCardFilterChange(s.key as typeof cardFilter)}
                 className={cn(
                   "p-4 sm:p-5 flex items-center gap-3 cursor-pointer select-none transition-all duration-200 hover:scale-[1.02] hover:shadow-xs",
                   active

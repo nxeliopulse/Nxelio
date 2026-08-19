@@ -158,6 +158,7 @@ export function NotificationsBell({ className }: { className?: string }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
+        aria-label={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
         className={cn(
           "relative flex items-center justify-center transition-colors",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 focus-visible:ring-offset-1 focus-visible:ring-offset-[#1e242b]",
@@ -173,7 +174,7 @@ export function NotificationsBell({ className }: { className?: string }) {
       </button>
 
       {open && (
-        <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1 w-[26rem] bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50">
+        <div className="lp-anim-pop origin-top-right absolute right-[-4.5rem] sm:right-0 top-full mt-1 w-[calc(100vw-2rem)] sm:w-[26rem] bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50">
           {/* Title */}
           <div className="flex items-center justify-between px-4 pt-4 pb-2">
             <p className="text-lg font-bold text-slate-900">Notifications</p>
