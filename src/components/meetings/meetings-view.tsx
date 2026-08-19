@@ -515,9 +515,8 @@ export function MeetingsView({ meetings, leads, userEmail }: { meetings: Meeting
         
         {/* Left Column Sidebar */}
         <div className="w-full lg:w-80 shrink-0 space-y-6">
-          {/* Zoho-style dark panel: New Event, search, account, calendars, mini calendar, timezone.
-              Kept permanently dark (not theme-linked) to match Zoho's own fixed navy sidebar chrome. */}
-          <div className="rounded-2xl bg-[#1a1f2e] p-5 shadow-sm space-y-5">
+          {/* Zoho-style panel: New Event, search, account, calendars, mini calendar, timezone. */}
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-5">
             <Button
               onClick={() => setEditing("new")}
               className="w-full justify-center rounded-xl font-bold text-sm py-2.5 bg-blue-600 hover:bg-blue-700 text-white"
@@ -527,12 +526,12 @@ export function MeetingsView({ meetings, leads, userEmail }: { meetings: Meeting
 
             {/* Search — filters your real meetings by title, click a result to open it */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
               <input
                 value={sidebarSearch}
                 onChange={(e) => setSidebarSearch(e.target.value)}
                 placeholder="Search calendar"
-                className="w-full rounded-lg bg-white/10 border border-white/10 pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-lg bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 pl-9 pr-3 py-2 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:ring-1 focus:ring-blue-500"
               />
               {sidebarSearch.trim() && (
                 <div className="absolute z-20 mt-1 w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl max-h-64 overflow-y-auto">
@@ -556,11 +555,11 @@ export function MeetingsView({ meetings, leads, userEmail }: { meetings: Meeting
 
             {/* Account row — your real email; gear links to Settings */}
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-blue-400 truncate" title={userEmail}>{userEmail.toUpperCase()}</span>
+              <span className="text-xs font-bold text-blue-600 dark:text-blue-400 truncate" title={userEmail}>{userEmail.toUpperCase()}</span>
               <Link
                 href="/settings"
                 title="Calendar settings"
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
+                className="p-1 rounded text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex-shrink-0"
               >
                 <Settings className="h-3.5 w-3.5" />
               </Link>
@@ -570,7 +569,7 @@ export function MeetingsView({ meetings, leads, userEmail }: { meetings: Meeting
             <div className="space-y-3">
               <button
                 onClick={() => setCalendarsOpen((v) => !v)}
-                className="flex items-center gap-1.5 text-xs font-bold text-slate-300 w-full"
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-600 w-full"
               >
                 <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !calendarsOpen && "-rotate-90")} />
                 My Calendars
@@ -593,11 +592,11 @@ export function MeetingsView({ meetings, leads, userEmail }: { meetings: Meeting
                       >
                         <div className={cn(
                           "h-4 w-4 rounded-full flex items-center justify-center transition-all",
-                          active ? `${cat.color} text-white` : "border border-slate-600 text-transparent"
+                          active ? `${cat.color} text-white` : "border border-slate-300 dark:border-slate-600 text-transparent"
                         )}>
                           <Check className="h-2.5 w-2.5 stroke-[3]" />
                         </div>
-                        <span className="text-xs font-semibold text-slate-300">{cat.name}</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-600">{cat.name}</span>
                       </button>
                     );
                   })}
@@ -612,7 +611,7 @@ export function MeetingsView({ meetings, leads, userEmail }: { meetings: Meeting
               onSelectDay={setSelectedDay}
             />
 
-            {timezone && <p className="text-xs font-semibold text-blue-400 text-center">{timezone}</p>}
+            {timezone && <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 text-center">{timezone}</p>}
           </div>
 
           {/* Card 3: Upcoming Events */}
@@ -1294,23 +1293,23 @@ function MiniCalendar({
       <div className="flex items-center justify-between px-1">
         <button
           onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() - 1); onMonthChange(d); }}
-          className="p-1 rounded-lg text-slate-500 hover:bg-white/10 hover:text-white transition-colors"
+          className="p-1 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-white transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="font-bold text-sm text-white">
+        <span className="font-bold text-sm text-slate-800 dark:text-white">
           {month.toLocaleDateString([], { month: "long", year: "numeric" })}
         </span>
         <button
           onClick={() => { const d = new Date(month); d.setMonth(d.getMonth() + 1); onMonthChange(d); }}
-          className="p-1 rounded-lg text-slate-500 hover:bg-white/10 hover:text-white transition-colors"
+          className="p-1 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-white transition-colors"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
 
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-500">
+      <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-500 dark:text-slate-500">
         <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
       </div>
 
@@ -1329,15 +1328,15 @@ function MiniCalendar({
                 isSelected
                   ? "bg-blue-600 text-white font-bold shadow-sm"
                   : isToday
-                  ? "bg-blue-500/20 text-blue-400 font-bold border border-blue-500/40"
+                  ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/40"
                   : inMonth
-                  ? "text-slate-300 hover:bg-white/10"
-                  : "text-slate-600"
+                  ? "text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/10"
+                  : "text-slate-300 dark:text-slate-700"
               )}
             >
               {d.getDate()}
               {inMonth && !isSelected && (
-                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-slate-600" />
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
               )}
             </button>
           );

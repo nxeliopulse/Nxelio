@@ -191,7 +191,7 @@ export function ConvertLeadModal({
       <div className="lp-anim-fade fixed inset-0 bg-black/45 backdrop-blur-xs transition-opacity" onClick={onClose} />
 
       {/* Centered dialog */}
-      <div className="lp-anim-scale relative w-full sm:w-[800px] max-w-[95vw] max-h-[90vh] bg-white dark:bg-slate-950 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-850 flex flex-col overflow-hidden">
+      <div className="lp-anim-scale relative w-full sm:w-[960px] max-w-[95vw] max-h-[90vh] bg-white dark:bg-slate-950 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-850 flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 flex-shrink-0 flex items-center justify-between">
