@@ -4,9 +4,9 @@ import { useState, useTransition, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Check, X, Sparkles, CreditCard, Users2, Send,
-  Zap, Crown, Rocket, Lock, AlertTriangle, Clock,
+  Zap, Crown, Rocket, AlertTriangle, Clock,
   TrendingUp, ExternalLink, Loader2, PartyPopper,
-  Search, Reply, Target, Ticket, Gift, RotateCcw,
+  Target, Ticket, Gift, RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import type {
 } from "@/lib/queries/subscription-types";
 import type { PromotionHistoryEntry } from "@/lib/queries/promotions";
 import { PlanTermsModal } from "@/components/billing/plan-terms-modal";
+import { BillingSupportWidget } from "@/components/billing/billing-support-widget";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -643,35 +644,6 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
           })}
         </div>
 
-        {/* Feature gate notes */}
-        <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div className="h-11 w-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Search className="h-5 w-5" />
-              </div>
-              <Link href="#plans" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors shrink-0">
-                <Lock className="h-3 w-3" />Upgrade
-              </Link>
-            </div>
-            <p className="text-sm font-bold text-slate-900 mb-1">Lead Discovery</p>
-            <p className="text-xs text-slate-500">Automatically find real prospects by industry, role, and location. Starter plan and up.</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div className="h-11 w-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                <Reply className="h-5 w-5" />
-              </div>
-              {currentPlanId !== "pro" && (
-                <Link href="#plans" className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors shrink-0">
-                  <Lock className="h-3 w-3" />Upgrade
-                </Link>
-              )}
-            </div>
-            <p className="text-sm font-bold text-slate-900 mb-1">Priority Support</p>
-            <p className="text-xs text-slate-500">Faster response times on every ticket. Pro plan only.</p>
-          </div>
-        </div>
       </div>
 
       {/* ── Promotion history ───────────────────────────────────── */}
@@ -830,6 +802,10 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
         onConfirm={confirmTermsAndCheckout}
         confirming={checkoutPending}
       />
+
+      {/* AI billing helper — deliberately mounted here (not the global app
+          shell) so it only ever appears on this page. */}
+      <BillingSupportWidget subscription={sub} plans={plans} />
     </div>
   );
 }
