@@ -10,11 +10,27 @@ function formatDate(iso: string): string {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  active: "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold",
-  trialing: "bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-semibold",
-  past_due: "bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-semibold",
-  canceled: "bg-slate-100 dark:bg-[var(--muted)] text-slate-600 dark:text-slate-500 border border-slate-200 dark:border-slate-700 font-semibold",
+  active:        "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold",
+  trialing:      "bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-semibold",
+  trial_ended:   "bg-orange-50 dark:bg-orange-950/80 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 font-semibold",
+  past_due:      "bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-semibold",
+  canceled:      "bg-slate-100 dark:bg-[var(--muted)] text-slate-600 dark:text-slate-500 border border-slate-200 dark:border-slate-700 font-semibold",
 };
+
+const STATUS_LABEL: Record<string, string> = {
+  active:      "Active",
+  trialing:    "Trialing",
+  trial_ended: "Trial Ended",
+  past_due:    "Past Due",
+  canceled:    "Canceled",
+};
+
+function effectiveStatus(r: SubscriptionRow): string {
+  if (r.status === "trialing" && r.trial_ends_at && new Date(r.trial_ends_at) < new Date()) {
+    return "trial_ended";
+  }
+  return r.status;
+}
 
 const PAGE_SIZE = 15;
 
@@ -47,21 +63,29 @@ export function SubscriptionsTab({ rows }: { rows: SubscriptionRow[] }) {
             {paged.length === 0 && (
               <DataTableEmpty colSpan={7}>No subscriptions yet.</DataTableEmpty>
             )}
-            {paged.map((r) => (
+            {paged.map((r) => {
+              const status = effectiveStatus(r);
+              return (
               <DataTableRow key={r.workspace_id}>
                 <DataTableTd className="font-semibold text-slate-900 dark:text-white">{r.workspace_name}</DataTableTd>
                 <DataTableTd className="text-slate-600 dark:text-slate-500 font-medium">{r.plan_name}</DataTableTd>
                 <DataTableTd className="text-slate-500 dark:text-slate-500 capitalize">{r.billing_interval}</DataTableTd>
                 <DataTableTd>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs capitalize ${STATUS_STYLE[r.status] || "bg-slate-100 dark:bg-[var(--muted)] text-slate-600 dark:text-slate-500"}`}>
-                    {r.status.replace("_", " ")}
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ${STATUS_STYLE[status] || "bg-slate-100 dark:bg-[var(--muted)] text-slate-600 dark:text-slate-500"}`}>
+                    {STATUS_LABEL[status] ?? status.replace(/_/g, " ")}
                   </span>
                 </DataTableTd>
                 <DataTableTd className="text-slate-900 dark:text-slate-700 font-semibold tabular-nums">{r.credits_remaining} / {r.credits_total}</DataTableTd>
-                <DataTableTd className="text-slate-600 dark:text-slate-500 whitespace-nowrap">{formatDate(r.current_period_end)}</DataTableTd>
+                <DataTableTd className="text-slate-600 dark:text-slate-500 whitespace-nowrap">
+                  {status === "trial_ended" && r.trial_ends_at
+                    ? <span className="text-orange-600 dark:text-orange-400">Ended {formatDate(r.trial_ends_at)}</span>
+                    : status === "trialing" && r.trial_ends_at
+                    ? <span className="text-amber-600 dark:text-amber-400">Expires {formatDate(r.trial_ends_at)}</span>
+                    : formatDate(r.current_period_end)}
+                </DataTableTd>
                 <DataTableTd className="text-slate-400 dark:text-slate-500 font-mono text-xs">{r.stripe_customer_id || "—"}</DataTableTd>
               </DataTableRow>
-            ))}
+            );})}
           </DataTableBody>
         </DataTable>
       </div>

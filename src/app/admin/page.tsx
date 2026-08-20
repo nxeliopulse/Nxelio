@@ -12,6 +12,7 @@ import { getLeadProviderStatus } from "@/lib/queries/lead-provider-settings";
 import { getEmailPromoCodes } from "@/lib/queries/admin-promo-codes";
 import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach-accounts";
 import { getFeatureKillSwitches } from "@/lib/queries/feature-kill-switches";
+import { getCancellationRequests } from "@/lib/queries/cancellation-requests";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 
 export default async function AdminPage() {
@@ -29,6 +30,7 @@ export default async function AdminPage() {
     outreachAccounts,
     unipileReady,
     featureKillSwitches,
+    cancellationRequests,
   ] = await Promise.all([
     getPlatformOverviewStats(),
     getHotCustomers(),
@@ -43,6 +45,7 @@ export default async function AdminPage() {
     getOutreachAccounts(),
     isUnipileConfigured(),
     getFeatureKillSwitches(),
+    getCancellationRequests(),
   ]);
   const whatsappAccounts = outreachAccounts.filter((a) => a.channel === "whatsapp");
 
@@ -61,6 +64,7 @@ export default async function AdminPage() {
       whatsappAccounts={whatsappAccounts}
       unipileConfigured={unipileReady}
       featureKillSwitches={featureKillSwitches}
+      cancellationRequests={cancellationRequests}
     />
   );
 }
