@@ -50,7 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // until checkout completes (see migration 0035). Block the whole dashboard
   // until that happens — nothing else here matters if there's no subscription.
   const subscription = await getSubscription();
-  if (!subscription) return <SubscriptionGate />;
+  if (!subscription || subscription.status === "canceled") return <SubscriptionGate />;
 
   const { data: profile } = await supabase
     .from("users")

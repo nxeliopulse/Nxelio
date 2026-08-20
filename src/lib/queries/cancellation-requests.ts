@@ -44,6 +44,16 @@ export async function submitCancellationRequest(
   if (!workspaceId) return { ok: false, error: "No subscription found" };
 
   const admin = createAdminClient();
+
+  // Block duplicate submissions — one open ticket per workspace is enough
+  const { data: existing } = await admin
+    .from("cancellation_requests")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .not("status", "in", '("cancelled","retained")')
+    .maybeSingle();
+  if (existing) return { ok: false, error: "A cancellation request is already open for your account. Our team will be in touch shortly." };
+
   const { data: row, error } = await admin.from("cancellation_requests").insert({
     workspace_id: workspaceId,
     customer_name: input.customerName?.trim() || null,
@@ -177,7 +187,21 @@ export async function adminCancelSubscription(
     .eq("workspace_id", workspaceId)
     .maybeSingle();
 
-  if (!sub?.stripe_subscription_id) return { ok: false, error: "No active Stripe subscription found" };
+  // Trial users (no Stripe subscription): cancel directly in the DB
+  if (!sub?.stripe_subscription_id) {
+    await admin.from("subscriptions").update({
+      status: "canceled",
+      canceled_at: new Date().toISOString(),
+    }).eq("workspace_id", workspaceId);
+
+    if (cancellationRequestId) {
+      await admin.from("cancellation_requests").update({
+        status: "cancelled",
+        resolved_at: new Date().toISOString(),
+      }).eq("id", cancellationRequestId);
+    }
+    return { ok: true };
+  }
 
   const stripeSub = await stripe().subscriptions.update(sub.stripe_subscription_id, {
     cancel_at_period_end: true,
