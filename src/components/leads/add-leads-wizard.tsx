@@ -2,7 +2,7 @@
 import { useRef, useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  X, Search, Megaphone, Video, FileSpreadsheet, Pencil, ShoppingCart,
+  X, Search, Megaphone, MailCheck, FileSpreadsheet, Pencil, ShoppingCart,
   ArrowLeft, ArrowRight, Loader2, Check, CheckCircle2, AlertCircle, AlertTriangle,
   Upload, Plus, Trash2, Users2, Link2, RefreshCw, ExternalLink, Sparkles,
   Building2, User,
@@ -28,7 +28,7 @@ import { getPicklistValues } from "@/lib/queries/picklists";
 import { cn } from "@/lib/utils";
 import { PhoneInput, formatPhoneForStorage, isPhoneValid, detectCountry, type CountryCode } from "@/components/ui/phone-input";
 
-export type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
+export type SourceId = "linkedin-search" | "linkedin-post" | "verified-emails" | "manual" | "buy" | "csv";
 
 interface SourceDef {
   id: SourceId;
@@ -44,7 +44,7 @@ interface SourceDef {
 const SOURCES: SourceDef[] = [
   { id: "linkedin-search", label: "Basic LinkedIn Search", desc: "Add profiles from the free LinkedIn search page", icon: Search, color: "text-blue-600 bg-blue-50" },
   { id: "linkedin-post", label: "LinkedIn Post", desc: "Capture people who engaged with a post", icon: Megaphone, color: "text-sky-600 bg-sky-50", badge: "New" },
-  { id: "youtube", label: "YouTube Post", desc: "Scrape engagers from a video or post", icon: Video, color: "text-red-600 bg-red-50" },
+  { id: "verified-emails", label: "Verified Emails", desc: "Get real prospects that always come with a verified email", icon: MailCheck, color: "text-red-600 bg-red-50", featureFlag: "discovery" },
   { id: "manual", label: "Add Leads Manually", desc: "Type in leads one by one with full details", icon: Pencil, color: "text-indigo-600 bg-indigo-50" },
   { id: "buy", label: "Buy Leads", desc: "Find real prospects by industry, role & location", icon: ShoppingCart, color: "text-amber-600 bg-amber-50", featureFlag: "discovery" },
   { id: "csv", label: "Upload CSV file", desc: "Import an existing prospect list in bulk", icon: FileSpreadsheet, color: "text-emerald-600 bg-emerald-50" },
@@ -53,7 +53,7 @@ const SOURCES: SourceDef[] = [
 const SOURCE_LABEL: Record<SourceId, string> = {
   "linkedin-search": "LinkedIn Search",
   "linkedin-post": "LinkedIn Post",
-  youtube: "YouTube",
+  "verified-emails": "Verified Emails",
   manual: "Manual Entry",
   buy: "Buy Leads",
   csv: "CSV Upload",
@@ -264,7 +264,9 @@ export function AddLeadsWizard({
   const isCsv = source === "csv";
   const isLinkedIn = source === "linkedin-search" || source === "linkedin-post";
   const isManualEntry = source === "manual";
-  const isBuy = source === "buy";
+  // "verified-emails" is a shortcut into the same Buy Leads flow with the
+  // verified-email filter forced on (see chooseSource) — not a separate pipeline.
+  const isBuy = source === "buy" || source === "verified-emails";
   const isCompanyBuy = isBuy && buyMode === "company";
 
   // Check LinkedIn connection when the wizard opens / a LinkedIn source is picked
@@ -348,6 +350,7 @@ export function AddLeadsWizard({
   // ---- Company-wise Leads: find people at the named companies ----
   function runFindProspects() {
     setStep2Error(null);
+    setStep2Warning(null);
     setPeopleLoading(true);
     setCompanyProspects(null);
     const named = companies.filter((c) => c.name.trim());
@@ -371,6 +374,7 @@ export function AddLeadsWizard({
         });
         setCompanyProspects(prospects);
         setSelectedProspects(new Set(prospects.map((_, i) => i)));
+        if (res.note) setStep2Warning(res.note);
       })
       .catch((e) => setStep2Error(e instanceof Error ? e.message : "Search failed"))
       .finally(() => setPeopleLoading(false));
@@ -395,11 +399,16 @@ export function AddLeadsWizard({
     setStep2Error(null);
     setStep2Warning(null);
     setInputValue("");
+    if (id === "verified-emails") {
+      setBuy((b) => ({ ...b, requireVerifiedEmail: true }));
+      setCompanyForm((f) => ({ ...f, requireVerifiedEmail: true }));
+    }
   }
 
   // ---- Buy leads: generate sample prospects via AI ----
   function runGenerate() {
     setStep2Error(null);
+    setStep2Warning(null);
     setBuyLoading(true);
     setBuyResults(null);
     searchBuyLeads(buy)
@@ -407,6 +416,7 @@ export function AddLeadsWizard({
         if (!res.ok) { setStep2Error(res.error || "Could not find prospects."); return; }
         setBuyResults(res.prospects);
         setBuySource(res.source ?? null);
+        if (res.note) setStep2Warning(res.note);
       })
       .catch((e) => setStep2Error(e instanceof Error ? e.message : "Search failed"))
       .finally(() => setBuyLoading(false));
@@ -459,10 +469,6 @@ export function AddLeadsWizard({
     if (source === "linkedin-post") {
       if (!v) { setStep2Error("Paste the LinkedIn post URL."); return false; }
       if (!/linkedin\.com/i.test(v)) { setStep2Error("Enter a valid LinkedIn post URL."); return false; }
-    }
-    if (source === "youtube") {
-      if (!v) { setStep2Error("Paste the YouTube video URL."); return false; }
-      if (!/(youtube\.com|youtu\.be)/i.test(v)) { setStep2Error("Invalid or private video URL. Enter a public YouTube link."); return false; }
     }
     return true;
   }
@@ -657,7 +663,7 @@ export function AddLeadsWizard({
       <div className="overflow-auto flex-1 px-6 sm:px-10 py-8 flex flex-col">
         <div className={cn(
           "max-w-6xl mx-auto w-full flex-1 flex flex-col",
-          (source === "linkedin-search" || source === "linkedin-post" || source === "youtube") && step === 2 && "justify-center"
+          (source === "linkedin-search" || source === "linkedin-post") && step === 2 && "justify-center"
         )}>
           {step === 1 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -728,7 +734,9 @@ export function AddLeadsWizard({
                     loading={buyLoading}
                     onGenerate={runGenerate}
                     error={step2Error}
+                    warning={step2Warning}
                     maxCount={maxBuyCount}
+                    forceVerifiedEmail={source === "verified-emails"}
                   />
                 ) : (
                   <CompanyWiseLeadsFlow
@@ -743,7 +751,9 @@ export function AddLeadsWizard({
                     setSelectedProspects={setSelectedProspects}
                     maxCount={maxBuyCount}
                     error={step2Error}
+                    warning={step2Warning}
                     clearError={() => setStep2Error(null)}
+                    forceVerifiedEmail={source === "verified-emails"}
                   />
                 )}
               </div>
@@ -881,7 +891,7 @@ function Step2Input(props: {
   const fieldLabel: Record<SourceId, string> = {
     "linkedin-search": "LinkedIn search URL",
     "linkedin-post": "LinkedIn post URL",
-    youtube: "YouTube video / post URL",
+    "verified-emails": "",
     manual: "",
     buy: "",
     csv: "",
@@ -889,7 +899,7 @@ function Step2Input(props: {
   const placeholder: Record<SourceId, string> = {
     "linkedin-search": "https://www.linkedin.com/search/results/people/?keywords=…",
     "linkedin-post": "https://www.linkedin.com/posts/…",
-    youtube: "https://www.youtube.com/watch?v=…",
+    "verified-emails": "",
     manual: "",
     buy: "",
     csv: "",
@@ -955,11 +965,7 @@ function Step2Input(props: {
       "Copy the post's URL and paste it here.",
       "Next, add the engagers you want to capture as leads.",
     ],
-    youtube: [
-      "Find a YouTube video or Community post with an engaged audience.",
-      "Copy its URL and paste it here.",
-      "Next, add the commenters/channels you want to capture as leads.",
-    ],
+    "verified-emails": [],
     manual: [], buy: [], csv: [],
   };
 
@@ -1064,8 +1070,8 @@ function CsvReview({ rows, valid, invalid }: { rows: CsvRow[]; valid: number; in
 }
 
 function ManualReview({ source, manual, setManual }: { source: SourceId; manual: ManualLead[]; setManual: (m: ManualLead[]) => void }) {
-  const titleLabel = source === "youtube" ? "Comment / note" : "Title / role";
-  const urlLabel = source === "linkedin-search" || source === "linkedin-post" ? "Profile URL" : source === "youtube" ? "Channel link" : "Profile link";
+  const titleLabel = "Title / role";
+  const urlLabel = source === "linkedin-search" || source === "linkedin-post" ? "Profile URL" : "Profile link";
 
   function update(id: string, key: keyof ManualLead, value: string) {
     setManual(manual.map((m) => (m.id === id ? { ...m, [key]: value } : m)));
@@ -1289,7 +1295,7 @@ export type BuyState = {
 // values load in — "Any" is a client-only sentinel for this filter UI, never stored.
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
-export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, maxCount }: {
+export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, warning, maxCount, forceVerifiedEmail }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;
@@ -1297,7 +1303,11 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
   loading: boolean;
   onGenerate: () => void;
   error: string | null;
+  warning?: string | null;
   maxCount: number;
+  /** Set when the wizard's "Verified Emails" card was chosen instead of plain
+   *  "Buy Leads" — locks the filter on so it can't be turned off. */
+  forceVerifiedEmail?: boolean;
 }) {
   const isReal = source === "brightdata" || source === "anysite";
   // Initialized once from buy.count — BuyForm unmounts whenever the user leaves
@@ -1361,9 +1371,15 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
         </div>
 
         <div className="space-y-3 py-1">
-          <label className="flex items-center gap-3 text-base text-slate-800 cursor-pointer">
-            <input type="checkbox" checked={buy.requireVerifiedEmail} onChange={(e) => setBuy({ ...buy, requireVerifiedEmail: e.target.checked })} className="rounded border-slate-400 h-5 w-5 cursor-pointer" />
-            Require a verified work email
+          <label className={cn("flex items-center gap-3 text-base text-slate-800", forceVerifiedEmail ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
+            <input
+              type="checkbox"
+              checked={buy.requireVerifiedEmail}
+              disabled={forceVerifiedEmail}
+              onChange={(e) => setBuy({ ...buy, requireVerifiedEmail: e.target.checked })}
+              className={cn("rounded border-slate-400 h-5 w-5", forceVerifiedEmail ? "cursor-not-allowed" : "cursor-pointer")}
+            />
+            Require a verified work email{forceVerifiedEmail && " (always on for Verified Emails)"}
           </label>
           <label className="flex items-center gap-3 text-base text-slate-800 cursor-pointer">
             <input type="checkbox" checked={buy.includePhoneAndSocial} onChange={(e) => setBuy({ ...buy, includePhoneAndSocial: e.target.checked })} className="rounded border-slate-400 h-5 w-5 cursor-pointer" />
@@ -1404,6 +1420,11 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           </div>
         )}
 
+        {warning && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{warning}</span>
+          </div>
+        )}
         {error && <ErrorNote text={error} />}
       </div>
 
@@ -1479,7 +1500,7 @@ type CompanyWiseForm = { locations: string[]; requireVerifiedEmail: boolean; cou
 
 function CompanyWiseLeadsFlow({
   companies, setCompanies, form, setForm, prospects, peopleLoading, onFindProspects,
-  selectedProspects, setSelectedProspects, maxCount, error, clearError,
+  selectedProspects, setSelectedProspects, maxCount, error, warning, clearError, forceVerifiedEmail,
 }: {
   companies: CompanyEntry[];
   setCompanies: (c: CompanyEntry[]) => void;
@@ -1492,7 +1513,10 @@ function CompanyWiseLeadsFlow({
   setSelectedProspects: (s: Set<number>) => void;
   maxCount: number;
   error: string | null;
+  warning?: string | null;
   clearError: () => void;
+  /** Set when the wizard's "Verified Emails" card was chosen — locks the filter on. */
+  forceVerifiedEmail?: boolean;
 }) {
   const [countDraft, setCountDraft] = useState(String(form.count));
   const [showResults, setShowResults] = useState(prospects !== null);
@@ -1596,9 +1620,15 @@ function CompanyWiseLeadsFlow({
           <MultiLocationInput value={form.locations} onChange={(v) => setForm({ ...form, locations: v })} />
         </div>
 
-        <label className="flex items-center gap-3 text-base text-slate-800 cursor-pointer">
-          <input type="checkbox" checked={form.requireVerifiedEmail} onChange={(e) => setForm({ ...form, requireVerifiedEmail: e.target.checked })} className="rounded border-slate-400 h-5 w-5 cursor-pointer" />
-          Require a verified work email
+        <label className={cn("flex items-center gap-3 text-base text-slate-800", forceVerifiedEmail ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
+          <input
+            type="checkbox"
+            checked={form.requireVerifiedEmail}
+            disabled={forceVerifiedEmail}
+            onChange={(e) => setForm({ ...form, requireVerifiedEmail: e.target.checked })}
+            className={cn("rounded border-slate-400 h-5 w-5", forceVerifiedEmail ? "cursor-not-allowed" : "cursor-pointer")}
+          />
+          Require a verified work email{forceVerifiedEmail && " (always on for Verified Emails)"}
         </label>
 
         <div className="max-w-[220px]">
@@ -1625,6 +1655,11 @@ function CompanyWiseLeadsFlow({
         </Button>
 
         {namedCount === 0 && <p className="text-xs text-slate-400">Enter at least one company to continue.</p>}
+        {warning && (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" /> <span>{warning}</span>
+          </div>
+        )}
         {error && <ErrorNote text={error} />}
       </div>
 

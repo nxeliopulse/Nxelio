@@ -287,27 +287,21 @@ export function ConvertLeadModal({
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1 animate-in fade-in duration-200">
                     <div>
                       <label className={labelStyle}>First Name</label>
-                      <input className={fieldStyle} value={contactFirstName} onChange={(e) => setContactFirstName(e.target.value)} />
+                      <input className={`${fieldStyle} bg-slate-50 dark:bg-slate-800/60 cursor-not-allowed`} value={contactFirstName} disabled readOnly />
                     </div>
                     <div>
                       <label className={labelStyle}>Last Name</label>
-                      <input className={fieldStyle} value={contactLastName} onChange={(e) => setContactLastName(e.target.value)} />
+                      <input className={`${fieldStyle} bg-slate-50 dark:bg-slate-800/60 cursor-not-allowed`} value={contactLastName} disabled readOnly />
                     </div>
                     <div>
                       <label className={labelStyle}>Email</label>
-                      <input className={fieldStyle} value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+                      <input className={`${fieldStyle} bg-slate-50 dark:bg-slate-800/60 cursor-not-allowed`} value={contactEmail} disabled readOnly />
                     </div>
                     <div>
                       <label className={labelStyle}>Phone</label>
-                      <PhoneInput
-                        label=""
-                        country={contactPhoneCountry}
-                        value={contactPhone}
-                        onCountryChange={setContactPhoneCountry}
-                        onValueChange={setContactPhone}
-                        inputClassName={fieldStyle}
-                      />
+                      <input className={`${fieldStyle} bg-slate-50 dark:bg-slate-800/60 cursor-not-allowed`} value={contactPhone} disabled readOnly />
                     </div>
+                    <p className="text-xs text-slate-400 sm:col-span-4 -mt-1">These come straight from the lead record — edit the lead itself first if anything here needs to change.</p>
                   </div>
                 )}
                 {contactMode === "existing" && matchedContact && (

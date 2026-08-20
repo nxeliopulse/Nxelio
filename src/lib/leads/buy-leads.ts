@@ -49,6 +49,10 @@ export interface BuyLeadsResult {
   /** "brightdata" / "anysite" = real prospects (from whichever provider is active), "ai" = synthetic samples. */
   source?: "brightdata" | "anysite" | "ai";
   error?: string;
+  /** Set only when requireVerifiedEmail was on and, even after expanding the
+   *  search across several rounds, fewer verified-email prospects were found
+   *  than requested — honest partial-result note, never papered over. */
+  note?: string;
 }
 
 /**
@@ -58,6 +62,12 @@ export interface BuyLeadsResult {
  * fully wired, this just decides which one runs. Falls back to AI-generated
  * samples only when the active provider isn't configured at all.
  */
+/** How many extra rounds to try when requireVerifiedEmail leaves the caller
+ *  short of what they asked for. Each round re-queries the provider for a
+ *  larger raw batch (never fabricating anyone) — bounded so a stubborn
+ *  criteria/location combo can't spiral into unbounded provider calls. */
+const VERIFIED_EMAIL_TOPUP_MULTIPLIERS = [2, 3, 5];
+
 export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeadsResult> {
   if (!(await hasFeature("discovery"))) {
     return { ok: false, prospects: [], error: "Lead discovery isn't included on your plan. Upgrade to Starter or Pro to unlock it." };
@@ -70,46 +80,82 @@ export async function searchBuyLeads(rawCriteria: BuyCriteria): Promise<BuyLeads
   const provider = await getActiveLeadProvider();
 
   if (provider === "anysite" && anysiteConfigured) {
-    const r = await searchAnysiteUsers({ role: [criteria.role, criteria.industry].filter(Boolean).join(" ").trim(), locations: criteria.locations, count: criteria.count });
-    if (r.ok && r.prospects.length) {
-      const prospects: GeneratedProspect[] = r.prospects
-        .filter((p) => !criteria.seniority || criteria.seniority === "Any" || p.seniority === criteria.seniority)
-        .map((p) => ({
-          full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
-          title: p.title, seniority: p.seniority, company_name: p.company_name,
-          industry: criteria.industry || "", website_url: "", linkedin: p.linkedin,
-          location: p.location, email: "",
-        }));
-      return enrichWithAnysiteEmails(prospects, criteria.requireVerifiedEmail);
-    }
-    return { ok: false, prospects: [], error: r.error || "No prospects found." };
+    return searchAnysiteWithTopUp(criteria, maxAllowed);
   }
 
   if (provider === "bright_data" && brightDataConfigured) {
-    const r = await brightDataSearchPeople(criteria);
-    if (r.ok && r.prospects.length) {
-      const prospects: GeneratedProspect[] = r.prospects.map((p) => ({
-        full_name: p.full_name,
-        first_name: p.first_name,
-        last_name: p.last_name,
-        title: p.title,
-        seniority: p.seniority,
-        company_name: p.company_name,
-        industry: criteria.industry || "",
-        website_url: "",
-        linkedin: p.linkedin,
-        location: p.location,
-        email: p.email || "",
-      }));
-      return enrichAndFilterProspects(prospects, criteria.requireVerifiedEmail);
-    }
-    // Configured but failed → surface the error rather than faking data.
-    return { ok: false, prospects: [], error: r.error || "No prospects found." };
+    return searchBrightDataWithTopUp(criteria, maxAllowed);
   }
 
   // Active provider isn't configured (missing API key) → AI samples, clearly labeled as such.
   const ai = await generateSampleProspects(criteria);
   return { ...ai, source: "ai" };
+}
+
+async function searchAnysiteWithTopUp(criteria: BuyCriteria, maxAllowed: number): Promise<BuyLeadsResult> {
+  const rounds = criteria.requireVerifiedEmail ? [1, ...VERIFIED_EMAIL_TOPUP_MULTIPLIERS] : [1];
+  let lastError: string | undefined;
+  let best: GeneratedProspect[] = [];
+
+  for (const multiplier of rounds) {
+    const rawCount = Math.min(criteria.count * multiplier, maxAllowed);
+    const r = await searchAnysiteUsers({ role: [criteria.role, criteria.industry].filter(Boolean).join(" ").trim(), locations: criteria.locations, count: rawCount });
+    if (!r.ok || !r.prospects.length) { lastError = r.error || "No prospects found."; if (multiplier === rounds[rounds.length - 1]) break; else continue; }
+
+    const raw: GeneratedProspect[] = r.prospects
+      .filter((p) => !criteria.seniority || criteria.seniority === "Any" || p.seniority === criteria.seniority)
+      .map((p) => ({
+        full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
+        title: p.title, seniority: p.seniority, company_name: p.company_name,
+        industry: criteria.industry || "", website_url: "", linkedin: p.linkedin,
+        location: p.location, email: "",
+      }));
+
+    const enriched = await enrichWithAnysiteEmails(raw, criteria.requireVerifiedEmail);
+    if (enriched.ok) best = enriched.prospects;
+    else lastError = enriched.error;
+
+    if (!criteria.requireVerifiedEmail || best.length >= criteria.count || rawCount >= maxAllowed) break;
+  }
+
+  if (!best.length) return { ok: false, prospects: [], error: lastError || "No prospects found." };
+  const trimmed = best.slice(0, criteria.count);
+  const note = criteria.requireVerifiedEmail && trimmed.length < criteria.count
+    ? `Found ${trimmed.length} of the ${criteria.count} requested — that's every real prospect with a verified email matching these criteria right now. Try a broader location/role to get more.`
+    : undefined;
+  return { ok: true, source: "anysite", prospects: trimmed, note };
+}
+
+async function searchBrightDataWithTopUp(criteria: BuyCriteria, maxAllowed: number): Promise<BuyLeadsResult> {
+  const rounds = criteria.requireVerifiedEmail ? [1, ...VERIFIED_EMAIL_TOPUP_MULTIPLIERS] : [1];
+  let lastError: string | undefined;
+  let best: GeneratedProspect[] = [];
+
+  for (const multiplier of rounds) {
+    const rawCount = Math.min(criteria.count * multiplier, maxAllowed);
+    const r = await brightDataSearchPeople({ ...criteria, count: rawCount });
+    if (!r.ok || !r.prospects.length) { lastError = r.error || "No prospects found."; if (multiplier === rounds[rounds.length - 1]) break; else continue; }
+
+    const raw: GeneratedProspect[] = r.prospects.map((p) => ({
+      full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
+      title: p.title, seniority: p.seniority, company_name: p.company_name,
+      industry: criteria.industry || "", website_url: "", linkedin: p.linkedin,
+      location: p.location, email: p.email || "",
+    }));
+
+    const enriched = await enrichAndFilterProspects(raw, criteria.requireVerifiedEmail);
+    if (enriched.ok) best = enriched.prospects;
+    else lastError = enriched.error;
+
+    if (!criteria.requireVerifiedEmail || best.length >= criteria.count || rawCount >= maxAllowed) break;
+  }
+
+  if (!best.length) return { ok: false, prospects: [], error: lastError || "No prospects found." };
+  const trimmed = best.slice(0, criteria.count);
+  const note = criteria.requireVerifiedEmail && trimmed.length < criteria.count
+    ? `Found ${trimmed.length} of the ${criteria.count} requested — that's every real prospect with a verified email matching these criteria right now. Try a broader location/role to get more.`
+    : undefined;
+  return { ok: true, source: "brightdata", prospects: trimmed, note };
 }
 
 /** Anysite-only enrichment path — email lookup via Anysite's own endpoint,
@@ -324,49 +370,52 @@ export async function searchPeopleAtCompanies(rawCriteria: CompanyPeopleCriteria
   // rather than inventing a filter the data source can't actually apply.
   const role = [rawCriteria.role, rawCriteria.department].filter(Boolean).join(" ").trim();
   const provider = await getActiveLeadProvider();
+  const rounds = rawCriteria.requireVerifiedEmail ? [1, ...VERIFIED_EMAIL_TOPUP_MULTIPLIERS] : [1];
+  let lastError: string | undefined;
+  let best: GeneratedProspect[] = [];
 
   if (provider === "anysite" && anysiteConfigured) {
-    const r = await searchAnysiteUsers({ role, locations: rawCriteria.locations, count, companyNames: rawCriteria.companyNames });
-    if (!r.ok || !r.prospects.length) {
-      return { ok: false, prospects: [], error: r.error || "No prospects found at the selected companies." };
+    for (const multiplier of rounds) {
+      const rawCount = Math.min(count * multiplier, maxAllowed);
+      const r = await searchAnysiteUsers({ role, locations: rawCriteria.locations, count: rawCount, companyNames: rawCriteria.companyNames });
+      if (!r.ok || !r.prospects.length) { lastError = r.error || "No prospects found at the selected companies."; if (multiplier === rounds[rounds.length - 1]) break; else continue; }
+      const raw: GeneratedProspect[] = r.prospects
+        .filter((p) => !rawCriteria.seniority || rawCriteria.seniority === "Any" || p.seniority === rawCriteria.seniority)
+        .map((p) => ({
+          full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
+          title: p.title, seniority: p.seniority, company_name: p.company_name,
+          industry: "", website_url: "", linkedin: p.linkedin, location: p.location, email: "",
+        }));
+      const enriched = await enrichWithAnysiteEmails(raw, rawCriteria.requireVerifiedEmail);
+      if (enriched.ok) best = enriched.prospects;
+      else lastError = enriched.error;
+      if (!rawCriteria.requireVerifiedEmail || best.length >= count || rawCount >= maxAllowed) break;
     }
-    const prospects: GeneratedProspect[] = r.prospects
-      .filter((p) => !rawCriteria.seniority || rawCriteria.seniority === "Any" || p.seniority === rawCriteria.seniority)
-      .map((p) => ({
+  } else if (brightDataConfigured) {
+    for (const multiplier of rounds) {
+      const rawCount = Math.min(count * multiplier, maxAllowed);
+      const r = await brightDataSearchPeople({ role, locations: rawCriteria.locations, count: rawCount, seniority: rawCriteria.seniority, companyNames: rawCriteria.companyNames });
+      if (!r.ok || !r.prospects.length) { lastError = r.error || "No prospects found at the selected companies."; if (multiplier === rounds[rounds.length - 1]) break; else continue; }
+      const raw: GeneratedProspect[] = r.prospects.map((p) => ({
         full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
         title: p.title, seniority: p.seniority, company_name: p.company_name,
-        industry: "", website_url: "", linkedin: p.linkedin, location: p.location, email: "",
+        industry: "", website_url: "", linkedin: p.linkedin, location: p.location, email: p.email || "",
       }));
-    return enrichWithAnysiteEmails(prospects, rawCriteria.requireVerifiedEmail);
-  }
-
-  if (!brightDataConfigured) {
+      const enriched = await enrichAndFilterProspects(raw, rawCriteria.requireVerifiedEmail);
+      if (enriched.ok) best = enriched.prospects;
+      else lastError = enriched.error;
+      if (!rawCriteria.requireVerifiedEmail || best.length >= count || rawCount >= maxAllowed) break;
+    }
+  } else {
     return { ok: false, prospects: [], error: "Lead discovery requires the active provider to be configured." };
   }
-  const r = await brightDataSearchPeople({
-    role,
-    locations: rawCriteria.locations,
-    count,
-    seniority: rawCriteria.seniority,
-    companyNames: rawCriteria.companyNames,
-  });
-  if (!r.ok || !r.prospects.length) {
-    return { ok: false, prospects: [], error: r.error || "No prospects found at the selected companies." };
-  }
-  const prospects: GeneratedProspect[] = r.prospects.map((p) => ({
-    full_name: p.full_name,
-    first_name: p.first_name,
-    last_name: p.last_name,
-    title: p.title,
-    seniority: p.seniority,
-    company_name: p.company_name,
-    industry: "",
-    website_url: "",
-    linkedin: p.linkedin,
-    location: p.location,
-    email: p.email || "",
-  }));
-  return enrichAndFilterProspects(prospects, rawCriteria.requireVerifiedEmail);
+
+  if (!best.length) return { ok: false, prospects: [], error: lastError || "No prospects found at the selected companies." };
+  const trimmed = best.slice(0, count);
+  const note = rawCriteria.requireVerifiedEmail && trimmed.length < count
+    ? `Found ${trimmed.length} of the ${count} requested — that's every real prospect with a verified email at these companies right now. Try adding more companies or broadening the role/location.`
+    : undefined;
+  return { ok: true, source: provider === "anysite" ? "anysite" : "brightdata", prospects: trimmed, note };
 }
 
 /**
