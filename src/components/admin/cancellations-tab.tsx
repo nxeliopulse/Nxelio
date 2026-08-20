@@ -28,7 +28,7 @@ const STATUS_STYLE: Record<CancellationStatus, string> = {
   retained: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
   cancelled: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400",
   follow_up_required: "bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400",
-  no_response: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+  no_response: "bg-slate-100 text-slate-600",
 };
 
 const STATUS_ICON: Record<CancellationStatus, React.ElementType> = {
@@ -108,15 +108,15 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
   }
 
   return (
-    <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+    <div className="border border-slate-200 rounded-xl overflow-hidden">
       {/* Summary row */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{ticket.customer_email}</span>
+            <span className="text-sm font-medium text-slate-900">{ticket.customer_email}</span>
             {ticket.plan_id && <span className="text-xs text-slate-500 capitalize">{ticket.plan_id}</span>}
             <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLE[ticket.status]}`}>
               <StatusIcon className="h-3 w-3" />
@@ -139,7 +139,7 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
 
       {/* Expanded panel */}
       {expanded && (
-        <div className="border-t border-slate-200 dark:border-slate-700 p-4 space-y-4 bg-slate-50 dark:bg-slate-900">
+        <div className="border-t border-slate-200 p-4 space-y-4 bg-slate-50">
           {error && (
             <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-3 py-2.5">
               <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
@@ -160,7 +160,7 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
           {ticket.feedback && (
             <div>
               <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Customer Feedback</span>
-              <p className="mt-1 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{ticket.feedback}</p>
+              <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{ticket.feedback}</p>
             </div>
           )}
 
@@ -180,7 +180,7 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
                 <button
                   onClick={handleCreateMeeting}
                   disabled={meetingPending}
-                  className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-blue-700 bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors disabled:opacity-50"
+                  className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-blue-700 bg-white border border-blue-300 dark:border-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors disabled:opacity-50"
                 >
                   {meetingPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Video className="h-3.5 w-3.5" />}
                   Create Meeting Link
@@ -194,7 +194,7 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
                     value={meetingLink}
                     onChange={e => setMeetingLink(e.target.value)}
                     onBlur={e => saveField("meeting_link", e.target.value)}
-                    className="w-full text-xs rounded-lg border border-blue-200 dark:border-blue-600 px-3 py-1.5 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-xs rounded-lg border border-blue-200 dark:border-blue-600 px-3 py-1.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               )}
@@ -208,7 +208,7 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
               value={ticket.status}
               onChange={e => changeStatus(e.target.value as CancellationStatus)}
               disabled={pending || ticket.status === "cancelled"}
-              className="text-sm rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className="text-sm rounded-lg border border-slate-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 text-slate-800"
             >
               {ALL_STATUSES.map(s => (
                 <option key={s} value={s}>{STATUS_LABELS[s]}</option>
@@ -225,7 +225,7 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
               onChange={e => setAdminNotes(e.target.value)}
               onBlur={e => saveField("admin_notes", e.target.value)}
               placeholder="Internal notes…"
-              className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 bg-white dark:bg-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
 
@@ -238,7 +238,7 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
               onChange={e => setRetentionOffer(e.target.value)}
               onBlur={e => saveField("retention_offer", e.target.value)}
               placeholder="e.g. 2 months free, 30% discount…"
-              className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 bg-white dark:bg-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
 
@@ -282,7 +282,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="text-xs text-slate-500 block">{label}</span>
-      <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{value}</span>
+      <span className="text-sm font-medium text-slate-800">{value}</span>
     </div>
   );
 }
@@ -311,7 +311,7 @@ export function CancellationsTab({ initialRequests }: CancellationsTabProps) {
   const maxCount = topReasons[0]?.[1] ?? 1;
 
   const statCards = [
-    { label: "Total", value: total, color: "text-slate-700 dark:text-slate-200", bg: "bg-slate-50 dark:bg-slate-800" },
+    { label: "Total", value: total, color: "text-slate-700", bg: "bg-slate-50" },
     { label: "Pending", value: byStatus("pending"), color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20" },
     { label: "Meeting Scheduled", value: byStatus("meeting_scheduled"), color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
     { label: "Retained", value: byStatus("retained"), color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
@@ -341,16 +341,16 @@ export function CancellationsTab({ initialRequests }: CancellationsTabProps) {
           <div className="space-y-2">
             {topReasons.map(([reason, count]) => (
               <div key={reason} className="flex items-center gap-3">
-                <span className="text-xs text-slate-600 dark:text-slate-400 w-40 shrink-0 truncate">
+                <span className="text-xs text-slate-600 w-40 shrink-0 truncate">
                   {REASON_LABELS[reason as keyof typeof REASON_LABELS] ?? reason}
                 </span>
-                <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-blue-500 rounded-full"
                     style={{ width: `${Math.round((count / maxCount) * 100)}%` }}
                   />
                 </div>
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400 w-5 text-right">{count}</span>
+                <span className="text-xs font-medium text-slate-600 w-5 text-right">{count}</span>
               </div>
             ))}
           </div>
@@ -363,8 +363,8 @@ export function CancellationsTab({ initialRequests }: CancellationsTabProps) {
           Cancellation Requests {total > 0 && `(${total})`}
         </h3>
         {requests.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-12 text-center">
-            <XCircle className="h-8 w-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <div className="rounded-xl border border-dashed border-slate-200 p-12 text-center">
+            <XCircle className="h-8 w-8 text-slate-300 mx-auto mb-2" />
             <p className="text-sm text-slate-500 dark:text-slate-400">No cancellation requests yet.</p>
           </div>
         ) : (
