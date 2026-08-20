@@ -1,6 +1,8 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { resolveAiConfig } from "@/lib/ai/provider";
+import { scanPrompt, rateLimit } from "@/lib/ai/security";
+import { auditInjectionBlocked, auditInjectionSanitized, auditRateLimited } from "@/lib/ai/audit";
 
 export interface SupportMessage {
   role: "user" | "assistant";
@@ -94,9 +96,29 @@ export async function runSupport(history: SupportMessage[]): Promise<SupportResu
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { reply: "", error: "Please sign in to use support." };
 
+  const rl = rateLimit(user.id, "support");
+  if (!rl.allowed) {
+    await auditRateLimited("support");
+    return { reply: "You're sending messages too quickly — please wait a moment and try again." };
+  }
+
+  const trimmed = history.slice(-10).map((m) => ({ role: m.role, content: m.content }));
+  const lastUserIdx = trimmed.map((m) => m.role).lastIndexOf("user");
+  if (lastUserIdx >= 0) {
+    const scan = scanPrompt(trimmed[lastUserIdx].content);
+    if (scan.blocked) {
+      await auditInjectionBlocked(scan.flags);
+      return { reply: "I can't help with that request." };
+    }
+    if (scan.sanitized) {
+      await auditInjectionSanitized(scan.flags);
+      trimmed[lastUserIdx] = { ...trimmed[lastUserIdx], content: scan.safeText };
+    }
+  }
+
   const messages = [
     { role: "system", content: SYSTEM_PROMPT },
-    ...history.slice(-10).map((m) => ({ role: m.role, content: m.content })),
+    ...trimmed,
   ];
 
   const res = await call(apiKey, baseUrl, model, messages);

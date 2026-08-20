@@ -1,5 +1,7 @@
 "use server";
+import { headers } from "next/headers";
 import { resolveAiConfig } from "@/lib/ai/provider";
+import { scanPrompt, rateLimit } from "@/lib/ai/security";
 
 export interface LandingChatMessage {
   role: "user" | "assistant";
@@ -71,11 +73,21 @@ async function call(apiKey: string, baseUrl: string, model: string, messages: { 
 }
 
 /** Public, unauthenticated Q&A chat for the marketing landing page. No workspace/credit
- *  gating — bounded instead by trimming history and message length below. */
+ *  gating — bounded instead by trimming history and message length below, a
+ *  per-IP rate limit, and the same prompt-injection scan every other AI
+ *  surface in the app uses. */
 export async function askLandingAssistant(history: LandingChatMessage[]): Promise<LandingChatResult> {
   const { apiKey, baseUrl, model } = await resolveAiConfig();
   if (!apiKey) {
     return { reply: "Our AI assistant isn't available right now, but I'd love to show you around — try booking a demo instead!" };
+  }
+
+  // No login here, so rate-limit by IP instead of user id.
+  const hdrs = await headers();
+  const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() || hdrs.get("x-real-ip") || "unknown";
+  const rl = rateLimit(`landing:${ip}`, "landing");
+  if (!rl.allowed) {
+    return { reply: "I'm getting a lot of questions right now — please try again in a moment." };
   }
 
   const trimmed = history.slice(-8).map((m) => ({
@@ -83,6 +95,17 @@ export async function askLandingAssistant(history: LandingChatMessage[]): Promis
     content: m.content.slice(0, 600),
   }));
   if (trimmed.length === 0) return { reply: "" };
+
+  const lastUserIdx = trimmed.map((m) => m.role).lastIndexOf("user");
+  if (lastUserIdx >= 0) {
+    const scan = scanPrompt(trimmed[lastUserIdx].content);
+    if (scan.blocked) {
+      return { reply: "I can't help with that request — is there anything about Nxelio Nurture I can answer instead?" };
+    }
+    if (scan.sanitized) {
+      trimmed[lastUserIdx] = { ...trimmed[lastUserIdx], content: scan.safeText };
+    }
+  }
 
   const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...trimmed];
   const res = await call(apiKey, baseUrl, model, messages);

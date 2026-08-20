@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runProactiveAi } from "@/lib/queries/proactive-ai";
+import { webhookSecretValid } from "@/lib/webhook-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -12,7 +13,8 @@ export const maxDuration = 60;
 async function run(request: NextRequest) {
   const secret = process.env.AI_PROACTIVE_CRON_SECRET || process.env.OUTREACH_CRON_SECRET;
   const auth = request.headers.get("authorization") || "";
-  if (!secret || auth !== `Bearer ${secret}`) {
+  const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!webhookSecretValid(provided, secret)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   try {

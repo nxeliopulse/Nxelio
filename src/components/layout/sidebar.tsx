@@ -187,30 +187,41 @@ export function Sidebar({ role, navAccess }: { role?: string; navAccess?: Record
       )}
     >
       <div className="w-full flex flex-col h-full">
-        {/* Header Logo — aligned with Topbar height (h-16) */}
+        {/* Header Logo — aligned with Topbar height (h-16). Logo is a plain brand
+            mark now (not a toggle); collapse/expand has its own dedicated button. */}
         <div className={cn("h-16 py-2.5 flex items-center flex-shrink-0", collapsed ? "justify-center px-2" : "px-4")}>
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            suppressHydrationWarning
-            className={cn("flex items-center gap-2.5 group w-full", collapsed && "justify-center")}
-          >
-            {!collapsed && (
+          {collapsed ? (
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+              className="h-9 w-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm hover:scale-105 transition-transform"
+            >
+              <PanelLeftOpen className="h-4 w-4 text-slate-800" />
+            </button>
+          ) : (
+            <div className="flex items-center gap-2.5 w-full">
+              <span className="h-9 w-9 rounded-xl bg-white flex items-center justify-center font-bold flex-shrink-0 shadow-sm overflow-hidden">
+                <LogoMark className="h-full w-full" />
+              </span>
               <span className="flex flex-col leading-tight whitespace-nowrap text-left">
                 <span className="font-bold text-white text-[15px] tracking-tight">
                   Nxelio Nurture
                 </span>
                 <span className="text-[11px] text-white/80 font-bold uppercase tracking-wider mt-0.5">AI NURTURE</span>
               </span>
-            )}
-            <span className="relative h-9 w-9 rounded-xl bg-white flex items-center justify-center font-bold flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
-              <LogoMark className="h-full w-full transition-opacity duration-200 group-hover:opacity-0" />
-              <PanelLeftClose className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", collapsed && "hidden")} />
-              <PanelLeftOpen className={cn("absolute h-4 w-4 text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200", !collapsed && "hidden")} />
-            </span>
-          </button>
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+                className="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0 hover:bg-white/15 hover:scale-105 transition-all"
+              >
+                <PanelLeftClose className="h-4 w-4 text-white" />
+              </button>
+            </div>
+          )}
         </div>
 
         <nav className={cn("flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide py-3 space-y-5", collapsed ? "px-2" : "px-3")}>

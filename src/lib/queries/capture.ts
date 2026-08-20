@@ -42,16 +42,20 @@ export async function capturePublicLead(payload: {
     if (ws) workspaceId = ws.id;
   }
 
+  // This form has no auth and no CAPTCHA — cap free-text fields so a
+  // submission can't fill the database with oversized junk (or make the
+  // eventual XSS-escaping/rendering of these fields more expensive than it
+  // needs to be).
   const insertPayload: Record<string, unknown> = {
-    full_name: payload.fullName?.trim() || null,
-    company_name: payload.companyName?.trim() || null,
-    email: payload.email?.trim().toLowerCase() || null,
-    phone: payload.phone?.trim() || null,
-    website_url: payload.websiteUrl?.trim() || null,
+    full_name: payload.fullName?.trim().slice(0, 200) || null,
+    company_name: payload.companyName?.trim().slice(0, 200) || null,
+    email: payload.email?.trim().toLowerCase().slice(0, 320) || null,
+    phone: payload.phone?.trim().slice(0, 40) || null,
+    website_url: payload.websiteUrl?.trim().slice(0, 300) || null,
     industry: payload.industry || null,
     interest_area: payload.interestArea || null,
-    message: payload.message?.trim() || null,
-    linkedin: payload.linkedin?.trim() || null,
+    message: payload.message?.trim().slice(0, 2000) || null,
+    linkedin: payload.linkedin?.trim().slice(0, 300) || null,
     source: "Public Capture Form",
     status: "New",
     lead_score: 0,

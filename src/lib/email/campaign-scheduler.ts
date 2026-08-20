@@ -150,13 +150,15 @@ export async function sendCampaignStepToLead(
   if (!lead.email) return { ok: false, skipped: true, error: "No email" };
   if (await isBlockedIn(db, workspaceId, lead.email)) return { ok: false, skipped: true, error: "Blocklisted" };
 
-  const subject = substituteMergeTags(opts.subject, lead, senderName);
-  const body = substituteMergeTags(opts.body, lead, senderName);
-
   // Step bodies written in the rich-text sequence editor are stored as HTML —
   // send them as html so formatting/links/images render; older plain-text
-  // drafts have no tags and keep going through the text→<br> path.
-  const isHtml = /<[a-z][\s\S]*>/i.test(body);
+  // drafts have no tags and keep going through the text→<br> path. Checked on
+  // the TEMPLATE (before merge-tag substitution) so a lead's own data can't
+  // flip a plain-text template into the html path — and so we know to escape
+  // the lead-controlled values below whenever they're about to land in HTML.
+  const isHtml = /<[a-z][\s\S]*>/i.test(opts.body);
+  const subject = substituteMergeTags(opts.subject, lead, senderName);
+  const body = substituteMergeTags(opts.body, lead, senderName, { escapeValues: isHtml });
   const replyTo = await connectedEmailAddress(db, workspaceId);
   const r = await sendEmail({
     to: lead.email, subject, tags: [campaignId], fromName: opts.fromName, replyTo,

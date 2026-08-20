@@ -123,6 +123,21 @@ export async function POST(req: NextRequest) {
 
   console.log("[billing/webhook]", event.type);
 
+  // Stripe explicitly documents that the same event can be delivered more
+  // than once (a retry after a slow/failed response, or a genuine
+  // redelivery) — this is the one general guard against reprocessing it,
+  // on top of the idempotency each individual operation below already has.
+  const admin = createAdminClient();
+  const { data: alreadyProcessed } = await admin
+    .from("stripe_processed_events")
+    .select("event_id")
+    .eq("event_id", event.id)
+    .maybeSingle();
+  if (alreadyProcessed) {
+    console.log(`[billing/webhook] duplicate event ${event.id} (${event.type}) — already processed, skipping`);
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
   try {
     switch (event.type) {
       // New subscriber's Checkout Session finished — fetch the subscription
@@ -146,7 +161,6 @@ export async function POST(req: NextRequest) {
         const sub = event.data.object as Stripe.Subscription;
         const workspaceId = await resolveWorkspace(sub);
         if (workspaceId) {
-          const admin = createAdminClient();
           await admin.from("subscriptions")
             .update({ status: "canceled", cancel_at_period_end: false, canceled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
             .eq("workspace_id", workspaceId);
@@ -180,7 +194,6 @@ export async function POST(req: NextRequest) {
           const sub = await stripe().subscriptions.retrieve(subId);
           const workspaceId = await resolveWorkspace(sub);
           if (workspaceId) {
-            const admin = createAdminClient();
             await admin.from("subscriptions")
               .update({ status: "past_due", updated_at: new Date().toISOString() })
               .eq("workspace_id", workspaceId);
@@ -196,6 +209,13 @@ export async function POST(req: NextRequest) {
     console.error("[billing/webhook] error:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
+
+  // Record success AFTER processing (not before) — if processing above had
+  // thrown, Stripe's retry needs this event to still look unprocessed.
+  await admin.from("stripe_processed_events").upsert(
+    { event_id: event.id, event_type: event.type },
+    { onConflict: "event_id", ignoreDuplicates: true }
+  );
 
   return NextResponse.json({ received: true });
 }

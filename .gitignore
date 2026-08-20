@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# load-test account credentials/session tokens — never commit real
+# passwords or session cookies, even for test-only accounts
+/scripts/.load-test-credentials.json
+/scripts/.load-test-tokens.json
+
 # vercel
 .vercel
 

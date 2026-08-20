@@ -78,8 +78,8 @@ export async function bookMeeting(input: {
   if (!ws) return { ok: false, error: "This booking page doesn't exist." };
 
   const admin = createAdminClient();
-  const email = input.email.trim().toLowerCase();
-  const name = input.name.trim();
+  const email = input.email.trim().toLowerCase().slice(0, 320);
+  const name = input.name.trim().slice(0, 200);
 
   // Re-check the slot is still free (avoid double-booking between page load and submit).
   const busy = await getWorkspaceBusy(ws.id, input.startIso, input.endIso);
@@ -120,7 +120,7 @@ export async function bookMeeting(input: {
     status: "scheduled",
     lead_id: leadId,
     attendees: [{ name, email }],
-    description: input.note?.trim() || null,
+    description: input.note?.trim().slice(0, 2000) || null,
   });
   if (error) return { ok: false, error: error.message };
 

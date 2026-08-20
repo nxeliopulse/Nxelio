@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
+import { createClient } from "@/lib/supabase/server";
+import { rateLimit } from "@/lib/ai/security";
 
 export async function POST(req: NextRequest) {
   try {
+    // This triggers a paid external search + AI call per lead — without an
+    // auth check, anyone who finds this URL could run it (logged in or not)
+    // with no way to attribute or limit the cost.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+    }
+
+    const { allowed, retryAfterMs } = rateLimit(user.id, "findCompaniesBulk");
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests — please wait a moment and try again." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) } }
+      );
+    }
+
     const body = await req.json();
     const leads = body?.leads as Array<{ id: string; linkedin: string | null; full_name?: string | null }>;
 
