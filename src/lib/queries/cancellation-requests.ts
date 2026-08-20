@@ -76,7 +76,7 @@ export async function submitCancellationRequest(
 
   // Email to Nxelio support
   await sendEmail({
-    to: "mmani786ms@gmail.com",
+    to: "hello@nxelio.ai",
     subject: `[Action Required] New cancellation request — ${input.customerEmail} (${input.planId ?? "unknown plan"})`,
     html: adminNotificationHtml({ input, ticketId: row.id }),
   }).catch(() => null);
