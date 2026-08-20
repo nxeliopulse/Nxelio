@@ -283,8 +283,8 @@ export function OverviewTab({
               Monthly recurring revenue growth over the last 6 months.
             </p>
           </div>
-          <div className="h-[200px] w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[200px] w-full min-w-0 mt-4">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart
                 data={chartData}
                 margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
