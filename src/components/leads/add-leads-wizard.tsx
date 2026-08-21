@@ -218,7 +218,7 @@ export function AddLeadsWizard({
   // Buy leads (real prospects via Bright Data, or AI samples as fallback)
   const [buy, setBuy] = useState({
     industry: "", role: "", locations: [] as string[], count: 10,
-    companySize: "Any", seniority: "Any", requireVerifiedEmail: false,
+    requireVerifiedEmail: false,
   });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
   const [buySource, setBuySource] = useState<"brightdata" | "anysite" | "ai" | null>(null);
@@ -332,7 +332,7 @@ export function AddLeadsWizard({
     setStep(1); setSource(null); setInputValue("");
     setStep2Error(null); setStep2Warning(null);
     setManual([newManual()]); setEntries([newEntry()]); setCsvRows(null); setCsvName(""); setDragOver(false);
-    setBuy({ industry: "", role: "", locations: [], count: 10, companySize: "Any", seniority: "Any", requireVerifiedEmail: false });
+    setBuy({ industry: "", role: "", locations: [], count: 10, requireVerifiedEmail: false });
     setBuyResults(null); setBuySource(null); setBuyLoading(false);
     setBuyMode("individual");
     setCompanies([newCompanyEntry()]);
@@ -1287,7 +1287,7 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
 // Buy Leads — real LinkedIn prospects via Bright Data (AI samples as fallback)
 export type BuyState = {
   industry: string; role: string; locations: string[]; count: number;
-  companySize: string; seniority: string; requireVerifiedEmail: boolean;
+  requireVerifiedEmail: boolean;
 };
 
 // Fallbacks while the workspace's actual (admin-editable, Settings > Picklists)
@@ -1316,13 +1316,6 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
   // the Buy Leads source/step, so a fresh mount always picks up the latest value
   // (e.g. after the plan-cap clamp on wizard open) without needing a sync effect.
   const [countDraft, setCountDraft] = useState(String(buy.count));
-
-  const [companySizeBuckets, setCompanySizeBuckets] = useState(FALLBACK_COMPANY_SIZE_BUCKETS);
-  const [seniorityLevels, setSeniorityLevels] = useState(FALLBACK_SENIORITY_LEVELS);
-  useEffect(() => {
-    getPicklistValues("lead_company_size").then(setCompanySizeBuckets).catch(() => {});
-    getPicklistValues("lead_seniority").then(setSeniorityLevels).catch(() => {});
-  }, []);
 
   function commitCount() {
     const n = Math.max(1, Math.min(maxCount, parseInt(countDraft, 10) || 1));
@@ -1353,23 +1346,6 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
         <div>
           <label className="block text-base font-semibold text-slate-800 mb-2">Location</label>
           <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-base font-semibold text-slate-800 mb-2">Company size / headcount</label>
-            <Select value={buy.companySize} onChange={(e) => setBuy({ ...buy, companySize: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
-              <option value="Any">Any size</option>
-              {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
-            </Select>
-          </div>
-          <div>
-            <label className="block text-base font-semibold text-slate-800 mb-2">Seniority level</label>
-            <Select value={buy.seniority} onChange={(e) => setBuy({ ...buy, seniority: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
-              <option value="Any">Any seniority</option>
-              {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
-            </Select>
-          </div>
         </div>
 
         <div className="max-w-[220px]">
@@ -1433,14 +1409,18 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           <p className="font-bold text-slate-900 text-base mb-3 uppercase tracking-wider">What you&apos;ll get</p>
           <ul className="space-y-3 text-base text-slate-600">
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Name, job title, company and LinkedIn URL from real public profiles.</li>
-            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Seniority estimated from each person&apos;s real job title.</li>
-            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Work email included when found — flagged as verified or catch-all, never guessed silently.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> An estimated seniority label, shown alongside each result (not a search filter — just informational).</li>
+            {onRunInBackground ? (
+              <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> A confirmed work email for every result, guaranteed — never guessed, never skipped.</li>
+            ) : (
+              <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> No email — this is a fast, no-email lookup. Use Verified Emails if you need one.</li>
+            )}
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
           </ul>
         </div>
         <div className="pt-3 border-t border-amber-200/70">
           <p className="text-sm font-bold uppercase tracking-wider text-slate-800 mb-1.5">Not available from this source</p>
-          <p className="text-sm text-slate-600 leading-relaxed">Company size and seniority above are search filters/estimates, not verified fields — there&apos;s no public data source for a company&apos;s exact headcount, revenue, direct phone, or Twitter/X handle. Add those yourself afterward, or via Manual Entry / CSV Import where you already have them.</p>
+          <p className="text-sm text-slate-600 leading-relaxed">There&apos;s no public data source for a company&apos;s exact headcount, revenue, direct phone, or Twitter/X handle, and seniority is only ever a best-effort estimate from the title text — never a real search filter. Add those yourself afterward, or via Manual Entry / CSV Import where you already have them.</p>
         </div>
       </div>
     </div>

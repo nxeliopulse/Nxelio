@@ -22,11 +22,6 @@ export interface BuyCriteria {
   role: string;
   locations: string[];
   count: number;
-  /** Query-hint only for Bright Data (no real per-prospect headcount data exists in
-   *  this pipeline) — "Any" or omitted means no filtering. */
-  companySize?: string;
-  /** Biases the search AND filters results by their real, derived seniority. */
-  seniority?: string;
   /** Drop any prospect whose email wasn't confirmed by a real check (AnySite hit,
    *  or an SMTP-verified/catch-all guess) — never relaxes into fabricating one. */
   requireVerifiedEmail?: boolean;
@@ -111,7 +106,6 @@ async function searchAnysiteWithTopUp(criteria: BuyCriteria, maxAllowed: number)
     if (!r.ok || !r.prospects.length) { lastError = r.error || "No prospects found."; if (multiplier === rounds[rounds.length - 1]) break; else continue; }
 
     const raw: GeneratedProspect[] = r.prospects
-      .filter((p) => !criteria.seniority || criteria.seniority === "Any" || p.seniority === criteria.seniority)
       .map((p) => ({
         full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
         title: p.title, seniority: p.seniority, company_name: p.company_name,
@@ -364,7 +358,6 @@ export interface CompanyPeopleCriteria {
   companyNames: string[];
   department?: string;
   role: string;
-  seniority?: string;
   locations?: string[];
   count: number;
   requireVerifiedEmail?: boolean;
@@ -396,7 +389,6 @@ export async function searchPeopleAtCompanies(rawCriteria: CompanyPeopleCriteria
       const r = await searchAnysiteUsers({ role, locations: rawCriteria.locations, count: rawCount, companyNames: rawCriteria.companyNames });
       if (!r.ok || !r.prospects.length) { lastError = r.error || "No prospects found at the selected companies."; if (multiplier === rounds[rounds.length - 1]) break; else continue; }
       const raw: GeneratedProspect[] = r.prospects
-        .filter((p) => !rawCriteria.seniority || rawCriteria.seniority === "Any" || p.seniority === rawCriteria.seniority)
         .map((p) => ({
           full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
           title: p.title, seniority: p.seniority, company_name: p.company_name,
@@ -410,7 +402,7 @@ export async function searchPeopleAtCompanies(rawCriteria: CompanyPeopleCriteria
   } else if (brightDataConfigured) {
     for (const multiplier of rounds) {
       const rawCount = Math.min(count * multiplier, maxAllowed);
-      const r = await brightDataSearchPeople({ role, locations: rawCriteria.locations, count: rawCount, seniority: rawCriteria.seniority, companyNames: rawCriteria.companyNames });
+      const r = await brightDataSearchPeople({ role, locations: rawCriteria.locations, count: rawCount, companyNames: rawCriteria.companyNames });
       if (!r.ok || !r.prospects.length) { lastError = r.error || "No prospects found at the selected companies."; if (multiplier === rounds[rounds.length - 1]) break; else continue; }
       const raw: GeneratedProspect[] = r.prospects.map((p) => ({
         full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,

@@ -219,7 +219,6 @@ async function runSearchRound(
     });
     if (!r.ok) return { ok: false, prospects: [], error: r.error };
     const prospects: GeneratedProspect[] = r.prospects
-      .filter((p) => !criteria.seniority || criteria.seniority === "Any" || p.seniority === criteria.seniority)
       .map((p) => ({
         full_name: p.full_name, first_name: p.first_name, last_name: p.last_name,
         title: p.title, seniority: p.seniority, company_name: p.company_name,
