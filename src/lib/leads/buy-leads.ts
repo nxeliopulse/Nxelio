@@ -9,6 +9,14 @@ import { mapWithConcurrency } from "@/lib/utils";
 import { bulkInsertLeads } from "@/lib/queries/leads";
 import { findMatchingAccount, createAccount } from "@/lib/queries/accounts";
 
+export interface ImportGeneratedProspectsResult {
+  ok: boolean;
+  inserted: number;
+  duplicates: number;
+  leadsRemaining?: number;
+  error?: string;
+}
+
 export interface BuyCriteria {
   industry: string;
   role: string;
@@ -162,7 +170,7 @@ async function searchBrightDataWithTopUp(criteria: BuyCriteria, maxAllowed: numb
  *  no Bright Data calls at all (so switching providers actually switches
  *  which vendor's credits get spent, with nothing silently mixed in). Company
  *  website is left empty ("Not available") rather than resolved via Bright Data. */
-async function enrichWithAnysiteEmails(rawProspects: GeneratedProspect[], requireVerifiedEmail?: boolean): Promise<BuyLeadsResult> {
+export async function enrichWithAnysiteEmails(rawProspects: GeneratedProspect[], requireVerifiedEmail?: boolean): Promise<BuyLeadsResult> {
   let prospects = rawProspects;
   const urls = prospects.map((p) => p.linkedin).filter((u): u is string => Boolean(u));
   if (urls.length) {
@@ -189,7 +197,7 @@ async function enrichWithAnysiteEmails(rawProspects: GeneratedProspect[], requir
  * then (optionally) drops anyone whose email was never actually confirmed.
  * Never fabricates a website, email, or verification status.
  */
-async function enrichAndFilterProspects(rawProspects: GeneratedProspect[], requireVerifiedEmail?: boolean): Promise<BuyLeadsResult> {
+export async function enrichAndFilterProspects(rawProspects: GeneratedProspect[], requireVerifiedEmail?: boolean): Promise<BuyLeadsResult> {
   let prospects = rawProspects;
 
   // Company website — free, reuses the same Bright Data credentials as the
@@ -531,6 +539,59 @@ export async function purchaseCompanyWiseLeads(prospects: GeneratedProspect[]): 
       else leadsRemaining = deductRes.remaining;
     } catch (err) {
       console.error("[company-wise-leads/credits] deduct threw:", err);
+    }
+  }
+
+  return { ok: true, inserted: res.inserted, duplicates: res.duplicates, leadsRemaining };
+}
+
+/**
+ * Shared import step for the plain Buy Leads / Verified Emails path (not
+ * Company-wise, which has its own account-linking version above). Used by
+ * both the wizard's immediate "Search now" flow and the Verified Leads jobs
+ * results page (background search) — same payload shape, same credit-check
+ * and deduction rules, so the two paths can never drift apart.
+ */
+export async function importGeneratedProspects(
+  prospects: GeneratedProspect[],
+  source: "brightdata" | "anysite" | "ai" | null
+): Promise<ImportGeneratedProspectsResult> {
+  if (!prospects.length) return { ok: false, inserted: 0, duplicates: 0, error: "No prospects to import." };
+  if (!(await canAffordLeads(prospects.length))) {
+    return { ok: false, inserted: 0, duplicates: 0, error: "You don't have enough leads remaining on your plan this cycle. Upgrade your plan or wait for renewal." };
+  }
+
+  const sourceLabel = source === "brightdata" || source === "anysite" ? "Purchased Leads" : "Purchased Leads (sample)";
+  const payload = prospects.map((p) => ({
+    full_name: (p.full_name || "").slice(0, 150) || null,
+    first_name: (p.first_name || "").slice(0, 100) || null,
+    last_name: (p.last_name || "").slice(0, 100) || null,
+    company_name: (p.company_name || "").slice(0, 200) || null,
+    industry: (p.industry || "").slice(0, 100) || null,
+    interest_area: (p.title || "").slice(0, 150) || null,
+    job_title: (p.title || "").slice(0, 150) || null,
+    seniority: p.seniority || null,
+    email: p.email || null,
+    email_verification_status: p.emailVerificationStatus || null,
+    linkedin: p.linkedin || null,
+    website_url: p.website_url || null,
+    source: sourceLabel,
+    status: "New",
+  }));
+
+  const res = await bulkInsertLeads(payload, { defaultSource: sourceLabel });
+  if (res.error) return { ok: false, inserted: 0, duplicates: res.duplicates, error: res.error };
+
+  let leadsRemaining: number | undefined;
+  if (res.inserted > 0) {
+    // Best-effort post-insert deduction — the leads are already in the CRM,
+    // so a deduction failure here should never hide that from the user.
+    try {
+      const deductRes = await deductLeads(res.inserted, { source: "buy_leads" });
+      if (!deductRes.ok) console.error("[buy-leads/credits] deduct failed:", deductRes.error);
+      else leadsRemaining = deductRes.remaining;
+    } catch (err) {
+      console.error("[buy-leads/credits] deduct threw:", err);
     }
   }
 

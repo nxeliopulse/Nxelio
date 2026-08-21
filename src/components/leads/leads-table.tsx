@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect, useOptimistic } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, Flame, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, Flame, MailCheck, type LucideIcon } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -999,6 +999,9 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import prospects" className="rounded-xl h-8 w-8">
             <Upload className="h-3.5 w-3.5" />
           </Button>
+          <Link href="/leads/verified-jobs" title="Verified Leads — background searches" className="inline-flex items-center justify-center rounded-xl h-8 w-8 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800">
+            <MailCheck className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </div>
 

@@ -16,13 +16,14 @@ import { bulkInsertLeads, type LeadRow } from "@/lib/queries/leads";
 import { importLinkedInLeads, hasLinkedInAccount } from "@/lib/leads/linkedin-import";
 import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outreach-accounts";
 import {
-  searchBuyLeads, searchPeopleAtCompanies, purchaseCompanyWiseLeads,
+  searchBuyLeads, searchPeopleAtCompanies, purchaseCompanyWiseLeads, importGeneratedProspects,
   type GeneratedProspect, type CompanyPeopleCriteria,
 } from "@/lib/leads/buy-leads";
+import { createLeadSearchJob } from "@/lib/leads/lead-search-jobs";
 import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
 import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
-import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, deductLeads } from "@/lib/queries/subscriptions";
+import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { cn } from "@/lib/utils";
@@ -197,7 +198,7 @@ export function AddLeadsWizard({
   initialSource?: SourceId | null;
 }) {
   const router = useRouter();
-  const { confirm } = useFeedback();
+  const { confirm, toast } = useFeedback();
   const [step, setStep] = useState(1);
   const [source, setSource] = useState<SourceId | null>(null);
 
@@ -222,6 +223,7 @@ export function AddLeadsWizard({
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
   const [buySource, setBuySource] = useState<"brightdata" | "anysite" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
+  const [bgQueueLoading, setBgQueueLoading] = useState(false);
   // Per-request cap: at most 100, further capped by what's left on the plan this cycle.
   const [maxBuyCount, setMaxBuyCount] = useState(100);
 
@@ -422,6 +424,25 @@ export function AddLeadsWizard({
       .finally(() => setBuyLoading(false));
   }
 
+  // ---- Verified Emails: queue as a background job instead of searching now.
+  // Runs across cron ticks with no time limit, emails the requester when the
+  // full requested count of verified-email leads is found (or the search is
+  // genuinely exhausted) — see src/lib/leads/lead-search-jobs.ts. ----
+  function runInBackground() {
+    setStep2Error(null);
+    setStep2Warning(null);
+    setBgQueueLoading(true);
+    createLeadSearchJob(buy)
+      .then((res) => {
+        if (!res.ok) { setStep2Error(res.error || "Could not queue the search."); return; }
+        toast(`We'll email you when your ${buy.count} verified leads are ready. Check Verified Leads under Prospects later.`, "success");
+        reset();
+        onClose();
+      })
+      .catch((e) => setStep2Error(e instanceof Error ? e.message : "Could not queue the search."))
+      .finally(() => setBgQueueLoading(false));
+  }
+
   // ---- CSV handling ----
   function handleFile(file: File) {
     setStep2Error(null);
@@ -526,6 +547,21 @@ export function AddLeadsWizard({
       return;
     }
 
+    // Buy Leads / Verified Emails — shared with the Verified Leads jobs results
+    // page (background search), so the credit-check + insert + deduct logic
+    // lives in one place: importGeneratedProspects().
+    if (isBuy) {
+      start(async () => {
+        const res = await importGeneratedProspects(buyResults ?? [], buySource);
+        if (!res.ok) { setImportError(res.error || "Import failed"); return; }
+        setSummary({ imported: res.inserted, skipped: 0, duplicates: res.duplicates, leadsRemaining: res.leadsRemaining });
+        if (res.inserted > 0) notifyCreditsChanged();
+        setStep(4);
+        router.refresh();
+      });
+      return;
+    }
+
     const sourceLabel = source ? SOURCE_LABEL[source] : "Import";
     let payload: Array<Partial<LeadRow>>;
     let skipped: number;
@@ -565,28 +601,6 @@ export function AddLeadsWizard({
         postal_code: e.postalCode.trim() || null,
         source: "Manual Entry", status: "New",
       }));
-    } else if (isBuy) {
-      skipped = 0;
-      // Real prospects (from whichever provider is active) carry a LinkedIn URL;
-      // AI samples carry a placeholder website. Neither carries an unverified email.
-      const buyLabel = buySource === "brightdata" ? "Purchased Leads (BILEADS Kit)"
-        : buySource === "anysite" ? "Purchased Leads (Anysite)"
-        : "Purchased Leads (sample)";
-      payload = (buyResults ?? []).map((p) => ({
-        full_name: (p.full_name || "").slice(0, 150) || null,
-        first_name: (p.first_name || "").slice(0, 100) || null,
-        last_name: (p.last_name || "").slice(0, 100) || null,
-        company_name: (p.company_name || "").slice(0, 200) || null,
-        industry: (p.industry || "").slice(0, 100) || null,
-        interest_area: (p.title || "").slice(0, 150) || null,
-        job_title: (p.title || "").slice(0, 150) || null,
-        seniority: p.seniority || null,
-        email: p.email || null,
-        email_verification_status: p.emailVerificationStatus || null,
-        linkedin: p.linkedin || null,
-        website_url: p.website_url || null,
-        source: buyLabel, status: "New",
-      }));
     } else {
       // Non-LinkedIn social sources (YouTube/Instagram/Twitter) — manual entry.
       skipped = manualInvalid.length;
@@ -600,32 +614,10 @@ export function AddLeadsWizard({
     }
 
     start(async () => {
-      // Buy Leads draws from the plan's monthly lead-discovery balance — check
-      // before inserting, same "check before you spend" pattern as AI credits.
-      if (isBuy && payload.length) {
-        if (!(await canAffordLeads(payload.length))) {
-          setImportError("You don't have enough leads remaining on your plan this cycle. Upgrade your plan or wait for renewal.");
-          return;
-        }
-      }
-
       const res = await bulkInsertLeads(payload, { defaultSource: sourceLabel });
       if (res.error) { setImportError(res.error); return; }
 
-      let leadsRemaining: number | undefined;
-      if (isBuy && res.inserted > 0) {
-        // Best-effort post-insert deduction — the leads are already in the
-        // CRM, so a deduction failure here should never hide that from the
-        // user (same philosophy as chargeCredits() for AI features).
-        try {
-          const deductRes = await deductLeads(res.inserted, { source: "buy_leads" });
-          if (!deductRes.ok) console.error("[buy-leads/credits] deduct failed:", deductRes.error);
-          else leadsRemaining = deductRes.remaining;
-        } catch (err) {
-          console.error("[buy-leads/credits] deduct threw:", err);
-        }
-        notifyCreditsChanged();
-      }
+      const leadsRemaining: number | undefined = undefined;
 
       setSummary({ imported: res.inserted, skipped, duplicates: res.duplicates, leadsRemaining });
       setStep(4);
@@ -737,6 +729,8 @@ export function AddLeadsWizard({
                     warning={step2Warning}
                     maxCount={maxBuyCount}
                     forceVerifiedEmail={source === "verified-emails"}
+                    onRunInBackground={source === "verified-emails" ? runInBackground : undefined}
+                    backgroundLoading={bgQueueLoading}
                   />
                 ) : (
                   <CompanyWiseLeadsFlow
@@ -1295,7 +1289,7 @@ export type BuyState = {
 // values load in — "Any" is a client-only sentinel for this filter UI, never stored.
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
-export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, warning, maxCount, forceVerifiedEmail }: {
+export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, warning, maxCount, forceVerifiedEmail, onRunInBackground, backgroundLoading }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;
@@ -1308,6 +1302,10 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
   /** Set when the wizard's "Verified Emails" card was chosen instead of plain
    *  "Buy Leads" — locks the filter on so it can't be turned off. */
   forceVerifiedEmail?: boolean;
+  /** Verified Emails only — queues the search as a background job (any time
+   *  budget, exact requested count) instead of searching synchronously now. */
+  onRunInBackground?: () => void;
+  backgroundLoading?: boolean;
 }) {
   const isReal = source === "brightdata" || source === "anysite";
   // Initialized once from buy.count — BuyForm unmounts whenever the user leaves
@@ -1401,11 +1399,25 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           />
         </div>
 
-        <Button onClick={onGenerate} disabled={loading} size="lg" className="shadow-md">
-          {loading
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
-            : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={onGenerate} disabled={loading || backgroundLoading} size="lg" className="shadow-md">
+            {loading
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
+              : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
+          </Button>
+          {onRunInBackground && (
+            <Button onClick={onRunInBackground} disabled={loading || backgroundLoading} variant="outline" size="lg">
+              {backgroundLoading
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Queuing…</>
+                : <>Run in background &amp; email me</>}
+            </Button>
+          )}
+        </div>
+        {onRunInBackground && (
+          <p className="text-sm text-slate-500">
+            Takes as long as it needs to find the exact count with a verified email — we&apos;ll email you when it&apos;s ready, and you can find it later under Prospects → Verified Leads.
+          </p>
+        )}
 
         {results && isReal && (
           <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
@@ -1447,7 +1459,7 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
   );
 }
 
-function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; locations: string[] } }) {
+export function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; locations: string[] } }) {
   const withLinkedIn = prospects.filter((p) => p.linkedin).length;
   const withEmail = prospects.filter((p) => p.email).length;
   return (
