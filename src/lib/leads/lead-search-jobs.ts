@@ -11,34 +11,46 @@ import { enrichWithAnysiteEmails, enrichAndFilterProspects, type BuyCriteria, ty
  * Background "Verified Leads" search jobs — a dedicated exhaustive-search
  * policy, deliberately separate from Buy Leads' synchronous "try a few
  * top-up rounds, then hand back whatever we found" behavior. Here, time
- * genuinely doesn't matter: the job keeps widening its search until it
- * either hits the exact requested count, or has proven the pool is really
- * empty (several rounds in a row at the largest search size, finding nobody
- * new) — never gives up just because an early round came up short. See
- * supabase/migrations/0137_lead_search_jobs.sql and
+ * genuinely doesn't matter: the job keeps searching until it either hits the
+ * exact requested count, or has examined every real match there is — never
+ * gives up just because an early round came up short.
+ *
+ * For Anysite (no cursor/offset — confirmed against their API reference),
+ * "examined every match" is a hard guarantee, not a heuristic: the search
+ * partitions all matching results into fixed, non-overlapping buckets, and
+ * stepping through every bucket means nothing was missed and nothing was
+ * re-paid-for twice (see BUCKET_TOTAL below). Bright Data has no such
+ * guarantee, so it falls back to a consecutive-empty-rounds heuristic.
+ *
+ * See supabase/migrations/0137_lead_search_jobs.sql and
  * 0139_lead_search_jobs_progress.sql for the table shape, and
  * src/app/api/leads/search-jobs/cron/route.ts for the drainer.
  */
 
-// How large a single search round can get. NOT tied to the workspace's
-// lead-credit balance — that balance limits how many leads you can IMPORT,
-// it has nothing to do with how many candidates a search may examine while
-// hunting for enough confirmed emails. This ceiling instead matches the
-// search provider's own realistic per-request size (see anysite.ts).
+// Anysite's search has no cursor/offset — confirmed against their API
+// reference. Instead it partitions ALL matching results into BUCKET_TOTAL
+// non-overlapping slices (bucket_total/bucket_index). Fixing BUCKET_TOTAL
+// for the whole job and stepping bucket_index each round (0, 1, 2, ...)
+// guarantees every round returns genuinely NEW people — unlike escalating
+// `count` from scratch each time, which silently re-fetches (and re-pays
+// for) the same top matches over and over. Once round reaches BUCKET_TOTAL,
+// every single matching person has been examined — a DEFINITE exhaustion
+// signal, not a heuristic.
+const BUCKET_TOTAL = 25;
+// Max Anysite allows per call. Cost is billed per person ACTUALLY returned
+// (confirmed via testing — asking for 1000 from a bucket with 40 matches
+// only costs 40), so there's no downside to always asking for the ceiling.
 const HARD_SEARCH_CEILING = 1000;
 
-// Each round asks for requestedCount * this multiplier (capped at the
-// ceiling above) — escalates far past Buy Leads' [1,2,3,5] because a
-// background job has no reason to stop early.
-const ESCALATION = [1, 2, 3, 5, 8, 15, 25, 40, 70, 120, 200, 350, 600, 1000];
-function roundSize(round: number, requestedCount: number): number {
-  const mult = ESCALATION[Math.min(round, ESCALATION.length - 1)];
-  return Math.min(requestedCount * mult, HARD_SEARCH_CEILING);
-}
+// Bright Data has no confirmed bucketing/pagination scheme, so its rounds
+// still escalate `count` from scratch — same old approach, just for the one
+// provider we don't have better information on.
+const BRIGHT_DATA_ESCALATION = [1, 2, 3, 5, 8, 15, 25, 40, 70, 120, 200, 350, 600, 1000];
 
-// "Genuinely exhausted" means: already searching at the hard ceiling, AND
-// this many rounds in a row turned up not one single new candidate. Only
-// then do we accept a partial result — never after just one thin round.
+// Secondary safety net: if a provider's round comes up completely empty this
+// many times in a row, treat the search as exhausted even before formally
+// running out of buckets/escalation room — a real population smaller than
+// expected shows up this way well before BUCKET_TOTAL is reached.
 const DRY_ROUNDS_TO_GIVE_UP = 5;
 
 // Backstop only — not the normal way a job ends. Guards against a truly
@@ -185,18 +197,26 @@ function dedupeKey(p: GeneratedProspect): string {
   return p.linkedin || `${p.full_name}|${p.company_name}`;
 }
 
-/** One search round at the given raw count, mapped into the same
+/** One search round for the given round index, mapped into the same
  *  GeneratedProspect shape searchBuyLeads() produces — reusing whichever
  *  provider is active platform-wide, same as the synchronous path. Only the
  *  low-level API call is shared; the retry/give-up policy around it is
- *  entirely separate (see module comment above). */
+ *  entirely separate (see module comment above). `round` becomes Anysite's
+ *  bucket_index (0-based, wrapped defensively — see BUCKET_TOTAL above) or
+ *  Bright Data's escalation step. */
 async function runSearchRound(
   criteria: BuyCriteria,
-  rawCount: number,
+  round: number,
   provider: "anysite" | "bright_data"
 ): Promise<{ ok: boolean; prospects: GeneratedProspect[]; error?: string }> {
   if (provider === "anysite" && anysiteConfigured) {
-    const r = await searchAnysiteUsers({ role: [criteria.role, criteria.industry].filter(Boolean).join(" ").trim(), locations: criteria.locations, count: rawCount });
+    const r = await searchAnysiteUsers({
+      role: [criteria.role, criteria.industry].filter(Boolean).join(" ").trim(),
+      locations: criteria.locations,
+      count: HARD_SEARCH_CEILING,
+      bucketTotal: BUCKET_TOTAL,
+      bucketIndex: Math.min(round, BUCKET_TOTAL - 1),
+    });
     if (!r.ok) return { ok: false, prospects: [], error: r.error };
     const prospects: GeneratedProspect[] = r.prospects
       .filter((p) => !criteria.seniority || criteria.seniority === "Any" || p.seniority === criteria.seniority)
@@ -209,6 +229,8 @@ async function runSearchRound(
     return { ok: true, prospects };
   }
   if (provider === "bright_data" && brightDataConfigured) {
+    const mult = BRIGHT_DATA_ESCALATION[Math.min(round, BRIGHT_DATA_ESCALATION.length - 1)];
+    const rawCount = Math.min(criteria.count * mult, HARD_SEARCH_CEILING);
     const r = await brightDataSearchPeople({ ...criteria, count: rawCount });
     if (!r.ok) return { ok: false, prospects: [], error: r.error };
     const prospects: GeneratedProspect[] = r.prospects.map((p) => ({
@@ -230,7 +252,7 @@ async function enrichBatch(prospects: GeneratedProspect[], provider: "anysite" |
 
 function noteFor(found: number, requested: number): string | undefined {
   if (found >= requested) return undefined;
-  return `Found ${found} of the ${requested} requested. We searched up to ${HARD_SEARCH_CEILING} candidates and ${DRY_ROUNDS_TO_GIVE_UP} rounds in a row turned up nobody new with a confirmed email — that's genuinely everyone available for this criteria right now. Try a broader location/role to get more.`;
+  return `Found ${found} of the ${requested} requested — we checked every real match we could find for this criteria (right up to genuine exhaustion) and this is everyone available with a confirmed email right now. Try a broader location/role to get more.`;
 }
 
 async function sendCompletionEmail(row: JobDbRow, note?: string) {
@@ -293,9 +315,7 @@ export async function processDueLeadSearchJobs(jobLimit = 3, perJobBudgetMs = 15
 
     while (Date.now() < deadline && results.length < job.requested_count) {
       if (pool.length === 0 && !exhausted) {
-        const rawCount = roundSize(round, job.requested_count);
-        const atCeiling = rawCount >= HARD_SEARCH_CEILING;
-        const r = await runSearchRound(job.criteria, rawCount, provider);
+        const r = await runSearchRound(job.criteria, round, provider);
         round += 1;
         attempts += 1;
 
@@ -308,8 +328,14 @@ export async function processDueLeadSearchJobs(jobLimit = 3, perJobBudgetMs = 15
           pool = [...pool, ...fresh];
         } else {
           dryRounds += 1;
-          if (atCeiling && dryRounds >= DRY_ROUNDS_TO_GIVE_UP) exhausted = true;
         }
+
+        // Anysite: buckets are a strict, non-overlapping partition of every
+        // matching result — once every bucket has been examined, there is
+        // NOTHING left to find, full stop. Bright Data has no such guarantee,
+        // so it relies purely on the consecutive-dry-rounds heuristic.
+        if (provider === "anysite" && round >= BUCKET_TOTAL) exhausted = true;
+        if (dryRounds >= DRY_ROUNDS_TO_GIVE_UP) exhausted = true;
         continue;
       }
 
