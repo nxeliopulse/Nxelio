@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nxelio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nxelio
+  template:
+    metadata:
+      labels:
+        app: nxelio
+    spec:
+      containers:
+        - name: nxelio
+          # This exact placeholder is what the workflow's
+          # `kustomize edit set image LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:TAG=...`
+          # command matches on and rewrites at deploy time — don't change it.
+          image: LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:TAG
+          ports:
+            - containerPort: 3000
+          # Runtime secrets (Supabase, Stripe, Nylas, Anthropic, etc.).
+          # Create this Secret once per cluster before the first deploy:
+          #   kubectl create secret generic nxelio-secrets --from-env-file=.env
+          envFrom:
+            - secretRef:
+                name: nxelio-secrets
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '256Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+          readinessProbe:
+            httpGet:
+              # Swap for a dedicated health-check route (e.g. /api/health)
+              # if root ("/") ever requires auth or does redirects.
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
