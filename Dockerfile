@@ -24,6 +24,13 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Accepted so the GKE workflow's --build-arg GITHUB_SHA/--build-arg
+# GITHUB_REF don't trigger "build-arg not consumed" warnings. Not used by
+# the build itself; wire into NEXT_PUBLIC_* below if you want the commit
+# baked into the client bundle for display somewhere.
+ARG GITHUB_SHA
+ARG GITHUB_REF
+
 # Public NEXT_PUBLIC_* values must be present at BUILD time because Next.js
 # inlines them into the client bundle. Pass any you need with --build-arg
 # and export them as ENV before `next build` runs. Example:
