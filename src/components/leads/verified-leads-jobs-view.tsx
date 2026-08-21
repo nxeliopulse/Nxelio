@@ -127,13 +127,12 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
 
   return (
     <div className="max-w-[1200px] mx-auto w-full">
+      <Link href="/leads" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-4">
+        <ArrowLeft className="h-4 w-4" /> Back to Prospects
+      </Link>
       <div className="mb-6">
         <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Verified Leads</h1>
-        <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
-          <Link href="/leads" className="hover:text-slate-700 dark:hover:text-slate-600">Prospects</Link>
-          <span className="mx-1">›</span>
-          <span className="text-slate-700 dark:text-slate-600 font-medium">Verified Leads</span>
-        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">Background searches queued from the Verified Emails source — they finish here, no matter how long they take.</p>
       </div>
 
       {jobs.length === 0 ? (
@@ -163,7 +162,12 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
                   </td>
                   <td className="px-4 py-3">{j.requestedCount}</td>
                   <td className="px-4 py-3">{j.foundCount}</td>
-                  <td className="px-4 py-3"><StatusBadge status={j.status} /></td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={j.status} />
+                    {(j.status === "pending" || j.status === "running") && j.timeEstimate && (
+                      <div className="text-[11px] text-slate-400 mt-1">usually {j.timeEstimate}</div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-slate-500">{new Date(j.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3 text-right">
                     {j.status === "done" && (

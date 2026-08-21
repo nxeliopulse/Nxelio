@@ -999,8 +999,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import prospects" className="rounded-xl h-8 w-8">
             <Upload className="h-3.5 w-3.5" />
           </Button>
-          <Link href="/leads/verified-jobs" title="Verified Leads — background searches" className="inline-flex items-center justify-center rounded-xl h-8 w-8 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800">
-            <MailCheck className="h-3.5 w-3.5" />
+          <Link href="/leads/verified-jobs" title="Background searches you've queued from Verified Emails" className="inline-flex items-center gap-1.5 rounded-xl h-8 px-3 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800">
+            <MailCheck className="h-3.5 w-3.5" /> Verified Leads
           </Link>
         </div>
       </div>

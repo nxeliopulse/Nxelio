@@ -218,7 +218,7 @@ export function AddLeadsWizard({
   // Buy leads (real prospects via Bright Data, or AI samples as fallback)
   const [buy, setBuy] = useState({
     industry: "", role: "", locations: [] as string[], count: 10,
-    companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true,
+    companySize: "Any", seniority: "Any", requireVerifiedEmail: false,
   });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
   const [buySource, setBuySource] = useState<"brightdata" | "anysite" | "ai" | null>(null);
@@ -332,7 +332,7 @@ export function AddLeadsWizard({
     setStep(1); setSource(null); setInputValue("");
     setStep2Error(null); setStep2Warning(null);
     setManual([newManual()]); setEntries([newEntry()]); setCsvRows(null); setCsvName(""); setDragOver(false);
-    setBuy({ industry: "", role: "", locations: [], count: 10, companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true });
+    setBuy({ industry: "", role: "", locations: [], count: 10, companySize: "Any", seniority: "Any", requireVerifiedEmail: false });
     setBuyResults(null); setBuySource(null); setBuyLoading(false);
     setBuyMode("individual");
     setCompanies([newCompanyEntry()]);
@@ -402,8 +402,10 @@ export function AddLeadsWizard({
     setStep2Warning(null);
     setInputValue("");
     if (id === "verified-emails") {
+      // Verified Emails is Individual-only and background-search-only —
+      // Company-wise isn't offered here (no background support for it yet).
       setBuy((b) => ({ ...b, requireVerifiedEmail: true }));
-      setCompanyForm((f) => ({ ...f, requireVerifiedEmail: true }));
+      setBuyMode("individual");
     }
   }
 
@@ -435,7 +437,8 @@ export function AddLeadsWizard({
     createLeadSearchJob(buy)
       .then((res) => {
         if (!res.ok) { setStep2Error(res.error || "Could not queue the search."); return; }
-        toast(`We'll email you when your ${buy.count} verified leads are ready. Check Verified Leads under Prospects later.`, "success");
+        const eta = res.timeEstimate ? ` Usually takes ${res.timeEstimate}, but we'll keep going as long as it takes to find all ${buy.count}.` : "";
+        toast(`We'll email you when your ${buy.count} verified leads are ready.${eta} Check Verified Leads under Prospects later.`, "success");
         reset();
         onClose();
       })
@@ -709,15 +712,19 @@ export function AddLeadsWizard({
               <ManualEntryForm entries={entries} setEntries={setEntries} error={step2Error} />
             ) : isBuy ? (
               <div className="space-y-6">
-                <Tabs
-                  tabs={[
-                    { id: "individual", label: "Individual Leads", icon: <User className="h-4 w-4" /> },
-                    { id: "company", label: "Company-wise Leads", icon: <Building2 className="h-4 w-4" /> },
-                  ]}
-                  active={buyMode}
-                  onChange={(id) => { setBuyMode(id as "individual" | "company"); setStep2Error(null); }}
-                />
-                {buyMode === "individual" ? (
+                {source === "buy" && (
+                  <Tabs
+                    tabs={[
+                      { id: "individual", label: "Individual Leads", icon: <User className="h-4 w-4" /> },
+                      { id: "company", label: "Company-wise Leads", icon: <Building2 className="h-4 w-4" /> },
+                    ]}
+                    active={buyMode}
+                    onChange={(id) => { setBuyMode(id as "individual" | "company"); setStep2Error(null); }}
+                  />
+                )}
+                {/* Verified Emails is Individual-only, background-search-only — see
+                    runInBackground() and BuyForm's onRunInBackground handling. */}
+                {source === "verified-emails" || buyMode === "individual" ? (
                   <BuyForm
                     buy={buy}
                     setBuy={(b) => { setBuy(b); setBuyResults(null); setBuySource(null); }}
@@ -728,7 +735,6 @@ export function AddLeadsWizard({
                     error={step2Error}
                     warning={step2Warning}
                     maxCount={maxBuyCount}
-                    forceVerifiedEmail={source === "verified-emails"}
                     onRunInBackground={source === "verified-emails" ? runInBackground : undefined}
                     backgroundLoading={bgQueueLoading}
                   />
@@ -747,7 +753,6 @@ export function AddLeadsWizard({
                     error={step2Error}
                     warning={step2Warning}
                     clearError={() => setStep2Error(null)}
-                    forceVerifiedEmail={source === "verified-emails"}
                   />
                 )}
               </div>
@@ -1282,14 +1287,14 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
 // Buy Leads — real LinkedIn prospects via Bright Data (AI samples as fallback)
 export type BuyState = {
   industry: string; role: string; locations: string[]; count: number;
-  companySize: string; seniority: string; requireVerifiedEmail: boolean; includePhoneAndSocial: boolean;
+  companySize: string; seniority: string; requireVerifiedEmail: boolean;
 };
 
 // Fallbacks while the workspace's actual (admin-editable, Settings > Picklists)
 // values load in — "Any" is a client-only sentinel for this filter UI, never stored.
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
-export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, warning, maxCount, forceVerifiedEmail, onRunInBackground, backgroundLoading }: {
+export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, warning, maxCount, onRunInBackground, backgroundLoading }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;
@@ -1299,11 +1304,10 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
   error: string | null;
   warning?: string | null;
   maxCount: number;
-  /** Set when the wizard's "Verified Emails" card was chosen instead of plain
-   *  "Buy Leads" — locks the filter on so it can't be turned off. */
-  forceVerifiedEmail?: boolean;
-  /** Verified Emails only — queues the search as a background job (any time
-   *  budget, exact requested count) instead of searching synchronously now. */
+  /** Set only for the "Verified Emails" source — when present, this form is
+   *  background-search-only (no instant "Find prospects"): guaranteeing an
+   *  exact count with a real email needs patience an on-screen wait can't
+   *  honestly promise, so that path doesn't exist here at all. */
   onRunInBackground?: () => void;
   backgroundLoading?: boolean;
 }) {
@@ -1368,23 +1372,6 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           </div>
         </div>
 
-        <div className="space-y-3 py-1">
-          <label className={cn("flex items-center gap-3 text-base text-slate-800", forceVerifiedEmail ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
-            <input
-              type="checkbox"
-              checked={buy.requireVerifiedEmail}
-              disabled={forceVerifiedEmail}
-              onChange={(e) => setBuy({ ...buy, requireVerifiedEmail: e.target.checked })}
-              className={cn("rounded border-slate-400 h-5 w-5", forceVerifiedEmail ? "cursor-not-allowed" : "cursor-pointer")}
-            />
-            Require a verified work email{forceVerifiedEmail && " (always on for Verified Emails)"}
-          </label>
-          <label className="flex items-center gap-3 text-base text-slate-800 cursor-pointer">
-            <input type="checkbox" checked={buy.includePhoneAndSocial} onChange={(e) => setBuy({ ...buy, includePhoneAndSocial: e.target.checked })} className="rounded border-slate-400 h-5 w-5 cursor-pointer" />
-            Include phone number &amp; social handles (where available)
-          </label>
-        </div>
-
         <div className="max-w-[220px]">
           <label className="block text-base font-semibold text-slate-800 mb-2">How many (max {maxCount})</label>
           <Input
@@ -1400,22 +1387,23 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={onGenerate} disabled={loading || backgroundLoading} size="lg" className="shadow-md">
-            {loading
-              ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
-              : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
-          </Button>
-          {onRunInBackground && (
-            <Button onClick={onRunInBackground} disabled={loading || backgroundLoading} variant="outline" size="lg">
+          {onRunInBackground ? (
+            <Button onClick={onRunInBackground} disabled={backgroundLoading} size="lg" className="shadow-md">
               {backgroundLoading
                 ? <><Loader2 className="h-4 w-4 animate-spin" /> Queuing…</>
-                : <>Run in background &amp; email me</>}
+                : <><Sparkles className="h-4 w-4" /> Search &amp; email me when ready</>}
+            </Button>
+          ) : (
+            <Button onClick={onGenerate} disabled={loading} size="lg" className="shadow-md">
+              {loading
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
+                : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
             </Button>
           )}
         </div>
         {onRunInBackground && (
           <p className="text-sm text-slate-500">
-            Takes as long as it needs to find the exact count with a verified email — we&apos;ll email you when it&apos;s ready, and you can find it later under Prospects → Verified Leads.
+            Every lead here comes with a verified email — that takes real time to confirm, so this runs in the background, however long it needs. We&apos;ll email you when it&apos;s ready; find it later under Prospects → Verified Leads.
           </p>
         )}
 
@@ -1512,7 +1500,7 @@ type CompanyWiseForm = { locations: string[]; requireVerifiedEmail: boolean; cou
 
 function CompanyWiseLeadsFlow({
   companies, setCompanies, form, setForm, prospects, peopleLoading, onFindProspects,
-  selectedProspects, setSelectedProspects, maxCount, error, warning, clearError, forceVerifiedEmail,
+  selectedProspects, setSelectedProspects, maxCount, error, warning, clearError,
 }: {
   companies: CompanyEntry[];
   setCompanies: (c: CompanyEntry[]) => void;
@@ -1527,8 +1515,6 @@ function CompanyWiseLeadsFlow({
   error: string | null;
   warning?: string | null;
   clearError: () => void;
-  /** Set when the wizard's "Verified Emails" card was chosen — locks the filter on. */
-  forceVerifiedEmail?: boolean;
 }) {
   const [countDraft, setCountDraft] = useState(String(form.count));
   const [showResults, setShowResults] = useState(prospects !== null);
@@ -1631,17 +1617,6 @@ function CompanyWiseLeadsFlow({
           <label className="block text-base font-semibold text-slate-800 mb-2">Location</label>
           <MultiLocationInput value={form.locations} onChange={(v) => setForm({ ...form, locations: v })} />
         </div>
-
-        <label className={cn("flex items-center gap-3 text-base text-slate-800", forceVerifiedEmail ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
-          <input
-            type="checkbox"
-            checked={form.requireVerifiedEmail}
-            disabled={forceVerifiedEmail}
-            onChange={(e) => setForm({ ...form, requireVerifiedEmail: e.target.checked })}
-            className={cn("rounded border-slate-400 h-5 w-5", forceVerifiedEmail ? "cursor-not-allowed" : "cursor-pointer")}
-          />
-          Require a verified work email{forceVerifiedEmail && " (always on for Verified Emails)"}
-        </label>
 
         <div className="max-w-[220px]">
           <label className="block text-base font-semibold text-slate-800 mb-2">How many leads (max {maxCount})</label>

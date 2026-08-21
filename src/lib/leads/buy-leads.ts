@@ -172,7 +172,11 @@ async function searchBrightDataWithTopUp(criteria: BuyCriteria, maxAllowed: numb
  *  website is left empty ("Not available") rather than resolved via Bright Data. */
 export async function enrichWithAnysiteEmails(rawProspects: GeneratedProspect[], requireVerifiedEmail?: boolean): Promise<BuyLeadsResult> {
   let prospects = rawProspects;
-  const urls = prospects.map((p) => p.linkedin).filter((u): u is string => Boolean(u));
+  // Email lookup costs real credits per attempt (win or lose) — only worth
+  // spending when the caller actually wants an email. Skipping entirely when
+  // unchecked means "give me leads" doesn't silently pay for "give me leads
+  // with email" behavior nobody asked for.
+  const urls = requireVerifiedEmail ? prospects.map((p) => p.linkedin).filter((u): u is string => Boolean(u)) : [];
   if (urls.length) {
     console.log(`[buy-leads/anysite] Enriching ${urls.length} profiles with Anysite email lookup…`);
     const found = await findEmailsByLinkedIn(urls);
@@ -214,8 +218,11 @@ export async function enrichAndFilterProspects(rawProspects: GeneratedProspect[]
   }));
 
   // Enrich real LinkedIn profiles with an email via Anysite, when configured.
-  // Never fabricated — a lookup miss just leaves email empty.
-  if (anysiteConfigured) {
+  // Never fabricated — a lookup miss just leaves email empty. Only attempted
+  // when the caller actually wants an email — each lookup costs real Anysite
+  // credits (win or lose), so skip entirely when unchecked rather than
+  // spending on emails nobody asked for.
+  if (anysiteConfigured && requireVerifiedEmail) {
     const urls = prospects.map((p) => p.linkedin).filter((u): u is string => Boolean(u));
     console.log(`[buy-leads] Enriching ${urls.length} profiles with AnySite email lookup…`);
     const found = await findEmailsByLinkedIn(urls);
@@ -234,8 +241,9 @@ export async function enrichAndFilterProspects(rawProspects: GeneratedProspect[]
   // email, try the pattern-guess + SMTP-verify method against their company
   // website. See email-guess.ts for the serverless/port-25 caveat — this
   // step is a no-op (fails closed, never fabricates) wherever outbound SMTP
-  // isn't reachable, e.g. on Vercel.
-  const stillMissing = prospects.filter((p) => !p.email && p.website_url && p.full_name);
+  // isn't reachable, e.g. on Vercel. Same reasoning as above — only worth
+  // running when an email was actually requested.
+  const stillMissing = requireVerifiedEmail ? prospects.filter((p) => !p.email && p.website_url && p.full_name) : [];
   if (stillMissing.length) {
     const guesses = await mapWithConcurrency(stillMissing, 5, async (p) => {
       const r = await guessAndVerifyEmail(p.full_name, p.website_url);

@@ -59,7 +59,7 @@ export function AddProspectsDrawer({
   const [csvName, setCsvName] = useState("");
 
   // Buy leads
-  const [buy, setBuy] = useState<BuyState>({ industry: "", role: "", locations: [], count: 10, companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true });
+  const [buy, setBuy] = useState<BuyState>({ industry: "", role: "", locations: [], count: 10, companySize: "Any", seniority: "Any", requireVerifiedEmail: false });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
   const [buySource, setBuySource] = useState<"brightdata" | "anysite" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
