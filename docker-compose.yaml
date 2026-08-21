@@ -1,0 +1,11 @@
+services:
+  nxelio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nxelio:local
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    restart: unless-stopped
