@@ -228,6 +228,14 @@ export async function adminCancelSubscription(
     });
   }
 
+  // Force DB status to canceled immediately — admin-initiated cancellation
+  // revokes access right away; Stripe's webhook will confirm it later when the
+  // period actually ends and Stripe transitions the status to "canceled".
+  await admin
+    .from("subscriptions")
+    .update({ status: "canceled", canceled_at: new Date().toISOString() })
+    .eq("workspace_id", workspaceId);
+
   if (cancellationRequestId) {
     await admin.from("cancellation_requests").update({
       status: "cancelled",

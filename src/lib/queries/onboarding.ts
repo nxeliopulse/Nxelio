@@ -2,7 +2,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
-import { hasConnectedMailbox } from "@/lib/queries/outreach-accounts";
 
 export interface OnboardingData {
   // Company identity
@@ -116,11 +115,9 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus> {
   }
   // else: fail open, profileComplete stays true, profile stays null
 
-  const mailboxComplete = await hasConnectedMailbox();
+  const completed = businessComplete && (grandfathered || profileComplete);
 
-  const completed = businessComplete && (grandfathered || (profileComplete && mailboxComplete));
-
-  return { completed, profileComplete, businessComplete, mailboxComplete, grandfathered, data: onboardingData, profile };
+  return { completed, profileComplete, businessComplete, mailboxComplete: true, grandfathered, data: onboardingData, profile };
 }
 
 export async function saveOnboarding(data: OnboardingData): Promise<{ ok: boolean; error?: string }> {

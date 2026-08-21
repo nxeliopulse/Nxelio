@@ -40,17 +40,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
 
-  // Hard onboarding gate — runs BEFORE the subscription check, since a
-  // brand-new workspace has no subscription row yet either; checking
-  // subscription first would let someone pay before finishing onboarding.
-  const onboardingStatus = await getOnboardingStatus();
-  if (!onboardingStatus.completed) return <OnboardingGate status={onboardingStatus} />;
-
-  // Card-first gate: a brand-new workspace has no subscription row at all
-  // until checkout completes (see migration 0035). Block the whole dashboard
-  // until that happens — nothing else here matters if there's no subscription.
+  // Subscription gate first — a cancelled user should see the subscription
+  // page, not be stuck on the onboarding gate they can never complete.
   const subscription = await getSubscription();
   if (!subscription || subscription.status === "canceled") return <SubscriptionGate />;
+
+  // Onboarding gate — runs after subscription check so cancelled users
+  // aren't blocked behind an onboarding step they can't proceed past.
+  const onboardingStatus = await getOnboardingStatus();
+  if (!onboardingStatus.completed) return <OnboardingGate status={onboardingStatus} />;
 
   const { data: profile } = await supabase
     .from("users")

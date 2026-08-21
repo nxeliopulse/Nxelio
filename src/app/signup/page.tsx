@@ -49,9 +49,9 @@ export default function SignupPage() {
           <span className="h-2.5 w-2.5 rotate-45 bg-indigo-600 rounded-[2px] flex-shrink-0" />
           <span className="text-sm font-semibold text-indigo-600">Welcome</span>
         </div>
-        <div className="bg-white rounded-2xl border-2 border-indigo-300 shadow-sm p-10 flex flex-col items-center max-w-md w-full">
-          <img src="/welcome-animation.svg" alt="Welcome" className="w-full max-w-xs h-auto" />
-          <p className="text-sm text-slate-500 mt-6 text-center">Your account is ready. Setting up your workspace…</p>
+        <div className="bg-white rounded-2xl border-2 border-indigo-300 shadow-sm p-14 flex flex-col items-center max-w-xl w-full">
+          <img src="/welcome-animation.svg" alt="Welcome" className="w-full max-w-sm h-auto" />
+          <p className="text-base text-slate-500 mt-8 text-center">Your account is ready. Setting up your workspace…</p>
           <button
             type="button"
             onClick={goToVerify}

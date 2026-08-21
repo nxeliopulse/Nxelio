@@ -14,7 +14,6 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
   const items = [
     { label: "Your profile", done: status.profileComplete },
     { label: "Company & business info", done: status.businessComplete },
-    { label: "Connect your inbox", done: status.mailboxComplete },
   ];
 
   return (
