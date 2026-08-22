@@ -634,7 +634,7 @@ export function AddLeadsWizard({
   }
 
   return (
-    <div className="absolute inset-0 z-50 bg-white flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-white flex flex-col">
       {/* Header + progress */}
       <div className="px-6 sm:px-10 py-5 border-b border-slate-100 flex-shrink-0">
         <div className="max-w-6xl mx-auto flex items-start justify-between">
