@@ -50,6 +50,30 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow, 
     return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: `This campaign has no ${step1?.channel === "linkedin" ? "LinkedIn message" : "email"} content yet.` };
   }
 
+  // Which channel(s) this campaign actually needs to send with — not just "is
+  // anything connected". Connecting only LinkedIn must not let an Email sequence
+  // through, and vice versa. Re-checked here (not just at create/edit time)
+  // because an account can be disconnected after a campaign was scheduled.
+  // Scoped explicitly to this campaign's workspace_id via the query itself (not
+  // hasConnectedOutreachChannel(), which relies on RLS+cookies) because the cron
+  // path calls this with the admin client, which bypasses RLS and would
+  // otherwise see every workspace's connected accounts.
+  const usedChannels = [...new Set(steps.map((s) => s.channel))];
+  const { data: connectedRows } = await supabase
+    .from("outreach_accounts")
+    .select("channel")
+    .eq("workspace_id", workspaceId)
+    .eq("status", "connected")
+    .in("channel", usedChannels);
+  const connectedChannels = new Set((connectedRows || []).map((r) => r.channel as string));
+  const missingChannel = usedChannels.find((c) => !connectedChannels.has(c));
+  if (missingChannel) {
+    return {
+      ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0,
+      error: `Connect ${missingChannel === "linkedin" ? "a LinkedIn" : "an email"} account before launching this campaign — this sequence uses ${missingChannel === "linkedin" ? "LinkedIn" : "Email"} steps.`,
+    };
+  }
+
   // A campaign's audience is a snapshot taken at launch, never a live segment
   // re-resolved on every send — re-clicking Launch on an already-Active campaign
   // must never re-enroll/re-send to leads added to the segment afterward. This

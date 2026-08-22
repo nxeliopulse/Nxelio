@@ -16,13 +16,14 @@ import { bulkInsertLeads, type LeadRow } from "@/lib/queries/leads";
 import { importLinkedInLeads, hasLinkedInAccount } from "@/lib/leads/linkedin-import";
 import { connectOutreachAccount, syncOutreachAccounts } from "@/lib/queries/outreach-accounts";
 import {
-  searchBuyLeads, searchPeopleAtCompanies, purchaseCompanyWiseLeads,
+  searchBuyLeads, searchPeopleAtCompanies, purchaseCompanyWiseLeads, importGeneratedProspects,
   type GeneratedProspect, type CompanyPeopleCriteria,
 } from "@/lib/leads/buy-leads";
+import { createLeadSearchJob } from "@/lib/leads/lead-search-jobs";
 import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
 import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
-import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, deductLeads } from "@/lib/queries/subscriptions";
+import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { cn } from "@/lib/utils";
@@ -197,7 +198,7 @@ export function AddLeadsWizard({
   initialSource?: SourceId | null;
 }) {
   const router = useRouter();
-  const { confirm } = useFeedback();
+  const { confirm, toast } = useFeedback();
   const [step, setStep] = useState(1);
   const [source, setSource] = useState<SourceId | null>(null);
 
@@ -217,11 +218,12 @@ export function AddLeadsWizard({
   // Buy leads (real prospects via Bright Data, or AI samples as fallback)
   const [buy, setBuy] = useState({
     industry: "", role: "", locations: [] as string[], count: 10,
-    companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true,
+    requireVerifiedEmail: false,
   });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
   const [buySource, setBuySource] = useState<"brightdata" | "anysite" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
+  const [bgQueueLoading, setBgQueueLoading] = useState(false);
   // Per-request cap: at most 100, further capped by what's left on the plan this cycle.
   const [maxBuyCount, setMaxBuyCount] = useState(100);
 
@@ -330,7 +332,7 @@ export function AddLeadsWizard({
     setStep(1); setSource(null); setInputValue("");
     setStep2Error(null); setStep2Warning(null);
     setManual([newManual()]); setEntries([newEntry()]); setCsvRows(null); setCsvName(""); setDragOver(false);
-    setBuy({ industry: "", role: "", locations: [], count: 10, companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true });
+    setBuy({ industry: "", role: "", locations: [], count: 10, requireVerifiedEmail: false });
     setBuyResults(null); setBuySource(null); setBuyLoading(false);
     setBuyMode("individual");
     setCompanies([newCompanyEntry()]);
@@ -400,8 +402,10 @@ export function AddLeadsWizard({
     setStep2Warning(null);
     setInputValue("");
     if (id === "verified-emails") {
+      // Verified Emails is Individual-only and background-search-only —
+      // Company-wise isn't offered here (no background support for it yet).
       setBuy((b) => ({ ...b, requireVerifiedEmail: true }));
-      setCompanyForm((f) => ({ ...f, requireVerifiedEmail: true }));
+      setBuyMode("individual");
     }
   }
 
@@ -420,6 +424,26 @@ export function AddLeadsWizard({
       })
       .catch((e) => setStep2Error(e instanceof Error ? e.message : "Search failed"))
       .finally(() => setBuyLoading(false));
+  }
+
+  // ---- Verified Emails: queue as a background job instead of searching now.
+  // Runs across cron ticks with no time limit, emails the requester when the
+  // full requested count of verified-email leads is found (or the search is
+  // genuinely exhausted) — see src/lib/leads/lead-search-jobs.ts. ----
+  function runInBackground() {
+    setStep2Error(null);
+    setStep2Warning(null);
+    setBgQueueLoading(true);
+    createLeadSearchJob(buy)
+      .then((res) => {
+        if (!res.ok) { setStep2Error(res.error || "Could not queue the search."); return; }
+        const eta = res.timeEstimate ? ` Usually takes ${res.timeEstimate}, but we'll keep going as long as it takes to find all ${buy.count}.` : "";
+        toast(`We'll email you when your ${buy.count} verified leads are ready.${eta} Check Verified Leads under Prospects later.`, "success");
+        reset();
+        onClose();
+      })
+      .catch((e) => setStep2Error(e instanceof Error ? e.message : "Could not queue the search."))
+      .finally(() => setBgQueueLoading(false));
   }
 
   // ---- CSV handling ----
@@ -526,6 +550,21 @@ export function AddLeadsWizard({
       return;
     }
 
+    // Buy Leads / Verified Emails — shared with the Verified Leads jobs results
+    // page (background search), so the credit-check + insert + deduct logic
+    // lives in one place: importGeneratedProspects().
+    if (isBuy) {
+      start(async () => {
+        const res = await importGeneratedProspects(buyResults ?? [], buySource);
+        if (!res.ok) { setImportError(res.error || "Import failed"); return; }
+        setSummary({ imported: res.inserted, skipped: 0, duplicates: res.duplicates, leadsRemaining: res.leadsRemaining });
+        if (res.inserted > 0) notifyCreditsChanged();
+        setStep(4);
+        router.refresh();
+      });
+      return;
+    }
+
     const sourceLabel = source ? SOURCE_LABEL[source] : "Import";
     let payload: Array<Partial<LeadRow>>;
     let skipped: number;
@@ -565,28 +604,6 @@ export function AddLeadsWizard({
         postal_code: e.postalCode.trim() || null,
         source: "Manual Entry", status: "New",
       }));
-    } else if (isBuy) {
-      skipped = 0;
-      // Real prospects (from whichever provider is active) carry a LinkedIn URL;
-      // AI samples carry a placeholder website. Neither carries an unverified email.
-      const buyLabel = buySource === "brightdata" ? "Purchased Leads (BILEADS Kit)"
-        : buySource === "anysite" ? "Purchased Leads (Anysite)"
-        : "Purchased Leads (sample)";
-      payload = (buyResults ?? []).map((p) => ({
-        full_name: (p.full_name || "").slice(0, 150) || null,
-        first_name: (p.first_name || "").slice(0, 100) || null,
-        last_name: (p.last_name || "").slice(0, 100) || null,
-        company_name: (p.company_name || "").slice(0, 200) || null,
-        industry: (p.industry || "").slice(0, 100) || null,
-        interest_area: (p.title || "").slice(0, 150) || null,
-        job_title: (p.title || "").slice(0, 150) || null,
-        seniority: p.seniority || null,
-        email: p.email || null,
-        email_verification_status: p.emailVerificationStatus || null,
-        linkedin: p.linkedin || null,
-        website_url: p.website_url || null,
-        source: buyLabel, status: "New",
-      }));
     } else {
       // Non-LinkedIn social sources (YouTube/Instagram/Twitter) — manual entry.
       skipped = manualInvalid.length;
@@ -600,32 +617,10 @@ export function AddLeadsWizard({
     }
 
     start(async () => {
-      // Buy Leads draws from the plan's monthly lead-discovery balance — check
-      // before inserting, same "check before you spend" pattern as AI credits.
-      if (isBuy && payload.length) {
-        if (!(await canAffordLeads(payload.length))) {
-          setImportError("You don't have enough leads remaining on your plan this cycle. Upgrade your plan or wait for renewal.");
-          return;
-        }
-      }
-
       const res = await bulkInsertLeads(payload, { defaultSource: sourceLabel });
       if (res.error) { setImportError(res.error); return; }
 
-      let leadsRemaining: number | undefined;
-      if (isBuy && res.inserted > 0) {
-        // Best-effort post-insert deduction — the leads are already in the
-        // CRM, so a deduction failure here should never hide that from the
-        // user (same philosophy as chargeCredits() for AI features).
-        try {
-          const deductRes = await deductLeads(res.inserted, { source: "buy_leads" });
-          if (!deductRes.ok) console.error("[buy-leads/credits] deduct failed:", deductRes.error);
-          else leadsRemaining = deductRes.remaining;
-        } catch (err) {
-          console.error("[buy-leads/credits] deduct threw:", err);
-        }
-        notifyCreditsChanged();
-      }
+      const leadsRemaining: number | undefined = undefined;
 
       setSummary({ imported: res.inserted, skipped, duplicates: res.duplicates, leadsRemaining });
       setStep(4);
@@ -717,15 +712,19 @@ export function AddLeadsWizard({
               <ManualEntryForm entries={entries} setEntries={setEntries} error={step2Error} />
             ) : isBuy ? (
               <div className="space-y-6">
-                <Tabs
-                  tabs={[
-                    { id: "individual", label: "Individual Leads", icon: <User className="h-4 w-4" /> },
-                    { id: "company", label: "Company-wise Leads", icon: <Building2 className="h-4 w-4" /> },
-                  ]}
-                  active={buyMode}
-                  onChange={(id) => { setBuyMode(id as "individual" | "company"); setStep2Error(null); }}
-                />
-                {buyMode === "individual" ? (
+                {source === "buy" && (
+                  <Tabs
+                    tabs={[
+                      { id: "individual", label: "Individual Leads", icon: <User className="h-4 w-4" /> },
+                      { id: "company", label: "Company-wise Leads", icon: <Building2 className="h-4 w-4" /> },
+                    ]}
+                    active={buyMode}
+                    onChange={(id) => { setBuyMode(id as "individual" | "company"); setStep2Error(null); }}
+                  />
+                )}
+                {/* Verified Emails is Individual-only, background-search-only — see
+                    runInBackground() and BuyForm's onRunInBackground handling. */}
+                {source === "verified-emails" || buyMode === "individual" ? (
                   <BuyForm
                     buy={buy}
                     setBuy={(b) => { setBuy(b); setBuyResults(null); setBuySource(null); }}
@@ -736,7 +735,8 @@ export function AddLeadsWizard({
                     error={step2Error}
                     warning={step2Warning}
                     maxCount={maxBuyCount}
-                    forceVerifiedEmail={source === "verified-emails"}
+                    onRunInBackground={source === "verified-emails" ? runInBackground : undefined}
+                    backgroundLoading={bgQueueLoading}
                   />
                 ) : (
                   <CompanyWiseLeadsFlow
@@ -753,7 +753,6 @@ export function AddLeadsWizard({
                     error={step2Error}
                     warning={step2Warning}
                     clearError={() => setStep2Error(null)}
-                    forceVerifiedEmail={source === "verified-emails"}
                   />
                 )}
               </div>
@@ -1288,14 +1287,14 @@ function ManualEntryReview({ valid, invalid, rows }: { valid: number; invalid: n
 // Buy Leads — real LinkedIn prospects via Bright Data (AI samples as fallback)
 export type BuyState = {
   industry: string; role: string; locations: string[]; count: number;
-  companySize: string; seniority: string; requireVerifiedEmail: boolean; includePhoneAndSocial: boolean;
+  requireVerifiedEmail: boolean;
 };
 
 // Fallbacks while the workspace's actual (admin-editable, Settings > Picklists)
 // values load in — "Any" is a client-only sentinel for this filter UI, never stored.
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
-export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, warning, maxCount, forceVerifiedEmail }: {
+export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, warning, maxCount, onRunInBackground, backgroundLoading }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;
@@ -1305,22 +1304,18 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
   error: string | null;
   warning?: string | null;
   maxCount: number;
-  /** Set when the wizard's "Verified Emails" card was chosen instead of plain
-   *  "Buy Leads" — locks the filter on so it can't be turned off. */
-  forceVerifiedEmail?: boolean;
+  /** Set only for the "Verified Emails" source — when present, this form is
+   *  background-search-only (no instant "Find prospects"): guaranteeing an
+   *  exact count with a real email needs patience an on-screen wait can't
+   *  honestly promise, so that path doesn't exist here at all. */
+  onRunInBackground?: () => void;
+  backgroundLoading?: boolean;
 }) {
   const isReal = source === "brightdata" || source === "anysite";
   // Initialized once from buy.count — BuyForm unmounts whenever the user leaves
   // the Buy Leads source/step, so a fresh mount always picks up the latest value
   // (e.g. after the plan-cap clamp on wizard open) without needing a sync effect.
   const [countDraft, setCountDraft] = useState(String(buy.count));
-
-  const [companySizeBuckets, setCompanySizeBuckets] = useState(FALLBACK_COMPANY_SIZE_BUCKETS);
-  const [seniorityLevels, setSeniorityLevels] = useState(FALLBACK_SENIORITY_LEVELS);
-  useEffect(() => {
-    getPicklistValues("lead_company_size").then(setCompanySizeBuckets).catch(() => {});
-    getPicklistValues("lead_seniority").then(setSeniorityLevels).catch(() => {});
-  }, []);
 
   function commitCount() {
     const n = Math.max(1, Math.min(maxCount, parseInt(countDraft, 10) || 1));
@@ -1353,40 +1348,6 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-base font-semibold text-slate-800 mb-2">Company size / headcount</label>
-            <Select value={buy.companySize} onChange={(e) => setBuy({ ...buy, companySize: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
-              <option value="Any">Any size</option>
-              {companySizeBuckets.map((b) => <option key={b} value={b}>{b}</option>)}
-            </Select>
-          </div>
-          <div>
-            <label className="block text-base font-semibold text-slate-800 mb-2">Seniority level</label>
-            <Select value={buy.seniority} onChange={(e) => setBuy({ ...buy, seniority: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
-              <option value="Any">Any seniority</option>
-              {seniorityLevels.map((s) => <option key={s} value={s}>{s}</option>)}
-            </Select>
-          </div>
-        </div>
-
-        <div className="space-y-3 py-1">
-          <label className={cn("flex items-center gap-3 text-base text-slate-800", forceVerifiedEmail ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
-            <input
-              type="checkbox"
-              checked={buy.requireVerifiedEmail}
-              disabled={forceVerifiedEmail}
-              onChange={(e) => setBuy({ ...buy, requireVerifiedEmail: e.target.checked })}
-              className={cn("rounded border-slate-400 h-5 w-5", forceVerifiedEmail ? "cursor-not-allowed" : "cursor-pointer")}
-            />
-            Require a verified work email{forceVerifiedEmail && " (always on for Verified Emails)"}
-          </label>
-          <label className="flex items-center gap-3 text-base text-slate-800 cursor-pointer">
-            <input type="checkbox" checked={buy.includePhoneAndSocial} onChange={(e) => setBuy({ ...buy, includePhoneAndSocial: e.target.checked })} className="rounded border-slate-400 h-5 w-5 cursor-pointer" />
-            Include phone number &amp; social handles (where available)
-          </label>
-        </div>
-
         <div className="max-w-[220px]">
           <label className="block text-base font-semibold text-slate-800 mb-2">How many (max {maxCount})</label>
           <Input
@@ -1401,11 +1362,26 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           />
         </div>
 
-        <Button onClick={onGenerate} disabled={loading} size="lg" className="shadow-md">
-          {loading
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
-            : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          {onRunInBackground ? (
+            <Button onClick={onRunInBackground} disabled={backgroundLoading} size="lg" className="shadow-md">
+              {backgroundLoading
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Queuing…</>
+                : <><Sparkles className="h-4 w-4" /> Search &amp; email me when ready</>}
+            </Button>
+          ) : (
+            <Button onClick={onGenerate} disabled={loading} size="lg" className="shadow-md">
+              {loading
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Finding prospects…</>
+                : <><Sparkles className="h-4 w-4" /> {results ? "Search again" : "Find prospects"}</>}
+            </Button>
+          )}
+        </div>
+        {onRunInBackground && (
+          <p className="text-sm text-slate-500">
+            Every lead here comes with a verified email — that takes real time to confirm, so this runs in the background, however long it needs. We&apos;ll email you when it&apos;s ready; find it later under Prospects → Verified Leads.
+          </p>
+        )}
 
         {results && isReal && (
           <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
@@ -1433,21 +1409,25 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           <p className="font-bold text-slate-900 text-base mb-3 uppercase tracking-wider">What you&apos;ll get</p>
           <ul className="space-y-3 text-base text-slate-600">
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Name, job title, company and LinkedIn URL from real public profiles.</li>
-            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Seniority estimated from each person&apos;s real job title.</li>
-            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Work email included when found — flagged as verified or catch-all, never guessed silently.</li>
+            <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> An estimated seniority label, shown alongside each result (not a search filter — just informational).</li>
+            {onRunInBackground ? (
+              <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> A confirmed work email for every result, guaranteed — never guessed, never skipped.</li>
+            ) : (
+              <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> No email — this is a fast, no-email lookup. Use Verified Emails if you need one.</li>
+            )}
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
           </ul>
         </div>
         <div className="pt-3 border-t border-amber-200/70">
           <p className="text-sm font-bold uppercase tracking-wider text-slate-800 mb-1.5">Not available from this source</p>
-          <p className="text-sm text-slate-600 leading-relaxed">Company size and seniority above are search filters/estimates, not verified fields — there&apos;s no public data source for a company&apos;s exact headcount, revenue, direct phone, or Twitter/X handle. Add those yourself afterward, or via Manual Entry / CSV Import where you already have them.</p>
+          <p className="text-sm text-slate-600 leading-relaxed">There&apos;s no public data source for a company&apos;s exact headcount, revenue, direct phone, or Twitter/X handle, and seniority is only ever a best-effort estimate from the title text — never a real search filter. Add those yourself afterward, or via Manual Entry / CSV Import where you already have them.</p>
         </div>
       </div>
     </div>
   );
 }
 
-function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; locations: string[] } }) {
+export function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; locations: string[] } }) {
   const withLinkedIn = prospects.filter((p) => p.linkedin).length;
   const withEmail = prospects.filter((p) => p.email).length;
   return (
@@ -1500,7 +1480,7 @@ type CompanyWiseForm = { locations: string[]; requireVerifiedEmail: boolean; cou
 
 function CompanyWiseLeadsFlow({
   companies, setCompanies, form, setForm, prospects, peopleLoading, onFindProspects,
-  selectedProspects, setSelectedProspects, maxCount, error, warning, clearError, forceVerifiedEmail,
+  selectedProspects, setSelectedProspects, maxCount, error, warning, clearError,
 }: {
   companies: CompanyEntry[];
   setCompanies: (c: CompanyEntry[]) => void;
@@ -1515,8 +1495,6 @@ function CompanyWiseLeadsFlow({
   error: string | null;
   warning?: string | null;
   clearError: () => void;
-  /** Set when the wizard's "Verified Emails" card was chosen — locks the filter on. */
-  forceVerifiedEmail?: boolean;
 }) {
   const [countDraft, setCountDraft] = useState(String(form.count));
   const [showResults, setShowResults] = useState(prospects !== null);
@@ -1619,17 +1597,6 @@ function CompanyWiseLeadsFlow({
           <label className="block text-base font-semibold text-slate-800 mb-2">Location</label>
           <MultiLocationInput value={form.locations} onChange={(v) => setForm({ ...form, locations: v })} />
         </div>
-
-        <label className={cn("flex items-center gap-3 text-base text-slate-800", forceVerifiedEmail ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
-          <input
-            type="checkbox"
-            checked={form.requireVerifiedEmail}
-            disabled={forceVerifiedEmail}
-            onChange={(e) => setForm({ ...form, requireVerifiedEmail: e.target.checked })}
-            className={cn("rounded border-slate-400 h-5 w-5", forceVerifiedEmail ? "cursor-not-allowed" : "cursor-pointer")}
-          />
-          Require a verified work email{forceVerifiedEmail && " (always on for Verified Emails)"}
-        </label>
 
         <div className="max-w-[220px]">
           <label className="block text-base font-semibold text-slate-800 mb-2">How many leads (max {maxCount})</label>

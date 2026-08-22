@@ -1,7 +1,11 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/queries/audit-log";
+import { hasConnectedOutreachChannel } from "@/lib/queries/outreach-accounts";
 import { revalidatePath } from "next/cache";
+
+const NO_OUTREACH_ACCOUNT_MESSAGE =
+  "Connect an email or LinkedIn account before creating, editing, or running campaigns. Go to Outreach → Accounts to connect one.";
 
 export interface CampaignRow {
   id: string;
@@ -19,6 +23,9 @@ export interface CampaignRow {
   pause_same_company_on_reply: boolean;
   scheduled_at: string | null;
   approval_status: string;
+  /** True only when the sequence content was produced via the AI generator — shown as its
+   *  own badge, independent of approval_status (which just tracks the review lifecycle). */
+  generated_by_ai: boolean;
   /** When false, this campaign can launch directly without going through the review/approval lifecycle. */
   requires_approval: boolean;
   created_by: string | null;
@@ -116,10 +123,11 @@ export async function getCampaignRecipients(campaignId: string): Promise<{ name:
 }
 
 export async function createCampaign(payload: Partial<CampaignRow>) {
+  if (!(await hasConnectedOutreachChannel())) throw new Error(NO_OUTREACH_ACCOUNT_MESSAGE);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("campaigns")
-    .insert({ campaign_name: payload.campaign_name || "Untitled Campaign", status: "Draft", ...payload })
+    .insert({ campaign_name: payload.campaign_name || "Untitled Campaign", status: "Draft", approval_status: "Draft", generated_by_ai: false, ...payload })
     .select()
     .single();
   // Throw a real Error (not the raw Postgrest object) — plain objects thrown from
@@ -132,6 +140,7 @@ export async function createCampaign(payload: Partial<CampaignRow>) {
 }
 
 export async function updateCampaign(id: string, payload: Partial<CampaignRow>) {
+  if (!(await hasConnectedOutreachChannel())) throw new Error(NO_OUTREACH_ACCOUNT_MESSAGE);
   const supabase = await createClient();
   const { error } = await supabase.from("campaigns").update(payload).eq("id", id);
   if (error) throw new Error(error.message || "Couldn't update the campaign.");
@@ -152,6 +161,7 @@ export async function setCampaignStatus(id: string, status: string) {
 }
 
 export async function duplicateCampaign(id: string) {
+  if (!(await hasConnectedOutreachChannel())) throw new Error(NO_OUTREACH_ACCOUNT_MESSAGE);
   const supabase = await createClient();
   const { data: existing, error: fetchError } = await supabase
     .from("campaigns")

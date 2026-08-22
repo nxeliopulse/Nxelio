@@ -1,4 +1,4 @@
-export const APPROVAL_STATUSES = ["Draft (AI-generated)", "Pending review", "Approved", "Live/Distributing", "Archived"] as const;
+export const APPROVAL_STATUSES = ["Draft", "Pending review", "Approved", "Live/Distributing", "Archived"] as const;
 
 /** Badge variant for each stage of the campaign content-approval lifecycle. */
 export function approvalBadgeVariant(status: string): "default" | "warning" | "success" | "blue" | "outline" {
@@ -7,6 +7,6 @@ export function approvalBadgeVariant(status: string): "default" | "warning" | "s
     case "Approved": return "success";
     case "Live/Distributing": return "blue";
     case "Archived": return "outline";
-    default: return "default"; // Draft (AI-generated)
+    default: return "default"; // Draft
   }
 }

@@ -79,6 +79,13 @@ export async function hasConnectedLinkedIn(): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
+/** Whether this workspace can send a campaign at all — at least one connected
+ *  mailbox OR LinkedIn account. Used to gate campaign create/edit/launch. */
+export async function hasConnectedOutreachChannel(): Promise<boolean> {
+  const [mailbox, linkedin] = await Promise.all([hasConnectedMailbox(), hasConnectedLinkedIn()]);
+  return mailbox || linkedin;
+}
+
 export async function getOutreachAccounts(): Promise<OutreachAccountRow[]> {
   const supabase = await createClient();
   await pruneDeadUnipileAccounts(supabase);

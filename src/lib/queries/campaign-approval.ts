@@ -4,7 +4,7 @@ import { getCampaignById, type CampaignRow } from "@/lib/queries/campaigns";
 import { notifyUsersByRole } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
 
-export type ApprovalStatus = "Draft (AI-generated)" | "Pending review" | "Approved" | "Live/Distributing" | "Archived";
+export type ApprovalStatus = "Draft" | "Pending review" | "Approved" | "Live/Distributing" | "Archived";
 
 export interface ApprovalLogEntry {
   id: string;
@@ -98,11 +98,11 @@ function revalidateCampaign(campaignId: string) {
   revalidatePath("/campaigns/builder");
 }
 
-/** Draft (AI-generated) -> Pending review. Notifies every Reviewer in the workspace. */
+/** Draft -> Pending review. Notifies every Reviewer in the workspace. */
 export async function submitForReview(campaignId: string) {
   const { userId, workspaceId } = await requireCaller();
   const campaign = await loadCampaign(campaignId);
-  if (campaign.approval_status !== "Draft (AI-generated)") {
+  if (campaign.approval_status !== "Draft") {
     throw new Error("Only a Draft campaign can be submitted for review.");
   }
   const admin = createAdminClient();
@@ -139,7 +139,7 @@ export async function approveCampaign(campaignId: string) {
   revalidateCampaign(campaignId);
 }
 
-/** Pending review -> Draft (AI-generated), with a required comment so it doesn't silently disappear. */
+/** Pending review -> Draft, with a required comment so it doesn't silently disappear. */
 export async function sendBackToDraft(campaignId: string, comment: string) {
   const { userId, workspaceId } = await requireApprover();
   const campaign = await loadCampaign(campaignId);
@@ -148,9 +148,9 @@ export async function sendBackToDraft(campaignId: string, comment: string) {
   }
   if (!comment.trim()) throw new Error("A comment is required when sending a campaign back.");
   const admin = createAdminClient();
-  const { error } = await admin.from("campaigns").update({ approval_status: "Draft (AI-generated)" }).eq("id", campaignId);
+  const { error } = await admin.from("campaigns").update({ approval_status: "Draft" }).eq("id", campaignId);
   if (error) throw new Error(error.message || "Couldn't send campaign back.");
-  await logTransition(campaignId, workspaceId, campaign.approval_status, "Draft (AI-generated)", userId, comment);
+  await logTransition(campaignId, workspaceId, campaign.approval_status, "Draft", userId, comment);
   revalidateCampaign(campaignId);
 }
 

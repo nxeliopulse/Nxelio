@@ -125,6 +125,11 @@ export default function CampaignBuilderPage() {
   const [channelFilter, setChannelFilter] = useState<string>("All channels");
   const [sequence, setSequence] = useState<GeneratedEmail[]>([]);
   const [prompt, setPrompt] = useState("");
+  // True once the AI generator has actually produced content for this campaign —
+  // shown as a separate "AI-generated" badge, distinct from the Draft/Pending
+  // review/Approved approval lifecycle. Seeded from the loaded campaign (editing
+  // an existing one) so it isn't lost on reload.
+  const [usedAiGeneration, setUsedAiGeneration] = useState(false);
   const [generating, setGenerating] = useState(false);
 
   // Setup strip
@@ -286,8 +291,9 @@ export default function CampaignBuilderPage() {
 
   function startCustom() {
     setChosenTpl("custom");
+    const emailUsable = mailboxConnected && !emailBlocked;
     setSequence([
-      emailBlocked
+      !emailUsable
         ? { day: "Day 1", subject: "", body: "", channel: "linkedin", action: "connection_request" }
         : { day: "Day 1", subject: "", body: "" },
     ]);
@@ -308,6 +314,7 @@ export default function CampaignBuilderPage() {
       if (emails.length) {
         setSequence(emails);
         setPrompt(instruction);
+        setUsedAiGeneration(true);
         setAiModalOpen(false);
       }
     } catch (err) {
@@ -319,6 +326,18 @@ export default function CampaignBuilderPage() {
 
   const mailboxAccounts = senderAccounts.filter((a) => a.channel === "email");
   const linkedinAccounts = senderAccounts.filter((a) => a.channel === "linkedin");
+  // Nothing to send with at all — checked again server-side in createCampaign/
+  // updateCampaign/sendCampaign, but shown up front so a user doesn't fill out
+  // an entire sequence before hitting a save/launch error.
+  const mailboxConnected = mailboxAccounts.some((a) => a.status === "connected");
+  const linkedinConnected = linkedinAccounts.some((a) => a.status === "connected");
+  const accountsGate = mailboxConnected || linkedinConnected;
+  const ACCOUNTS_GATE_MESSAGE = "Connect an email or LinkedIn account before creating or running campaigns.";
+  // Which channel(s) a campaign can actually use is capped by which account(s)
+  // are connected — connecting only LinkedIn means Email templates/steps are
+  // off-limits (and vice versa), independent of whether the audience's data is complete.
+  const EMAIL_ACCOUNT_MISSING_MSG = "Connect an email account to use Email steps or templates.";
+  const LINKEDIN_ACCOUNT_MISSING_MSG = "Connect a LinkedIn account to use LinkedIn steps or templates.";
   const totalLeadsCount = lists.reduce((sum, l) => sum + (l.segmentId ? l.count : 0), 0) || (lists.length ? undefined : 0);
 
   // Empty audience — a list/segment was added but it has (or resolves to)
@@ -341,32 +360,45 @@ export default function CampaignBuilderPage() {
 
   function templateBlockReason(t: CampaignTemplate): string | null {
     if (audienceEmpty) return AUDIENCE_EMPTY_MSG;
+    if (!mailboxConnected && t.channels.includes("Email")) return EMAIL_ACCOUNT_MISSING_MSG;
+    if (!linkedinConnected && t.channels.includes("LinkedIn")) return LINKEDIN_ACCOUNT_MISSING_MSG;
     if (emailBlocked && t.channels.includes("Email")) return EMAIL_BLOCKED_MSG;
     if (linkedinBlocked && t.channels.includes("LinkedIn")) return LINKEDIN_BLOCKED_MSG;
     return null;
   }
 
-  const audienceWarningBanner = (audienceEmpty || emailBlocked || linkedinBlocked) && (
+  const noEmailAccount = !mailboxConnected;
+  const noLinkedinAccount = !linkedinConnected;
+  const audienceWarningBanner = (audienceEmpty || emailBlocked || linkedinBlocked || noEmailAccount || noLinkedinAccount) && (
     <div className="mb-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
       <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
       <span>
         {audienceEmpty && AUDIENCE_EMPTY_MSG}
-        {!audienceEmpty && emailBlocked && !linkedinBlocked && EMAIL_BLOCKED_MSG}
-        {!audienceEmpty && linkedinBlocked && !emailBlocked && LINKEDIN_BLOCKED_MSG}
-        {!audienceEmpty && emailBlocked && linkedinBlocked && `${missingEmailCount} lead${missingEmailCount === 1 ? "" : "s"} in this audience ${missingEmailCount === 1 ? "is" : "are"} missing an email, and ${missingLinkedinCount} ${missingLinkedinCount === 1 ? "is" : "are"} missing a LinkedIn profile — Email and LinkedIn templates/steps are disabled until you narrow the audience.`}
+        {!audienceEmpty && noEmailAccount && noLinkedinAccount && "No email or LinkedIn account connected — connect one in the Sender accounts tab before choosing a channel."}
+        {!audienceEmpty && noEmailAccount && !noLinkedinAccount && EMAIL_ACCOUNT_MISSING_MSG}
+        {!audienceEmpty && noLinkedinAccount && !noEmailAccount && LINKEDIN_ACCOUNT_MISSING_MSG}
+        {!audienceEmpty && !noEmailAccount && !noLinkedinAccount && emailBlocked && !linkedinBlocked && EMAIL_BLOCKED_MSG}
+        {!audienceEmpty && !noEmailAccount && !noLinkedinAccount && linkedinBlocked && !emailBlocked && LINKEDIN_BLOCKED_MSG}
+        {!audienceEmpty && !noEmailAccount && !noLinkedinAccount && emailBlocked && linkedinBlocked && `${missingEmailCount} lead${missingEmailCount === 1 ? "" : "s"} in this audience ${missingEmailCount === 1 ? "is" : "are"} missing an email, and ${missingLinkedinCount} ${missingLinkedinCount === 1 ? "is" : "are"} missing a LinkedIn profile — Email and LinkedIn templates/steps are disabled until you narrow the audience.`}
       </span>
     </div>
   );
 
   // Hard gate: every tab except Leads is locked until at least one lead list is added.
   const leadsGate = lists.length > 0;
+  // Hard gate: Sequence/Settings are locked until a sending account is connected — the
+  // "Sender accounts" tab itself stays open so there's a way to fix it without leaving the page.
   const visibleTabs = PAGE_TABS
-    .map((t) => ({ ...t, disabled: t.id !== "leads" && !leadsGate, disabledReason: LEADS_GATE_MESSAGE }));
+    .map((t) => ({
+      ...t,
+      disabled: (t.id !== "leads" && !leadsGate) || (t.id === "sequence" || t.id === "settings" ? !accountsGate : false),
+      disabledReason: t.id !== "leads" && !leadsGate ? LEADS_GATE_MESSAGE : ACCOUNTS_GATE_MESSAGE,
+    }));
 
   // A campaign's content must be reviewed and approved before it can be launched —
   // enforced again server-side in sendCampaign(), this is just the UI-level gate.
   // Unchecking "Requires approval" below bypasses this entirely.
-  const approvalStatus = campaign?.approval_status || "Draft (AI-generated)";
+  const approvalStatus = campaign?.approval_status || "Draft";
   const approvalGate = !requiresApproval || approvalStatus === "Approved";
   const APPROVAL_GATE_MESSAGE = approvalStatus === "Pending review"
     ? "Waiting on reviewer approval."
@@ -396,6 +428,7 @@ export default function CampaignBuilderPage() {
       pause_same_company_on_reply: pauseSameCompany,
       scheduled_at: isScheduled && scheduledAt ? new Date(scheduledAt).toISOString() : null,
       requires_approval: requiresApproval,
+      generated_by_ai: usedAiGeneration,
     };
     if (campaign) {
       await updateCampaign(campaign.id, payload);
@@ -502,22 +535,23 @@ export default function CampaignBuilderPage() {
           ) : (
             <Badge variant={approvalBadgeVariant(approvalStatus)}>{approvalStatus}</Badge>
           )}
+          {usedAiGeneration && <Badge variant="blue" title="Content was produced by the AI generator">AI-generated</Badge>}
           {campaign && requiresApproval && (
             <button onClick={openHistory} title="Approval history" className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2">
               History
             </button>
           )}
-          {campaign && requiresApproval && approvalStatus === "Draft (AI-generated)" && (
+          {campaign && requiresApproval && approvalStatus === "Draft" && (
             <Button variant="outline" onClick={handleSubmitForReview} disabled={pending || submittingReview}>
               {submittingReview ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Submit for review
             </Button>
           )}
           <Button
             onClick={launch}
-            disabled={!launchEnabled || pending || !leadsGate || audienceEmpty || !approvalGate}
+            disabled={!launchEnabled || pending || !leadsGate || !accountsGate || audienceEmpty || !approvalGate}
             title={
               !launchEnabled ? "Campaign launches have been temporarily disabled by the administrator."
-              : !leadsGate ? LEADS_GATE_MESSAGE : audienceEmpty ? AUDIENCE_EMPTY_MSG : !approvalGate ? APPROVAL_GATE_MESSAGE : undefined
+              : !leadsGate ? LEADS_GATE_MESSAGE : !accountsGate ? ACCOUNTS_GATE_MESSAGE : audienceEmpty ? AUDIENCE_EMPTY_MSG : !approvalGate ? APPROVAL_GATE_MESSAGE : undefined
             }
           >
             {pending
@@ -528,6 +562,13 @@ export default function CampaignBuilderPage() {
           </Button>
         </div>
       </div>
+
+      {!accountsGate && (
+        <div className="mb-4 flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+          <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 flex-shrink-0" /> {ACCOUNTS_GATE_MESSAGE}</span>
+          <Button variant="outline" size="sm" onClick={() => setTab("sender")}>Connect account</Button>
+        </div>
+      )}
 
       <Tabs tabs={visibleTabs} active={tab} onChange={(id) => setTab(id as TabId)} className="mb-6" />
 
@@ -829,22 +870,22 @@ export default function CampaignBuilderPage() {
                                     <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
                                       <button
                                         onClick={() => patchStep(i, { channel: "email", action: "email" })}
-                                        disabled={audienceEmpty || emailBlocked}
-                                        title={audienceEmpty ? AUDIENCE_EMPTY_MSG : emailBlocked ? EMAIL_BLOCKED_MSG : undefined}
+                                        disabled={audienceEmpty || !mailboxConnected || emailBlocked}
+                                        title={audienceEmpty ? AUDIENCE_EMPTY_MSG : !mailboxConnected ? EMAIL_ACCOUNT_MISSING_MSG : emailBlocked ? EMAIL_BLOCKED_MSG : undefined}
                                         className={cn(
                                           "px-2 py-0.5 text-xs rounded-md",
                                           !isLi ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-500",
-                                          (audienceEmpty || emailBlocked) && "opacity-40 cursor-not-allowed"
+                                          (audienceEmpty || !mailboxConnected || emailBlocked) && "opacity-40 cursor-not-allowed"
                                         )}
                                       >Email</button>
                                       <button
                                         onClick={() => patchStep(i, { channel: "linkedin", action: s.action && s.action !== "email" ? s.action : "connection_request" })}
-                                        disabled={audienceEmpty || linkedinBlocked}
-                                        title={audienceEmpty ? AUDIENCE_EMPTY_MSG : linkedinBlocked ? LINKEDIN_BLOCKED_MSG : undefined}
+                                        disabled={audienceEmpty || !linkedinConnected || linkedinBlocked}
+                                        title={audienceEmpty ? AUDIENCE_EMPTY_MSG : !linkedinConnected ? LINKEDIN_ACCOUNT_MISSING_MSG : linkedinBlocked ? LINKEDIN_BLOCKED_MSG : undefined}
                                         className={cn(
                                           "px-2 py-0.5 text-xs rounded-md",
                                           isLi ? "bg-white shadow-sm text-sky-700 font-medium" : "text-slate-500",
-                                          (audienceEmpty || linkedinBlocked) && "opacity-40 cursor-not-allowed"
+                                          (audienceEmpty || !linkedinConnected || linkedinBlocked) && "opacity-40 cursor-not-allowed"
                                         )}
                                       >LinkedIn</button>
                                     </div>
@@ -884,7 +925,7 @@ export default function CampaignBuilderPage() {
                     onClick={() =>
                       setSequence([
                         ...sequence,
-                        emailBlocked
+                        !(mailboxConnected && !emailBlocked)
                           ? { day: formatDelay(3, "days"), subject: "", body: "", channel: "linkedin", action: "connection_request" }
                           : { day: formatDelay(3, "days"), subject: "", body: "" },
                       ])
@@ -1102,9 +1143,9 @@ export default function CampaignBuilderPage() {
         </div>
       )}
 
-      {/* Bottom bar — save draft, always available */}
+      {/* Bottom bar — save draft, always available (except with no sending account connected) */}
       <div className="mt-6 flex items-center justify-end">
-        <Button variant="outline" onClick={saveDraft} disabled={pending}>
+        <Button variant="outline" onClick={saveDraft} disabled={pending || !accountsGate} title={!accountsGate ? ACCOUNTS_GATE_MESSAGE : undefined}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save draft
         </Button>
       </div>
