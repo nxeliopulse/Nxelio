@@ -399,10 +399,23 @@ export async function bulkInsertLeads(
   if (!leads.length) return { inserted: 0, duplicates: 0 };
   const supabase = await createClient();
 
-  // Build a set of existing identifiers (email + linkedin) to skip duplicates.
-  const { data: existingRows } = await supabase
-    .from("leads")
-    .select("email, linkedin");
+  // Build a set of existing identifiers (email + linkedin) to skip duplicates —
+  // scoped to just this batch's own emails/LinkedIn URLs, not the whole table.
+  // Fetching every lead's email+linkedin on every import got slower as the
+  // Prospects list grew; a workspace with a few thousand leads made even a
+  // 5-lead import take several seconds for no reason.
+  const escapeOrValue = (v: string) => (/[,()]/.test(v) ? `"${v.replace(/"/g, '\\"')}"` : v);
+  const batchEmails = leads.map((l) => l.email).filter((v): v is string => Boolean(v));
+  const batchLinkedins = leads.map((l) => l.linkedin).filter((v): v is string => Boolean(v));
+  // ilike with no wildcards is an exact, case-insensitive match — same dedup
+  // semantics as the old toLowerCase() comparison, just filtered server-side.
+  const orParts = [
+    ...batchEmails.map((e) => `email.ilike.${escapeOrValue(e)}`),
+    ...batchLinkedins.map((l) => `linkedin.ilike.${escapeOrValue(l)}`),
+  ];
+  const { data: existingRows } = orParts.length
+    ? await supabase.from("leads").select("email, linkedin").or(orParts.join(","))
+    : { data: [] };
   const norm = (s: string | null | undefined) => (s || "").toLowerCase().trim();
   const existing = new Set<string>();
   for (const r of existingRows || []) {

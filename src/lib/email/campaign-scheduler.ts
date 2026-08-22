@@ -6,6 +6,7 @@ import { substituteMergeTags } from "@/lib/email/merge-tags";
 import { parseDelay, delayToMinutes } from "@/lib/sequence-delay";
 import {
   unipileConfigured, unipileResolveProfile, unipileSendInvite, unipileSendLinkedInMessage,
+  isAlreadyLinkedInConnection,
 } from "@/lib/outreach/unipile";
 import { consumeSendQuota } from "@/lib/outreach/send-quota";
 import { isSuppressed } from "@/lib/segments";
@@ -197,7 +198,7 @@ async function sendLinkedInStepToLead(
   const message = substituteMergeTags(opts.body, lead, opts.senderName);
 
   try {
-    const { providerId, error: resolveError } = await unipileResolveProfile({ accountId, identifier: lead.linkedin });
+    const { providerId, networkDistance, error: resolveError } = await unipileResolveProfile({ accountId, identifier: lead.linkedin });
     if (!providerId) return { ok: false, error: resolveError || "Could not resolve LinkedIn profile" };
 
     // Reply webhooks identify the sender by this opaque provider_id, not the
@@ -205,6 +206,13 @@ async function sendLinkedInStepToLead(
     await db.from("leads").update({ linkedin_provider_id: providerId }).eq("id", lead.id);
 
     if (action === "connection_request") {
+      // Check the real relationship BEFORE sending — a lead re-added after being
+      // disconnected, or already a 1st-degree connection some other way, doesn't
+      // need (and can't receive) another invite. Skip cleanly instead of burning
+      // an API call and relying on Unipile's error text to catch it after the fact.
+      if (isAlreadyLinkedInConnection(networkDistance)) {
+        return { ok: false, skipped: true, error: "Already a LinkedIn connection" };
+      }
       await unipileSendInvite({ accountId, providerId, message });
     } else {
       await unipileSendLinkedInMessage({ accountId, providerId, text: message });
