@@ -298,6 +298,7 @@ export function CampaignDetailView({
               ) : (
                 <Badge variant={approvalBadgeVariant(campaign.approval_status)}>{campaign.approval_status}</Badge>
               )}
+              {campaign.generated_by_ai && <Badge variant="blue">AI-generated</Badge>}
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden max-w-md">
               <div className={cn("h-full bg-blue-500 rounded-full transition-all", isActive && "lp-progress-active")} style={{ width: `${progress}%` }} />

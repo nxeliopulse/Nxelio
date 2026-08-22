@@ -30,6 +30,7 @@ interface UnifiedRow {
   channelLabel: "Email" | "LinkedIn" | "Multichannel";
   status: string;
   approvalStatus: string | null; // email campaigns only — sequences aren't in scope for this lifecycle
+  generatedByAi: boolean; // whether the sequence content came from the AI generator, shown as its own badge
   leads: number | null;
   sent: number;
   openRate?: number;
@@ -81,7 +82,7 @@ function statusPillTone(status: string): "success" | "warning" | "danger" | "inf
     case "Pending review": case "Paused": return "warning";
     case "Archived": return "default";
     case "Live/Distributing": return "info";
-    default: return "default"; // Draft (AI-generated)
+    default: return "default"; // Draft
   }
 }
 
@@ -235,6 +236,7 @@ export function CampaignsView({
       channelLabel: campaignChannelLabel(c.content),
       status: c.status,
       approvalStatus: c.approval_status,
+      generatedByAi: Boolean(c.generated_by_ai),
       leads: c.segment_id ? (segmentContacts.get(c.segment_id) ?? 0) : totalLeads,
       sent: c.sent_count || 0,
       openRate: Number(c.open_rate || 0),
@@ -252,6 +254,7 @@ export function CampaignsView({
       channelLabel: s.channel === "linkedin" ? "LinkedIn" : s.channel === "multichannel" ? "Multichannel" : "Email",
       status: s.status,
       approvalStatus: null,
+      generatedByAi: false,
       leads: s.enrolled_count || 0,
       sent: s.sent_count || 0,
       openRate: 0,
@@ -880,6 +883,7 @@ export function CampaignsView({
                     ) : (
                       <Badge variant={isActive ? "success" : "default"}>{r.status}</Badge>
                     )}
+                    {r.generatedByAi && <Badge variant="blue">AI-generated</Badge>}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
@@ -978,6 +982,7 @@ export function CampaignsView({
                             ) : (
                               <StatusPill label={r.status} tone={statusPillTone(r.status)} />
                             )}
+                            {r.generatedByAi && <StatusPill label="AI-generated" tone="info" />}
                             {canApproveHere && (
                               <Button
                                 size="sm"
@@ -1054,7 +1059,7 @@ export function CampaignsView({
                               <button onClick={() => handleDuplicate(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
                                 <Copy className="h-4 w-4 text-slate-400" /> Duplicate
                               </button>
-                              {r.approvalStatus === "Draft (AI-generated)" && (
+                              {r.approvalStatus === "Draft" && (
                                 <button onClick={() => handleSubmitForReview(r)} disabled={pending} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50">
                                   <Send className="h-4 w-4 text-slate-400" /> Submit for review
                                 </button>

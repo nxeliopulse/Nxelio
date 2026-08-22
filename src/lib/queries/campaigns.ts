@@ -23,6 +23,9 @@ export interface CampaignRow {
   pause_same_company_on_reply: boolean;
   scheduled_at: string | null;
   approval_status: string;
+  /** True only when the sequence content was produced via the AI generator — shown as its
+   *  own badge, independent of approval_status (which just tracks the review lifecycle). */
+  generated_by_ai: boolean;
   /** When false, this campaign can launch directly without going through the review/approval lifecycle. */
   requires_approval: boolean;
   created_by: string | null;
@@ -124,7 +127,7 @@ export async function createCampaign(payload: Partial<CampaignRow>) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("campaigns")
-    .insert({ campaign_name: payload.campaign_name || "Untitled Campaign", status: "Draft", ...payload })
+    .insert({ campaign_name: payload.campaign_name || "Untitled Campaign", status: "Draft", approval_status: "Draft", generated_by_ai: false, ...payload })
     .select()
     .single();
   // Throw a real Error (not the raw Postgrest object) — plain objects thrown from
