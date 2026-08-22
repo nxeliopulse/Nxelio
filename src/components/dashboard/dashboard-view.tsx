@@ -66,8 +66,10 @@ function EmptyChartState({ label }: { label: string }) {
   );
 }
 
+const PLAN_NAME: Record<string, string> = { basic: "Basic", starter: "Starter", pro: "Pro" };
+
 // Welcome banner (shown once after checkout completes)
-function WelcomeBanner() {
+function WelcomeBanner({ planId = "basic" }: { planId?: string }) {
   const router = useRouter();
   const params = useSearchParams();
   const [visible, setVisible] = useState(false);
@@ -75,31 +77,60 @@ function WelcomeBanner() {
 
   useEffect(() => {
     if (params.get("welcome") === "1") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reacts to a one-time URL param set by the redirect after signup/checkout, then strips it
       setVisible(true);
       setWasTrial(params.get("trial") === "1");
       router.replace("/dashboard", { scroll: false });
+
+      const timer = setTimeout(() => {
+        setVisible(false);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
   }, [params, router]);
 
   if (!visible) return null;
 
+  const planName = PLAN_NAME[planId] ?? "Starter";
+
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.07] px-5 py-3.5 animate-in fade-in slide-in-from-top-2 duration-500 mb-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/15">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+        onClick={() => setVisible(false)}
+      />
+
+      {/* Modal Content */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        style={{ animation: "lp-toast-in 0.25s ease-out" }}
+        className="relative w-full max-w-sm rounded-2xl border border-slate-150 bg-white dark:bg-slate-900 p-6 shadow-2xl text-center flex flex-col items-center"
+      >
+        {/* Animated Success Checkmark / Confetti style */}
+        <div className="h-16 w-16 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center mb-4 border border-emerald-100 dark:border-emerald-500/20">
+          <CheckCircle2 className="h-10 w-10 text-emerald-500 animate-bounce" />
         </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-900 dark:text-white">Payment method added — you&apos;re all set!</p>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {wasTrial ? "Your trial is active. Explore all features below." : "Your subscription is active. Explore all features below."}
-          </p>
-        </div>
+
+        <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+          Congratulations!
+        </h3>
+
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+          You purchased the <span className="font-semibold text-slate-800 dark:text-slate-200">{planName}</span> plan.
+        </p>
+
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+          {wasTrial ? "Your trial is active. Explore all features below." : "Your subscription is active. Explore all features below."}
+        </p>
+
+        <button
+          onClick={() => setVisible(false)}
+          className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md p-1 transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
-      <button onClick={() => setVisible(false)} className="text-slate-600 hover:text-slate-300 dark:hover:text-slate-700 transition-colors">
-        <X className="h-4 w-4" />
-      </button>
     </div>
   );
 }
@@ -121,7 +152,7 @@ interface UsageHistoryEntry {
   metadata: Record<string, unknown> | null;
 }
 
-const PLAN_NAME: Record<string, string> = { basic: "Basic", starter: "Starter", pro: "Pro" };
+// PLAN_NAME was moved up to be available in WelcomeBanner
 
 export function DashboardView({
   stats,
@@ -241,7 +272,7 @@ export function DashboardView({
       
       {/* Welcome Banner */}
       <Suspense fallback={null}>
-        <WelcomeBanner />
+        <WelcomeBanner planId={credits?.planId} />
       </Suspense>
 
       {/* Header section */}
