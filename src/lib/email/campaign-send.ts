@@ -37,6 +37,22 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow, 
   const workspaceId = (campaign as { workspace_id?: string }).workspace_id;
   if (!workspaceId) return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Campaign has no workspace." };
 
+  // No sending channel connected → nothing to actually send with. Re-checked here
+  // (not just at create/edit time) because an account can be disconnected after a
+  // campaign was scheduled. Scoped explicitly to this campaign's workspace_id via
+  // the query itself (not hasConnectedOutreachChannel(), which relies on
+  // RLS+cookies) because the cron path calls this with the admin client, which
+  // bypasses RLS and would otherwise see every workspace's connected accounts.
+  const { count: connectedCount } = await supabase
+    .from("outreach_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", workspaceId)
+    .eq("status", "connected")
+    .in("channel", ["email", "linkedin"]);
+  if (!connectedCount) {
+    return { ok: false, sent: 0, failed: 0, skipped: 0, scheduled: 0, error: "Connect an email or LinkedIn account before launching this campaign." };
+  }
+
   // A campaign's content must be human-approved before it can reach anyone's inbox —
   // this is the real enforcement point, not just a disabled button in the UI.
   // Campaigns created with "requires approval" unchecked skip this gate entirely.

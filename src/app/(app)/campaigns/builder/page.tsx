@@ -319,6 +319,11 @@ export default function CampaignBuilderPage() {
 
   const mailboxAccounts = senderAccounts.filter((a) => a.channel === "email");
   const linkedinAccounts = senderAccounts.filter((a) => a.channel === "linkedin");
+  // Nothing to send with at all — checked again server-side in createCampaign/
+  // updateCampaign/sendCampaign, but shown up front so a user doesn't fill out
+  // an entire sequence before hitting a save/launch error.
+  const accountsGate = senderAccounts.some((a) => (a.channel === "email" || a.channel === "linkedin") && a.status === "connected");
+  const ACCOUNTS_GATE_MESSAGE = "Connect an email or LinkedIn account before creating or running campaigns.";
   const totalLeadsCount = lists.reduce((sum, l) => sum + (l.segmentId ? l.count : 0), 0) || (lists.length ? undefined : 0);
 
   // Empty audience — a list/segment was added but it has (or resolves to)
@@ -360,8 +365,14 @@ export default function CampaignBuilderPage() {
 
   // Hard gate: every tab except Leads is locked until at least one lead list is added.
   const leadsGate = lists.length > 0;
+  // Hard gate: Sequence/Settings are locked until a sending account is connected — the
+  // "Sender accounts" tab itself stays open so there's a way to fix it without leaving the page.
   const visibleTabs = PAGE_TABS
-    .map((t) => ({ ...t, disabled: t.id !== "leads" && !leadsGate, disabledReason: LEADS_GATE_MESSAGE }));
+    .map((t) => ({
+      ...t,
+      disabled: (t.id !== "leads" && !leadsGate) || (t.id === "sequence" || t.id === "settings" ? !accountsGate : false),
+      disabledReason: t.id !== "leads" && !leadsGate ? LEADS_GATE_MESSAGE : ACCOUNTS_GATE_MESSAGE,
+    }));
 
   // A campaign's content must be reviewed and approved before it can be launched —
   // enforced again server-side in sendCampaign(), this is just the UI-level gate.
@@ -514,10 +525,10 @@ export default function CampaignBuilderPage() {
           )}
           <Button
             onClick={launch}
-            disabled={!launchEnabled || pending || !leadsGate || audienceEmpty || !approvalGate}
+            disabled={!launchEnabled || pending || !leadsGate || !accountsGate || audienceEmpty || !approvalGate}
             title={
               !launchEnabled ? "Campaign launches have been temporarily disabled by the administrator."
-              : !leadsGate ? LEADS_GATE_MESSAGE : audienceEmpty ? AUDIENCE_EMPTY_MSG : !approvalGate ? APPROVAL_GATE_MESSAGE : undefined
+              : !leadsGate ? LEADS_GATE_MESSAGE : !accountsGate ? ACCOUNTS_GATE_MESSAGE : audienceEmpty ? AUDIENCE_EMPTY_MSG : !approvalGate ? APPROVAL_GATE_MESSAGE : undefined
             }
           >
             {pending
@@ -528,6 +539,13 @@ export default function CampaignBuilderPage() {
           </Button>
         </div>
       </div>
+
+      {!accountsGate && (
+        <div className="mb-4 flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+          <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 flex-shrink-0" /> {ACCOUNTS_GATE_MESSAGE}</span>
+          <Button variant="outline" size="sm" onClick={() => setTab("sender")}>Connect account</Button>
+        </div>
+      )}
 
       <Tabs tabs={visibleTabs} active={tab} onChange={(id) => setTab(id as TabId)} className="mb-6" />
 
@@ -1102,9 +1120,9 @@ export default function CampaignBuilderPage() {
         </div>
       )}
 
-      {/* Bottom bar — save draft, always available */}
+      {/* Bottom bar — save draft, always available (except with no sending account connected) */}
       <div className="mt-6 flex items-center justify-end">
-        <Button variant="outline" onClick={saveDraft} disabled={pending}>
+        <Button variant="outline" onClick={saveDraft} disabled={pending || !accountsGate} title={!accountsGate ? ACCOUNTS_GATE_MESSAGE : undefined}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save draft
         </Button>
       </div>

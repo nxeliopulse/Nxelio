@@ -18,6 +18,9 @@ import { campaignTemplates } from "@/lib/campaign-templates";
 import { formatDate, cn } from "@/lib/utils";
 import { usePageTour } from "@/components/tour/use-page-tour";
 import { CAMPAIGNS_TOUR_STEPS } from "@/components/tour/tour-registry";
+import { getOutreachAccounts } from "@/lib/queries/outreach-accounts";
+
+const ACCOUNTS_GATE_MESSAGE = "Connect an email or LinkedIn account before creating, editing, or running campaigns.";
 
 interface UnifiedRow {
   id: string;
@@ -133,6 +136,15 @@ export function CampaignsView({
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  // Nothing to send with at all — the authoritative block is server-side (createCampaign/
+  // updateCampaign/sendCampaign), this just tells the user up front instead of via a
+  // surprise error after they've already started building a campaign.
+  const [accountsGate, setAccountsGate] = useState(true);
+  useEffect(() => {
+    getOutreachAccounts()
+      .then((accts) => setAccountsGate(accts.some((a) => (a.channel === "email" || a.channel === "linkedin") && a.status === "connected")))
+      .catch(() => {});
+  }, []);
   const [selected, setSelected] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [sortField, setSortField] = useState<SortField>("updatedAt");
@@ -294,16 +306,27 @@ export function CampaignsView({
   function toggleStatus(r: UnifiedRow) {
     setOpenId(null);
     const next = r.status === "Active" ? "Paused" : "Active";
+    // Pausing is always allowed; reactivating needs a live sending account.
+    if (next === "Active" && r.kind === "email" && !accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); return; }
     start(async () => {
-      if (r.kind === "email") await setCampaignStatus(r.id, next);
-      else await setSequenceStatus(r.id, next);
+      try {
+        if (r.kind === "email") await setCampaignStatus(r.id, next);
+        else await setSequenceStatus(r.id, next);
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Couldn't update campaign status.", "error");
+      }
     });
   }
   function handleDuplicate(r: UnifiedRow) {
     setOpenId(null);
+    if (r.kind === "email" && !accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); return; }
     start(async () => {
-      if (r.kind === "email") await duplicateCampaign(r.id);
-      else await duplicateSequence(r.id);
+      try {
+        if (r.kind === "email") await duplicateCampaign(r.id);
+        else await duplicateSequence(r.id);
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Couldn't duplicate this campaign.", "error");
+      }
     });
   }
 
@@ -420,11 +443,15 @@ export function CampaignsView({
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
-          <Link href="/campaigns/builder">
-            <Button data-tour-id="campaigns-new" size="sm" className="rounded-xl gap-1.5 font-semibold h-8 text-xs px-3">
-              <Plus className="h-3.5 w-3.5" /> New Campaign
-            </Button>
-          </Link>
+          <Button
+            data-tour-id="campaigns-new" size="sm" className="rounded-xl gap-1.5 font-semibold h-8 text-xs px-3"
+            onClick={() => {
+              if (!accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); setConnectionsOpen(true); return; }
+              router.push("/campaigns/builder");
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" /> New Campaign
+          </Button>
         </div>
       </div>
 
@@ -539,7 +566,11 @@ export function CampaignsView({
                       return (
                         <button
                           key={t.id}
-                          onClick={() => { setTemplatesOpen(false); router.push(`/campaigns/builder?template=${t.id}`); }}
+                          onClick={() => {
+                            setTemplatesOpen(false);
+                            if (!accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); setConnectionsOpen(true); return; }
+                            router.push(`/campaigns/builder?template=${t.id}`);
+                          }}
                           className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                         >
                           <span className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${t.accent}`}>
@@ -790,7 +821,14 @@ export function CampaignsView({
             </div>
             <p className="text-slate-900 font-semibold">You currently have no campaigns</p>
             <p className="text-sm text-slate-500 mt-1 mb-5">Create your first campaign or start from a template.</p>
-            <Link href="/campaigns/builder"><Button><Plus className="h-4 w-4" /> Create campaign</Button></Link>
+            <Button
+              onClick={() => {
+                if (!accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); setConnectionsOpen(true); return; }
+                router.push("/campaigns/builder");
+              }}
+            >
+              <Plus className="h-4 w-4" /> Create campaign
+            </Button>
           </div>
         ) : viewMode === "grid" ? (
           <div data-tour-id="campaigns-list" className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

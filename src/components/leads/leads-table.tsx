@@ -18,6 +18,7 @@ import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { updateLead, type LeadRow } from "@/lib/queries/leads";
 import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
 import { createStaticSegment } from "@/lib/queries/segments";
+import { getOutreachAccounts } from "@/lib/queries/outreach-accounts";
 import { usePageTour } from "@/components/tour/use-page-tour";
 import { LEADS_TOUR_STEPS } from "@/components/tour/tour-registry";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
@@ -753,6 +754,14 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   async function handleAddToCampaign() {
     const ids = [...selected];
     const count = ids.length;
+    // Tell the user up front instead of letting them build a segment for a
+    // campaign they won't be able to create — same gate enforced server-side
+    // in createCampaign/updateCampaign/sendCampaign.
+    const accounts = await getOutreachAccounts().catch(() => []);
+    if (!accounts.some((a) => (a.channel === "email" || a.channel === "linkedin") && a.status === "connected")) {
+      toast("Connect an email or LinkedIn account before creating a campaign.", "error");
+      return;
+    }
     setSelected([]);
     start(async () => {
       const seg = await createStaticSegment(`Campaign audience (${count} leads)`, "", ids);
