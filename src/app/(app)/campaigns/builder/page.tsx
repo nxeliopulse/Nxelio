@@ -502,8 +502,7 @@ export default function CampaignBuilderPage() {
         setDirty(false);
         const res = await sendCampaign(saved.id);
         if (res.ok) {
-          const chargedLeads = res.sent + res.failed + res.skipped + (res.deferred ?? 0);
-          toast(`Campaign sent successfully — ${res.sent} email${res.sent === 1 ? "" : "s"} sent${res.simulated ? " (simulated — no email provider live)" : ""}. ${chargedLeads * 2} credits used.`, "success");
+          toast(`Campaign launched — ${res.queued} email${res.queued === 1 ? "" : "s"} queued to send${res.simulated ? " (simulated — no email provider live)" : ""}. ${res.queued * 2} credits used.`, "success");
           notifyCreditsChanged();
           router.push("/campaigns");
         } else {

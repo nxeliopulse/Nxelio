@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback";
 import {
-  listLeadSearchJobs, getLeadSearchJob,
+  listLeadSearchJobs, getLeadSearchJob, markLeadSearchJobImported,
   type LeadSearchJobSummary, type LeadSearchJobDetail,
 } from "@/lib/leads/lead-search-jobs";
 import { importGeneratedProspects } from "@/lib/leads/buy-leads";
@@ -77,6 +77,7 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
       );
       if (res.inserted > 0) notifyCreditsChanged();
       setImportedIds((s) => new Set(s).add(detail.id));
+      markLeadSearchJobImported(detail.id).catch(() => {});
       setOpenId(null);
     });
   }

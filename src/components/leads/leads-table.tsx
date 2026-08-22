@@ -81,6 +81,10 @@ interface Props {
   aiColumnSavedTemplates?: AiColumnSavedTemplateRow[];
   /** Maps owner_id -> full name, for the Owner column. */
   owners?: Record<string, string>;
+  /** True when a background Verified Leads search has finished and hasn't
+   *  been imported yet — glows the Verified Leads button so it acts like a
+   *  real notification instead of a permanent decoration. */
+  hasReadyVerifiedLeads?: boolean;
 }
 
 /** Bold solid status pill — same real status vocabulary as before (plus the legacy
@@ -123,7 +127,7 @@ function CompanyLogo({ name }: { name?: string | null }) {
   );
 }
 
-export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
+export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {}, hasReadyVerifiedLeads = false }: Props) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   usePageTour("leads", LEADS_TOUR_STEPS);
@@ -1008,7 +1012,19 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import prospects" className="rounded-xl h-8 w-8">
             <Upload className="h-3.5 w-3.5" />
           </Button>
-          <Link href="/leads/verified-jobs" title="Background searches you've queued from Verified Emails" className="inline-flex items-center gap-1.5 rounded-xl h-8 px-3 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800">
+          <Link
+            href="/leads/verified-jobs"
+            title={hasReadyVerifiedLeads ? "A background search has finished — ready to review" : "Background searches you've queued from Verified Emails"}
+            className={cn(
+              "relative inline-flex items-center gap-1.5 rounded-xl h-8 px-3 text-xs font-semibold transition-shadow",
+              hasReadyVerifiedLeads
+                ? "border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.15)] animate-pulse hover:animate-none"
+                : "border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+            )}
+          >
+            {hasReadyVerifiedLeads && (
+              <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-slate-950" />
+            )}
             <MailCheck className="h-3.5 w-3.5" /> Verified Leads
           </Link>
         </div>

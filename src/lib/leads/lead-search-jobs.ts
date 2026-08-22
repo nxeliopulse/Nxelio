@@ -95,6 +95,7 @@ interface JobDbRow {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  imported_at: string | null;
 }
 
 export interface LeadSearchJobSummary {
@@ -107,6 +108,7 @@ export interface LeadSearchJobSummary {
   timeEstimate: string | null;
   createdAt: string;
   completedAt: string | null;
+  importedAt: string | null;
 }
 
 export interface LeadSearchJobDetail extends LeadSearchJobSummary {
@@ -124,6 +126,7 @@ function toSummary(r: JobDbRow): LeadSearchJobSummary {
     timeEstimate: r.time_estimate,
     createdAt: r.created_at,
     completedAt: r.completed_at,
+    importedAt: r.imported_at,
   };
 }
 
@@ -179,7 +182,7 @@ export async function listLeadSearchJobs(): Promise<LeadSearchJobSummary[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("lead_search_jobs")
-    .select("id, workspace_id, notify_email, criteria, requested_count, status, found_count, results, pending_pool, seen_linkedin, round, search_exhausted, dry_rounds, attempts, last_error, note, time_estimate, last_progress_email_at, created_at, updated_at, completed_at")
+    .select("id, workspace_id, notify_email, criteria, requested_count, status, found_count, results, pending_pool, seen_linkedin, round, search_exhausted, dry_rounds, attempts, last_error, note, time_estimate, last_progress_email_at, created_at, updated_at, completed_at, imported_at")
     .order("created_at", { ascending: false });
   return ((data as JobDbRow[]) || []).map(toSummary);
 }
@@ -191,6 +194,27 @@ export async function getLeadSearchJob(id: string): Promise<LeadSearchJobDetail 
   if (!data) return null;
   const row = data as JobDbRow;
   return { ...toSummary(row), results: row.results || [] };
+}
+
+/** Marks a finished job's results as imported — clears the "ready to review"
+ *  indicator (e.g. the Verified Leads button's glow) for this job. */
+export async function markLeadSearchJobImported(id: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("lead_search_jobs").update({ imported_at: new Date().toISOString() }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/** Cheap existence check for the Prospects page header — true when at least
+ *  one background search has finished and hasn't been imported yet. */
+export async function hasReadyLeadSearchJobs(): Promise<boolean> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("lead_search_jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "done")
+    .is("imported_at", null);
+  return Boolean(count && count > 0);
 }
 
 function dedupeKey(p: GeneratedProspect): string {

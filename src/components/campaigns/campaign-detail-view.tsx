@@ -231,8 +231,7 @@ export function CampaignDetailView({
     try {
       const res = await sendCampaign(campaign.id, includeIds);
       if (res.ok) {
-        const chargedLeads = res.sent + res.failed + res.skipped + (res.deferred ?? 0);
-        toast(`Campaign sent successfully — ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.deferred ? `, ${res.deferred} queued for tomorrow (daily limit reached)` : ""}${res.simulated ? " (simulated)" : ""}. ${chargedLeads * 2} credits used.`, "success");
+        toast(`Campaign launched — ${res.queued} email${res.queued === 1 ? "" : "s"} queued to send${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}. ${res.queued * 2} credits used.`, "success");
         notifyCreditsChanged();
         // The Launch button/Status dropdown read local `status` state, which
         // router.refresh() alone doesn't update (it re-renders server data but
