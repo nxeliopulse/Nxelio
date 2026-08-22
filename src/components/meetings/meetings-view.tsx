@@ -1828,6 +1828,7 @@ interface Attendee { leadId?: string; name: string; email: string }
 
 function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings = [], onClose }: { meeting: MeetingRow | null; leads: LeadOption[]; initialLeadIds?: string[]; otherMeetings?: MeetingRow[]; onClose: () => void }) {
   const isEdit = !!meeting;
+  const { toast } = useFeedback();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"details" | "review">("details");
@@ -1967,8 +1968,14 @@ function MeetingFormModal({ meeting, leads, initialLeadIds = [], otherMeetings =
     const payload = build();
     if (!payload) { setStep("details"); return; }
     start(async () => {
-      const res = isEdit ? await updateMeeting(meeting!.id, payload) : await scheduleMeeting(payload, { sendInvites });
-      if (!res.ok) { setError(res.error || "Couldn't save the meeting."); setStep("details"); return; }
+      if (isEdit) {
+        const res = await updateMeeting(meeting!.id, payload);
+        if (!res.ok) { setError(res.error || "Couldn't save the meeting."); setStep("details"); return; }
+      } else {
+        const res = await scheduleMeeting(payload, { sendInvites });
+        if (!res.ok) { setError(res.error || "Couldn't save the meeting."); setStep("details"); return; }
+        toast(res.whatsappSent ? "Meeting scheduled — WhatsApp invite sent to the lead." : "Meeting scheduled.", "success");
+      }
       onClose();
     });
   }

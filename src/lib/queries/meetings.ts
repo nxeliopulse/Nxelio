@@ -213,8 +213,9 @@ export async function scheduleMeeting(
             });
           }
         }
-      } catch {
+      } catch (e) {
         // A WhatsApp hiccup should never break scheduling — the email invite still went out.
+        console.error("[scheduleMeeting] WhatsApp send failed:", e instanceof Error ? e.message : e);
       }
     }
   }
