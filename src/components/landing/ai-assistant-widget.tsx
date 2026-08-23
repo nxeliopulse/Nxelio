@@ -76,8 +76,11 @@ export function AiAssistantWidget() {
   const ttsKeepAliveRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const ttsFallbackRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callSecsRef      = useRef(0);
-  // Prevents double mic-restart when both onerror and onend fire for the same session
   const micRestartLock   = useRef(false);
+  // Ref mirror of speaking state — safe to read inside stale-closure callbacks
+  const speakingRef      = useRef(false);
+  // Always-current handleUserSpeech — startMic calls this ref so it never goes stale
+  const handleUserSpeechRef = useRef<(text: string) => void>(() => {});
 
   // Load voices — may fire immediately or after onvoiceschanged
   useEffect(() => {
@@ -104,7 +107,7 @@ export function AiAssistantWidget() {
     clearTtsTimers();
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setListening(false);
-    setSpeaking(false);
+    speakingRef.current = false; setSpeaking(false);
     setThinking(false);
   }, [clearTtsTimers]);
 
@@ -149,7 +152,7 @@ export function AiAssistantWidget() {
       utter.pitch = 1.05;
     }
 
-    setSpeaking(true);
+    speakingRef.current = true; setSpeaking(true);
 
     // Chrome bug: TTS silently stops after ~15s — keep it alive with pause/resume
     ttsKeepAliveRef.current = setInterval(() => {
@@ -159,20 +162,20 @@ export function AiAssistantWidget() {
       }
     }, 10_000);
 
-    // Safety net: if onend never fires (browser bug), force-proceed after a
-    // generous timeout so the call never gets permanently stuck
+    // Safety net: if onend never fires (browser bug), force-proceed.
+    // Uses speakingRef (not the state variable) to avoid stale-closure false negatives.
     const maxMs = Math.max(8_000, text.length * 80 + 3_000);
     ttsFallbackRef.current = setTimeout(() => {
-      if (speaking) {
+      if (speakingRef.current) {
         clearTtsTimers();
-        setSpeaking(false);
+        speakingRef.current = false; setSpeaking(false);
         setTimeout(() => onDone?.(), 200);
       }
     }, maxMs);
 
     const cleanup = () => {
       clearTtsTimers();
-      setSpeaking(false);
+      speakingRef.current = false; setSpeaking(false);
     };
     // 500ms echo-prevention delay before reopening mic
     utter.onend   = () => { cleanup(); setTimeout(() => onDone?.(), 500); };
@@ -197,7 +200,7 @@ export function AiAssistantWidget() {
     r.onresult = (e) => {
       gotResult = true;
       const transcript = e.results[0]?.[0]?.transcript?.trim();
-      if (transcript && callActiveRef.current) handleUserSpeech(transcript);
+      if (transcript && callActiveRef.current) handleUserSpeechRef.current(transcript);
     };
 
     r.onerror = (e) => {
@@ -227,6 +230,9 @@ export function AiAssistantWidget() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI response ─────────────────────────────────────────────────────────
+  // Keep the ref in sync so startMic (a useCallback with [] deps) always
+  // calls the latest version and never captures a stale closure.
+  handleUserSpeechRef.current = handleUserSpeech;
   function handleUserSpeech(text: string) {
     recognitionRef.current?.abort(); // stop mic while AI is thinking
     recognitionRef.current = null;
