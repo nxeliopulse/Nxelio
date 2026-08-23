@@ -111,6 +111,14 @@ export interface AnysiteSearchCriteria {
   count: number;
   /** Restricts to people currently at one of these companies — used by Company-wise Leads. */
   companyNames?: string[];
+  /** Anysite has no cursor/offset — instead it partitions ALL matching
+   *  results into `bucketTotal` non-overlapping slices, returning slice
+   *  `bucketIndex` (0-based). Fixing bucketTotal for a search and stepping
+   *  bucketIndex across repeated calls guarantees every call returns
+   *  genuinely new people — no re-paying for the same top matches the way
+   *  plain count-escalation would. Confirmed via Anysite's API reference. */
+  bucketTotal?: number;
+  bucketIndex?: number;
 }
 
 /**
@@ -174,6 +182,10 @@ export async function searchAnysiteUsers(criteria: AnysiteSearchCriteria): Promi
   if (criteria.role) baseBody.current_title = criteria.role;
   const locs = (criteria.locations || []).filter(Boolean);
   if (locs.length) baseBody.location = locs.join(", "); // API expects a single free-text string, not an array
+  if (criteria.bucketTotal !== undefined && criteria.bucketIndex !== undefined) {
+    baseBody.bucket_total = criteria.bucketTotal;
+    baseBody.bucket_index = criteria.bucketIndex;
+  }
 
   const companies = (criteria.companyNames || []).filter(Boolean);
   if (!companies.length) {

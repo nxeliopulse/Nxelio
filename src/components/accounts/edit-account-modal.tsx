@@ -138,12 +138,6 @@ export function EditAccountModal({
     billing_country: account?.billing_country || "",
     billing_zip: account?.billing_zip || "",
     billing_building: "",
-    shipping_street: account?.shipping_street || "",
-    shipping_city: account?.shipping_city || "",
-    shipping_state: account?.shipping_state || "",
-    shipping_country: account?.shipping_country || "",
-    shipping_zip: account?.shipping_zip || "",
-    shipping_building: "",
     description: account?.description || "",
   };
 
@@ -162,19 +156,6 @@ export function EditAccountModal({
     setStep(0);
     setError(null);
     onClose();
-  }
-
-  function handleCopyAddress() {
-    setForm((f) => ({
-      ...f,
-      shipping_country: f.billing_country,
-      shipping_building: f.billing_building,
-      shipping_street: f.billing_street,
-      shipping_city: f.billing_city,
-      shipping_state: f.billing_state,
-      shipping_zip: f.billing_zip,
-    }));
-    toast("Billing address copied to Shipping address", "info");
   }
 
   function goNext() {
@@ -239,11 +220,6 @@ export function EditAccountModal({
         billing_state: form.billing_state.trim() || null,
         billing_country: form.billing_country.trim() || null,
         billing_zip: form.billing_zip.trim() || null,
-        shipping_street: [form.shipping_building, form.shipping_street].filter(Boolean).join(", ").trim() || null,
-        shipping_city: form.shipping_city.trim() || null,
-        shipping_state: form.shipping_state.trim() || null,
-        shipping_country: form.shipping_country.trim() || null,
-        shipping_zip: form.shipping_zip.trim() || null,
         description: form.description.trim() || null,
       };
       if (isEdit && account) {
@@ -462,102 +438,53 @@ export function EditAccountModal({
 
             {step === 2 && (
               <div>
-                <div className="flex items-center justify-between mb-4 pb-1 border-b border-slate-100 dark:border-slate-800">
+                <div className="mb-4 pb-1 border-b border-slate-100 dark:border-slate-800">
                   <h3 className="text-xs font-bold text-slate-800 dark:text-slate-700">Address</h3>
-                  <Button variant="outline" size="sm" onClick={handleCopyAddress} className="h-7 text-xs px-3 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-[var(--border)]">Copy Billing to Shipping</Button>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <fieldset className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 pt-3 relative bg-slate-50/30 dark:bg-slate-950/40">
-                    <legend className="px-2 text-xs font-semibold text-slate-700 dark:text-slate-600">Billing Address</legend>
-                    <div className="space-y-3">
-                      <FormRow label="Country / Region">
-                        <LocationAutocomplete
-                          type="country"
-                          value={form.billing_country || ""}
-                          onChange={(val) => set("billing_country", val)}
-                          placeholder="Country"
-                          className={selectStyle}
-                        />
-                      </FormRow>
-                      <FormRow label="Flat / House No.">
-                        <input type="text" className={inputStyle} value={form.billing_building} onChange={(e) => set("billing_building", e.target.value)} />
-                      </FormRow>
-                      <FormRow label="Street">
-                        <input type="text" className={inputStyle} value={form.billing_street} onChange={(e) => set("billing_street", e.target.value)} />
-                      </FormRow>
-                      <FormRow label="City">
-                        <LocationAutocomplete
-                          type="city"
-                          value={form.billing_city || ""}
-                          onChange={(val) => set("billing_city", val)}
-                          placeholder="City"
-                          className={inputStyle}
-                          countryContext={form.billing_country}
-                          stateContext={form.billing_state}
-                        />
-                      </FormRow>
-                      <FormRow label="State">
-                        <LocationAutocomplete
-                          type="state"
-                          value={form.billing_state || ""}
-                          onChange={(val) => set("billing_state", val)}
-                          placeholder="State"
-                          className={inputStyle}
-                          countryContext={form.billing_country}
-                        />
-                      </FormRow>
-                      <FormRow label="Zip Code">
-                        <input type="text" className={inputStyle} value={form.billing_zip} onChange={(e) => set("billing_zip", e.target.value)} />
-                      </FormRow>
-                    </div>
-                  </fieldset>
-
-                  <fieldset className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 pt-3 relative bg-slate-50/30 dark:bg-slate-950/40">
-                    <legend className="px-2 text-xs font-semibold text-slate-700 dark:text-slate-600">Shipping Address</legend>
-                    <div className="space-y-3">
-                      <FormRow label="Country / Region">
-                        <LocationAutocomplete
-                          type="country"
-                          value={form.shipping_country || ""}
-                          onChange={(val) => set("shipping_country", val)}
-                          placeholder="Country"
-                          className={selectStyle}
-                        />
-                      </FormRow>
-                      <FormRow label="Flat / House No.">
-                        <input type="text" className={inputStyle} value={form.shipping_building} onChange={(e) => set("shipping_building", e.target.value)} />
-                      </FormRow>
-                      <FormRow label="Street">
-                        <input type="text" className={inputStyle} value={form.shipping_street} onChange={(e) => set("shipping_street", e.target.value)} />
-                      </FormRow>
-                      <FormRow label="City">
-                        <LocationAutocomplete
-                          type="city"
-                          value={form.shipping_city || ""}
-                          onChange={(val) => set("shipping_city", val)}
-                          placeholder="City"
-                          className={inputStyle}
-                          countryContext={form.shipping_country}
-                          stateContext={form.shipping_state}
-                        />
-                      </FormRow>
-                      <FormRow label="State">
-                        <LocationAutocomplete
-                          type="state"
-                          value={form.shipping_state || ""}
-                          onChange={(val) => set("shipping_state", val)}
-                          placeholder="State"
-                          className={inputStyle}
-                          countryContext={form.shipping_country}
-                        />
-                      </FormRow>
-                      <FormRow label="Zip Code">
-                        <input type="text" className={inputStyle} value={form.shipping_zip} onChange={(e) => set("shipping_zip", e.target.value)} />
-                      </FormRow>
-                    </div>
-                  </fieldset>
-                </div>
+                <fieldset className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 pt-3 relative bg-slate-50/30 dark:bg-slate-950/40 max-w-xl">
+                  <div className="space-y-3">
+                    <FormRow label="Country / Region">
+                      <LocationAutocomplete
+                        type="country"
+                        value={form.billing_country || ""}
+                        onChange={(val) => set("billing_country", val)}
+                        placeholder="Country"
+                        className={selectStyle}
+                      />
+                    </FormRow>
+                    <FormRow label="Address Line 1">
+                      <input type="text" className={inputStyle} value={form.billing_building} onChange={(e) => set("billing_building", e.target.value)} />
+                    </FormRow>
+                    <FormRow label="Address Line 2">
+                      <input type="text" className={inputStyle} value={form.billing_street} onChange={(e) => set("billing_street", e.target.value)} />
+                    </FormRow>
+                    <FormRow label="City">
+                      <LocationAutocomplete
+                        type="city"
+                        value={form.billing_city || ""}
+                        onChange={(val) => set("billing_city", val)}
+                        placeholder="City"
+                        className={inputStyle}
+                        countryContext={form.billing_country}
+                        stateContext={form.billing_state}
+                      />
+                    </FormRow>
+                    <FormRow label="State">
+                      <LocationAutocomplete
+                        type="state"
+                        value={form.billing_state || ""}
+                        onChange={(val) => set("billing_state", val)}
+                        placeholder="State"
+                        className={inputStyle}
+                        countryContext={form.billing_country}
+                      />
+                    </FormRow>
+                    <FormRow label="Zip Code">
+                      <input type="text" className={inputStyle} value={form.billing_zip} onChange={(e) => set("billing_zip", e.target.value)} />
+                    </FormRow>
+                  </div>
+                </fieldset>
               </div>
             )}
 
@@ -589,8 +516,7 @@ export function EditAccountModal({
 
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
                     <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2">Address</p>
-                    <ReviewRow label="Billing" value={[form.billing_street, form.billing_city, form.billing_state, form.billing_country].filter(Boolean).join(", ")} />
-                    <ReviewRow label="Shipping" value={[form.shipping_street, form.shipping_city, form.shipping_state, form.shipping_country].filter(Boolean).join(", ")} />
+                    <ReviewRow label="Address" value={[form.billing_street, form.billing_city, form.billing_state, form.billing_country].filter(Boolean).join(", ")} />
                   </div>
                 </div>
               </div>

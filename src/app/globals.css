@@ -547,6 +547,24 @@ html, body {
 .dark .force-light-theme .bg-slate-700 { background-color: #334155 !important; }
 .dark .force-light-theme .border-slate-300 { border-color: #cbd5e1 !important; }
 
+/* Force correct text colors on inputs inside forced light themes, overriding dark:text-* utilities */
+.dark .landing-page input,
+.dark .landing-page select,
+.dark .landing-page textarea,
+.dark .force-light-theme input,
+.dark .force-light-theme select,
+.dark .force-light-theme textarea {
+  color: #0f172a !important;
+}
+
+.dark .landing-page input::placeholder,
+.dark .landing-page textarea::placeholder,
+.dark .force-light-theme input::placeholder,
+.dark .force-light-theme textarea::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
 /* In-app toast/dialog entrance animation */
 @keyframes lp-toast-in {
   from { opacity: 0; transform: translateY(-8px) scale(0.98); }

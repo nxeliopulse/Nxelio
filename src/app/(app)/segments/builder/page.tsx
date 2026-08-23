@@ -975,7 +975,7 @@ export default function SegmentBuilderPage() {
                 ) : trendData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">No matching prospects yet</div>
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <AreaChart data={trendData} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
                       <defs>
                         <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
@@ -1022,7 +1022,7 @@ export default function SegmentBuilderPage() {
                   {/* Donut Pie chart */}
                   <div className="h-28 w-28 flex-shrink-0">
                     {mounted ? (
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                         <PieChart>
                           <Pie
                             data={breakdown.industries}

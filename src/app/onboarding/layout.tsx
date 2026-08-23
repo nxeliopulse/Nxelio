@@ -8,8 +8,8 @@ export default async function OnboardingLayout({ children }: { children: React.R
   if (!user) redirect("/login");
 
   return (
-    <div className="force-light-theme min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:py-6">
+    <div className="force-light-theme min-h-screen bg-slate-50 flex items-center justify-center py-8 sm:py-12">
+      <div className="mx-auto max-w-7xl w-full px-4">
         <div className="flex gap-10 items-start">
           <div className="flex-1 min-w-0">
             {children}

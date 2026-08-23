@@ -20,6 +20,7 @@ import type {
 import type { PromotionHistoryEntry } from "@/lib/queries/promotions";
 import { PlanTermsModal } from "@/components/billing/plan-terms-modal";
 import { BillingSupportWidget } from "@/components/billing/billing-support-widget";
+import { CancellationFlowModal } from "@/components/billing/cancellation-flow-modal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -178,6 +179,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
   const [promoResult, setPromoResult] = useState<PromoValidationResult | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
+  const [cancellationFlowOpen, setCancellationFlowOpen] = useState(false);
 
   const currentPlanId       = sub?.plan_id          ?? "basic";
   const currentInterval     = sub?.billing_interval ?? "monthly";
@@ -412,7 +414,7 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                 <Button
                   variant="custom"
                   className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
-                  onClick={() => setCancelOpen(true)}
+                  onClick={() => setCancellationFlowOpen(true)}
                 >
                   <X className="h-4 w-4" />
                   Cancel subscription
@@ -793,6 +795,13 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
           </div>
         </div>
       </Modal>
+
+      {/* ── Cancellation flow modal ───────────────────────────── */}
+      <CancellationFlowModal
+        open={cancellationFlowOpen}
+        onClose={() => setCancellationFlowOpen(false)}
+        subscription={sub ?? null}
+      />
 
       {/* ── Plan terms gate ────────────────────────────────────── */}
       <PlanTermsModal

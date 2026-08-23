@@ -21,7 +21,11 @@
     "test:engagement-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-engagement-metrics.mjs",
     "test:pipeline-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-pipeline-metrics.mjs",
     "test:subscription-metrics": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-subscription-metrics.mjs",
-    "test:report-schedules": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-report-schedules.mjs"
+    "test:report-schedules": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-report-schedules.mjs",
+    "test:auth-errors": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs",
+    "test:subscription-types": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-subscription-types.mjs",
+    "test:cancellation-types": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-cancellation-types.mjs",
+    "test:unit": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs scripts/test-subscription-types.mjs scripts/test-cancellation-types.mjs scripts/test-idle-timeout.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
@@ -49,7 +53,8 @@
     "reactflow": "^11.11.4",
     "recharts": "^3.8.1",
     "stripe": "^22.3.2",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "twilio": "^6.1.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

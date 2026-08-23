@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect, useOptimistic } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, Flame, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, Flame, MailCheck, type LucideIcon } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { updateLead, type LeadRow } from "@/lib/queries/leads";
 import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
 import { createStaticSegment } from "@/lib/queries/segments";
+import { getOutreachAccounts } from "@/lib/queries/outreach-accounts";
 import { usePageTour } from "@/components/tour/use-page-tour";
 import { LEADS_TOUR_STEPS } from "@/components/tour/tour-registry";
 import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
@@ -80,6 +81,10 @@ interface Props {
   aiColumnSavedTemplates?: AiColumnSavedTemplateRow[];
   /** Maps owner_id -> full name, for the Owner column. */
   owners?: Record<string, string>;
+  /** True when a background Verified Leads search has finished and hasn't
+   *  been imported yet — glows the Verified Leads button so it acts like a
+   *  real notification instead of a permanent decoration. */
+  hasReadyVerifiedLeads?: boolean;
 }
 
 /** Bold solid status pill — same real status vocabulary as before (plus the legacy
@@ -122,7 +127,7 @@ function CompanyLogo({ name }: { name?: string | null }) {
   );
 }
 
-export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {} }: Props) {
+export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {}, hasReadyVerifiedLeads = false }: Props) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   usePageTour("leads", LEADS_TOUR_STEPS);
@@ -753,6 +758,14 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   async function handleAddToCampaign() {
     const ids = [...selected];
     const count = ids.length;
+    // Tell the user up front instead of letting them build a segment for a
+    // campaign they won't be able to create — same gate enforced server-side
+    // in createCampaign/updateCampaign/sendCampaign.
+    const accounts = await getOutreachAccounts().catch(() => []);
+    if (!accounts.some((a) => (a.channel === "email" || a.channel === "linkedin") && a.status === "connected")) {
+      toast("Connect an email or LinkedIn account before creating a campaign.", "error");
+      return;
+    }
     setSelected([]);
     start(async () => {
       const seg = await createStaticSegment(`Campaign audience (${count} leads)`, "", ids);
@@ -999,6 +1012,21 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import prospects" className="rounded-xl h-8 w-8">
             <Upload className="h-3.5 w-3.5" />
           </Button>
+          <Link
+            href="/leads/verified-jobs"
+            title={hasReadyVerifiedLeads ? "A background search has finished — ready to review" : "Background searches you've queued from Verified Emails"}
+            className={cn(
+              "relative inline-flex items-center gap-1.5 rounded-xl h-8 px-3 text-xs font-semibold transition-shadow",
+              hasReadyVerifiedLeads
+                ? "border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.15)] animate-pulse hover:animate-none"
+                : "border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+            )}
+          >
+            {hasReadyVerifiedLeads && (
+              <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-slate-950" />
+            )}
+            <MailCheck className="h-3.5 w-3.5" /> Verified Leads
+          </Link>
         </div>
       </div>
 

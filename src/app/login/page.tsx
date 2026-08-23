@@ -8,6 +8,7 @@ import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { sendVerificationCode } from "@/lib/queries/email-verification";
 import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { AuthSplitCard, FIELD_LABEL, UNDERLINE_INPUT, UNDERLINE_INPUT_STYLE, authInputFocus, authInputBlur, RadioToggle, AuthButtonRow } from "@/components/auth/auth-split-card";
+import { friendlyAuthError } from "@/lib/auth/auth-error";
 
 function LoginForm() {
   const router  = useRouter();
@@ -56,7 +57,7 @@ function LoginForm() {
         return;
       }
       setLoading(false);
-      setError(loginError.message);
+      setError(friendlyAuthError(loginError));
       return;
     }
 

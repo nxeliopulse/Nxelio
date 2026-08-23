@@ -425,6 +425,7 @@ const create_campaign = def({
       subject: args.subject ? String(args.subject) : null,
       content: args.body ? String(args.body) : null,
       segment_id: segmentId,
+      generated_by_ai: true,
     });
     const id = c?.id ? String(c.id) : null;
     return {

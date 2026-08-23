@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle, ShieldAlert, Users, CalendarClock, PhoneCall } from "lucide-react";
+import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle, ShieldAlert, Users, CalendarClock, PhoneCall, XCircle } from "lucide-react";
 import { platformAdminSignOut } from "@/lib/queries/platform-admin";
 import { OverviewTab } from "@/components/admin/overview-tab";
 import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
@@ -14,6 +14,8 @@ import { FeatureKillSwitchesTab } from "@/components/admin/feature-kill-switches
 import { DemoRequestsTab } from "@/components/admin/demo-requests-tab";
 import { DemoCallAdminTab } from "@/components/admin/demo-call-admin-tab";
 import type { DemoCallPerson, DemoCallSlot } from "@/lib/queries/demo-call-admin";
+import { CancellationsTab } from "@/components/admin/cancellations-tab";
+import type { CancellationRequest } from "@/lib/queries/cancellation-types";
 import { Modal } from "@/components/ui/modal";
 import { WhatsAppConnectorView } from "@/components/settings/connectors-view";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
@@ -45,6 +47,7 @@ const TABS = [
   { id: "lead-provider", label: "Lead Provider", icon: Users },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "feature-access", label: "Feature Access", icon: ShieldAlert },
+  { id: "cancellations", label: "Cancellations", icon: XCircle },
 ] as const;
 
 export function AdminDashboard({
@@ -64,6 +67,7 @@ export function AdminDashboard({
   demoRequests,
   demoCallPeople,
   demoCallSlots,
+  cancellationRequests,
 }: {
   stats: PlatformOverviewStats;
   hotCustomers: HotCustomerRow[];
@@ -81,6 +85,7 @@ export function AdminDashboard({
   demoRequests: DemoRequestRow[];
   demoCallPeople: DemoCallPerson[];
   demoCallSlots: DemoCallSlot[];
+  cancellationRequests: CancellationRequest[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
@@ -113,7 +118,7 @@ export function AdminDashboard({
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3.5">
@@ -232,6 +237,7 @@ export function AdminDashboard({
           <WhatsAppConnectorView isSuperAdmin whatsappAccounts={whatsappAccounts} connectorReady={unipileConfigured} />
         )}
         {tab === "feature-access" && <FeatureKillSwitchesTab initialSwitches={featureKillSwitches} />}
+        {tab === "cancellations" && <CancellationsTab initialRequests={cancellationRequests} />}
       </div>
     </div>
   );

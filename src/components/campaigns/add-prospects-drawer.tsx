@@ -59,7 +59,7 @@ export function AddProspectsDrawer({
   const [csvName, setCsvName] = useState("");
 
   // Buy leads
-  const [buy, setBuy] = useState<BuyState>({ industry: "", role: "", locations: [], count: 10, companySize: "Any", seniority: "Any", requireVerifiedEmail: false, includePhoneAndSocial: true });
+  const [buy, setBuy] = useState<BuyState>({ industry: "", role: "", locations: [], count: 10, requireVerifiedEmail: false });
   const [buyResults, setBuyResults] = useState<GeneratedProspect[] | null>(null);
   const [buySource, setBuySource] = useState<"brightdata" | "anysite" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
@@ -179,9 +179,7 @@ export function AddProspectsDrawer({
         setError("You don't have enough leads remaining on your plan this cycle.");
         return;
       }
-      const buyLabel = buySource === "brightdata" ? "Purchased Leads (BILEADS Kit)"
-        : buySource === "anysite" ? "Purchased Leads (Anysite)"
-        : "Purchased Leads (sample)";
+      const buyLabel = buySource === "brightdata" || buySource === "anysite" ? "Purchased Leads" : "Purchased Leads (sample)";
       const res = await bulkInsertLeads(
         buyResults.map((p) => ({
           full_name: p.full_name || null, company_name: p.company_name || null, industry: p.industry || null,

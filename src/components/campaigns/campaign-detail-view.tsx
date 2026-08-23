@@ -32,6 +32,9 @@ import type { LeadEngagementRow } from "@/lib/email/campaign-stats";
 import { getEnrollments, getEnrollmentCounts, type CampaignEnrollmentRow, type EnrollmentStatus } from "@/lib/campaigns/enrollment";
 import { AddProspectsDrawer } from "@/components/campaigns/add-prospects-drawer";
 import type { SegmentRow } from "@/lib/queries/segments";
+import { getOutreachAccounts } from "@/lib/queries/outreach-accounts";
+
+const ACCOUNTS_GATE_MESSAGE = "Connect an email or LinkedIn account before running or editing this campaign.";
 
 /** "Jul 2, 3:45 PM" — used in the activity table so opens/sends are traceable to a moment, not just a rate. */
 function fmtDateTime(iso: string | null): string {
@@ -127,6 +130,15 @@ export function CampaignDetailView({
     getEnrollmentCounts(campaign.id).then(setEnrollmentCounts).catch(() => {});
   }, [campaign.id]);
 
+  // Nothing to send/edit with — re-checked server-side in updateCampaign/sendCampaign,
+  // but shown here so Launch/Save don't just fail with a surprise error.
+  const [accountsGate, setAccountsGate] = useState(true);
+  useEffect(() => {
+    getOutreachAccounts()
+      .then((accts) => setAccountsGate(accts.some((a) => (a.channel === "email" || a.channel === "linkedin") && a.status === "connected")))
+      .catch(() => {});
+  }, []);
+
   // Editable sequence steps (parsed from saved content) + inline node editor
   const [steps, setSteps] = useState<FlowStep[]>(() => parseSequence(campaign.content));
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -158,8 +170,13 @@ export function CampaignDetailView({
     setEditIndex(null);
     const content = next.map(serializeStep).join("\n\n---\n\n").slice(0, 5000);
     start(async () => {
-      await updateCampaign(campaign.id, { content, subject: next[0]?.subject || null });
-      toast("Step updated", "success");
+      try {
+        await updateCampaign(campaign.id, { content, subject: next[0]?.subject || null });
+        toast("Step updated", "success");
+      } catch (err) {
+        setSteps(steps); // revert the optimistic edit
+        toast(err instanceof Error ? err.message : "Couldn't update this step.", "error");
+      }
     });
   }
 
@@ -187,9 +204,19 @@ export function CampaignDetailView({
   ];
 
   function toggleStatus() {
+    const original = status;
     const next = isActive ? "Paused" : "Active";
+    // Pausing is always allowed; reactivating needs a live sending account.
+    if (next === "Active" && !accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); return; }
     setStatusLocal(next);
-    start(async () => { await setCampaignStatus(campaign.id, next); });
+    start(async () => {
+      try {
+        await setCampaignStatus(campaign.id, next);
+      } catch (err) {
+        setStatusLocal(original); // revert the optimistic flip
+        toast(err instanceof Error ? err.message : "Couldn't update campaign status.", "error");
+      }
+    });
   }
   // Split-and-send (Phase 4A) — `null` means "everyone" (the default); once the
   // user unchecks anyone in the Audience tab this becomes the explicit subset
@@ -204,8 +231,7 @@ export function CampaignDetailView({
     try {
       const res = await sendCampaign(campaign.id, includeIds);
       if (res.ok) {
-        const chargedLeads = res.sent + res.failed + res.skipped + (res.deferred ?? 0);
-        toast(`Campaign sent successfully — ${res.sent} email${res.sent === 1 ? "" : "s"}${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.deferred ? `, ${res.deferred} queued for tomorrow (daily limit reached)` : ""}${res.simulated ? " (simulated)" : ""}. ${chargedLeads * 2} credits used.`, "success");
+        toast(`Campaign launched — ${res.queued} email${res.queued === 1 ? "" : "s"} queued to send${res.scheduled ? `, ${res.scheduled} follow-up${res.scheduled === 1 ? "" : "s"} scheduled` : ""}${res.simulated ? " (simulated)" : ""}. ${res.queued * 2} credits used.`, "success");
         notifyCreditsChanged();
         // The Launch button/Status dropdown read local `status` state, which
         // router.refresh() alone doesn't update (it re-renders server data but
@@ -222,7 +248,15 @@ export function CampaignDetailView({
     }
   }
   function saveName() {
-    start(async () => { await updateCampaign(campaign.id, { campaign_name: name.trim() || "Untitled Campaign" }); toast("Campaign updated", "success"); });
+    start(async () => {
+      try {
+        await updateCampaign(campaign.id, { campaign_name: name.trim() || "Untitled Campaign" });
+        toast("Campaign updated", "success");
+      } catch (err) {
+        setName(campaign.campaign_name); // revert the optimistic edit
+        toast(err instanceof Error ? err.message : "Couldn't update the campaign name.", "error");
+      }
+    });
   }
   function toggleRequiresApproval(next: boolean) {
     if (status !== "Draft") return; // locked once the campaign has run — the Switch is also disabled, this is the backstop
@@ -243,6 +277,13 @@ export function CampaignDetailView({
         <ArrowLeft className="h-4 w-4" /> Back to campaigns
       </Link>
 
+      {!accountsGate && (
+        <div className="mb-4 flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+          <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 flex-shrink-0" /> {ACCOUNTS_GATE_MESSAGE}</span>
+          <Link href="/outreach"><Button variant="outline" size="sm">Connect account</Button></Link>
+        </div>
+      )}
+
       {/* Summary header */}
       <Card className="p-5 mb-4">
         <div className="flex flex-col lg:flex-row lg:items-center gap-5">
@@ -256,6 +297,7 @@ export function CampaignDetailView({
               ) : (
                 <Badge variant={approvalBadgeVariant(campaign.approval_status)}>{campaign.approval_status}</Badge>
               )}
+              {campaign.generated_by_ai && <Badge variant="blue">AI-generated</Badge>}
             </div>
             <div className="h-2 bg-slate-100 rounded-full overflow-hidden max-w-md">
               <div className={cn("h-full bg-blue-500 rounded-full transition-all", isActive && "lp-progress-active")} style={{ width: `${progress}%` }} />
@@ -277,9 +319,10 @@ export function CampaignDetailView({
             <div className="flex items-center gap-2">
               <Button
                 onClick={handleSendNow}
-                disabled={!launchEnabled || pending || sending || status !== "Draft" && status !== "Scheduled"}
+                disabled={!launchEnabled || !accountsGate || pending || sending || status !== "Draft" && status !== "Scheduled"}
                 title={
                   !launchEnabled ? "Campaign launches have been temporarily disabled by the administrator."
+                  : !accountsGate ? ACCOUNTS_GATE_MESSAGE
                   : status === "Active" ? "This campaign has already launched — its audience is locked to who was enrolled at launch."
                   : status === "Paused" || status === "Completed" ? `This campaign is ${status.toLowerCase()} — reactivate it to launch.`
                   : undefined
@@ -543,7 +586,7 @@ export function CampaignDetailView({
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Campaign name</label>
               <div className="flex gap-2">
                 <Input value={name} onChange={(e) => setName(e.target.value)} />
-                <Button variant="outline" onClick={saveName} disabled={pending || name.trim() === campaign.campaign_name}>Save</Button>
+                <Button variant="outline" onClick={saveName} disabled={pending || !accountsGate || name.trim() === campaign.campaign_name} title={!accountsGate ? ACCOUNTS_GATE_MESSAGE : undefined}>Save</Button>
               </div>
             </div>
             <div>
@@ -556,7 +599,20 @@ export function CampaignDetailView({
                   : status === "Draft" ? "Use the Launch button to move this campaign out of Draft."
                   : undefined
                 }
-                onChange={(e) => { setStatusLocal(e.target.value); start(async () => { await setCampaignStatus(campaign.id, e.target.value); }); }}
+                onChange={(e) => {
+                  const original = status;
+                  const nextStatus = e.target.value;
+                  if (nextStatus === "Active" && !accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); return; }
+                  setStatusLocal(nextStatus);
+                  start(async () => {
+                    try {
+                      await setCampaignStatus(campaign.id, nextStatus);
+                    } catch (err) {
+                      setStatusLocal(original);
+                      toast(err instanceof Error ? err.message : "Couldn't update campaign status.", "error");
+                    }
+                  });
+                }}
               >
                 {/* Active/Paused may only move between each other from here — Draft is a
                     one-way starting state (never something to revert back into once
@@ -579,7 +635,7 @@ export function CampaignDetailView({
                       : "Only settable when creating a campaign — this one has already run, so it's locked."}
                   </span>
                 </span>
-                <Switch checked={requiresApproval} onChange={toggleRequiresApproval} disabled={pending || status !== "Draft"} />
+                <Switch checked={requiresApproval} onChange={toggleRequiresApproval} disabled={pending || !accountsGate || status !== "Draft"} />
               </label>
             </div>
           </Card>
@@ -661,7 +717,7 @@ export function CampaignDetailView({
         </div>
         <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setEditIndex(null)}>Cancel</Button>
-          <Button onClick={saveStep} disabled={pending}>{pending ? "Saving…" : "Save step"}</Button>
+          <Button onClick={saveStep} disabled={pending || !accountsGate} title={!accountsGate ? ACCOUNTS_GATE_MESSAGE : undefined}>{pending ? "Saving…" : "Save step"}</Button>
         </div>
       </Modal>
     </div>

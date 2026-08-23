@@ -5362,7 +5362,316 @@ ALTER TABLE accounts
   ADD COLUMN IF NOT EXISTS parent_account TEXT,
   ADD COLUMN IF NOT EXISTS account_number TEXT;
 
--- >>> FILE: 0136_demo_call_roster.sql
+-- >>> FILE: 0136_secure_send_quota_and_billing_lock_rpcs.sql
+-- ============================================================================
+-- 0134_secure_send_quota_and_billing_lock_rpcs.sql
+--
+-- 0126_secure_billing_rpcs.sql locked down deduct_credits/deduct_leads/
+-- redeem_promotion_start/redeem_promotion_finalize (called via PostgREST
+-- with a client-supplied workspace_id, never checked against the caller's
+-- own workspace, never revoked from PUBLIC). Two more functions in the
+-- same original migration (0028_subscriptions.sql) have the identical gap
+-- and were missed by that pass:
+--
+-- 1. consume_send_quota — called via the user-token client (manual campaign
+--    launch) as well as the admin client (scheduled-send cron), exactly the
+--    same mixed calling pattern deduct_credits already has. Any authenticated
+--    user could call it directly via PostgREST with another workspace's id
+--    to burn or reset that workspace's daily send quota. Fixed the same way:
+--    checked against get_current_workspace_id() only when there's a real
+--    logged-in caller (service-role calls have no JWT, so the check is
+--    skipped there — trusted since only our own server code holds that key).
+--
+-- 2. claim_billing_op — has no caller anywhere in the app today (grep
+--    confirms), but ships with the same missing check and default-open
+--    PUBLIC grant as the others. Fixed the same way and locked to
+--    service_role only, since nothing legitimate calls it as an
+--    authenticated user yet — a future caller needs an explicit grant here,
+--    which is the safe failure mode.
+-- ============================================================================
+
+-- ── consume_send_quota: ownership check + REVOKE/GRANT ─────────────────────
+CREATE OR REPLACE FUNCTION consume_send_quota(p_workspace_id uuid, p_channel text, p_requested integer) RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_limit   outreach_send_limits%ROWTYPE;
+  v_count   outreach_send_counts%ROWTYPE;
+  v_today   DATE := CURRENT_DATE;
+  v_allowed INTEGER;
+  v_granted INTEGER;
+BEGIN
+  IF get_current_workspace_id() IS NOT NULL AND p_workspace_id <> get_current_workspace_id() THEN
+    RETURN 0;
+  END IF;
+
+  IF p_requested <= 0 THEN RETURN 0; END IF;
+
+  SELECT * INTO v_limit FROM outreach_send_limits
+  WHERE workspace_id = p_workspace_id AND channel = p_channel;
+  IF NOT FOUND THEN
+    RETURN p_requested; -- no limit configured for this channel — unthrottled
+  END IF;
+
+  SELECT * INTO v_count FROM outreach_send_counts
+  WHERE workspace_id = p_workspace_id AND channel = p_channel AND send_date = v_today
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    INSERT INTO outreach_send_counts (workspace_id, channel, send_date, quota, sent_count)
+    VALUES (
+      p_workspace_id, p_channel, v_today,
+      v_limit.daily_min + floor(random() * (v_limit.daily_max - v_limit.daily_min + 1))::INTEGER,
+      0
+    )
+    RETURNING * INTO v_count;
+  END IF;
+
+  v_allowed := GREATEST(0, v_count.quota - v_count.sent_count);
+  v_granted := LEAST(p_requested, v_allowed);
+
+  IF v_granted > 0 THEN
+    UPDATE outreach_send_counts SET sent_count = sent_count + v_granted, updated_at = now()
+    WHERE id = v_count.id;
+  END IF;
+
+  RETURN v_granted;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION consume_send_quota(uuid, text, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION consume_send_quota(uuid, text, integer) TO authenticated, service_role;
+
+-- ── claim_billing_op: ownership check + service_role-only ──────────────────
+CREATE OR REPLACE FUNCTION claim_billing_op(p_workspace_id uuid, p_stale_after_seconds integer DEFAULT 20) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  claimed BOOLEAN := false;
+BEGIN
+  IF get_current_workspace_id() IS NOT NULL AND p_workspace_id <> get_current_workspace_id() THEN
+    RETURN false;
+  END IF;
+
+  UPDATE subscriptions
+  SET billing_op_lock_at = now()
+  WHERE workspace_id = p_workspace_id
+    AND (billing_op_lock_at IS NULL OR billing_op_lock_at < now() - (p_stale_after_seconds || ' seconds')::interval)
+  RETURNING true INTO claimed;
+
+  RETURN COALESCE(claimed, false);
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION claim_billing_op(uuid, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION claim_billing_op(uuid, integer) TO service_role;
+
+-- >>> FILE: 0135_stripe_event_idempotency.sql
+-- ============================================================================
+-- 0135_stripe_event_idempotency.sql
+--
+-- Stripe explicitly documents that a webhook endpoint may receive the same
+-- event more than once (retries after a slow/failed response, or a genuine
+-- redelivery) and that handlers must be safe to run twice. Several of the
+-- webhook's individual operations already guard against this on their own
+-- (reset_subscription_cycle's invoice-id idempotency key from 0126,
+-- sync_subscription_from_stripe's plan-change guard, redeem_promotion_finalize's
+-- pending→completed status transition) — but that safety was scattered
+-- per-operation rather than at the one place that actually knows which
+-- Stripe event this is. This adds a single, general event-id ledger so
+-- src/app/api/billing/webhook/route.ts can recognize and skip a redelivered
+-- event outright, protecting every event type uniformly (including any
+-- added later that isn't independently idempotent).
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS stripe_processed_events (
+  event_id     TEXT PRIMARY KEY,
+  event_type   TEXT NOT NULL,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE stripe_processed_events ENABLE ROW LEVEL SECURITY;
+
+-- Server-only (the webhook route uses the admin/service-role client) — no
+-- workspace to scope this to, and nothing client-side ever needs to read it.
+REVOKE ALL ON stripe_processed_events FROM PUBLIC, anon, authenticated;
+GRANT ALL ON stripe_processed_events TO service_role;
+
+-- >>> FILE: 0137_lead_search_jobs.sql
+-- ============================================================================
+-- Lead search jobs — background "Verified Leads" search.
+--
+-- Lets a user request N verified-email prospects without waiting on the
+-- request: a row is inserted here `pending`, and a per-minute cron (see the
+-- commented pg_cron block below) drains it in small chunks — one search
+-- round + a handful of email lookups per tick — persisting progress after
+-- every batch so a Vercel function timeout never loses work. Keeps going
+-- (escalating the search round) until it hits requested_count or genuinely
+-- runs out of new prospects, then emails the requester and marks the row
+-- `done`. Mirrors the outreach_jobs/campaign_jobs queue shape.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS lead_search_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  created_by UUID REFERENCES users(user_id) ON DELETE SET NULL,
+  notify_email TEXT NOT NULL,
+  criteria JSONB NOT NULL,
+  requested_count INT NOT NULL,
+  -- 'pending' | 'running' | 'done' | 'failed'
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  found_count INT NOT NULL DEFAULT 0,
+  results JSONB NOT NULL DEFAULT '[]'::jsonb,        -- GeneratedProspect[] confirmed-verified so far
+  pending_pool JSONB NOT NULL DEFAULT '[]'::jsonb,    -- raw prospects awaiting email lookup
+  seen_linkedin JSONB NOT NULL DEFAULT '[]'::jsonb,   -- dedupe across search rounds
+  round INT NOT NULL DEFAULT 0,
+  search_exhausted BOOLEAN NOT NULL DEFAULT false,
+  attempts INT NOT NULL DEFAULT 0,
+  last_error TEXT,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_lead_search_jobs_due ON lead_search_jobs(status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_lead_search_jobs_workspace ON lead_search_jobs(workspace_id, created_at DESC);
+
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY['lead_search_jobs']) LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS auto_workspace_trigger ON %I;', t);
+    EXECUTE format('CREATE TRIGGER auto_workspace_trigger BEFORE INSERT ON %I FOR EACH ROW EXECUTE FUNCTION set_workspace_from_user();', t);
+
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
+    EXECUTE format('DROP POLICY IF EXISTS ws_select_%s ON %I;', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS ws_insert_%s ON %I;', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS ws_update_%s ON %I;', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS ws_delete_%s ON %I;', t, t);
+    EXECUTE format('CREATE POLICY ws_select_%s ON %I FOR SELECT TO authenticated USING (workspace_id = get_current_workspace_id());', t, t);
+    EXECUTE format('CREATE POLICY ws_insert_%s ON %I FOR INSERT TO authenticated WITH CHECK (workspace_id = get_current_workspace_id());', t, t);
+    EXECUTE format('CREATE POLICY ws_update_%s ON %I FOR UPDATE TO authenticated USING (workspace_id = get_current_workspace_id());', t, t);
+    EXECUTE format('CREATE POLICY ws_delete_%s ON %I FOR DELETE TO authenticated USING (workspace_id = get_current_workspace_id());', t, t);
+  END LOOP;
+END $$;
+
+-- Drained every minute by /api/leads/search-jobs/cron (Authorization: Bearer
+-- LEAD_SEARCH_CRON_SECRET). Uncomment and fill in the real app URL + secret
+-- once deployed:
+-- SELECT cron.schedule('process-lead-search-jobs', '* * * * *', $$
+--   SELECT net.http_post(
+--     url := 'https://YOUR_APP_URL/api/leads/search-jobs/cron',
+--     headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer YOUR_LEAD_SEARCH_CRON_SECRET'),
+--     body := '{}'::jsonb
+--   );
+-- $$);
+
+-- >>> FILE: 0138_cancellation_requests.sql
+-- Cancellation retention system: tracks customer cancellation requests so the
+-- admin team can intervene, schedule a meeting, make a retention offer, and
+-- only cancel in Stripe when the customer cannot be retained.
+
+CREATE TABLE cancellation_requests (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id         UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  customer_name        TEXT,
+  customer_email       TEXT NOT NULL,
+  plan_id              TEXT,
+  reason               TEXT NOT NULL
+                       CHECK (reason IN ('too_expensive','missing_features','found_alternative',
+                                         'not_using','technical_issues','business_closed','other')),
+  feedback             TEXT,
+  wants_meeting        BOOLEAN NOT NULL DEFAULT false,
+  meeting_provider     TEXT CHECK (meeting_provider IN ('zoom','google_meet') OR meeting_provider IS NULL),
+  preferred_date       DATE,
+  preferred_time       TEXT,
+  meeting_link         TEXT,
+  meeting_scheduled_at TIMESTAMPTZ,
+  status               TEXT NOT NULL DEFAULT 'pending'
+                       CHECK (status IN ('pending','meeting_scheduled','retained',
+                                         'cancelled','follow_up_required','no_response')),
+  admin_notes          TEXT,
+  retention_offer      TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at          TIMESTAMPTZ
+);
+
+ALTER TABLE cancellation_requests ENABLE ROW LEVEL SECURITY;
+
+-- Customers can read and insert their own workspace's tickets
+CREATE POLICY "cr_workspace_select" ON cancellation_requests
+  FOR SELECT USING (workspace_id = get_current_workspace_id());
+
+CREATE POLICY "cr_workspace_insert" ON cancellation_requests
+  FOR INSERT WITH CHECK (workspace_id = get_current_workspace_id());
+
+-- Admin uses createAdminClient() (service_role) which bypasses RLS
+
+CREATE TRIGGER cancellation_requests_updated_at
+  BEFORE UPDATE ON cancellation_requests
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- >>> FILE: 0139_lead_search_jobs_progress.sql
+-- ============================================================================
+-- Lead search jobs — exhaustive-search + progress-email fields.
+--
+-- Follow-up to 0137_lead_search_jobs.sql. That first version tied how large a
+-- raw search round could get to the workspace's remaining lead *credit*
+-- balance — which is a billing limit on how many leads you can IMPORT, not a
+-- real constraint on how many candidates a search may examine while looking
+-- for enough confirmed emails. That made the job give up (e.g. "8 of 10")
+-- long before it had actually exhausted the real candidate pool.
+--
+-- This adds: a consecutive-dry-round counter (so "give up" means "N rounds in
+-- a row at max search size found nobody new," not "hit an arbitrary count"),
+-- a timestamp for the last "still working" status email, and a stored
+-- human-readable time estimate shown to the requester up front.
+-- ============================================================================
+
+ALTER TABLE lead_search_jobs
+  ADD COLUMN IF NOT EXISTS dry_rounds INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_progress_email_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS time_estimate TEXT;
+
+-- >>> FILE: 0140_campaign_ai_generated_flag.sql
+-- The "Draft (AI-generated)" approval status was being applied to every new
+-- campaign via the column default, including ones built entirely by hand —
+-- there was no way to tell the two apart. Split it: approval_status now just
+-- tracks the review lifecycle ("Draft"), and a separate boolean flag tracks
+-- whether AI generation was actually used, so the UI can show that as its own
+-- badge instead of baking it into the approval status string.
+
+ALTER TABLE campaigns
+  ADD COLUMN IF NOT EXISTS generated_by_ai BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE campaigns
+  ALTER COLUMN approval_status SET DEFAULT 'Draft';
+
+-- The old check constraint only allowed 'Draft (AI-generated)', not plain
+-- 'Draft' — drop it before renaming existing rows below, since Postgres
+-- validates a constraint against ALL existing rows the moment either
+-- version of it is active, and neither the old nor new wording alone
+-- covers a table mid-rename.
+ALTER TABLE campaigns DROP CONSTRAINT IF EXISTS campaigns_approval_status_check;
+
+-- Existing rows stuck at the old default: we can't know in hindsight whether
+-- AI was actually used, so leave generated_by_ai false and just normalize the
+-- label itself so old manually-built drafts stop being mislabeled going forward.
+UPDATE campaigns SET approval_status = 'Draft' WHERE approval_status = 'Draft (AI-generated)';
+
+-- Now that every row already says 'Draft', re-adding the constraint validates cleanly.
+ALTER TABLE campaigns ADD CONSTRAINT campaigns_approval_status_check
+  CHECK (approval_status IN ('Draft', 'Pending review', 'Approved', 'Live/Distributing', 'Archived'));
+
+-- >>> FILE: 0141_lead_search_jobs_imported_at.sql
+-- Tracks whether a finished Verified Leads job's results have actually been
+-- imported yet — lets the UI show a "ready to review" indicator (e.g. a glow
+-- on the Verified Leads button) only for jobs that are done AND still
+-- unactioned, instead of glowing forever after the first import.
+ALTER TABLE lead_search_jobs
+  ADD COLUMN IF NOT EXISTS imported_at TIMESTAMPTZ;
+
+-- >>> FILE: 0142_demo_call_roster.sql
 -- Demo call roster: which reps can take a landing-page demo call, and which
 -- one is "live" for each bookable time slot. Platform-admin only.
 CREATE TABLE IF NOT EXISTS demo_call_people (
@@ -5400,7 +5709,7 @@ ALTER TABLE demo_call_people ENABLE ROW LEVEL SECURITY;
 ALTER TABLE demo_call_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE demo_call_slot_assignments ENABLE ROW LEVEL SECURITY;
 
--- >>> FILE: 0137_demo_call_people_multiple_emails.sql
+-- >>> FILE: 0143_demo_call_people_multiple_emails.sql
 -- A demo call person can have more than one email. Replaces the single
 -- `email` column with `emails TEXT[]`, backfilling existing rows first.
 ALTER TABLE demo_call_people ADD COLUMN IF NOT EXISTS emails TEXT[] NOT NULL DEFAULT '{}';

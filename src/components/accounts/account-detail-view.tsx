@@ -136,7 +136,7 @@ export function AccountDetailView({
       ["Account Type", account.account_type || ""],
       ["Phone", account.phone || ""],
       ["Website", account.website || ""],
-      ["Billing Address", billing],
+      ["Address", billing],
     ];
     if (format === "csv") {
       const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -153,7 +153,6 @@ export function AccountDetailView({
   }
 
   const billing = [account.billing_street, account.billing_city, account.billing_state, account.billing_zip, account.billing_country].filter(Boolean).join(", ");
-  const shipping = [account.shipping_street, account.shipping_city, account.shipping_state, account.shipping_zip, account.shipping_country].filter(Boolean).join(", ");
   const accountEmail = contacts.find((c) => c.email)?.email ?? null;
   const faviconHost = account.website ? account.website.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null;
   const ownerInfo = owners.find((o) => o.id === account.account_owner) ?? null;
@@ -348,8 +347,7 @@ export function AccountDetailView({
             )}
 
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
-              <InfoBlock label="Billing address" value={billing || "—"} />
-              <InfoBlock label="Shipping address" value={shipping || "—"} />
+              <InfoBlock label="Address" value={billing || "—"} />
             </div>
 
             <h6 className="text-sm font-bold text-slate-800 dark:text-slate-700 mb-2 tracking-wide">Owner</h6>

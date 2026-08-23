@@ -14,6 +14,7 @@ import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach
 import { getFeatureKillSwitches } from "@/lib/queries/feature-kill-switches";
 import { getDemoRequests } from "@/lib/queries/demo-requests-admin";
 import { getDemoCallPeople, getDemoCallSlots } from "@/lib/queries/demo-call-admin";
+import { getCancellationRequests } from "@/lib/queries/cancellation-requests";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 
 export default async function AdminPage() {
@@ -34,6 +35,7 @@ export default async function AdminPage() {
     demoRequests,
     demoCallPeople,
     demoCallSlots,
+    cancellationRequests,
   ] = await Promise.all([
     getPlatformOverviewStats(),
     getHotCustomers(),
@@ -51,6 +53,7 @@ export default async function AdminPage() {
     getDemoRequests(),
     getDemoCallPeople(),
     getDemoCallSlots(),
+    getCancellationRequests(),
   ]);
   const whatsappAccounts = outreachAccounts.filter((a) => a.channel === "whatsapp");
 
@@ -72,6 +75,7 @@ export default async function AdminPage() {
       demoRequests={demoRequests}
       demoCallPeople={demoCallPeople}
       demoCallSlots={demoCallSlots}
+      cancellationRequests={cancellationRequests}
     />
   );
 }

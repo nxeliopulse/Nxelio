@@ -10,6 +10,7 @@ import {
   unipileSendInvite,
   unipileSendLinkedInMessage,
   unipileResolveProfile,
+  isAlreadyLinkedInConnection,
 } from "@/lib/outreach/unipile";
 
 // Plain admin-client types (service role bypasses RLS — we scope by workspace_id by hand).
@@ -180,7 +181,7 @@ async function executeJob(db: Db, job: JobRow, lead: Record<string, unknown>): P
   const linkedinUrl = (lead.linkedin as string) || "";
   if (!linkedinUrl && job.action !== "profile_view") return { status: "failed", detail: "Lead has no LinkedIn URL" };
 
-  const { providerId, error: resolveError } = await unipileResolveProfile({ accountId: account.account_id, identifier: linkedinUrl });
+  const { providerId, networkDistance, error: resolveError } = await unipileResolveProfile({ accountId: account.account_id, identifier: linkedinUrl });
   if (!providerId) return { status: "failed", detail: resolveError || "Could not resolve LinkedIn profile" };
 
   // Reply webhooks identify the sender by this opaque provider_id, not the
@@ -191,6 +192,11 @@ async function executeJob(db: Db, job: JobRow, lead: Record<string, unknown>): P
 
   try {
     if (job.action === "connection_request") {
+      // Check the real relationship BEFORE sending — a lead re-added after being
+      // disconnected, or already 1st-degree connected, doesn't need another invite.
+      if (isAlreadyLinkedInConnection(networkDistance)) {
+        return { status: "skipped", detail: `Already a LinkedIn connection — skipped to next step (${linkedinUrl})` };
+      }
       await unipileSendInvite({ accountId: account.account_id, providerId, message: body });
       return { status: "sent", detail: `LinkedIn invite → ${linkedinUrl}` };
     }

@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, AlertCircle, Building2, Boxes, Users, Calendar, MapPin,
-  DollarSign, Target, Receipt, Clock, Package, Swords, Mail, ExternalLink, Loader2,
-  Check, Sparkles, CheckCircle2, User, Phone, Briefcase, Camera, Video,
+  DollarSign, Target, Receipt, Clock, Package, Swords, Mail, Loader2,
+  Check, Sparkles, User, Briefcase, Camera,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,6 @@ import { saveOnboarding, type OnboardingData, type OnboardingStatus } from "@/li
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { updateProfile } from "@/lib/queries/profile";
 import { uploadAvatarImage } from "@/lib/storage/upload";
-import { connectOutreachAccount, syncOutreachAccounts, hasConnectedMailbox, hasConnectedLinkedIn } from "@/lib/queries/outreach-accounts";
-import { getZoomAccounts } from "@/lib/queries/zoom-accounts";
-import { getCalendarAccounts } from "@/lib/queries/calendar-accounts";
 import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid, type CountryCode } from "@/components/ui/phone-input";
 
 const GOALS = ["Generate leads", "Book more meetings", "Grow pipeline", "Close deals faster", "Automate outreach", "Track performance"];
@@ -32,7 +29,6 @@ const STEP_TITLES = [
   { title: "Your profile", desc: "A little about you, so your team and leads know who they're talking to" },
   { title: "Company identity", desc: "Tell us about your business so Nxelio Nurture can tailor your workflow" },
   { title: "Sales context", desc: "Help us understand who you sell to and how" },
-  { title: "Connect your inbox", desc: "Send and track campaigns from your own mailbox" },
 ];
 
 const emptyForm: OnboardingData = {
@@ -41,21 +37,7 @@ const emptyForm: OnboardingData = {
   target_customer_type: "", avg_deal_size: "", sales_cycle: "", primary_product: "", key_competitors: "",
 };
 
-// Button's outline variant carries its own real Tailwind dark: classes (for the
-// logged-in dashboard's dark mode) — this page force-lights everything else via
-// the .force-light-theme CSS escape hatch, but that only touches plain utility
-// classes, not dark:-prefixed ones. Inline style always wins regardless, so use
-// it here to keep these specific buttons readable even when html has .dark.
 const LIGHT_OUTLINE_STYLE: React.CSSProperties = { background: "white", borderColor: "#e2e8f0", color: "#334155" };
-
-// lucide-react has no LinkedIn brand mark — same glyph used in oauth-buttons.tsx.
-function LinkedInGlyph({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 448 512" fill="white" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <path d="M100.28 448H7.4V148.9h92.88zM53.79 108.1C24.09 108.1 0 83.5 0 53.8a53.79 53.79 0 0 1 107.58 0c0 29.7-24.1 54.3-53.79 54.3zM447.9 448h-92.68V302.4c0-34.7-.7-79.2-48.29-79.2-48.29 0-55.69 37.7-55.69 76.7V448h-92.78V148.9h89.08v40.8h1.3c12.4-23.5 42.69-48.3 87.88-48.3 94 0 111.28 61.9 111.28 142.3z" />
-    </svg>
-  );
-}
 
 function Field({ label, required, icon, children }: { label: string; required?: boolean; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -73,30 +55,17 @@ function Field({ label, required, icon, children }: { label: string; required?: 
   );
 }
 
-export function OnboardingWizard({ status, calendarProviderStatus, calendarConnected: calendarConnectedInitial, zoomConfigured, zoomConnected: zoomConnectedInitial, linkedinConnected: linkedinConnectedInitial }: {
+export function OnboardingWizard({ status }: {
   status: OnboardingStatus;
-  calendarProviderStatus: { google: boolean; microsoft: boolean };
-  calendarConnected: boolean;
-  zoomConfigured: boolean;
-  zoomConnected: boolean;
-  linkedinConnected: boolean;
 }) {
   const router = useRouter();
   const isEdit = status.completed;
-  const [step, setStep] = useState(() => (!status.profileComplete ? 1 : !status.businessComplete ? 2 : 4));
+  const [step, setStep] = useState(() => (!status.profileComplete ? 1 : !status.businessComplete ? 2 : 3));
   const [form, setForm] = useState<OnboardingData>(status.data ?? emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [industries, setIndustries] = useState(FALLBACK_INDUSTRIES);
   useEffect(() => { getPicklistValues("lead_industry").then(setIndustries).catch(() => {}); }, []);
   const [saving, setSaving] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [inboxStarted, setInboxStarted] = useState(false);
-  const [mailboxConnected, setMailboxConnected] = useState(status.mailboxComplete);
-  const [zoomConnected, setZoomConnected] = useState(zoomConnectedInitial);
-  const [calendarConnected, setCalendarConnected] = useState(calendarConnectedInitial);
-  const [linkedinConnected, setLinkedinConnected] = useState(linkedinConnectedInitial);
-  const [connectingLinkedin, setConnectingLinkedin] = useState(false);
-  const [linkedinStarted, setLinkedinStarted] = useState(false);
 
   // Profile step state
   const [phone, setPhone] = useState(status.profile?.phone ?? "");
@@ -170,89 +139,16 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
       return;
     }
     if (step === 2 && !validateCompanyIdentity()) return;
-    if (step === 3) {
-      if (!validateSalesContext()) return;
-      setSaving(true);
-      const res = await saveOnboarding(form);
-      setSaving(false);
-      if (!res.ok) { setError(res.error || "Couldn't save your company details. Please try again."); return; }
-    }
     setError(null);
-    setStep((s) => Math.min(4, s + 1));
+    setStep((s) => Math.min(3, s + 1));
   }
   function back() {
     setError(null);
     setStep((s) => Math.max(1, s - 1));
   }
 
-  async function connectInbox() {
-    setConnecting(true);
-    setError(null);
-    try {
-      const res = await connectOutreachAccount("email", "/onboarding");
-      if (res.ok && res.url) {
-        window.open(res.url, "_blank", "noopener");
-        setInboxStarted(true);
-      } else if (res.error?.includes("Super Admin")) {
-        setError("Ask your workspace admin to connect a mailbox to unlock the app for your team.");
-      } else {
-        setError(res.error || "Couldn't start the connection.");
-      }
-    } finally {
-      setConnecting(false);
-    }
-  }
-
-  async function connectLinkedin() {
-    setConnectingLinkedin(true);
-    setError(null);
-    try {
-      const res = await connectOutreachAccount("linkedin", "/onboarding");
-      if (res.ok && res.url) {
-        window.open(res.url, "_blank", "noopener");
-        setLinkedinStarted(true);
-      } else if (res.error?.includes("Super Admin")) {
-        setError("Ask your workspace admin to connect LinkedIn to unlock the app for your team.");
-      } else {
-        setError(res.error || "Couldn't start the connection.");
-      }
-    } finally {
-      setConnectingLinkedin(false);
-    }
-  }
-
-  // The connect popup lands in a different tab/React tree, so it can't update
-  // this component's state directly — re-check on focus-regain instead (the
-  // user alt-tabbing back after authorizing is the actual signal we have).
-  // Covers all optional/mandatory integrations, not just mailbox — Zoom and
-  // Calendar used to only ever refresh on a full page reload. Email and
-  // LinkedIn both go through the same syncOutreachAccounts() Unipile pull, so
-  // each is re-checked via its own per-channel query afterward rather than
-  // syncOutreachAccounts()'s combined count — otherwise connecting only
-  // LinkedIn would incorrectly mark the mailbox as connected too.
-  useEffect(() => {
-    if (step !== 4 || (mailboxConnected && linkedinConnected && zoomConnected && calendarConnected)) return;
-    async function onFocus() {
-      if (!mailboxConnected || !linkedinConnected) {
-        await syncOutreachAccounts();
-        if (!mailboxConnected && (await hasConnectedMailbox())) setMailboxConnected(true);
-        if (!linkedinConnected && (await hasConnectedLinkedIn())) setLinkedinConnected(true);
-      }
-      if (!zoomConnected) {
-        const zoomAccounts = await getZoomAccounts();
-        if (zoomAccounts.length > 0) setZoomConnected(true);
-      }
-      if (!calendarConnected) {
-        const calendarAccounts = await getCalendarAccounts();
-        if (calendarAccounts.length > 0) setCalendarConnected(true);
-      }
-    }
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [step, mailboxConnected, linkedinConnected, zoomConnected, calendarConnected]);
-
   async function finish() {
-    if (!isEdit && !mailboxConnected) { setErr("Connect a mailbox to finish setting up your workspace."); return; }
+    if (!validateSalesContext()) return;
     if (!isPhoneValid(phone, phoneCountry)) { setErr("Phone number isn't valid for the selected country."); return; }
     setSaving(true);
     setError(null);
@@ -312,12 +208,12 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
       {/* Progress */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex gap-1.5 flex-1">
-          {[1, 2, 3, 4].map((n) => (
+          {[1, 2, 3].map((n) => (
             <div key={n} className="h-1.5 flex-1 rounded-full transition-colors bg-slate-200"
               style={n <= step ? { background: "linear-gradient(135deg,#18A7B8,#7E57C2)" } : undefined} />
           ))}
         </div>
-        <span className="text-sm font-medium text-slate-400 whitespace-nowrap">Step {step} of 4</span>
+        <span className="text-sm font-medium text-slate-400 whitespace-nowrap">Step {step} of 3</span>
       </div>
 
       {error && (
@@ -514,146 +410,6 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
           </Card>
       )}
 
-      {/* ── Step 4: Connect inbox (mandatory on first run) ── */}
-      {step === 4 && (
-        <Card className="p-5">
-          <div className="flex items-start gap-4">
-            <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-              style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-              <Mail className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-semibold text-slate-900">Connect your mailbox</h2>
-              <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
-                Send campaigns from your own Gmail or Outlook inbox for better deliverability and real reply threads.
-                {isEdit && <> You can always do this later in <span className="font-medium text-slate-700">Settings → Connections</span>.</>}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                {mailboxConnected ? (
-                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                    <CheckCircle2 className="h-4 w-4" /> Mailbox connected
-                  </span>
-                ) : (
-                  <>
-                    <Button variant="outline" onClick={connectInbox} disabled={connecting} style={LIGHT_OUTLINE_STYLE}>
-                      {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />} Connect inbox
-                    </Button>
-                    {inboxStarted && (
-                      <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">
-                        Authorize in the new tab, then come back here.
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-              {!isEdit && !mailboxConnected && (
-                <p className="text-xs text-slate-400 mt-2">Connect a mailbox to finish setting up your workspace.</p>
-              )}
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* ── Optional: LinkedIn + Calendar + Zoom (never block Finish — only the mailbox above is mandatory) ── */}
-      {step === 4 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-          <Card className="p-4 flex flex-col justify-between h-full">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                  <LinkedInGlyph className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold text-slate-900 text-sm">LinkedIn</h3>
-              </div>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Send connection requests and messages from your own LinkedIn account.</p>
-            </div>
-            <div className="mt-3">
-              {linkedinConnected ? (
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                  <CheckCircle2 className="h-4 w-4" /> Connected
-                </span>
-              ) : (
-                <div className="w-full">
-                  <Button variant="outline" size="sm" onClick={connectLinkedin} disabled={connectingLinkedin} style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
-                    {connectingLinkedin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />} Connect LinkedIn
-                  </Button>
-                  {linkedinStarted && (
-                    <p className="text-xs text-slate-500 mt-2">Authorize in the new tab, then come back here.</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-4 flex flex-col justify-between h-full">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold text-slate-900 text-sm">Calendar</h3>
-              </div>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Sync availability and get real Google Meet links on your meetings.</p>
-            </div>
-            <div className="mt-3">
-              {calendarConnected ? (
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                  <CheckCircle2 className="h-4 w-4" /> Connected
-                </span>
-              ) : calendarProviderStatus.google || calendarProviderStatus.microsoft ? (
-                <div className="flex flex-col gap-2 w-full">
-                  {calendarProviderStatus.google && (
-                    <a href="/api/calendar/google/connect?next=/onboarding" target="_blank" rel="noopener noreferrer" className="block w-full">
-                      <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
-                        <ExternalLink className="h-3.5 w-3.5" /> Google Calendar
-                      </Button>
-                    </a>
-                  )}
-                  {calendarProviderStatus.microsoft && (
-                    <a href="/api/calendar/microsoft/connect?next=/onboarding" target="_blank" rel="noopener noreferrer" className="block w-full">
-                      <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
-                        <ExternalLink className="h-3.5 w-3.5" /> Outlook
-                      </Button>
-                    </a>
-                  )}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-4 flex flex-col justify-between h-full">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
-                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                  <Video className="h-5 w-5" />
-                </div>
-                <h3 className="font-semibold text-slate-900 text-sm">Zoom</h3>
-              </div>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Create real Zoom meeting links directly from your meetings.</p>
-            </div>
-            <div className="mt-3">
-              {zoomConnected ? (
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-                  <CheckCircle2 className="h-4 w-4" /> Connected
-                </span>
-              ) : zoomConfigured ? (
-                <a href="/api/zoom/connect?next=/onboarding" target="_blank" rel="noopener noreferrer" className="block w-full">
-                  <Button variant="outline" size="sm" style={LIGHT_OUTLINE_STYLE} className="w-full justify-center gap-1.5">
-                    <ExternalLink className="h-3.5 w-3.5" /> Connect Zoom
-                  </Button>
-                </a>
-              ) : (
-                <p className="text-xs text-slate-400">Not configured yet — you can set this up later in Settings.</p>
-              )}
-            </div>
-          </Card>
-        </div>
-      )}
 
       {/* Footer nav */}
       <div className="flex items-center justify-between mt-4">
@@ -665,7 +421,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
           )}
         </div>
         <div className="flex items-center gap-2">
-          {step < 4 ? (
+          {step < 3 ? (
             <Button onClick={next} disabled={saving || uploadingAvatar} className="rounded-full"
               style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow: "0 4px 20px rgba(24,167,184,.3)" }}>
               {uploadingAvatar || saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Save and continue <ArrowRight className="h-4 w-4" />
@@ -675,7 +431,7 @@ export function OnboardingWizard({ status, calendarProviderStatus, calendarConne
               {isEdit && (
                 <Button variant="ghost" onClick={() => router.push("/dashboard")} disabled={saving} style={{ color: "#334155" }}>Cancel</Button>
               )}
-              <Button onClick={finish} disabled={saving || (!isEdit && !mailboxConnected)} className="rounded-full"
+              <Button onClick={finish} disabled={saving} className="rounded-full"
                 style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow: "0 4px 20px rgba(24,167,184,.3)" }}>
                 {saving
                   ? <><Loader2 className="h-4 w-4 animate-spin" /> {isEdit ? "Saving…" : "Finishing…"}</>

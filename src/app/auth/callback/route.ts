@@ -45,12 +45,7 @@ export async function GET(request: NextRequest) {
     const isBrandNew = Math.abs(lastSignInMs - createdMs) < 10_000;
 
     if (isBrandNew) {
-      // Sign back out so the landing page's own "if (user) redirect to
-      // dashboard" guard doesn't fire — the user must log in for real,
-      // matching the required Sign Up -> Landing Page -> Login journey.
-      await supabase.auth.signOut();
-      const target = `/?just_signed_up=1&email=${encodeURIComponent(user.email ?? "")}`;
-      return NextResponse.redirect(new URL(target, url.origin));
+      return NextResponse.redirect(new URL("/onboarding", url.origin));
     }
 
     // Returning OAuth user — best-effort backfill avatar_url for accounts
