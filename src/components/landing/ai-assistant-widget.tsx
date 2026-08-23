@@ -141,16 +141,10 @@ export function AiAssistantWidget() {
     if (voiceRef.current) utter.voice = voiceRef.current;
 
     // Natural tone settings:
-    // Neural voices (Microsoft/Google) are already optimised — keep rate/pitch
-    // at 1.0 so the neural model sounds its best. For classic TTS voices,
-    // a slightly slower rate and neutral pitch reads more naturally.
-    if (isNeuralVoice(voiceRef.current)) {
-      utter.rate = 1.0;
-      utter.pitch = 1.0;
-    } else {
-      utter.rate = 0.93;
-      utter.pitch = 1.05;
-    }
+    // We keep the rate and pitch at 1.0 to ensure the voice engine's 
+    // default natural inflection is preserved, preventing robotic artifacts.
+    utter.rate = 1.0;
+    utter.pitch = 1.0;
 
     speakingRef.current = true; setSpeaking(true);
 

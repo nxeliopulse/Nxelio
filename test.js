@@ -1,0 +1,1 @@
+import { askLandingAssistant } from "./src/lib/ai/landing-chat.js"; (async () => { const res = await askLandingAssistant([{role: "user", content: "what is nxelio?"}]); console.log("Q1:", res); const res2 = await askLandingAssistant([{role: "user", content: "what is the capital of france?"}]); console.log("Q2:", res2); })();
