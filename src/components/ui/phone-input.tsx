@@ -105,20 +105,20 @@ function CountryDropdown({ country, onChange }: { country: CountryCode; onChange
       <button
         type="button"
         onClick={toggleOpen}
-        className="flex items-center gap-1 h-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-2 text-sm outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600"
+        className="flex items-center gap-1 h-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[var(--card)] px-2 py-2 text-sm outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)]"
       >
         <CountryFlag code={current?.code} className="h-3.5 w-5" />
         <ChevronDown className="h-3 w-3 text-slate-400" />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-64 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg overflow-hidden">
+        <div className="absolute left-0 top-full mt-1 z-50 w-64 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[var(--card)] shadow-lg overflow-hidden">
           <div className="p-2 border-b border-slate-100 dark:border-slate-800">
             <input
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search country or code…"
-              className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 dark:text-white px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600"
+              className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] dark:text-slate-900 px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)]"
             />
           </div>
           <div className="max-h-64 overflow-y-auto">
@@ -131,12 +131,12 @@ function CountryDropdown({ country, onChange }: { country: CountryCode; onChange
                   type="button"
                   onClick={() => { onChange(c.code); setOpen(false); }}
                   className={cn(
-                    "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-800",
-                    c.code === country && "bg-blue-50 dark:bg-blue-950/40"
+                    "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-slate-50 dark:hover:bg-[var(--muted)]",
+                    c.code === country && "bg-[var(--primary)]/10 dark:bg-[var(--primary)]/15"
                   )}
                 >
                   <CountryFlag code={c.code} />
-                  <span className="flex-1 truncate text-slate-700 dark:text-slate-300">{c.name}</span>
+                  <span className="flex-1 truncate text-slate-700 dark:text-slate-600">{c.name}</span>
                   <span className="text-slate-400 tabular-nums">+{c.callingCode}</span>
                 </button>
               ))
@@ -181,7 +181,7 @@ export function PhoneInput({ label, country, value, onCountryChange, onValueChan
           // button) still stores a properly formatted value.
           onBlur={() => { if (value.trim()) onValueChange(formatPhoneForStorage(value, country)); }}
           placeholder={examplePlaceholder(country)}
-          className={inputClassName ?? "flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-white px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600"}
+          className={inputClassName ?? "flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[var(--card)] dark:text-slate-900 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)]"}
           aria-invalid={!valid}
         />
       </div>

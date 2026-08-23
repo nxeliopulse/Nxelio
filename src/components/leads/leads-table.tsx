@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { useFeedback } from "@/components/ui/feedback";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import { cn, formatDate, formatDateTime, toAbsoluteUrl } from "@/lib/utils";
 import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
@@ -922,7 +922,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         return <span className="text-slate-500 dark:text-slate-500 text-xs whitespace-nowrap">{formatDate(l.updated_at)}</span>;
       case "linkedin":
         return l.linkedin ? (
-          <a href={l.linkedin} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
+          <a href={toAbsoluteUrl(l.linkedin)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Share2 className="h-3.5 w-3.5" /> Profile</a>
         ) : (
           <button
             type="button"
@@ -934,7 +934,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         );
       case "website":
         return l.website_url ? (
-          <a href={l.website_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Link2 className="h-3.5 w-3.5 flex-shrink-0" />{l.website_url.replace(/^https?:\/\//, "")}</a>
+          <a href={toAbsoluteUrl(l.website_url)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 max-w-[180px] truncate text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs whitespace-nowrap"><Link2 className="h-3.5 w-3.5 flex-shrink-0" />{l.website_url.replace(/^https?:\/\//, "")}</a>
         ) : (
           <button
             type="button"

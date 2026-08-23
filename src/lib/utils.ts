@@ -46,6 +46,14 @@ export async function mapWithConcurrency<T, R>(items: T[], concurrency: number, 
   return results;
 }
 
+/** User-entered URLs (website, LinkedIn, etc.) are often saved without a
+ *  protocol (e.g. "acme.com") — used directly as an <a href>, that's a
+ *  relative link and never leaves the current page. Prepend "https://"
+ *  whenever one isn't already present. */
+export function toAbsoluteUrl(value: string): string {
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
 export function formatRelative(date: string | Date) {
   const d = typeof date === "string" ? new Date(date) : date;
   const diff = Date.now() - d.getTime();

@@ -2,6 +2,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email/resend";
 import { generateConferenceLink } from "@/lib/meetings/conference-link";
+import { getLiveRepForSlot } from "@/lib/queries/demo-call-admin";
 
 const SALES_NOTIFY_EMAIL = "anu.ramachandran@gmail.com";
 
@@ -107,12 +108,26 @@ export async function submitDemoRequest(input: DemoRequestInput): Promise<DemoRe
     `How they heard about us: ${input.referralSource || "-"}\n` +
     `Requested time: ${formattedDate} at ${requestedTime}\n` +
     `Join link: ${joinUrl}`;
-  await sendEmail({
-    to: SALES_NOTIFY_EMAIL,
-    subject: `New demo booked — ${fullName} (${input.industry})`,
-    text: salesText,
-    fromName: "Nxelio Nurture",
-  }).catch(() => {});
+
+  // Whoever is live for this exact slot is the one expected to take the
+  // call — route the booking to only that person's email(s), not the whole
+  // team, so it's unambiguous who's on. Only fall back to the general sales
+  // inbox when nobody is currently marked live for this slot, so a booking
+  // is never silently missed.
+  const timeOfDay = `${String(meetingStartAt.getHours()).padStart(2, "0")}:${String(meetingStartAt.getMinutes()).padStart(2, "0")}:00`;
+  const liveRep = await getLiveRepForSlot(input.date, timeOfDay).catch(() => null);
+  const notifyEmails = liveRep?.emails.length ? liveRep.emails : [SALES_NOTIFY_EMAIL];
+
+  await Promise.all(
+    notifyEmails.map((to) =>
+      sendEmail({
+        to,
+        subject: `New demo booked — ${fullName} (${input.industry})`,
+        text: salesText,
+        fromName: "Nxelio Nurture",
+      }).catch(() => {})
+    )
+  );
 
   return { ok: true, joinUrl, formattedDate, formattedTime: requestedTime };
 }

@@ -27,7 +27,7 @@ import type { MeetingRow } from "@/lib/queries/meetings";
 import type { LeadHistory } from "@/lib/queries/lead-detail";
 import type { LeadCampaignSummary } from "@/lib/queries/campaigns";
 import { createLeadNote, deleteLeadNote, type LeadNoteRow } from "@/lib/queries/lead-notes";
-import { formatDate, formatDateTime, cn } from "@/lib/utils";
+import { formatDate, formatDateTime, cn, toAbsoluteUrl } from "@/lib/utils";
 import { allowedNextStatuses, isManualStatusTransitionAllowed, statusTransitionError } from "@/lib/leads/status-flow";
 import { notifyUser } from "@/lib/queries/notifications";
 
@@ -648,7 +648,7 @@ export function LeadDetailView({
                 <p className="text-slate-500 dark:text-slate-500 font-medium flex-shrink-0">LinkedIn</p>
                 {lead.linkedin ? (
                   <a
-                    href={lead.linkedin}
+                    href={toAbsoluteUrl(lead.linkedin)}
                     target="_blank"
                     rel="noopener noreferrer"
                     title={lead.linkedin}
@@ -664,7 +664,7 @@ export function LeadDetailView({
               {lead.website_url && (
                 <div className="flex justify-between items-center text-xs py-1">
                   <p className="text-slate-500 dark:text-slate-500 font-medium">Website</p>
-                  <a href={lead.website_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1">
+                  <a href={toAbsoluteUrl(lead.website_url)} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1">
                     {lead.website_url} <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>

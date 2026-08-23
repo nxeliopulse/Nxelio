@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle, ShieldAlert, Users } from "lucide-react";
+import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle, ShieldAlert, Users, CalendarClock, PhoneCall } from "lucide-react";
 import { platformAdminSignOut } from "@/lib/queries/platform-admin";
 import { OverviewTab } from "@/components/admin/overview-tab";
 import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
@@ -11,6 +11,9 @@ import { AiProviderTab } from "@/components/admin/ai-provider-tab";
 import { LeadProviderTab } from "@/components/admin/lead-provider-tab";
 import { PromoCodesTab } from "@/components/admin/promo-codes-tab";
 import { FeatureKillSwitchesTab } from "@/components/admin/feature-kill-switches-tab";
+import { DemoRequestsTab } from "@/components/admin/demo-requests-tab";
+import { DemoCallAdminTab } from "@/components/admin/demo-call-admin-tab";
+import type { DemoCallPerson, DemoCallSlot } from "@/lib/queries/demo-call-admin";
 import { Modal } from "@/components/ui/modal";
 import { WhatsAppConnectorView } from "@/components/settings/connectors-view";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
@@ -27,12 +30,15 @@ import type { VendorSubscriptionRow } from "@/lib/queries/platform-vendor-subscr
 import type { AiProviderStatus } from "@/lib/queries/ai-provider-settings";
 import type { LeadProviderStatus } from "@/lib/queries/lead-provider-settings";
 import type { EmailPromoCodeRow } from "@/lib/queries/admin-promo-codes";
+import type { DemoRequestRow } from "@/lib/queries/demo-requests-admin";
 import { LogoMark } from "@/components/brand/logo";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "subscriptions", label: "Subscriptions", icon: CreditCard },
   { id: "promo-codes", label: "Promo Codes", icon: Ticket },
+  { id: "demo-requests", label: "Demo Requests", icon: CalendarClock },
+  { id: "demo-call-admin", label: "Demo Call Admin", icon: PhoneCall },
   { id: "leads", label: "Leads Archive", icon: Archive },
   { id: "vendors", label: "Our Vendor Subscriptions", icon: Plug },
   { id: "ai-provider", label: "AI Provider", icon: Sparkles },
@@ -55,6 +61,9 @@ export function AdminDashboard({
   whatsappAccounts,
   unipileConfigured,
   featureKillSwitches,
+  demoRequests,
+  demoCallPeople,
+  demoCallSlots,
 }: {
   stats: PlatformOverviewStats;
   hotCustomers: HotCustomerRow[];
@@ -69,6 +78,9 @@ export function AdminDashboard({
   whatsappAccounts: OutreachAccountRow[];
   unipileConfigured: boolean;
   featureKillSwitches: Record<KillSwitchFeature, boolean>;
+  demoRequests: DemoRequestRow[];
+  demoCallPeople: DemoCallPerson[];
+  demoCallSlots: DemoCallSlot[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
@@ -210,6 +222,8 @@ export function AdminDashboard({
         )}
         {tab === "subscriptions" && <SubscriptionsTab rows={subscriptions} />}
         {tab === "promo-codes" && <PromoCodesTab initialCodes={promoCodes} />}
+        {tab === "demo-requests" && <DemoRequestsTab rows={demoRequests} />}
+        {tab === "demo-call-admin" && <DemoCallAdminTab initialPeople={demoCallPeople} initialSlots={demoCallSlots} />}
         {tab === "leads" && <AdminLeadArchiveView rows={leadArchive} />}
         {tab === "vendors" && <VendorSubscriptionsTab rows={vendorSubscriptions} />}
         {tab === "ai-provider" && <AiProviderTab status={aiProviderStatus} />}

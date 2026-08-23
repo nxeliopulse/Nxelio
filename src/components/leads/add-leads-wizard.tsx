@@ -25,7 +25,7 @@ import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, deductLeads } from "@/lib/queries/subscriptions";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
-import { cn } from "@/lib/utils";
+import { cn, toAbsoluteUrl } from "@/lib/utils";
 import { PhoneInput, formatPhoneForStorage, isPhoneValid, detectCountry, type CountryCode } from "@/components/ui/phone-input";
 
 export type SourceId = "linkedin-search" | "linkedin-post" | "youtube" | "manual" | "buy" | "csv";
@@ -1461,7 +1461,7 @@ function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; cr
                     </span>
                   ) : <span className="text-slate-400">—</span>}
                 </td>
-                <td className="px-3 py-2 align-top">{p.linkedin ? <a href={p.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Profile</a> : <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2 align-top">{p.linkedin ? <a href={toAbsoluteUrl(p.linkedin)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Profile</a> : <span className="text-slate-400">—</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -1684,7 +1684,7 @@ function CompanyProspectsTable({ prospects, selected, onToggle, onToggleAll, rea
                   </span>
                 ) : <span className="text-slate-400">Not available</span>}
               </td>
-              <td className="px-3 py-2 align-top">{p.linkedin ? <a href={p.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Profile</a> : <span className="text-slate-400">Not available</span>}</td>
+              <td className="px-3 py-2 align-top">{p.linkedin ? <a href={toAbsoluteUrl(p.linkedin)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Profile</a> : <span className="text-slate-400">Not available</span>}</td>
             </tr>
           ))}
         </tbody>

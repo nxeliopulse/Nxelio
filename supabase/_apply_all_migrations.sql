@@ -5361,3 +5361,52 @@ ALTER TABLE accounts
   ADD COLUMN IF NOT EXISTS account_site TEXT,
   ADD COLUMN IF NOT EXISTS parent_account TEXT,
   ADD COLUMN IF NOT EXISTS account_number TEXT;
+
+-- >>> FILE: 0136_demo_call_roster.sql
+-- Demo call roster: which reps can take a landing-page demo call, and which
+-- one is "live" for each bookable time slot. Platform-admin only.
+CREATE TABLE IF NOT EXISTS demo_call_people (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         TEXT NOT NULL,
+  email        TEXT NOT NULL,
+  designation  TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS demo_call_slots (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slot_date   DATE NOT NULL,
+  start_time  TIME NOT NULL,
+  end_time    TIME NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS demo_call_slot_assignments (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slot_id     UUID NOT NULL REFERENCES demo_call_slots(id) ON DELETE CASCADE,
+  person_id   UUID NOT NULL REFERENCES demo_call_people(id) ON DELETE CASCADE,
+  is_live     BOOLEAN NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (slot_id, person_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_demo_call_slot_one_live
+  ON demo_call_slot_assignments (slot_id) WHERE is_live;
+
+CREATE INDEX IF NOT EXISTS idx_demo_call_slots_date ON demo_call_slots (slot_date, start_time);
+CREATE INDEX IF NOT EXISTS idx_demo_call_slot_assignments_slot ON demo_call_slot_assignments (slot_id);
+
+ALTER TABLE demo_call_people ENABLE ROW LEVEL SECURITY;
+ALTER TABLE demo_call_slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE demo_call_slot_assignments ENABLE ROW LEVEL SECURITY;
+
+-- >>> FILE: 0137_demo_call_people_multiple_emails.sql
+-- A demo call person can have more than one email. Replaces the single
+-- `email` column with `emails TEXT[]`, backfilling existing rows first.
+ALTER TABLE demo_call_people ADD COLUMN IF NOT EXISTS emails TEXT[] NOT NULL DEFAULT '{}';
+
+UPDATE demo_call_people
+SET emails = ARRAY[email]
+WHERE cardinality(emails) = 0 AND email IS NOT NULL;
+
+ALTER TABLE demo_call_people DROP COLUMN IF EXISTS email;
