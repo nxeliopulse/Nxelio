@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { AppShell } from "@/components/layout/app-shell";
 import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { getSubscription } from "@/lib/queries/subscriptions";
@@ -20,6 +21,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // reasons, so without this it would hit the same onboarding/subscription
   // gates as any customer. Send it straight to the admin panel instead.
   if (await isPlatformAdmin()) redirect("/admin");
+
+  // OAuth users (Google, LinkedIn) skip the login OTP gate — they already
+  // went through their provider's own 2FA. Email+password users must verify
+  // a 6-digit code each session; the cookie is set by verifyLoginOtp().
+  const provider = (user.app_metadata as { provider?: string } | null)?.provider;
+  const isOAuth = provider === "google" || provider === "linkedin_oidc";
+  if (!isOAuth) {
+    const cookieStore = await cookies();
+    if (!cookieStore.get("login_otp_verified")?.value) {
+      redirect(`/verify-login?email=${encodeURIComponent(user.email ?? "")}`);
+    }
+  }
 
   // If an admin removed this login's access to its currently-active workspace
   // (updateUserStatus on workspace_members) since their last request, their

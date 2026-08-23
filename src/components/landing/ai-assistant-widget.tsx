@@ -1,272 +1,281 @@
 "use client";
-import { useEffect, useRef, useState, useTransition } from "react";
-import { X, Send, Loader2, Mic, MicOff, Volume2, VolumeX, Sparkles, Volume1 } from "lucide-react";
+import { useEffect, useRef, useState, useTransition, useCallback } from "react";
+import { X, Phone, PhoneOff, ChevronDown } from "lucide-react";
 import { askLandingAssistant, type LandingChatMessage } from "@/lib/ai/landing-chat";
 
-const SUGGESTED_QUESTIONS = [
-  "What does Nxelio Nurture do?",
-  "What's included in the pricing plans?",
-  "How does AI lead scoring work?",
-  "Is my data secure?",
-];
-
-// Minimal ambient types for the (still non-standard, vendor-prefixed) Web Speech API.
 interface SpeechRecognitionResultLike { transcript: string }
 interface SpeechRecognitionEventLike { results: { 0: SpeechRecognitionResultLike }[] }
 interface SpeechRecognitionLike {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
+  lang: string; interimResults: boolean; continuous: boolean;
   onresult: ((e: SpeechRecognitionEventLike) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
+  onerror: (() => void) | null; onend: (() => void) | null;
+  start: () => void; stop: () => void; abort: () => void;
+}
+
+function pickFemaleVoice(): SpeechSynthesisVoice | null {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  // Priority: Microsoft neural "Natural" voices (best quality, Windows/Edge)
+  const priority = [
+    "Microsoft Sonia Online (Natural) - English (United Kingdom)",
+    "Microsoft Libby Online (Natural) - English (United Kingdom)",
+    "Microsoft Jenny Online (Natural) - English (United States)",
+    "Microsoft Aria Online (Natural) - English (United States)",
+    "Microsoft Mia Online (Natural) - Spanish (Mexico)",
+    "Google UK English Female",
+    "Samantha",
+    "Victoria",
+    "Karen",
+    "Moira",
+    "Fiona",
+  ];
+  for (const name of priority) { const v = voices.find((x) => x.name === name); if (v) return v; }
+  // Fallback: any Microsoft natural online female English voice
+  const msNatural = voices.find((v) => v.name.includes("Online (Natural)") && v.lang.startsWith("en") && /aria|jenny|sonia|libby|emily|clara|hazel/i.test(v.name));
+  if (msNatural) return msNatural;
+  return voices.find((v) => /female|woman/i.test(v.name) && v.lang.startsWith("en"))
+    ?? voices.find((v) => v.lang.startsWith("en")) ?? null;
+}
+
+function formatTimer(secs: number) {
+  return `${Math.floor(secs / 60).toString().padStart(2, "0")}:${(secs % 60).toString().padStart(2, "0")}`;
 }
 
 export function AiAssistantWidget() {
   const [open, setOpen] = useState(false);
-  const [input, setInput] = useState("");
-  const [chat, setChat] = useState<LandingChatMessage[]>([]);
-  const [pending, start] = useTransition();
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [callActive, setCallActive] = useState(false);
+  const [callSecs, setCallSecs] = useState(0);
+  const [lastCallSecs, setLastCallSecs] = useState<number | null>(null);
   const [listening, setListening] = useState(false);
-  const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
-  const [speechInputSupported, setSpeechInputSupported] = useState(false);
-  const [speechOutputSupported, setSpeechOutputSupported] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [, start] = useTransition();
+  const chatRef = useRef<LandingChatMessage[]>([]);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const callActiveRef = useRef(false);
+  const ttsKeepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time browser feature detection on mount
-    setSpeechOutputSupported(typeof window !== "undefined" && "speechSynthesis" in window);
-    const SR = typeof window !== "undefined"
-      ? (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition
-        || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition
-      : undefined;
-    setSpeechInputSupported(Boolean(SR));
+    if (typeof window === "undefined") return;
+    const SR = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition
+      || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
+    setSpeechSupported(Boolean(SR) && "speechSynthesis" in window);
+    function loadVoices() { voiceRef.current = pickFemaleVoice(); }
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => { window.speechSynthesis.onvoiceschanged = null; };
   }, []);
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [chat, pending]);
+  const stopAll = useCallback(() => {
+    recognitionRef.current?.abort();
+    if (ttsKeepAliveRef.current) { clearInterval(ttsKeepAliveRef.current); ttsKeepAliveRef.current = null; }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+    setListening(false); setSpeaking(false);
+  }, []);
+
+  const endCall = useCallback(() => {
+    callActiveRef.current = false;
+    stopAll();
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    setLastCallSecs(callSecs);
+    setCallActive(false);
+    setCallSecs(0);
+  }, [callSecs, stopAll]);
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
-    if (open) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+    if (!open) { if (callActive) endCall(); }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Stop any in-flight mic/voice when the panel closes or unmounts.
-  useEffect(() => {
-    if (!open) {
-      recognitionRef.current?.stop();
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- stopping in-flight mic/voice when the panel closes
-      setListening(false);
-      if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
-      setSpeakingIndex(null);
-    }
-    return () => {
-      recognitionRef.current?.stop();
-      if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
-    };
-  }, [open]);
-
-  function speak(text: string, index: number) {
-    if (!speechOutputSupported) return;
+  function speakText(text: string, onDone?: () => void) {
+    if (!("speechSynthesis" in window)) { onDone?.(); return; }
     window.speechSynthesis.cancel();
+    if (ttsKeepAliveRef.current) clearInterval(ttsKeepAliveRef.current);
+
     const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 1;
-    utter.onend = () => setSpeakingIndex((i) => (i === index ? null : i));
-    utter.onerror = () => setSpeakingIndex((i) => (i === index ? null : i));
-    setSpeakingIndex(index);
+    if (voiceRef.current) utter.voice = voiceRef.current;
+    utter.rate = 0.92; utter.pitch = 1.15;
+    setSpeaking(true);
+
+    // Chrome bug: speechSynthesis pauses after ~15s — keep it alive with resume()
+    ttsKeepAliveRef.current = setInterval(() => {
+      if (window.speechSynthesis.speaking) window.speechSynthesis.pause(), window.speechSynthesis.resume();
+    }, 10000);
+
+    const cleanup = () => {
+      if (ttsKeepAliveRef.current) { clearInterval(ttsKeepAliveRef.current); ttsKeepAliveRef.current = null; }
+      setSpeaking(false);
+    };
+    utter.onend = () => { cleanup(); setTimeout(() => onDone?.(), 500); };
+    utter.onerror = () => { cleanup(); setTimeout(() => onDone?.(), 500); };
     window.speechSynthesis.speak(utter);
   }
 
-  function stopSpeaking() {
-    if (speechOutputSupported) window.speechSynthesis.cancel();
-    setSpeakingIndex(null);
-  }
-
-  function ask(text?: string) {
-    const message = (text ?? input).trim();
-    if (!message || pending) return;
-    setInput("");
-    const next: LandingChatMessage[] = [...chat, { role: "user", content: message }];
-    setChat(next);
-    start(async () => {
-      const res = await askLandingAssistant(next);
-      setChat((c) => {
-        const updated: LandingChatMessage[] = [...c, { role: "assistant", content: res.reply }];
-        if (voiceEnabled && res.reply) speak(res.reply, updated.length - 1);
-        return updated;
-      });
-    });
-  }
-
-  function toggleMic() {
-    if (!speechInputSupported) return;
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-      return;
-    }
+  function startMic() {
+    if (!callActiveRef.current) return;
     const SR = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition
       || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
     if (!SR) return;
-    const recognition = new SR();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.continuous = false;
-    recognition.onresult = (e) => {
-      const transcript = e.results[0]?.[0]?.transcript;
-      if (transcript) ask(transcript);
+    const r = new SR(); r.lang = "en-US"; r.interimResults = false; r.continuous = false;
+    r.onresult = (e) => {
+      const t = e.results[0]?.[0]?.transcript;
+      if (t && callActiveRef.current) handleUserSpeech(t);
     };
-    recognition.onerror = () => setListening(false);
-    recognition.onend = () => setListening(false);
-    recognitionRef.current = recognition;
-    setListening(true);
-    recognition.start();
+    r.onerror = () => setListening(false);
+    r.onend = () => setListening(false);
+    recognitionRef.current = r; setListening(true); r.start();
   }
 
-  function toggleVoice() {
-    setVoiceEnabled((v) => {
-      if (v) stopSpeaking();
-      return !v;
+  function handleUserSpeech(text: string) {
+    const next: LandingChatMessage[] = [...chatRef.current, { role: "user", content: text }];
+    chatRef.current = next;
+    start(async () => {
+      const res = await askLandingAssistant(next);
+      chatRef.current = [...next, { role: "assistant", content: res.reply }];
+      if (callActiveRef.current) speakText(res.reply, () => { if (callActiveRef.current) startMic(); });
     });
   }
 
+  function startCall() {
+    callActiveRef.current = true;
+    chatRef.current = [];
+    setCallActive(true); setCallSecs(0);
+    timerRef.current = setInterval(() => setCallSecs((s) => s + 1), 1000);
+    speakText("Hi! I'm Nxelio Assistant. How can I help you today?", () => {
+      if (callActiveRef.current) startMic();
+    });
+  }
+
+  const PURPLE = "#7C3AED";
+  const GRADIENT = "linear-gradient(135deg,#18A7B8,#5B21B6)";
+
   return (
     <>
+      {/* ── Widget panel ── */}
       {open && (
-        <div className="fixed inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-24 sm:right-6 z-50 w-full sm:w-[380px] sm:max-w-[92vw]">
-          <div className="lp-anim-pop origin-bottom sm:origin-bottom-right bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[78vh] sm:max-h-[70vh] overflow-hidden">
-            {/* Header */}
-            <div className="p-5 text-white" style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-              <div className="flex items-start justify-between">
-                <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div className="flex items-center gap-1">
-                  {speechOutputSupported && (
-                    <button
-                      type="button"
-                      onClick={toggleVoice}
-                      aria-label={voiceEnabled ? "Mute voice replies" : "Unmute voice replies"}
-                      title={voiceEnabled ? "Voice replies on" : "Voice replies off"}
-                      className="p-1.5 rounded-md hover:bg-white/15"
-                    >
-                      {voiceEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-                    </button>
-                  )}
-                  <button type="button" onClick={() => setOpen(false)} aria-label="Close AI assistant" className="p-1.5 rounded-md hover:bg-white/15">
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-              <h2 className="mt-3 text-lg font-bold">Ask Nxelio Nurture AI</h2>
-              <p className="text-white/80 text-sm">Product questions, answered instantly — with voice.</p>
+        <div className="fixed bottom-24 right-6 z-50 w-[340px] max-w-[92vw]">
+          <div className="lp-anim-pop origin-bottom-right bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+
+            {/* Header strip */}
+            <div className="flex items-center gap-2.5 px-4 py-3 text-white" style={{ background: GRADIENT }}>
+              <img src="/ChatGPT Image Aug 22, 2026, 11_38_35 AM.png" alt="" className="h-8 w-8 rounded-full object-cover flex-shrink-0 ring-2 ring-white/40"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+              <span className="flex-1 text-sm font-semibold">AI Assistant is Online!</span>
+              <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-white/20">
+                <ChevronDown className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Body */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
-              {chat.length === 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1">Try asking</p>
-                  {SUGGESTED_QUESTIONS.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => ask(q)}
-                      className="w-full text-left bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-700 hover:border-teal-300 hover:shadow-sm transition-all"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
+            <div className="flex flex-col items-center px-8 py-8 gap-4 bg-white">
+
+              {callActive ? (
+                /* ── ACTIVE CALL ── */
+                <>
+                  <div className="relative">
+                    <img src="/ChatGPT Image Aug 22, 2026, 11_38_35 AM.png" alt="Nxelio AI"
+                      className="h-32 w-32 rounded-full object-cover shadow-lg ring-4 ring-violet-200"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                        (e.currentTarget.nextSibling as HTMLElement).style.display = "flex";
+                      }} />
+                    <div className="h-32 w-32 rounded-full hidden items-center justify-center text-white text-2xl font-bold shadow-lg"
+                      style={{ background: GRADIENT }}>AI</div>
+                    {(listening || speaking) && (
+                      <span className="absolute inset-0 rounded-full animate-ping opacity-25"
+                        style={{ background: listening ? "#18A7B8" : PURPLE }} />
+                    )}
+                  </div>
+
+                  <div className="text-center">
+                    <p className="font-bold text-slate-900 text-base flex items-center justify-center gap-1.5">
+                      Nxelio AI
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">AI</span>
+                    </p>
+                    <p className="text-sm text-slate-400 mt-0.5">Nxelio Assistant</p>
+                  </div>
+
+                  {/* wave bars */}
+                  <div className="flex items-end gap-1 h-7">
+                    {[1,2,3,4,5].map((i) => (
+                      <span key={i} className="w-1.5 rounded-full"
+                        style={{
+                          background: GRADIENT,
+                          height: (listening || speaking) ? `${12 + i * 4}px` : "6px",
+                          transition: "height 0.3s ease",
+                          animation: (listening || speaking) ? `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate` : "none",
+                        }} />
+                    ))}
+                  </div>
+
+                  <p className="text-sm font-mono text-slate-500">{formatTimer(callSecs)}</p>
+                  <p className="text-xs text-slate-400">{speaking ? "Speaking…" : listening ? "Listening… speak now" : "Connected"}</p>
+
+                  <button onClick={endCall}
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-full text-white text-sm font-semibold bg-red-500 hover:bg-red-600 transition-colors shadow">
+                    <PhoneOff className="h-4 w-4" /> End Call
+                  </button>
+                </>
               ) : (
-                chat.map((m, i) => (
-                  <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                    <div className="max-w-[88%]">
-                      <div
-                        className={`rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap ${
-                          m.role === "user"
-                            ? "text-white rounded-br-sm"
-                            : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
-                        }`}
-                        style={m.role === "user" ? { background: "linear-gradient(135deg,#18A7B8,#7E57C2)" } : undefined}
-                      >
-                        {m.content}
-                      </div>
-                      {m.role === "assistant" && speechOutputSupported && m.content && (
-                        <button
-                          onClick={() => (speakingIndex === i ? stopSpeaking() : speak(m.content, i))}
-                          className="mt-1 inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-teal-600"
-                        >
-                          {speakingIndex === i ? <><Volume1 className="h-3 w-3 animate-pulse" /> Speaking… tap to stop</> : <><Volume2 className="h-3 w-3" /> Replay</>}
-                        </button>
-                      )}
-                    </div>
+                /* ── IDLE / POST-CALL ── */
+                <>
+                  <img src="/ChatGPT Image Aug 22, 2026, 11_38_35 AM.png" alt="Nxelio AI"
+                    className="h-32 w-32 rounded-full object-cover shadow-lg ring-4 ring-slate-100"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                      (e.currentTarget.nextSibling as HTMLElement).style.display = "flex";
+                    }} />
+                  <div className="h-32 w-32 rounded-full hidden items-center justify-center text-white text-2xl font-bold shadow-lg"
+                    style={{ background: GRADIENT }}>AI</div>
+
+                  <div className="text-center">
+                    <p className="font-bold text-slate-900 text-base flex items-center justify-center gap-1.5">
+                      Nxelio AI <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">AI</span>
+                    </p>
+                    <p className="text-sm text-slate-400 mt-0.5">Nxelio Assistant</p>
                   </div>
-                ))
-              )}
-              {pending && (
-                <div className="flex justify-start">
-                  <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm text-slate-500 inline-flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Thinking…
-                  </div>
-                </div>
+
+                  {lastCallSecs !== null && (
+                    <p className="text-sm text-slate-500 font-medium">
+                      Call Ended &nbsp;<span className="font-mono">{formatTimer(lastCallSecs)}</span>
+                    </p>
+                  )}
+
+                  <button onClick={speechSupported ? startCall : undefined}
+                    className="flex items-center gap-2 px-8 py-2.5 rounded-full text-sm font-semibold border-2 transition-colors"
+                    style={{ borderColor: PURPLE, color: PURPLE }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = PURPLE; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = PURPLE; }}>
+                    <Phone className="h-4 w-4" />
+                    {lastCallSecs !== null ? "Talk Again" : "Talk to Us"}
+                  </button>
+
+                  {!speechSupported && (
+                    <p className="text-xs text-slate-400 text-center">Voice calls work in Chrome or Edge</p>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Input */}
-            <div className="p-3 border-t border-slate-100 bg-white">
-              <form onSubmit={(e) => { e.preventDefault(); ask(); }} className="flex items-center gap-2">
-                {speechInputSupported && (
-                  <button
-                    type="button"
-                    onClick={toggleMic}
-                    aria-label={listening ? "Stop voice input" : "Ask by voice"}
-                    title={listening ? "Listening… click to stop" : "Ask by voice"}
-                    className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                      listening ? "bg-red-500 text-white animate-pulse" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {listening ? <MicOff className="h-4.5 w-4.5" /> : <Mic className="h-4.5 w-4.5" />}
-                  </button>
-                )}
-                <input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={listening ? "Listening…" : "Ask about Nxelio Nurture…"}
-                  className="flex-1 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-400"
-                  disabled={pending}
-                />
-                <button
-                  type="submit"
-                  disabled={pending || !input.trim()}
-                  aria-label="Send"
-                  className="h-10 w-10 rounded-xl text-white flex items-center justify-center disabled:opacity-40 transition-colors flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}
-                >
-                  <Send className="h-4 w-4" />
-                </button>
-              </form>
+            {/* Footer */}
+            <div className="pb-4 text-center">
+              <p className="text-xs text-slate-300">
+                Powered by <span className="text-slate-400 font-medium">Nxelio</span>
+              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Floating launcher */}
+      {/* ── Launcher button ── */}
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? "Close AI assistant" : "Open AI assistant"}
-        title="Ask Nxelio Nurture AI"
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full text-white shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-        style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow: "0 8px 24px rgba(24,167,184,.45)" }}
+        aria-label={open ? "Close AI assistant" : "Talk to Nxelio AI"}
+        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full text-white shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+        style={{ background: PURPLE, boxShadow: "0 8px 24px rgba(124,58,237,.5)" }}
       >
-        {open ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
+        {open ? <X className="h-6 w-6" /> : <Phone className="h-6 w-6" />}
       </button>
     </>
   );

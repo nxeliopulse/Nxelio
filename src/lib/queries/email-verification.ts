@@ -1,6 +1,7 @@
 "use server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email/resend";
+import { cookies } from "next/headers";
 import crypto from "node:crypto";
 
 const CODE_TTL_MINUTES = 10;
@@ -62,6 +63,71 @@ export async function sendVerificationCode(email: string, fullName?: string): Pr
   if ("simulated" in res && res.simulated) {
     console.log(`\n🔑 [DEV] Verification code for ${normalized}: ${code}\n`);
   }
+  return { ok: true };
+}
+
+/** Sends a 6-digit login OTP to a verified user (skips the email_confirmed_at guard). */
+export async function sendLoginOtp(email: string): Promise<{ ok: boolean; error?: string }> {
+  const admin = createAdminClient();
+  const normalized = email.trim().toLowerCase();
+
+  const { data: userList, error: listError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (listError) return { ok: false, error: "Couldn't look up the account" };
+  const user = userList.users.find((u) => (u.email || "").toLowerCase() === normalized);
+  if (!user) return { ok: false, error: "No account found for that email" };
+
+  const code = generateCode();
+  const { error: upsertError } = await admin
+    .from("email_verification_codes")
+    .upsert(
+      { user_id: user.id, email: normalized, code_hash: hashCode(code), attempts: 0, expires_at: new Date(Date.now() + CODE_TTL_MINUTES * 60_000).toISOString() },
+      { onConflict: "user_id" }
+    );
+  if (upsertError) return { ok: false, error: "Couldn't generate a verification code" };
+
+  const name = (user.user_metadata as { full_name?: string } | null)?.full_name ?? "";
+  const html = `<div style="font-family:sans-serif;line-height:1.6;color:#0f172a;padding:24px;background:#f8fafc">
+    <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;border:1px solid #e2e8f0">
+      <div style="height:40px;width:40px;border-radius:12px;background:linear-gradient(135deg,#18A7B8,#7E57C2);margin-bottom:20px"></div>
+      <h2 style="margin:0 0 8px;color:#0f172a;font-size:20px">Your login verification code</h2>
+      <p style="margin:0 0 24px;color:#64748b;font-size:14px">Hi ${name ? escapeHtml(name) : "there"}, use this code to complete your sign in:</p>
+      <div style="text-align:center;margin:0 0 24px">
+        <span style="display:inline-block;font-size:32px;font-weight:800;letter-spacing:8px;color:#0d8fa0;background:#f0fdfb;padding:16px 24px;border-radius:12px;border:1.5px solid #b2ebf2">${code}</span>
+      </div>
+      <p style="margin:0;color:#94a3b8;font-size:12px">Expires in ${CODE_TTL_MINUTES} minutes. If you didn't try to sign in, change your password immediately.</p>
+    </div>
+  </div>`;
+  const res = await sendEmail({ to: normalized, subject: "Your login code — Nxelio Nurture", html });
+  if (!res.ok) return { ok: false, error: "Couldn't send the verification email" };
+  if ("simulated" in res && res.simulated) console.log(`\n🔑 [DEV] Login OTP for ${normalized}: ${code}\n`);
+  return { ok: true };
+}
+
+/** Verifies a login OTP and sets an httpOnly session cookie to grant app access. */
+export async function verifyLoginOtp(email: string, code: string): Promise<{ ok: boolean; error?: string }> {
+  const admin = createAdminClient();
+  const normalized = email.trim().toLowerCase();
+
+  const { data: row } = await admin.from("email_verification_codes").select("*").eq("email", normalized).maybeSingle();
+  if (!row) return { ok: false, error: "No pending code — try signing in again" };
+  if (new Date(row.expires_at) < new Date()) return { ok: false, error: "Code expired — try signing in again" };
+  if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "Too many attempts — try signing in again" };
+
+  if (hashCode(code.trim()) !== row.code_hash) {
+    await admin.from("email_verification_codes").update({ attempts: row.attempts + 1 }).eq("id", row.id);
+    return { ok: false, error: "Incorrect code" };
+  }
+
+  await admin.from("email_verification_codes").delete().eq("id", row.id);
+
+  const cookieStore = await cookies();
+  cookieStore.set("login_otp_verified", "1", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 8, // 8 hours
+    path: "/",
+  });
   return { ok: true };
 }
 

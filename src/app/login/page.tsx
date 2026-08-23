@@ -5,8 +5,7 @@ import { Eye, EyeOff, AlertCircle, Mail } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
-import { sendVerificationCode } from "@/lib/queries/email-verification";
-import { getOnboardingStatus } from "@/lib/queries/onboarding";
+import { sendVerificationCode, sendLoginOtp } from "@/lib/queries/email-verification";
 import { AuthSplitCard, FIELD_LABEL, UNDERLINE_INPUT, UNDERLINE_INPUT_STYLE, authInputFocus, authInputBlur, RadioToggle, AuthButtonRow } from "@/components/auth/auth-split-card";
 import { friendlyAuthError } from "@/lib/auth/auth-error";
 
@@ -61,33 +60,16 @@ function LoginForm() {
       return;
     }
 
-    // The platform admin account lands in the standalone admin panel, not the customer app.
+    // The platform admin account lands in the standalone admin panel — skip OTP.
     if (form.email.trim().toLowerCase() === "admin@nxelio.com") {
       window.location.href = "/admin";
       return;
     }
 
-    // Onboarding-aware routing — mirrors what the OAuth callback does for
-    // returning users. Subscription status is deliberately not checked here;
-    // that's (app)/layout.tsx's job. Wrapped in try/catch so a failure here
-    // (e.g. a transient network/DB hiccup) shows an error instead of leaving
-    // the button stuck on "Signing in…" forever with no feedback — the user
-    // is already authenticated at this point, so falling back to /dashboard
-    // on error is safe (its own layout will re-check onboarding/subscription).
-    //
-    // A hard navigation (not router.push + router.refresh) on purpose: the
-    // session cookie was just set by signInWithPassword, and firing push()
-    // immediately followed by refresh() raced the in-flight RSC fetch for
-    // the destination route — the URL would silently change while the page
-    // never actually rendered, only "fixing itself" on a manual reload. A
-    // full page load has no such race and always sees the fresh session.
-    try {
-      const status = await getOnboardingStatus();
-      window.location.href = status.completed ? "/dashboard" : "/onboarding";
-    } catch (err) {
-      setError(err instanceof Error ? `Signed in, but couldn't finish loading your account: ${err.message}` : "Signed in, but something went wrong loading your account.");
-      setLoading(false);
-    }
+    // Every email+password login requires a 6-digit verification code.
+    await sendLoginOtp(form.email);
+    router.push(`/verify-login?email=${encodeURIComponent(form.email)}`);
+    setLoading(false);
   }
 
   return (
