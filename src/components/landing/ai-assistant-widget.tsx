@@ -8,20 +8,27 @@ interface SpeechRecognitionEventLike { results: { 0: SpeechRecognitionResultLike
 interface SpeechRecognitionLike {
   lang: string; interimResults: boolean; continuous: boolean;
   onresult: ((e: SpeechRecognitionEventLike) => void) | null;
-  onerror: (() => void) | null; onend: (() => void) | null;
+  onerror: ((e: { error: string }) => void) | null; onend: (() => void) | null;
   start: () => void; stop: () => void; abort: () => void;
 }
 
-function pickFemaleVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
-  const voices = window.speechSynthesis.getVoices();
-  // Priority: Microsoft neural "Natural" voices (best quality, Windows/Edge)
+type SRConstructor = new () => SpeechRecognitionLike;
+
+function getSR(): SRConstructor | null {
+  if (typeof window === "undefined") return null;
+  return (
+    (window as unknown as { SpeechRecognition?: SRConstructor }).SpeechRecognition ||
+    (window as unknown as { webkitSpeechRecognition?: SRConstructor }).webkitSpeechRecognition ||
+    null
+  );
+}
+
+function pickFemaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   const priority = [
     "Microsoft Sonia Online (Natural) - English (United Kingdom)",
     "Microsoft Libby Online (Natural) - English (United Kingdom)",
     "Microsoft Jenny Online (Natural) - English (United States)",
     "Microsoft Aria Online (Natural) - English (United States)",
-    "Microsoft Mia Online (Natural) - Spanish (Mexico)",
     "Google UK English Female",
     "Samantha",
     "Victoria",
@@ -29,12 +36,21 @@ function pickFemaleVoice(): SpeechSynthesisVoice | null {
     "Moira",
     "Fiona",
   ];
-  for (const name of priority) { const v = voices.find((x) => x.name === name); if (v) return v; }
-  // Fallback: any Microsoft natural online female English voice
-  const msNatural = voices.find((v) => v.name.includes("Online (Natural)") && v.lang.startsWith("en") && /aria|jenny|sonia|libby|emily|clara|hazel/i.test(v.name));
+  for (const name of priority) {
+    const v = voices.find((x) => x.name === name);
+    if (v) return v;
+  }
+  const msNatural = voices.find(
+    (v) => v.name.includes("Online (Natural)") && v.lang.startsWith("en") &&
+      /aria|jenny|sonia|libby|emily|clara|hazel/i.test(v.name)
+  );
   if (msNatural) return msNatural;
-  return voices.find((v) => /female|woman/i.test(v.name) && v.lang.startsWith("en"))
-    ?? voices.find((v) => v.lang.startsWith("en")) ?? null;
+  return (
+    voices.find((v) => /female|woman/i.test(v.name) && v.lang.startsWith("en")) ??
+    voices.find((v) => v.lang.startsWith("en-GB")) ??
+    voices.find((v) => v.lang.startsWith("en")) ??
+    null
+  );
 }
 
 function formatTimer(secs: number) {
@@ -48,21 +64,28 @@ export function AiAssistantWidget() {
   const [lastCallSecs, setLastCallSecs] = useState<number | null>(null);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  const [, start] = useTransition();
+  const [, startTransition] = useTransition();
+
   const chatRef = useRef<LandingChatMessage[]>([]);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const callActiveRef = useRef(false);
   const ttsKeepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Track call seconds in a ref so endCall always has the latest value
+  const callSecsRef = useRef(0);
 
+  // Load voices — may fire immediately or after onvoiceschanged
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const SR = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition
-      || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
-    setSpeechSupported(Boolean(SR) && "speechSynthesis" in window);
-    function loadVoices() { voiceRef.current = pickFemaleVoice(); }
+    setSpeechSupported(Boolean(getSR()) && "speechSynthesis" in window);
+
+    function loadVoices() {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) voiceRef.current = pickFemaleVoice(voices);
+    }
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
     return () => { window.speechSynthesis.onvoiceschanged = null; };
@@ -70,97 +93,167 @@ export function AiAssistantWidget() {
 
   const stopAll = useCallback(() => {
     recognitionRef.current?.abort();
+    recognitionRef.current = null;
     if (ttsKeepAliveRef.current) { clearInterval(ttsKeepAliveRef.current); ttsKeepAliveRef.current = null; }
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
-    setListening(false); setSpeaking(false);
+    setListening(false);
+    setSpeaking(false);
+    setThinking(false);
   }, []);
 
   const endCall = useCallback(() => {
     callActiveRef.current = false;
     stopAll();
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    setLastCallSecs(callSecs);
+    setLastCallSecs(callSecsRef.current);
     setCallActive(false);
     setCallSecs(0);
-  }, [callSecs, stopAll]);
+    callSecsRef.current = 0;
+  }, [stopAll]);
 
   useEffect(() => {
-    if (!open) { if (callActive) endCall(); }
+    if (!open && callActive) endCall();
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── TTS ──────────────────────────────────────────────────────────────────
   function speakText(text: string, onDone?: () => void) {
     if (!("speechSynthesis" in window)) { onDone?.(); return; }
     window.speechSynthesis.cancel();
-    if (ttsKeepAliveRef.current) clearInterval(ttsKeepAliveRef.current);
+    if (ttsKeepAliveRef.current) { clearInterval(ttsKeepAliveRef.current); ttsKeepAliveRef.current = null; }
+
+    // Try to reload voice one more time in case it wasn't ready earlier
+    if (!voiceRef.current) {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) voiceRef.current = pickFemaleVoice(voices);
+    }
 
     const utter = new SpeechSynthesisUtterance(text);
     if (voiceRef.current) utter.voice = voiceRef.current;
-    utter.rate = 0.92; utter.pitch = 1.15;
+    utter.rate = 0.92;
+    utter.pitch = 1.1;
     setSpeaking(true);
 
-    // Chrome bug: speechSynthesis pauses after ~15s — keep it alive with resume()
+    // Chrome bug: TTS silently stops after ~15s — keep it alive
     ttsKeepAliveRef.current = setInterval(() => {
-      if (window.speechSynthesis.speaking) window.speechSynthesis.pause(), window.speechSynthesis.resume();
-    }, 10000);
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      }
+    }, 10_000);
 
     const cleanup = () => {
       if (ttsKeepAliveRef.current) { clearInterval(ttsKeepAliveRef.current); ttsKeepAliveRef.current = null; }
       setSpeaking(false);
     };
+    // 500ms echo-prevention delay before reopening mic
     utter.onend = () => { cleanup(); setTimeout(() => onDone?.(), 500); };
     utter.onerror = () => { cleanup(); setTimeout(() => onDone?.(), 500); };
     window.speechSynthesis.speak(utter);
   }
 
+  // ── Mic ──────────────────────────────────────────────────────────────────
   function startMic() {
     if (!callActiveRef.current) return;
-    const SR = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition
-      || (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
+    const SR = getSR();
     if (!SR) return;
-    const r = new SR(); r.lang = "en-US"; r.interimResults = false; r.continuous = false;
+
+    const r = new SR();
+    r.lang = "en-US";
+    r.interimResults = false;
+    r.continuous = false;
+
+    let gotResult = false;
+
     r.onresult = (e) => {
-      const t = e.results[0]?.[0]?.transcript;
-      if (t && callActiveRef.current) handleUserSpeech(t);
+      gotResult = true;
+      const transcript = e.results[0]?.[0]?.transcript?.trim();
+      if (transcript && callActiveRef.current) handleUserSpeech(transcript);
     };
-    r.onerror = () => setListening(false);
-    r.onend = () => setListening(false);
-    recognitionRef.current = r; setListening(true); r.start();
+
+    r.onerror = (e) => {
+      setListening(false);
+      // "no-speech" and "audio-capture" are transient — restart mic if call is still live
+      if (callActiveRef.current && !gotResult && e.error !== "aborted") {
+        setTimeout(() => { if (callActiveRef.current) startMic(); }, 600);
+      }
+    };
+
+    r.onend = () => {
+      setListening(false);
+      // If call is still active but we got no speech, restart the mic so the
+      // user can try again (silence timeout, background noise, etc.)
+      if (!gotResult && callActiveRef.current) {
+        setTimeout(() => { if (callActiveRef.current) startMic(); }, 600);
+      }
+    };
+
+    recognitionRef.current = r;
+    setListening(true);
+    try { r.start(); } catch { /* recognition already started */ }
   }
 
+  // ── AI response ──────────────────────────────────────────────────────────
   function handleUserSpeech(text: string) {
     const next: LandingChatMessage[] = [...chatRef.current, { role: "user", content: text }];
     chatRef.current = next;
-    start(async () => {
+    setThinking(true);
+    startTransition(async () => {
       const res = await askLandingAssistant(next);
+      setThinking(false);
       chatRef.current = [...next, { role: "assistant", content: res.reply }];
-      if (callActiveRef.current) speakText(res.reply, () => { if (callActiveRef.current) startMic(); });
+      if (callActiveRef.current) {
+        speakText(res.reply, () => { if (callActiveRef.current) startMic(); });
+      }
     });
   }
 
+  // ── Call start ───────────────────────────────────────────────────────────
   function startCall() {
     callActiveRef.current = true;
+    callSecsRef.current = 0;
     chatRef.current = [];
-    setCallActive(true); setCallSecs(0);
-    timerRef.current = setInterval(() => setCallSecs((s) => s + 1), 1000);
-    speakText("Hi! I'm Nxelio Assistant. How can I help you today?", () => {
-      if (callActiveRef.current) startMic();
-    });
+    setCallActive(true);
+    setCallSecs(0);
+
+    timerRef.current = setInterval(() => {
+      callSecsRef.current += 1;
+      setCallSecs((s) => s + 1);
+    }, 1000);
+
+    // Small delay so browser voice list has time to populate
+    setTimeout(() => {
+      if (!callActiveRef.current) return;
+      speakText("Hi! I'm Nxelio Assistant. How can I help you today?", () => {
+        if (callActiveRef.current) startMic();
+      });
+    }, 400);
   }
 
+  // ── UI ───────────────────────────────────────────────────────────────────
   const PURPLE = "#7C3AED";
   const GRADIENT = "linear-gradient(135deg,#18A7B8,#5B21B6)";
 
+  function statusLabel() {
+    if (thinking) return "Thinking…";
+    if (speaking) return "Speaking…";
+    if (listening) return "Listening… speak now";
+    return "Connected";
+  }
+
   return (
     <>
-      {/* ── Widget panel ── */}
       {open && (
         <div className="fixed bottom-24 right-6 z-50 w-[340px] max-w-[92vw]">
           <div className="lp-anim-pop origin-bottom-right bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
 
-            {/* Header strip */}
+            {/* Header */}
             <div className="flex items-center gap-2.5 px-4 py-3 text-white" style={{ background: GRADIENT }}>
-              <img src="/ChatGPT Image Aug 22, 2026, 11_38_35 AM.png" alt="" className="h-8 w-8 rounded-full object-cover flex-shrink-0 ring-2 ring-white/40"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+              <img
+                src="/ChatGPT Image Aug 22, 2026, 11_38_35 AM.png"
+                alt=""
+                className="h-8 w-8 rounded-full object-cover flex-shrink-0 ring-2 ring-white/40"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
               <span className="flex-1 text-sm font-semibold">AI Assistant is Online!</span>
               <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-white/20">
                 <ChevronDown className="h-4 w-4" />
@@ -171,20 +264,27 @@ export function AiAssistantWidget() {
             <div className="flex flex-col items-center px-8 py-8 gap-4 bg-white">
 
               {callActive ? (
-                /* ── ACTIVE CALL ── */
                 <>
+                  {/* Avatar with pulse ring */}
                   <div className="relative">
-                    <img src="/ChatGPT Image Aug 22, 2026, 11_38_35 AM.png" alt="Nxelio AI"
+                    <img
+                      src="/ChatGPT Image Aug 22, 2026, 11_38_35 AM.png"
+                      alt="Nxelio AI"
                       className="h-32 w-32 rounded-full object-cover shadow-lg ring-4 ring-violet-200"
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).style.display = "none";
                         (e.currentTarget.nextSibling as HTMLElement).style.display = "flex";
-                      }} />
-                    <div className="h-32 w-32 rounded-full hidden items-center justify-center text-white text-2xl font-bold shadow-lg"
-                      style={{ background: GRADIENT }}>AI</div>
-                    {(listening || speaking) && (
-                      <span className="absolute inset-0 rounded-full animate-ping opacity-25"
-                        style={{ background: listening ? "#18A7B8" : PURPLE }} />
+                      }}
+                    />
+                    <div
+                      className="h-32 w-32 rounded-full hidden items-center justify-center text-white text-2xl font-bold shadow-lg"
+                      style={{ background: GRADIENT }}
+                    >AI</div>
+                    {(listening || speaking || thinking) && (
+                      <span
+                        className="absolute inset-0 rounded-full animate-ping opacity-25"
+                        style={{ background: thinking ? "#f59e0b" : listening ? "#18A7B8" : PURPLE }}
+                      />
                     )}
                   </div>
 
@@ -196,42 +296,54 @@ export function AiAssistantWidget() {
                     <p className="text-sm text-slate-400 mt-0.5">Nxelio Assistant</p>
                   </div>
 
-                  {/* wave bars */}
+                  {/* Animated wave bars */}
                   <div className="flex items-end gap-1 h-7">
-                    {[1,2,3,4,5].map((i) => (
-                      <span key={i} className="w-1.5 rounded-full"
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <span
+                        key={i}
+                        className="w-1.5 rounded-full"
                         style={{
-                          background: GRADIENT,
-                          height: (listening || speaking) ? `${12 + i * 4}px` : "6px",
+                          background: thinking ? "#f59e0b" : GRADIENT,
+                          height: (listening || speaking || thinking) ? `${12 + i * 4}px` : "6px",
                           transition: "height 0.3s ease",
-                          animation: (listening || speaking) ? `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate` : "none",
-                        }} />
+                          animation: (listening || speaking || thinking)
+                            ? `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate`
+                            : "none",
+                        }}
+                      />
                     ))}
                   </div>
 
                   <p className="text-sm font-mono text-slate-500">{formatTimer(callSecs)}</p>
-                  <p className="text-xs text-slate-400">{speaking ? "Speaking…" : listening ? "Listening… speak now" : "Connected"}</p>
+                  <p className="text-xs text-slate-400">{statusLabel()}</p>
 
-                  <button onClick={endCall}
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-full text-white text-sm font-semibold bg-red-500 hover:bg-red-600 transition-colors shadow">
+                  <button
+                    onClick={endCall}
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-full text-white text-sm font-semibold bg-red-500 hover:bg-red-600 transition-colors shadow"
+                  >
                     <PhoneOff className="h-4 w-4" /> End Call
                   </button>
                 </>
               ) : (
-                /* ── IDLE / POST-CALL ── */
                 <>
-                  <img src="/ChatGPT Image Aug 22, 2026, 11_38_35 AM.png" alt="Nxelio AI"
+                  <img
+                    src="/ChatGPT Image Aug 22, 2026, 11_38_35 AM.png"
+                    alt="Nxelio AI"
                     className="h-32 w-32 rounded-full object-cover shadow-lg ring-4 ring-slate-100"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).style.display = "none";
                       (e.currentTarget.nextSibling as HTMLElement).style.display = "flex";
-                    }} />
-                  <div className="h-32 w-32 rounded-full hidden items-center justify-center text-white text-2xl font-bold shadow-lg"
-                    style={{ background: GRADIENT }}>AI</div>
+                    }}
+                  />
+                  <div
+                    className="h-32 w-32 rounded-full hidden items-center justify-center text-white text-2xl font-bold shadow-lg"
+                    style={{ background: GRADIENT }}
+                  >AI</div>
 
                   <div className="text-center">
                     <p className="font-bold text-slate-900 text-base flex items-center justify-center gap-1.5">
-                      Nxelio AI <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">AI</span>
+                      Nxelio AI
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">AI</span>
                     </p>
                     <p className="text-sm text-slate-400 mt-0.5">Nxelio Assistant</p>
                   </div>
@@ -242,11 +354,19 @@ export function AiAssistantWidget() {
                     </p>
                   )}
 
-                  <button onClick={speechSupported ? startCall : undefined}
+                  <button
+                    onClick={speechSupported ? startCall : undefined}
                     className="flex items-center gap-2 px-8 py-2.5 rounded-full text-sm font-semibold border-2 transition-colors"
                     style={{ borderColor: PURPLE, color: PURPLE }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = PURPLE; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = PURPLE; }}>
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = PURPLE;
+                      (e.currentTarget as HTMLButtonElement).style.color = "#fff";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                      (e.currentTarget as HTMLButtonElement).style.color = PURPLE;
+                    }}
+                  >
                     <Phone className="h-4 w-4" />
                     {lastCallSecs !== null ? "Talk Again" : "Talk to Us"}
                   </button>
@@ -268,7 +388,7 @@ export function AiAssistantWidget() {
         </div>
       )}
 
-      {/* ── Launcher button ── */}
+      {/* Launcher button */}
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close AI assistant" : "Talk to Nxelio AI"}
