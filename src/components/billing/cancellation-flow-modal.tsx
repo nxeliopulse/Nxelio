@@ -72,17 +72,26 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
         preferredDate: wantsMeeting ? preferredDate : undefined,
         preferredTime: wantsMeeting ? preferredTime : undefined,
       };
-      const res = await fetch("/api/billing/cancel-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        setError(json.error ?? "Something went wrong — please try again.");
-        return;
+      // The app patches window.fetch to throw on any non-2xx response (for the
+      // background-error toast system) instead of just returning it — without
+      // a try/catch here, a server error would throw past this component and
+      // trip the nearest route error boundary (a full-page "Internal Server
+      // Error" screen) instead of the inline red banner this modal already has.
+      try {
+        const res = await fetch("/api/billing/cancel-request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (!res.ok || json.error) {
+          setError(json.error ?? "Something went wrong — please try again.");
+          return;
+        }
+        setSubmitted(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong — please try again.");
       }
-      setSubmitted(true);
     });
   }
 
