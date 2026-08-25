@@ -14,6 +14,7 @@ export interface LeadArchiveRow {
   phone: string | null;
   company_name: string | null;
   industry: string | null;
+  job_title: string | null;
   linkedin: string | null;
   website_url: string | null;
   imported_at: string;
@@ -54,6 +55,7 @@ export async function archiveImportedLeads(
       phone: l.phone ?? null,
       company_name: l.company_name ?? null,
       industry: l.industry ?? null,
+      job_title: l.job_title ?? null,
       linkedin: l.linkedin ?? null,
       website_url: l.website_url ?? null,
     }));

@@ -5,7 +5,7 @@ import { Eye, EyeOff, AlertCircle, Mail } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
-import { sendVerificationCode, sendLoginOtp, isDeviceTrusted } from "@/lib/queries/email-verification";
+import { sendLoginOtp, isDeviceTrusted } from "@/lib/queries/email-verification";
 import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { AuthSplitCard, FIELD_LABEL, UNDERLINE_INPUT, UNDERLINE_INPUT_STYLE, authInputFocus, authInputBlur, RadioToggle, AuthButtonRow } from "@/components/auth/auth-split-card";
 import { friendlyAuthError } from "@/lib/auth/auth-error";
@@ -47,15 +47,6 @@ function LoginForm() {
     const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
 
     if (loginError) {
-      // Unconfirmed account — send a fresh code and hand off to the verify screen
-      // instead of just showing an error the user can't act on.
-      const unconfirmed = loginError.code === "email_not_confirmed" || /email not confirmed/i.test(loginError.message);
-      if (unconfirmed) {
-        await sendVerificationCode(form.email);
-        setLoading(false);
-        router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
-        return;
-      }
       setLoading(false);
       setError(friendlyAuthError(loginError));
       return;

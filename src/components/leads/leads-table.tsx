@@ -420,8 +420,25 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     setAiColMenu({ id, top: r.bottom + 6, left: r.left });
   }
 
-  function runAiColumnOnAll(columnId: string) {
+  async function runAiColumnOnAll(columnId: string) {
     setAiColMenu(null);
+
+    // AnySite email lookups spend real, uncapped AnySite credits (50 per
+    // successful find) — unlike every other AI column type, which is just
+    // AI-text generation. Running this across every lead with no warning is
+    // how a routine click can silently burn through hundreds of credits.
+    const column = aiColumns.find((c) => c.id === columnId);
+    if (column?.action_type === "anysite_email") {
+      const withLinkedin = optimisticLeads.filter((l) => l.linkedin).length;
+      const ok = await confirm({
+        title: "Run AnySite email lookup on all leads?",
+        message: `This will attempt a real email lookup for ${withLinkedin} lead${withLinkedin === 1 ? "" : "s"} that ${withLinkedin === 1 ? "has" : "have"} a LinkedIn URL. Each successful find costs 50 AnySite credits — up to ${withLinkedin * 50} credits in the worst case, deducted from your AnySite balance, not your app credits.`,
+        confirmLabel: "Run anyway",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+
     setRunningColumnId(columnId);
     setRunProgress({ columnId, done: 0, total: optimisticLeads.length });
 
@@ -1961,6 +1978,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         onClose={() => setShowAiColumnModal(false)}
         onCreated={() => router.refresh()}
         savedTemplates={aiColumnSavedTemplates}
+        leadCountWithLinkedin={optimisticLeads.filter((l) => l.linkedin).length}
       />
     )}
 

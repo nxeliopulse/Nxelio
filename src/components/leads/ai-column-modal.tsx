@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Sparkles, LayoutTemplate, Settings2, Loader2, Play, Check, X, Star, Trash2, SearchCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useFeedback } from "@/components/ui/feedback";
 import {
   aiColumnTemplates, AI_COLUMN_TEMPLATE_CATEGORIES, AI_COLUMN_VARIABLES,
   detectAiColumnActionType,
@@ -17,6 +18,9 @@ interface Props {
   onClose: () => void;
   onCreated: () => void;
   savedTemplates?: AiColumnSavedTemplateRow[];
+  /** How many leads currently have a LinkedIn URL — used to show a real cost
+   *  estimate before an AnySite-email column runs on every lead. */
+  leadCountWithLinkedin?: number;
 }
 
 /**
@@ -24,7 +28,8 @@ interface Props {
  * centered modal popup), matching the Clay-style "Use AI" panel that slides in
  * alongside the table instead of covering it.
  */
-export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props) {
+export function AiColumnModal({ onClose, onCreated, savedTemplates = [], leadCountWithLinkedin = 0 }: Props) {
+  const { confirm } = useFeedback();
   const [step, setStep] = useState<Step>("configure");
   const [configureTab, setConfigureTab] = useState<ConfigureTab>("generate");
   const [category, setCategory] = useState<"All" | AiColumnTemplateCategory>("All");
@@ -144,6 +149,18 @@ export function AiColumnModal({ onClose, onCreated, savedTemplates = [] }: Props
     if (!name.trim() || !prompt.trim()) return;
     setSaveError(null);
     startTransition(async () => {
+      // AnySite email lookups spend real, uncapped AnySite credits (50 per
+      // successful find) — confirm the real cost before running on every
+      // lead, same as the "run on all leads" menu action for an existing column.
+      if (runAfter && detectedAction === "anysite_email") {
+        const ok = await confirm({
+          title: "Run AnySite email lookup on all leads?",
+          message: `This will attempt a real email lookup for ${leadCountWithLinkedin} lead${leadCountWithLinkedin === 1 ? "" : "s"} that ${leadCountWithLinkedin === 1 ? "has" : "have"} a LinkedIn URL. Each successful find costs 50 AnySite credits — up to ${leadCountWithLinkedin * 50} credits in the worst case, deducted from your AnySite balance, not your app credits.`,
+          confirmLabel: "Run anyway",
+          danger: true,
+        });
+        if (!ok) runAfter = false;
+      }
       try {
         const col = await createAiColumn({
           name: name.trim(),
