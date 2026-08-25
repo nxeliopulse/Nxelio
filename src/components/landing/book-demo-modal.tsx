@@ -5,12 +5,9 @@ import { submitDemoRequest } from "@/lib/queries/demo-request";
 import { PhoneInput, formatPhoneForStorage, isPhoneValid } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 
-const INDUSTRIES = ["SaaS", "E-commerce", "Healthcare", "Finance", "Manufacturing", "Real Estate", "Education", "Other"];
-const EMPLOYEE_BANDS = ["1-10", "11-50", "51-200", "201-500", "500+"];
-const REVENUE_BANDS = ["Under $10k", "$10k - $50k", "$50k - $250k", "$250k - $1M", "$1M+"];
 const REFERRAL_SOURCES = ["Google Search", "LinkedIn", "Referral", "Twitter / X", "Other"];
 
-const MEETING_DURATION_MIN = 30;
+const MEETING_DURATION_MIN = 15;
 const WORK_START_HOUR = 9;
 const WORK_END_HOUR = 17;
 
@@ -256,11 +253,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
     setError(null);
     if (!details.fullName.trim()) return setError("Please enter your name.");
     if (!details.businessEmail.includes("@")) return setError("Please enter a valid business email.");
-    if (!details.phone.trim()) return setError("Please enter your phone number.");
     if (!isPhoneValid(details.phone, phoneCountry)) return setError("Phone number isn't valid for the selected country.");
-    if (!details.industry) return setError("Please select your industry.");
-    if (!details.employeeCount) return setError("Please select your number of employees.");
-    if (!details.monthlyRevenue) return setError("Please select your monthly revenue.");
 
     const { hour, minute, meridiem } = decomposeTime(selectedTime);
     const y = selectedTime.getFullYear();
@@ -377,7 +370,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
               </div>
 
               <div className="max-w-xs">
-                <label className={labelClass}>Phone number *</label>
+                <label className={labelClass}>Phone number</label>
                 <PhoneInput label="" country={phoneCountry} value={details.phone} onCountryChange={setPhoneCountry} onValueChange={(v) => setDetails({ ...details, phone: v })} inputClassName={inputClass} />
               </div>
 
@@ -415,30 +408,6 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
                     ))}
                   </div>
                 )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label htmlFor="demo-industry" className={labelClass}>Working industry *</label>
-                  <select id="demo-industry" value={details.industry} onChange={(e) => setDetails({ ...details, industry: e.target.value })} className={inputClass}>
-                    <option value="">Select industry</option>
-                    {INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="demo-employee-count" className={labelClass}>Number of employees *</label>
-                  <select id="demo-employee-count" value={details.employeeCount} onChange={(e) => setDetails({ ...details, employeeCount: e.target.value })} className={inputClass}>
-                    <option value="">Select range</option>
-                    {EMPLOYEE_BANDS.map((b) => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="demo-revenue" className={labelClass}>Company&apos;s monthly revenue *</label>
-                  <select id="demo-revenue" value={details.monthlyRevenue} onChange={(e) => setDetails({ ...details, monthlyRevenue: e.target.value })} className={inputClass}>
-                    <option value="">Select range</option>
-                    {REVENUE_BANDS.map((b) => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                </div>
               </div>
 
               <div>
@@ -570,16 +539,19 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
                         ? "text-white shadow-sm"
                         : disabled
                         ? "text-[#cbd5e1] cursor-default"
-                        : `bg-[#18A7B8]/10 text-[#18A7B8] hover:bg-[#18A7B8]/20${isToday ? " ring-1 ring-[#18A7B8]/50" : ""}`;
+                        : "bg-[#18A7B8]/15 text-[#18A7B8] hover:bg-[#18A7B8]/25";
                       return (
                         <button
                           key={d.toISOString()}
                           disabled={disabled}
                           onClick={() => setSelectedDate(d)}
-                          className={`h-8 w-8 mx-auto rounded-full flex items-center justify-center text-xs font-semibold transition-all ${dayClass}`}
+                          className={`relative h-8 w-8 mx-auto rounded-full flex items-center justify-center text-xs font-semibold transition-all ${dayClass}`}
                           style={isSelected ? { background: "linear-gradient(135deg,#18A7B8,#7E57C2)" } : undefined}
                         >
                           {d.getDate()}
+                          {isToday && !isSelected && (
+                            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-[#18A7B8]" />
+                          )}
                         </button>
                       );
                     })}
@@ -591,7 +563,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
                   <div className="mt-5">
                     <p className="text-sm font-bold text-slate-900 mb-2">Time zone</p>
                     <div className="relative">
-                      <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                      <div className="flex items-center gap-2 text-sm text-slate-700">
                         <Globe className="h-4 w-4 text-slate-400 flex-shrink-0" />
                         <span className="flex-1 truncate">
                           {tzLongLabel(timezone)} <span className="text-slate-400">({timeLabel(new Date(), timezone)})</span>
