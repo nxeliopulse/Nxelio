@@ -49,14 +49,14 @@ export function Modal({ open, onClose, title, description, children, size = "md"
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="lp-anim-fade fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn("lp-anim-scale relative bg-white rounded-xl shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col", sizes[size])}>
+      <div className={cn("lp-anim-scale relative bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-h-[90vh] overflow-hidden flex flex-col", sizes[size])}>
         {(title || description) && (
-          <div className="p-5 border-b border-slate-100 flex items-start justify-between">
+          <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between">
             <div>
-              {title && <h2 className="font-semibold text-lg text-slate-900">{title}</h2>}
-              {description && <p className="text-sm text-slate-500 mt-1">{description}</p>}
+              {title && <h2 className="font-semibold text-lg text-slate-900 dark:text-white">{title}</h2>}
+              {description && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{description}</p>}
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-700 rounded-md p-1">
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md p-1 transition-colors">
               <X className="h-5 w-5" />
             </button>
           </div>
