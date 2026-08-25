@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import {
   ChevronDown, ChevronUp, Loader2, AlertTriangle, Video, CalendarCheck,
-  UserCheck, XCircle, Clock, PhoneOff, HelpCircle,
+  UserCheck, XCircle, Clock, PhoneOff, HelpCircle, RotateCcw,
 } from "lucide-react";
 import {
   updateCancellationTicket,
@@ -13,13 +13,18 @@ import {
 import type { CancellationRequest, CancellationStatus } from "@/lib/queries/cancellation-types";
 import { REASON_LABELS } from "@/lib/queries/cancellation-types";
 
+// "pending" is labeled differently depending on audience: the customer's own
+// confirmation screen/email says "cancellation request received" (unchanged),
+// while here in the admin panel it reads as an action the admin still owes —
+// "Waiting for Approval" — same underlying status, no DB/customer-facing change.
 const STATUS_LABELS: Record<CancellationStatus, string> = {
-  pending: "Pending",
+  pending: "Waiting for Approval",
   meeting_scheduled: "Meeting Scheduled",
   retained: "Retained",
   cancelled: "Cancelled",
   follow_up_required: "Follow-up Required",
   no_response: "No Response",
+  reactivated: "Active",
 };
 
 const STATUS_STYLE: Record<CancellationStatus, string> = {
@@ -29,6 +34,7 @@ const STATUS_STYLE: Record<CancellationStatus, string> = {
   cancelled: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400",
   follow_up_required: "bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400",
   no_response: "bg-slate-100 text-slate-600",
+  reactivated: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
 };
 
 const STATUS_ICON: Record<CancellationStatus, React.ElementType> = {
@@ -38,8 +44,12 @@ const STATUS_ICON: Record<CancellationStatus, React.ElementType> = {
   cancelled: XCircle,
   follow_up_required: HelpCircle,
   no_response: PhoneOff,
+  reactivated: RotateCcw,
 };
 
+// The full set shown for tickets not (yet) cancelled — "reactivated" only
+// makes sense once a ticket has actually been cancelled, so it's excluded
+// here and added back in only for cancelled tickets (see selectableStatuses).
 const ALL_STATUSES: CancellationStatus[] = [
   "pending", "meeting_scheduled", "retained", "cancelled", "follow_up_required", "no_response",
 ];
@@ -78,7 +88,10 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
     startTransition(async () => {
       setError(null);
       const patch: Partial<CancellationRequest> = { status };
-      if (["retained", "cancelled", "no_response"].includes(status)) {
+      // "reactivated" re-stamps resolved_at to the reactivation date — the
+      // date shown should reflect the most recent thing that happened, not
+      // the original cancellation.
+      if (["retained", "cancelled", "no_response", "reactivated"].includes(status)) {
         patch.resolved_at = new Date().toISOString();
       }
       const res = await updateCancellationTicket(ticket.id, patch);
@@ -86,6 +99,12 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
       else onUpdate(ticket.id, patch);
     });
   }
+
+  // Once cancelled, the only forward move is reactivating — every other
+  // status would be a confusing step "backwards" through an already-closed
+  // flow. Reactivation itself only makes sense from a cancelled ticket.
+  const selectableStatuses: CancellationStatus[] =
+    ticket.status === "cancelled" ? ["cancelled", "reactivated"] : ALL_STATUSES;
 
   function handleCreateMeeting() {
     startMeetingTransition(async () => {
@@ -154,7 +173,12 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
             <Field label="Plan" value={ticket.plan_id ?? "—"} />
             <Field label="Reason" value={REASON_LABELS[ticket.reason]} />
             <Field label="Submitted" value={fmt(ticket.created_at)} />
-            {ticket.resolved_at && <Field label="Resolved" value={fmt(ticket.resolved_at)} />}
+            {ticket.resolved_at && (
+              <Field
+                label={ticket.status === "cancelled" ? "Cancelled on" : ticket.status === "reactivated" ? "Reactivated on" : "Resolved"}
+                value={fmt(ticket.resolved_at)}
+              />
+            )}
           </div>
 
           {ticket.feedback && (
@@ -207,10 +231,10 @@ function TicketRow({ ticket, onUpdate }: TicketRowProps) {
             <select
               value={ticket.status}
               onChange={e => changeStatus(e.target.value as CancellationStatus)}
-              disabled={pending || ticket.status === "cancelled"}
+              disabled={pending}
               className="text-sm rounded-lg border border-slate-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 text-slate-800"
             >
-              {ALL_STATUSES.map(s => (
+              {selectableStatuses.map(s => (
                 <option key={s} value={s}>{STATUS_LABELS[s]}</option>
               ))}
             </select>
@@ -312,10 +336,11 @@ export function CancellationsTab({ initialRequests }: CancellationsTabProps) {
 
   const statCards = [
     { label: "Total", value: total, color: "text-slate-700", bg: "bg-slate-50" },
-    { label: "Pending", value: byStatus("pending"), color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20" },
+    { label: "Waiting for Approval", value: byStatus("pending"), color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20" },
     { label: "Meeting Scheduled", value: byStatus("meeting_scheduled"), color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
     { label: "Retained", value: byStatus("retained"), color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
     { label: "Cancelled", value: byStatus("cancelled"), color: "text-red-700 dark:text-red-400", bg: "bg-red-50 dark:bg-red-900/20" },
+    { label: "Active (Reactivated)", value: byStatus("reactivated"), color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
     { label: "Follow-up Required", value: byStatus("follow_up_required"), color: "text-purple-700 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-900/20" },
   ];
 

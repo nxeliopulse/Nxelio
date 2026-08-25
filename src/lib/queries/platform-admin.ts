@@ -22,6 +22,22 @@ export async function platformAdminSignOut(): Promise<void> {
   await supabase.auth.signOut();
 }
 
+/** Resolves the platform admin's own workspace — treated as the one "company
+ *  account" for features that need a single fixed workspace regardless of
+ *  which customer/session is calling (e.g. auto-generating a Google Meet
+ *  link for a cancellation request using our shared calendar connection,
+ *  not the customer's). Returns null if the admin login has no workspace. */
+export async function getPlatformAdminWorkspaceId(): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data: userList, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) return null;
+  const adminUser = userList.users.find((u) => (u.email || "").toLowerCase() === PLATFORM_ADMIN_EMAIL);
+  if (!adminUser) return null;
+
+  const { data: row } = await admin.from("users").select("workspace_id").eq("user_id", adminUser.id).single();
+  return row?.workspace_id ?? null;
+}
+
 /** Cross-workspace lead-import archive — platform admin only, bypasses per-workspace RLS by design. */
 export async function getPlatformLeadArchive(): Promise<(LeadArchiveRow & { workspace_name: string | null })[]> {
   if (!(await isPlatformAdmin())) throw new Error("Forbidden");
