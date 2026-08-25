@@ -85,12 +85,21 @@ export function AiAssistantWidget() {
   const ttsKeepAliveRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const ttsFallbackRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callSecsRef      = useRef(0);
-  const micRestartLock   = useRef(false);
   // Ref mirror of speaking state — safe to read inside stale-closure callbacks
   const speakingRef      = useRef(false);
   // Always-current handleUserSpeech — startMic calls this ref so it never goes stale
   const handleUserSpeechRef = useRef<(text: string) => void>(() => {});
   const micFailCount     = useRef(0);
+  // Monotonic id for the live mic attempt. Every startMic() bumps it, which
+  // instantly invalidates every older recognition instance's callbacks — the
+  // only reliable way to guarantee exactly ONE listening chain at a time.
+  const micSessionRef    = useRef(0);
+  // Set once the browser tells us the mic will never be granted this session
+  // (permission blocked / no device). Both onerror AND onend must respect it,
+  // otherwise onend happily restarts the mic the instant onerror gave up.
+  const micFatalRef      = useRef(false);
+  // Collapses multiple startMic() calls that land in the same tick.
+  const micStartingRef   = useRef(false);
 
   // Load voices — may fire immediately or after onvoiceschanged
   useEffect(() => {
@@ -112,6 +121,10 @@ export function AiAssistantWidget() {
   }, []);
 
   const stopAll = useCallback(() => {
+    // Bumping the session first makes every in-flight recognition callback
+    // (and any pending restart timer) a no-op before we tear anything down.
+    micSessionRef.current += 1;
+    micStartingRef.current = false;
     recognitionRef.current?.abort();
     recognitionRef.current = null;
     clearTtsTimers();
@@ -124,6 +137,7 @@ export function AiAssistantWidget() {
 
   const retryMic = useCallback(() => {
     micFailCount.current = 0;
+    micFatalRef.current = false; // user is explicitly re-granting — allow another attempt
     setMicError(null);
     startMic();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -202,76 +216,114 @@ export function AiAssistantWidget() {
   // ── Mic ────────────────────────────────────────────────────────────────────
   const startMic = useCallback(() => {
     if (!callActiveRef.current) return;
+    if (micFatalRef.current) return;     // mic is denied for this session — never retry
+    if (micStartingRef.current) return;  // another startMic is mid-flight this tick
+
     const SR = getSR();
     if (!SR) { setMicError("Voice isn't supported in this browser. Try Chrome or Edge."); return; }
 
-    micRestartLock.current = false;
+    // Claim this attempt. Any older recognition instance still firing events
+    // now sees a mismatched id and bails, so chains can never multiply.
+    const session = ++micSessionRef.current;
+    micStartingRef.current = true;
+
     const r = new SR();
     r.lang = "en-US";
     r.interimResults = false;
     r.continuous = false;
 
+    const isStale = () => session !== micSessionRef.current;
     let gotResult = false;
+    // onerror and onend both fire for a single failed attempt; `settled`
+    // guarantees only the first of them gets to schedule a restart.
+    let settled = false;
+
+    function scheduleRestart(delayMs: number) {
+      if (settled || isStale()) return;
+      settled = true;
+      setTimeout(() => {
+        if (session === micSessionRef.current && callActiveRef.current && !micFatalRef.current) startMic();
+      }, delayMs);
+    }
 
     r.onresult = (e) => {
+      if (isStale()) return;
       gotResult = true;
+      settled = true;
       micFailCount.current = 0;
       const transcript = e.results[0]?.[0]?.transcript?.trim();
       if (transcript && callActiveRef.current) handleUserSpeechRef.current(transcript);
     };
 
     r.onerror = (e) => {
+      if (isStale()) return;
       setListening(false);
-      if (!callActiveRef.current || gotResult) return;
+      if (gotResult) return;
 
       if (FATAL_MIC_ERRORS.has(e.error)) {
+        micFatalRef.current = true; // also stops onend below from restarting
+        settled = true;
         setMicError(
           e.error === "audio-capture"
             ? "No microphone was found. Please connect one and try again."
             : "Microphone access is blocked. Please allow microphone permission in your browser's site settings, then try again."
         );
-        return; // stop retrying — the browser will just deny it again
-      }
-
-      if (e.error === "aborted" || micRestartLock.current) return;
-
-      micFailCount.current += 1;
-      if (micFailCount.current >= 5) {
-        setMicError("We're having trouble hearing you. Please check your microphone and try again.");
         return;
       }
-      micRestartLock.current = true;
-      setTimeout(() => { if (callActiveRef.current) startMic(); }, 700);
+
+      if (e.error === "aborted") { settled = true; return; }
+
+      // "no-speech" just means the caller stayed quiet — that's normal in a
+      // voice call, so keep listening patiently instead of counting it as a
+      // failure and eventually giving up on a perfectly working mic.
+      if (e.error !== "no-speech") {
+        micFailCount.current += 1;
+        if (micFailCount.current >= 5) {
+          settled = true;
+          setMicError("We're having trouble hearing you. Please check your microphone and try again.");
+          return;
+        }
+      }
+      scheduleRestart(700);
     };
 
     r.onend = () => {
+      if (isStale()) return;
       setListening(false);
-      if (!gotResult && callActiveRef.current && !micRestartLock.current) {
-        micRestartLock.current = true;
-        setTimeout(() => { if (callActiveRef.current) startMic(); }, 700);
-      }
+      if (gotResult) return;
+      scheduleRestart(700); // no-ops if onerror already handled this attempt
     };
 
     recognitionRef.current = r;
     try {
       r.start();
       setMicError(null);
-      setListening(true); // only set after start() succeeds
+      setListening(true); // only after start() actually succeeds
     } catch {
-      // Synchronous start() failure (e.g. double-start) — safe to retry a few times
+      // Synchronous start() failure (e.g. an instance was already running).
+      settled = true;
       micFailCount.current += 1;
       if (micFailCount.current >= 5) {
         setMicError("Something went wrong starting the microphone. Please try again.");
-        return;
+      } else if (callActiveRef.current) {
+        setTimeout(() => {
+          if (session === micSessionRef.current && callActiveRef.current && !micFatalRef.current) startMic();
+        }, 1_000);
       }
-      if (callActiveRef.current) setTimeout(() => startMic(), 1_000);
+    } finally {
+      micStartingRef.current = false;
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI response ─────────────────────────────────────────────────────────
   // Keep the ref in sync so startMic (a useCallback with [] deps) always
-  // calls the latest version and never captures a stale closure.
-  handleUserSpeechRef.current = handleUserSpeech;
+  // calls the latest version and never captures a stale closure. Done in an
+  // effect rather than during render — a render that React throws away must
+  // not be able to leave a dangling handler behind.
+  useEffect(() => {
+    handleUserSpeechRef.current = handleUserSpeech;
+  });
+
   function handleUserSpeech(text: string) {
     recognitionRef.current?.abort(); // stop mic while AI is thinking
     recognitionRef.current = null;
@@ -316,6 +368,8 @@ export function AiAssistantWidget() {
     callActiveRef.current = true;
     callSecsRef.current = 0;
     micFailCount.current = 0;
+    micFatalRef.current = false; // fresh call — give the mic another chance
+    micStartingRef.current = false;
     chatRef.current = [];
     setCallActive(true);
     setCallSecs(0);
@@ -395,12 +449,12 @@ export function AiAssistantWidget() {
 
                   <div className="flex items-end gap-1 h-7">
                     {[1, 2, 3, 4, 5].map((i) => (
-                      <span key={i} className="w-1.5 rounded-full"
+                      <span key={i} className="lp-voice-bar w-1.5 rounded-full"
                         style={{
                           background: thinking ? "#f59e0b" : GRADIENT,
                           height: wavesActive ? `${12 + i * 4}px` : "6px",
                           transition: "height 0.3s ease",
-                          animation: wavesActive ? `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate` : "none",
+                          animation: wavesActive ? `lp-voice-wave ${0.4 + i * 0.1}s ease-in-out infinite alternate` : "none",
                         }} />
                     ))}
                   </div>

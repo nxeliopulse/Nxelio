@@ -611,10 +611,20 @@ html, body {
   animation: lp-progress-stripes 0.9s linear infinite;
 }
 
+/* Voice-assistant equalizer bars. Needs its own keyframe because Tailwind's
+   built-in `pulse` only animates opacity — using it made the bars fade in
+   place instead of actually moving like a level meter. */
+@keyframes lp-voice-wave {
+  from { transform: scaleY(0.35); }
+  to   { transform: scaleY(1); }
+}
+.lp-voice-bar { transform-origin: bottom; }
+
 /* Respect users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .lp-anim-pop, .lp-anim-fade, .lp-anim-scale { animation: none; }
   .lp-progress-active { animation: none; }
+  .lp-voice-bar { animation: none !important; }
 }
 
 /* Dual-handle range slider (DualRangeSlider) — two overlapping native
