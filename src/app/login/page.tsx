@@ -1,17 +1,15 @@
 "use client";
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, Mail } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
-import { sendLoginOtp, isDeviceTrusted } from "@/lib/queries/email-verification";
 import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { AuthSplitCard, FIELD_LABEL, UNDERLINE_INPUT, UNDERLINE_INPUT_STYLE, authInputFocus, authInputBlur, RadioToggle, AuthButtonRow } from "@/components/auth/auth-split-card";
 import { friendlyAuthError } from "@/lib/auth/auth-error";
 
 function LoginForm() {
-  const router  = useRouter();
   const params  = useSearchParams();
   const [showPass, setShowPass]   = useState(false);
   const [form, setForm]           = useState({ email: "", password: "" });
@@ -44,7 +42,7 @@ function LoginForm() {
     if (!valid) return;
     setError(null); setLoading(true);
     const supabase = createClient();
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
+    const { error: loginError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
 
     if (loginError) {
       setLoading(false);
@@ -52,30 +50,19 @@ function LoginForm() {
       return;
     }
 
-    // The platform admin account lands in the standalone admin panel — skip OTP.
+    // The platform admin account lands in the standalone admin panel.
     if (form.email.trim().toLowerCase() === "admin@nxelio.com") {
       window.location.href = "/admin";
       return;
     }
 
-    // Signing in from a device that already verified a code (at signup or a
-    // prior login) skips the OTP step entirely — only a new/unrecognized
-    // device gets asked to verify.
-    const trusted = data.user ? await isDeviceTrusted(data.user.id) : false;
-    if (trusted) {
-      try {
-        const status = await getOnboardingStatus();
-        window.location.href = status.completed ? "/dashboard" : "/onboarding";
-      } catch (err) {
-        setError(err instanceof Error ? `Signed in, but couldn't finish loading your account: ${err.message}` : "Signed in, but something went wrong loading your account.");
-        setLoading(false);
-      }
-      return;
+    try {
+      const status = await getOnboardingStatus();
+      window.location.href = status.completed ? "/dashboard" : "/onboarding";
+    } catch (err) {
+      setError(err instanceof Error ? `Signed in, but couldn't finish loading your account: ${err.message}` : "Signed in, but something went wrong loading your account.");
+      setLoading(false);
     }
-
-    await sendLoginOtp(form.email);
-    router.push(`/verify-login?email=${encodeURIComponent(form.email)}`);
-    setLoading(false);
   }
 
   return (
