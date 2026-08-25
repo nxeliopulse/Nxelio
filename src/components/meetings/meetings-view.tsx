@@ -877,6 +877,7 @@ export function MeetingsView({ meetings, leads, userEmail }: { meetings: Meeting
                 externalByDay={externalByDay}
                 selectedDay={selectedDay}
                 onSelectDay={setSelectedDay}
+                onOpenMeeting={setDetail}
                 activeCategories={activeCategories}
                 getEventCategory={getEventCategory}
                 getEventStyle={getEventStyle}
@@ -1423,6 +1424,7 @@ function CalendarGrid({
   externalByDay,
   selectedDay,
   onSelectDay,
+  onOpenMeeting,
   activeCategories,
   getEventCategory,
   getEventStyle,
@@ -1433,11 +1435,14 @@ function CalendarGrid({
   externalByDay: Map<string, SyncedCalendarEvent[]>;
   selectedDay: Date;
   onSelectDay: (d: Date) => void;
+  onOpenMeeting?: (m: MeetingRow) => void;
   activeCategories: Set<string>;
   getEventCategory: (item: { kind: "meeting" | "external"; title: string }) => string;
   getEventStyle: (cat: string) => string;
 }) {
   const today = new Date();
+  const [hoveredDateKey, setHoveredDateKey] = useState<string | null>(null);
+
   const cells = useMemo(() => {
     const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
     const start = new Date(firstOfMonth);
@@ -1466,16 +1471,18 @@ function CalendarGrid({
       
       {/* 6-row Day grid */}
       <div className="grid grid-cols-7 gap-px bg-slate-200 dark:bg-slate-800 flex-1">
-        {cells.map((d) => {
+        {cells.map((d, cellIdx) => {
           const inMonth = d.getMonth() === month.getMonth();
-          const dayMeetings = meetingsByDay.get(dateKey(d)) ?? [];
-          const dayExternal = externalByDay.get(dateKey(d)) ?? [];
+          const dKey = dateKey(d);
+          const dayMeetings = meetingsByDay.get(dKey) ?? [];
+          const dayExternal = externalByDay.get(dKey) ?? [];
           const isToday = sameDay(d, today);
           const isSelected = sameDay(d, selectedDay);
+          const isHovered = hoveredDateKey === dKey;
 
           const chips = [
-            ...dayMeetings.map((m) => ({ kind: "meeting" as const, start: m.start_at, title: m.title, allDay: false })),
-            ...dayExternal.map((e) => ({ kind: "external" as const, start: e.start, title: e.title, provider: e.provider, allDay: e.allDay })),
+            ...dayMeetings.map((m) => ({ kind: "meeting" as const, start: m.start_at, end: m.end_at, title: m.title, allDay: false, rawMeeting: m })),
+            ...dayExternal.map((e) => ({ kind: "external" as const, start: e.start, end: e.end, title: e.title, provider: e.provider, allDay: e.allDay, rawMeeting: undefined })),
           ]
             .filter((c) => activeCategories.has(getEventCategory(c)))
             .sort((a, b) => a.start.localeCompare(b.start));
@@ -1483,49 +1490,149 @@ function CalendarGrid({
           const visibleChips = chips.slice(0, 3);
           const overflow = chips.length - visibleChips.length;
 
-          return (
-            <button
-              key={d.toISOString()}
-              onClick={() => onSelectDay(d)}
-              className={cn(
-                "min-h-[110px] bg-white dark:bg-slate-900 flex flex-col items-stretch gap-1.5 p-2 text-left relative transition-all",
-                isSelected ? "ring-2 ring-indigo-600 ring-inset z-10" : "hover:bg-slate-50/50"
-              )}
-            >
-              <span className={cn(
-                "h-5 w-5 flex items-center justify-center rounded-full text-xs font-semibold",
-                isToday
-                  ? "bg-indigo-600 text-white shadow-xs font-bold"
-                  : isSelected
-                  ? "text-indigo-600 font-bold"
-                  : inMonth
-                  ? "text-slate-700 dark:text-slate-600"
-                  : "text-slate-300 dark:text-slate-700"
-              )}>
-                {d.getDate()}
-              </span>
+          const rowIdx = Math.floor(cellIdx / 7);
+          const colIdx = cellIdx % 7;
+          const isBottom = rowIdx >= 3;
 
-              <div className="flex flex-col gap-1 min-w-0 flex-1 overflow-hidden">
-                {visibleChips.map((c, i) => {
-                  const cat = getEventCategory(c);
-                  const styleClass = getEventStyle(cat);
-                  return (
-                    <span
-                      key={i}
-                      className={cn(
-                        "truncate rounded px-1.5 py-1 text-[9px] font-bold leading-none block w-full",
-                        styleClass
-                      )}
-                    >
-                      {c.allDay ? "" : fmtTime(c.start)} {c.title}
-                    </span>
-                  );
-                })}
-                {overflow > 0 && (
-                  <span className="text-[9px] font-bold px-1 text-slate-400 dark:border-slate-500">+{overflow} more</span>
+          return (
+            <div
+              key={d.toISOString()}
+              onMouseEnter={() => setHoveredDateKey(dKey)}
+              onMouseLeave={() => setHoveredDateKey(null)}
+              className="relative flex flex-col"
+            >
+              <button
+                type="button"
+                onClick={() => onSelectDay(d)}
+                className={cn(
+                  "min-h-[110px] w-full h-full bg-white dark:bg-slate-900 flex flex-col items-stretch gap-1.5 p-2 text-left relative transition-all cursor-pointer",
+                  isSelected ? "ring-2 ring-indigo-600 ring-inset z-10" : "hover:bg-slate-50/70 dark:hover:bg-slate-800/50"
                 )}
-              </div>
-            </button>
+              >
+                <span className={cn(
+                  "h-5 w-5 flex items-center justify-center rounded-full text-xs font-semibold",
+                  isToday
+                    ? "bg-indigo-600 text-white shadow-xs font-bold"
+                    : isSelected
+                    ? "text-indigo-600 font-bold"
+                    : inMonth
+                    ? "text-slate-700 dark:text-slate-600"
+                    : "text-slate-300 dark:text-slate-700"
+                )}>
+                  {d.getDate()}
+                </span>
+
+                <div className="flex flex-col gap-1 min-w-0 flex-1 overflow-hidden">
+                  {visibleChips.map((c, i) => {
+                    const cat = getEventCategory(c);
+                    const styleClass = getEventStyle(cat);
+                    return (
+                      <span
+                        key={i}
+                        className={cn(
+                          "truncate rounded px-1.5 py-1 text-[9px] font-bold leading-none block w-full",
+                          styleClass
+                        )}
+                      >
+                        {c.allDay ? "" : fmtTime(c.start)} {c.title}
+                      </span>
+                    );
+                  })}
+                  {overflow > 0 && (
+                    <span className="text-[9px] font-bold px-1 text-slate-400 dark:border-slate-500">+{overflow} more</span>
+                  )}
+                </div>
+              </button>
+
+              {/* Hover Popup Effect showing all events for this date */}
+              {isHovered && chips.length > 0 && (
+                <div
+                  className={cn(
+                    "absolute z-50 w-72 sm:w-80 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 p-3.5 text-left pointer-events-auto",
+                    "animate-in fade-in zoom-in-95 duration-150 transition-all",
+                    isBottom ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]",
+                    colIdx >= 5 ? "right-0" : colIdx <= 1 ? "left-0" : "left-1/2 -translate-x-1/2"
+                  )}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <CalendarDays className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      <span className="text-xs font-bold text-slate-800 dark:text-white truncate">
+                        {d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 shrink-0">
+                      {chips.length} {chips.length === 1 ? "Event" : "Events"}
+                    </span>
+                  </div>
+
+                  {/* Events list */}
+                  <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                    {chips.map((c, i) => {
+                      const cat = getEventCategory(c);
+                      const styleClass = getEventStyle(cat);
+                      const isMeeting = c.kind === "meeting" && c.rawMeeting;
+                      return (
+                        <div
+                          key={i}
+                          onClick={() => {
+                            if (isMeeting && onOpenMeeting && c.rawMeeting) {
+                              onOpenMeeting(c.rawMeeting);
+                            } else {
+                              onSelectDay(d);
+                            }
+                          }}
+                          className={cn(
+                            "group/item p-2 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer",
+                            isMeeting ? "hover:border-indigo-200 dark:hover:border-indigo-800" : ""
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0", styleClass)}>
+                              {cat}
+                            </span>
+                            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 flex items-center gap-1 shrink-0">
+                              <Clock className="h-3 w-3" />
+                              {c.allDay ? "All Day" : fmtTime(c.start)}
+                            </span>
+                          </div>
+
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 leading-snug line-clamp-2">
+                            {c.title}
+                          </p>
+
+                          {isMeeting && c.rawMeeting?.lead && (
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 truncate">
+                              Lead: {leadLabel(c.rawMeeting.lead)}
+                            </p>
+                          )}
+
+                          {c.kind === "external" && c.provider && (
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 capitalize">
+                              {c.provider} Calendar
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer hint */}
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
+                    <span>Click meeting to open details</span>
+                    <button
+                      type="button"
+                      onClick={() => onSelectDay(d)}
+                      className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                    >
+                      View Day
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
