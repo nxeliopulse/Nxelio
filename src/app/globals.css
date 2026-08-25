@@ -1110,6 +1110,15 @@ select:disabled {
   cursor: not-allowed !important;
 }
 
+/* Landing page hero AI chat box — opts its textarea out of the app-wide
+   bordered-input styling above so it reads as a borderless chat field. */
+textarea.hero-chat-textarea,
+textarea.hero-chat-textarea:hover,
+textarea.hero-chat-textarea:focus {
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* Error states */
 .border-red-500,
 [class*="border-red-"] {

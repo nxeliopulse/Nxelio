@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { isDeviceTrusted } from "@/lib/queries/email-verification";
 import { AppShell } from "@/components/layout/app-shell";
 import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { getSubscription } from "@/lib/queries/subscriptions";
@@ -23,15 +23,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (await isPlatformAdmin()) redirect("/admin");
 
   // OAuth users (Google, LinkedIn) skip the login OTP gate — they already
-  // went through their provider's own 2FA. Email+password users must verify
-  // a 6-digit code each session; the cookie is set by verifyLoginOtp().
+  // went through their provider's own 2FA. Email+password users only need to
+  // verify a code once per device (at signup or their first login on it) —
+  // isDeviceTrusted() checks the long-lived trust cookie set by that step.
   const provider = (user.app_metadata as { provider?: string } | null)?.provider;
   const isOAuth = provider === "google" || provider === "linkedin_oidc";
-  if (!isOAuth) {
-    const cookieStore = await cookies();
-    if (!cookieStore.get("login_otp_verified")?.value) {
-      redirect(`/verify-login?email=${encodeURIComponent(user.email ?? "")}`);
-    }
+  if (!isOAuth && !(await isDeviceTrusted(user.id))) {
+    redirect(`/verify-login?email=${encodeURIComponent(user.email ?? "")}`);
   }
 
   // If an admin removed this login's access to its currently-active workspace

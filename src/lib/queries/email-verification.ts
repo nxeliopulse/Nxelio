@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 
 const CODE_TTL_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
+const TRUSTED_DEVICE_TTL_DAYS = 60;
 
 function generateCode(): string {
   return String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
@@ -13,6 +14,55 @@ function generateCode(): string {
 
 function hashCode(code: string): string {
   return crypto.createHash("sha256").update(code).digest("hex");
+}
+
+/** HMAC key for the trusted-device cookie — derived from the service-role
+ *  key (already server-only secret) with domain separation so it can't be
+ *  reused to forge anything else that key protects. */
+function deviceSigningKey(): Buffer {
+  return crypto.createHash("sha256").update(`trusted-device:${process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""}`).digest();
+}
+
+function signTrustedDeviceToken(userId: string, expiresAtMs: number): string {
+  const payload = `${userId}.${expiresAtMs}`;
+  const sig = crypto.createHmac("sha256", deviceSigningKey()).update(payload).digest("hex");
+  return `${payload}.${sig}`;
+}
+
+/** Marks the current browser as trusted for this user — future logins from
+ *  it skip the OTP step. Set once at signup verification and once per new
+ *  device's first login-OTP verification. */
+async function setTrustedDeviceCookie(userId: string): Promise<void> {
+  const expiresAtMs = Date.now() + TRUSTED_DEVICE_TTL_DAYS * 24 * 60 * 60 * 1000;
+  const token = signTrustedDeviceToken(userId, expiresAtMs);
+  const cookieStore = await cookies();
+  cookieStore.set("trusted_device", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: TRUSTED_DEVICE_TTL_DAYS * 24 * 60 * 60,
+    path: "/",
+  });
+}
+
+/** True when this browser already holds a valid, unexpired trust token for
+ *  this specific user — meaning the login-OTP step can be skipped. */
+export async function isDeviceTrusted(userId: string): Promise<boolean> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("trusted_device")?.value;
+  if (!token) return false;
+
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  const [tokenUserId, expiresAtStr, sig] = parts;
+  if (tokenUserId !== userId) return false;
+
+  const expiresAtMs = Number(expiresAtStr);
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs < Date.now()) return false;
+
+  const expectedSig = crypto.createHmac("sha256", deviceSigningKey()).update(`${tokenUserId}.${expiresAtStr}`).digest("hex");
+  // Constant-time compare — both sides are always 64 hex chars (sha256 digest), so length matches.
+  return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig));
 }
 
 function codeEmailHtml(code: string, fullName: string): string {
@@ -103,7 +153,7 @@ export async function sendLoginOtp(email: string): Promise<{ ok: boolean; error?
   return { ok: true };
 }
 
-/** Verifies a login OTP and sets an httpOnly session cookie to grant app access. */
+/** Verifies a login OTP and marks this device as trusted, so future logins from it skip the OTP step. */
 export async function verifyLoginOtp(email: string, code: string): Promise<{ ok: boolean; error?: string }> {
   const admin = createAdminClient();
   const normalized = email.trim().toLowerCase();
@@ -119,15 +169,7 @@ export async function verifyLoginOtp(email: string, code: string): Promise<{ ok:
   }
 
   await admin.from("email_verification_codes").delete().eq("id", row.id);
-
-  const cookieStore = await cookies();
-  cookieStore.set("login_otp_verified", "1", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 8, // 8 hours
-    path: "/",
-  });
+  await setTrustedDeviceCookie(row.user_id);
   return { ok: true };
 }
 
@@ -150,5 +192,8 @@ export async function verifyEmailCode(email: string, code: string): Promise<{ ok
   if (confirmError) return { ok: false, error: "Verification succeeded but activating the account failed — please try logging in" };
 
   await admin.from("email_verification_codes").delete().eq("id", row.id);
+  // Verifying at signup already proves control of this device+email — trust
+  // it so the very next login on this browser doesn't ask for another code.
+  await setTrustedDeviceCookie(row.user_id);
   return { ok: true };
 }

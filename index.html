@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nxelio Nurture | Turn Every Lead Into Revenue Automatically</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #2896fb;
+      --primary-dark: #1f7cd1;
+      --primary-light: #e6f3ff;
+      --accent: #17d94b;
+      --text-dark: #0f172a;
+      --text-gray: #475569;
+      --text-light: #94a3b8;
+      --bg-light: #f8fafc;
+      --bg-white: #ffffff;
+      --border: #e2e8f0;
+      
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --radius: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--text-dark);
+      background-color: var(--bg-light);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    img { max-width: 100%; height: auto; display: block; }
+    a { text-decoration: none; color: inherit; }
+    ul { list-style: none; }
+    button { cursor: pointer; font-family: inherit; border: none; background: none; }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 28px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 16px;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+      box-shadow: 0 4px 14px rgba(40, 150, 251, 0.3);
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(40, 150, 251, 0.4);
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-white);
+      color: var(--text-dark);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--bg-light);
+      border-color: #cbd5e1;
+    }
+
+    .section {
+      padding: 96px 0;
+    }
+
+    .text-center { text-align: center; }
+    .mb-2 { margin-bottom: 8px; }
+    .mb-4 { margin-bottom: 16px; }
+    .mb-6 { margin-bottom: 24px; }
+    .mb-8 { margin-bottom: 32px; }
+    .mb-12 { margin-bottom: 48px; }
+    .mb-16 { margin-bottom: 64px; }
+    
+    .grid { display: grid; gap: 24px; }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+    /* 1. Sticky Top Bar */
+    .promo-banner {
+      background-color: var(--text-dark);
+      color: white;
+      text-align: center;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .promo-banner a {
+      color: var(--accent);
+      text-decoration: underline;
+      margin-left: 8px;
+    }
+
+    .header {
+      position: sticky;
+      top: 0;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      padding: 16px 0;
+    }
+
+    .header .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .logo span {
+      color: var(--primary);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .nav-links a {
+      font-weight: 500;
+      color: var(--text-gray);
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-dark);
+    }
+
+    /* 2. Hero */
+    .hero {
+      padding: 120px 0 80px;
+      background: linear-gradient(180deg, var(--bg-light) 0%, var(--bg-white) 100%);
+      overflow: hidden;
+    }
+
+    .hero-content {
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .hero-title {
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -2px;
+      margin-bottom: 24px;
+    }
+
+    .hero-subtitle {
+      font-size: 20px;
+      color: var(--text-gray);
+      margin-bottom: 40px;
+      font-weight: 400;
+      line-height: 1.6;
+    }
+
+    .hero-bullets {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 48px;
+      flex-wrap: wrap;
+    }
+
+    .hero-bullets li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      color: var(--text-dark);
+    }
+
+    .check-icon {
+      color: var(--accent);
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 64px;
+    }
+
+    .reassurance {
+      font-size: 14px;
+      color: var(--text-light);
+    }
+
+    .hero-visual {
+      background: var(--bg-white);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-lg);
+      padding: 24px;
+      max-width: 900px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .mockup-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mockup-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #e2e8f0;
+    }
+    .dot:nth-child(1) { background: #fecaca; }
+    .dot:nth-child(2) { background: #fef08a; }
+    .dot:nth-child(3) { background: #bbf7d0; }
+
+    .chat-bubble {
+      background: var(--bg-light);
+      padding: 16px;
+      border-radius: var(--radius-lg);
+      border-bottom-left-radius: 4px;
+      max-width: 80%;
+      margin-bottom: 16px;
+      font-size: 15px;
+    }
+
+    .chat-bubble.ai {
+      background: var(--primary-light);
+      margin-left: auto;
+      border-radius: var(--radius-lg);
+      border-bottom-right-radius: 4px;
+      color: var(--primary-dark);
+    }
+
+    /* 3. What's Included */
+    .inclusions {
+      background: var(--bg-white);
+    }
+
+    .section-header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 64px;
+    }
+
+    .section-title {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+
+    .section-subtitle {
+      font-size: 18px;
+      color: var(--text-gray);
+    }
+
+    .inclusion-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      max-width: 800px;
+      margin: 0 auto 48px;
+    }
+
+    .inclusion-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 24px;
+      background: var(--bg-light);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+    }
+
+    .inclusion-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--primary-light);
+      color: var(--primary);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .inclusion-text {
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    /* 4. Incentive Banner */
+    .incentive {
+      background: var(--primary);
+      color: white;
+      padding: 48px 0;
+      text-align: center;
+    }
+
+    .incentive h3 {
+      font-size: 28px;
+      margin-bottom: 24px;
+    }
+
+    .incentive .btn {
+      background: white;
+      color: var(--primary);
+    }
+    
+    .incentive .btn:hover {
+      background: var(--bg-light);
+    }
+
+    /* 5. Problem -> Solution */
+    .problem-solution {
+      background: var(--bg-light);
+    }
+
+    .ps-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .problem {
+      color: var(--text-gray);
+      font-size: 15px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .problem::before {
+      content: '✕';
+      color: #ef4444;
+      font-weight: bold;
+    }
+
+    .solution {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-dark);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    
+    .solution::before {
+      content: '✓';
+      color: var(--accent);
+      font-weight: bold;
+      font-size: 20px;
+    }
+
+    /* 6. Testimonials */
+    .testimonials {
+      background: var(--bg-white);
+      overflow: hidden;
+      padding: 96px 0;
+    }
+
+    .carousel-container {
+      position: relative;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .testimonial-slide {
+      display: none;
+      text-align: center;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    .testimonial-slide.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .quote-mark {
+      font-size: 48px;
+      color: var(--primary-light);
+      line-height: 1;
+      margin-bottom: 24px;
+    }
+
+    .quote-text {
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.4;
+      margin-bottom: 32px;
+    }
+
+    .author-name {
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .author-title {
+      color: var(--text-gray);
+      font-size: 14px;
+    }
+    
+    .carousel-controls {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 32px;
+    }
+    
+    .dot-btn {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--border);
+      padding: 0;
+      transition: background 0.2s;
+    }
+    
+    .dot-btn.active {
+      background: var(--primary);
+    }
+
+    /* 7. AI Assistant Feature */
+    .assistant {
+      background: var(--text-dark);
+      color: white;
+    }
+
+    .assistant .section-title, .assistant .section-subtitle {
+      color: white;
+    }
+
+    .assistant .section-subtitle { opacity: 0.8; }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 32px;
+      border-radius: var(--radius-lg);
+    }
+
+    .feature-card h4 {
+      font-size: 20px;
+      margin-bottom: 12px;
+      color: white;
+    }
+
+    .feature-card p {
+      color: rgba(255,255,255,0.7);
+      font-size: 15px;
+    }
+
+    /* 8. Trust Badges */
+    .trust-badges {
+      padding: 48px 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-white);
+    }
+
+    .badges-flex {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 48px;
+      flex-wrap: wrap;
+      opacity: 0.6;
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: -0.5px;
+      color: var(--text-gray);
+    }
+
+    /* 9. Meet the Product */
+    .modules {
+      background: var(--bg-light);
+    }
+
+    .module-card {
+      background: white;
+      padding: 32px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .module-card h4 {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+
+    .module-card p {
+      color: var(--text-gray);
+      margin-bottom: 24px;
+      font-size: 15px;
+    }
+
+    .tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tag {
+      background: var(--bg-light);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-gray);
+      border: 1px solid var(--border);
+    }
+
+    /* 11. Security */
+    .security {
+      background: var(--bg-white);
+    }
+
+    .security-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      text-align: center;
+    }
+
+    .security-badge {
+      padding: 32px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg-light);
+    }
+
+    .security-badge h4 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .security-badge p {
+      font-size: 14px;
+      color: var(--text-gray);
+    }
+
+    /* 12. Final CTA */
+    .final-cta {
+      background: linear-gradient(135deg, var(--bg-light) 0%, var(--primary-light) 100%);
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+
+    .final-cta h2 {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 24px;
+    }
+
+    /* 13. FAQ */
+    .faq {
+      background: var(--bg-white);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .faq-item {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      padding: 24px;
+      width: 100%;
+      text-align: left;
+      font-size: 18px;
+      font-weight: 600;
+      background: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .faq-question::after {
+      content: '+';
+      font-size: 24px;
+      color: var(--text-gray);
+      transition: transform 0.3s;
+    }
+
+    .faq-item.active .faq-question::after {
+      transform: rotate(45deg);
+    }
+
+    .faq-answer {
+      padding: 0 24px;
+      max-height: 0;
+      overflow: hidden;
+      transition: all 0.3s ease-out;
+      color: var(--text-gray);
+      font-size: 16px;
+      background: var(--bg-light);
+    }
+
+    .faq-item.active .faq-answer {
+      padding: 0 24px 24px;
+      max-height: 500px;
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+    }
+
+    /* 14. Footer */
+    .footer {
+      background: var(--bg-white);
+      border-top: 1px solid var(--border);
+      padding: 64px 0 32px;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 48px;
+      margin-bottom: 48px;
+    }
+
+    .footer-logo {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .footer-desc {
+      color: var(--text-gray);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .footer-heading {
+      font-weight: 600;
+      margin-bottom: 16px;
+      font-size: 15px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .footer-links a {
+      color: var(--text-gray);
+      font-size: 14px;
+    }
+
+    .footer-links a:hover {
+      color: var(--primary);
+    }
+
+    .footer-bottom {
+      border-top: 1px solid var(--border);
+      padding-top: 32px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-light);
+      font-size: 14px;
+    }
+
+    /* Responsive */
+    @media (max-width: 992px) {
+      .hero-title { font-size: 48px; }
+      .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .footer-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .hero-title { font-size: 40px; }
+      .hero-bullets { flex-direction: column; align-items: center; gap: 16px; }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .inclusion-list { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      .footer-grid { grid-template-columns: 1fr; }
+      .footer-bottom { flex-direction: column; gap: 16px; text-align: center; }
+      .feature-grid, .security-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. Sticky Top Bar -->
+  <div class="promo-banner">
+    LIMITED-TIME OFFER: Get 1,000 AI-discovered leads free with your trial. <a href="#">Claim offer</a>
+  </div>
+  <header class="header">
+    <div class="container">
+      <div class="logo">Nx<span>elio</span> Nurture</div>
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <a href="#" class="btn btn-primary">Start your 7-day trial</a>
+    </div>
+  </header>
+
+  <!-- 2. Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <h1 class="hero-title">Turn Every Lead Into Revenue Automatically.</h1>
+        <p class="hero-subtitle">The average sales team spends 70% of their time on manual outreach. Nxelio Nurture closes that gap by automating your entire B2B growth with AI.</p>
+        
+        <ul class="hero-bullets">
+          <li><span class="check-icon">✓</span> Find high-intent leads instantly</li>
+          <li><span class="check-icon">✓</span> Auto-send personalized sequences</li>
+          <li><span class="check-icon">✓</span> Unified smart inbox for hot leads</li>
+        </ul>
+
+        <div class="hero-actions">
+          <a href="#" class="btn btn-primary" style="padding: 18px 40px; font-size: 18px;">Start your 7-day free trial</a>
+          <span class="reassurance">No credit card required · Cancel anytime</span>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="mockup-header">
+          <div class="mockup-dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+          </div>
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-gray); margin-left: 12px;">Nxelio AI Agent Workspace</div>
+        </div>
+        <div class="chat-bubble">
+          Found 150 new verified B2B leads in the 'SaaS Founders' segment. Should I initiate the intro sequence?
+        </div>
+        <div class="chat-bubble ai">
+          Yes, personalize the first line based on their recent company news and send.
+        </div>
+        <div class="chat-bubble">
+          Done! 150 emails scheduled. 3 hot replies already landed in your Smart Inbox.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. Trust Badges (Moved up for social proof early) -->
+  <section class="trust-badges">
+    <div class="container">
+      <div class="badges-flex">
+        <span>TechCrunch</span>
+        <span>Forbes</span>
+        <span>Product Hunt</span>
+        <span>G2 High Performer</span>
+        <span>SaaS Weekly</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. What's Included -->
+  <section class="section inclusions" id="features">
+    <div class="container text-center">
+      <div class="section-header">
+        <h2 class="section-title">Everything you need to scale.</h2>
+        <p class="section-subtitle">Replace 5 different sales tools with one intelligent platform.</p>
+      </div>
+      
+      <div class="inclusion-list">
+        <div class="inclusion-item">
+          <div class="inclusion-icon">🎯</div>
+          <div class="inclusion-text">AI Lead Discovery (1k+ leads/mo)</div>
+        </div>
+        <div class="inclusion-item">
+          <div class="inclusion-icon">✉️</div>
+          <div class="inclusion-text">Multi-channel Outreach Sequences</div>
+        </div>
+        <div class="inclusion-item">
+          <div class="inclusion-icon">📥</div>
+          <div class="inclusion-text">Smart Unified Inbox for Replies</div>
+        </div>
+        <div class="inclusion-item">
+          <div class="inclusion-icon">📊</div>
+          <div class="inclusion-text">Visual Pipeline & Deal Manager</div>
+        </div>
+        <div class="inclusion-item">
+          <div class="inclusion-icon">🤖</div>
+          <div class="inclusion-text">Autonomous AI Sales Agents</div>
+        </div>
+        <div class="inclusion-item">
+          <div class="inclusion-icon">📈</div>
+          <div class="inclusion-text">Advanced Campaign Analytics</div>
+        </div>
+      </div>
+      
+      <a href="#" class="btn btn-primary">Get started for free</a>
+    </div>
+  </section>
+
+  <!-- 5. Problem -> Solution -->
+  <section class="section problem-solution">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Manual outreach problems → Solved.</h2>
+        <p class="section-subtitle">How Nxelio Nurture eliminates the friction in B2B sales.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="ps-card">
+          <div class="problem">Manually searching for leads</div>
+          <div class="solution">AI finds 1,000s of verified B2B contacts instantly.</div>
+        </div>
+        <div class="ps-card">
+          <div class="problem">Writer's block on cold emails</div>
+          <div class="solution">AI drafts personalized, high-converting copy automatically.</div>
+        </div>
+        <div class="ps-card">
+          <div class="problem">Leads falling through the cracks</div>
+          <div class="solution">Smart inbox categorizes and tracks every hot reply.</div>
+        </div>
+        <div class="ps-card">
+          <div class="problem">Juggling 5 different sales tools</div>
+          <div class="solution">All-in-one platform replaces your entire fragmented stack.</div>
+        </div>
+        <div class="ps-card">
+          <div class="problem">Following up is tedious</div>
+          <div class="solution">Autonomous AI agents handle follow-ups until they book.</div>
+        </div>
+        <div class="ps-card">
+          <div class="problem">Guessing what works</div>
+          <div class="solution">Real-time analytics show exactly which campaigns convert.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. AI Assistant -->
+  <section class="section assistant">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Meet your new top performer.</h2>
+        <p class="section-subtitle">Nxelio AI Assistant works 24/7 to fill your calendar.</p>
+      </div>
+      
+      <div class="feature-grid max-w-800 mx-auto" style="max-width: 900px; margin: 0 auto;">
+        <div class="feature-card">
+          <h4>Smart Lead Enrichment</h4>
+          <p>AI automatically pulls in company news, recent funding, and tech stack details to hyper-personalize outreach.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Omni-channel Execution</h4>
+          <p>The assistant orchestrates touchpoints across Email, LinkedIn, and WhatsApp without you lifting a finger.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Objection Handling</h4>
+          <p>When a prospect replies with a common objection, the AI suggests the perfect response instantly.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Voice & Chat Interface</h4>
+          <p>Just tell your assistant "Find me 50 e-commerce CMOs and invite them to our webinar" and watch it happen.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. Meet the product modules -->
+  <section class="section modules">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Powerful modules. One platform.</h2>
+      </div>
+      
+      <div class="grid grid-3">
+        <div class="module-card">
+          <h4>Lead Management</h4>
+          <p>Import leads via CSV or use our public capture forms. Manage your entire prospect database with powerful filtering.</p>
+          <div class="tags">
+            <span class="tag">CSV Import</span>
+            <span class="tag">Filtering</span>
+            <span class="tag">CRM Sync</span>
+          </div>
+        </div>
+        <div class="module-card">
+          <h4>Email Campaigns</h4>
+          <p>Build multi-step outreach sequences with AI-written, personalized email copy that guarantees higher open rates.</p>
+          <div class="tags">
+            <span class="tag">Sequences</span>
+            <span class="tag">AI Copy</span>
+            <span class="tag">A/B Testing</span>
+          </div>
+        </div>
+        <div class="module-card">
+          <h4>Smart Inbox & Opportunities</h4>
+          <p>All replies land in a unified inbox. Spot hot leads instantly and track every deal through your visual pipeline.</p>
+          <div class="tags">
+            <span class="tag">Unified Inbox</span>
+            <span class="tag">Kanban Pipeline</span>
+            <span class="tag">Deal Tracking</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Testimonials Carousel -->
+  <section class="section testimonials">
+    <div class="container text-center">
+      <h2 class="section-title mb-12">Loved by fast-growing teams.</h2>
+      
+      <div class="carousel-container">
+        <div class="testimonial-slide active">
+          <div class="quote-mark">"</div>
+          <p class="quote-text">Nxelio Nurture replaced our entire SDR team's tech stack. We're booking 3x more demos while spending 60% less on software.</p>
+          <div class="author-name">Sarah Jenkins</div>
+          <div class="author-title">VP of Sales, TechFlow</div>
+        </div>
+        
+        <div class="testimonial-slide">
+          <div class="quote-mark">"</div>
+          <p class="quote-text">The AI lead discovery is insane. It found highly qualified targets we never even considered. Closed $45k in new ARR month one.</p>
+          <div class="author-name">Marcus Reed</div>
+          <div class="author-title">Founder, GrowthSync</div>
+        </div>
+        
+        <div class="testimonial-slide">
+          <div class="quote-mark">"</div>
+          <p class="quote-text">Finally, a unified inbox that actually works. We no longer lose track of hot leads across different email accounts and LinkedIn.</p>
+          <div class="author-name">Elena Rodriguez</div>
+          <div class="author-title">Head of RevOps, ScaleB2B</div>
+        </div>
+
+        <div class="carousel-controls">
+          <button class="dot-btn active" onclick="setSlide(0)"></button>
+          <button class="dot-btn" onclick="setSlide(1)"></button>
+          <button class="dot-btn" onclick="setSlide(2)"></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Incentive Banner -->
+  <section class="incentive">
+    <div class="container">
+      <h3>Special Bonus: Get 500 extra AI credits on your first month.</h3>
+      <a href="#" class="btn btn-secondary">Claim Bonus & Start Trial</a>
+      <p style="font-size: 12px; margin-top: 16px; opacity: 0.8;">New accounts only. Terms apply.</p>
+    </div>
+  </section>
+
+  <!-- 11. Security -->
+  <section class="section security">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Enterprise-grade peace of mind.</h2>
+        <p class="section-subtitle">Your data and your reputation are fully protected.</p>
+      </div>
+      
+      <div class="security-grid">
+        <div class="security-badge">
+          <h4>GDPR Compliant</h4>
+          <p>Built with privacy by design</p>
+        </div>
+        <div class="security-badge">
+          <h4>SOC 2 Type II</h4>
+          <p>Audited and certified secure</p>
+        </div>
+        <div class="security-badge">
+          <h4>256-bit Encryption</h4>
+          <p>Bank-level data protection</p>
+        </div>
+        <div class="security-badge">
+          <h4>99.99% Uptime</h4>
+          <p>Reliability you can count on</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 13. FAQ -->
+  <section class="section" id="faq">
+    <div class="container faq">
+      <h2 class="section-title text-center mb-12">Frequently Asked Questions</h2>
+      
+      <div class="faq-item active">
+        <button class="faq-question">What is Nxelio Nurture?</button>
+        <div class="faq-answer">Nxelio Nurture is our all-in-one AI growth suite that gives you autonomous AI sales agents, smart campaign builders, and seamless pipeline management to scale your business.</div>
+      </div>
+      
+      <div class="faq-item">
+        <button class="faq-question">How does the 7-day free trial work?</button>
+        <div class="faq-answer">You get full access to Nxelio Nurture for 7 days without commitment. Discover leads, launch personalized outreach sequences, and test AI agents risk-free. No credit card required.</div>
+      </div>
+      
+      <div class="faq-item">
+        <button class="faq-question">Can I bring my own existing leads?</button>
+        <div class="faq-answer">Yes! You can easily import your existing leads via CSV, sync with your CRM, or use our built-in AI lead finder to discover new high-intent prospects.</div>
+      </div>
+      
+      <div class="faq-item">
+        <button class="faq-question">Do I need technical skills to set this up?</button>
+        <div class="faq-answer">No technical experience is required. Our intuitive visual interface and pre-built templates mean you can launch your first AI-driven campaign in under 5 minutes.</div>
+      </div>
+      
+      <div class="faq-item">
+        <button class="faq-question">Are there sending limits for emails?</button>
+        <div class="faq-answer">We include built-in inbox rotation and smart sending limits to protect your domain reputation. The specific limits depend on your pricing tier, starting at 1,000 emails/day on our base plan.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12. Final CTA -->
+  <section class="section final-cta">
+    <div class="container">
+      <h2>Join over 2,500 businesses using Nxelio Nurture</h2>
+      <a href="#" class="btn btn-primary" style="padding: 20px 48px; font-size: 20px;">Start your 14-day free trial</a>
+      <p class="mt-4" style="margin-top: 16px; color: var(--text-gray);">Setup takes 5 minutes. Cancel anytime.</p>
+    </div>
+  </section>
+
+  <!-- 14. Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-logo">Nx<span>elio</span> Nurture</div>
+          <p class="footer-desc">The AI-powered growth platform that replaces your entire outbound sales stack.</p>
+        </div>
+        
+        <div>
+          <h4 class="footer-heading">Product</h4>
+          <div class="footer-links">
+            <a href="#">Features</a>
+            <a href="#">Pricing</a>
+            <a href="#">Security</a>
+            <a href="#">Changelog</a>
+          </div>
+        </div>
+        
+        <div>
+          <h4 class="footer-heading">Resources</h4>
+          <div class="footer-links">
+            <a href="#">Blog</a>
+            <a href="#">Help Center</a>
+            <a href="#">Cold Email Guide</a>
+            <a href="#">API Docs</a>
+          </div>
+        </div>
+        
+        <div>
+          <h4 class="footer-heading">Company</h4>
+          <div class="footer-links">
+            <a href="#">About Us</a>
+            <a href="#">Careers</a>
+            <a href="#">Contact</a>
+            <a href="#">Partners</a>
+          </div>
+        </div>
+      </div>
+      
+      <div class="footer-bottom">
+        <p>&copy; 2026 Nxelio Inc. All rights reserved.</p>
+        <div style="display: flex; gap: 24px;">
+          <a href="#">Terms of Service</a>
+          <a href="#">Privacy Policy</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Interactivity Scripts -->
+  <script>
+    // FAQ Accordion
+    const faqItems = document.querySelectorAll('.faq-item');
+    faqItems.forEach(item => {
+      const question = item.querySelector('.faq-question');
+      question.addEventListener('click', () => {
+        const isActive = item.classList.contains('active');
+        // Close all
+        faqItems.forEach(faq => faq.classList.remove('active'));
+        // Open clicked if it wasn't active
+        if (!isActive) {
+          item.classList.add('active');
+        }
+      });
+    });
+
+    // Carousel
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.testimonial-slide');
+    const dots = document.querySelectorAll('.dot-btn');
+    
+    function setSlide(index) {
+      slides.forEach(s => s.classList.remove('active'));
+      dots.forEach(d => d.classList.remove('active'));
+      
+      slides[index].classList.add('active');
+      dots[index].classList.add('active');
+      currentSlide = index;
+    }
+
+    // Auto-advance carousel
+    setInterval(() => {
+      let nextSlide = (currentSlide + 1) % slides.length;
+      setSlide(nextSlide);
+    }, 5000);
+  </script>
+</body>
+</html>

@@ -5,7 +5,8 @@ import { Eye, EyeOff, AlertCircle, Mail } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
-import { sendVerificationCode, sendLoginOtp } from "@/lib/queries/email-verification";
+import { sendVerificationCode, sendLoginOtp, isDeviceTrusted } from "@/lib/queries/email-verification";
+import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { AuthSplitCard, FIELD_LABEL, UNDERLINE_INPUT, UNDERLINE_INPUT_STYLE, authInputFocus, authInputBlur, RadioToggle, AuthButtonRow } from "@/components/auth/auth-split-card";
 import { friendlyAuthError } from "@/lib/auth/auth-error";
 
@@ -43,7 +44,7 @@ function LoginForm() {
     if (!valid) return;
     setError(null); setLoading(true);
     const supabase = createClient();
-    const { error: loginError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
 
     if (loginError) {
       // Unconfirmed account — send a fresh code and hand off to the verify screen
@@ -66,7 +67,21 @@ function LoginForm() {
       return;
     }
 
-    // Every email+password login requires a 6-digit verification code.
+    // Signing in from a device that already verified a code (at signup or a
+    // prior login) skips the OTP step entirely — only a new/unrecognized
+    // device gets asked to verify.
+    const trusted = data.user ? await isDeviceTrusted(data.user.id) : false;
+    if (trusted) {
+      try {
+        const status = await getOnboardingStatus();
+        window.location.href = status.completed ? "/dashboard" : "/onboarding";
+      } catch (err) {
+        setError(err instanceof Error ? `Signed in, but couldn't finish loading your account: ${err.message}` : "Signed in, but something went wrong loading your account.");
+        setLoading(false);
+      }
+      return;
+    }
+
     await sendLoginOtp(form.email);
     router.push(`/verify-login?email=${encodeURIComponent(form.email)}`);
     setLoading(false);

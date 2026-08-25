@@ -24,7 +24,9 @@ function getSR(): SRConstructor | null {
 }
 
 function pickFemaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  // Microsoft Neural "Online (Natural)" voices — best quality and most natural
+  // Best case: a Microsoft Neural "(Natural)" voice — only present if the OS/browser
+  // has cloud neural voices available (Edge ships these by default; Chrome only has
+  // them if the user downloaded "Natural voices" via Windows Settings > Speech).
   const priority = [
     "Microsoft Sonia Online (Natural) - English (United Kingdom)",
     "Microsoft Libby Online (Natural) - English (United Kingdom)",
@@ -37,26 +39,32 @@ function pickFemaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice |
     const v = voices.find((x) => x.name === name);
     if (v) return v;
   }
-  const msNatural = voices.find(
-    (v) => v.name.includes("Online (Natural)") && v.lang.startsWith("en") &&
-      /aria|jenny|sonia|libby|emily|clara|hazel/i.test(v.name)
-  );
-  if (msNatural) return msNatural;
+  // Any neural "(Natural)" voice at all, regardless of exact name/region
+  const anyNatural = voices.find((v) => /\(Natural\)/i.test(v.name) && v.lang.startsWith("en"));
+  if (anyNatural) return anyNatural;
+  // Legacy Windows SAPI voices (no neural ones installed) — Zira is the
+  // clearest-sounding of the classic bundled set, prefer it over Hazel/Susan.
   return (
+    voices.find((v) => v.name.includes("Zira")) ??
     voices.find((v) => /female|woman/i.test(v.name) && v.lang.startsWith("en")) ??
-    voices.find((v) => v.lang.startsWith("en-GB")) ??
+    voices.find((v) => v.name.includes("Hazel") || v.name.includes("Susan")) ??
     voices.find((v) => v.lang.startsWith("en")) ??
     null
   );
 }
 
 function isNeuralVoice(voice: SpeechSynthesisVoice | null): boolean {
-  return Boolean(voice?.name.includes("Online (Natural)") || voice?.name.startsWith("Google"));
+  return Boolean(voice && (/\(Natural\)/i.test(voice.name) || voice.name.startsWith("Google")));
 }
 
 function formatTimer(secs: number) {
   return `${Math.floor(secs / 60).toString().padStart(2, "0")}:${(secs % 60).toString().padStart(2, "0")}`;
 }
+
+// Mic errors that mean "the browser will never let us use the mic this
+// session" — retrying is pointless and previously caused a silent infinite
+// retry loop that looked exactly like a stuck call (no reply, ever).
+const FATAL_MIC_ERRORS = new Set(["not-allowed", "service-not-allowed", "audio-capture"]);
 
 export function AiAssistantWidget() {
   const [open, setOpen]               = useState(false);
@@ -67,6 +75,7 @@ export function AiAssistantWidget() {
   const [speaking, setSpeaking]       = useState(false);
   const [thinking, setThinking]       = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [micError, setMicError]       = useState<string | null>(null);
 
   const chatRef          = useRef<LandingChatMessage[]>([]);
   const recognitionRef   = useRef<SpeechRecognitionLike | null>(null);
@@ -81,6 +90,7 @@ export function AiAssistantWidget() {
   const speakingRef      = useRef(false);
   // Always-current handleUserSpeech — startMic calls this ref so it never goes stale
   const handleUserSpeechRef = useRef<(text: string) => void>(() => {});
+  const micFailCount     = useRef(0);
 
   // Load voices — may fire immediately or after onvoiceschanged
   useEffect(() => {
@@ -109,7 +119,14 @@ export function AiAssistantWidget() {
     setListening(false);
     speakingRef.current = false; setSpeaking(false);
     setThinking(false);
+    setMicError(null);
   }, [clearTtsTimers]);
+
+  const retryMic = useCallback(() => {
+    micFailCount.current = 0;
+    setMicError(null);
+    startMic();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const endCall = useCallback(() => {
     callActiveRef.current = false;
@@ -140,11 +157,16 @@ export function AiAssistantWidget() {
     const utter = new SpeechSynthesisUtterance(text);
     if (voiceRef.current) utter.voice = voiceRef.current;
 
-    // Natural tone settings:
-    // We keep the rate and pitch at 1.0 to ensure the voice engine's 
-    // default natural inflection is preserved, preventing robotic artifacts.
-    utter.rate = 1.0;
-    utter.pitch = 1.0;
+    // Neural voices already have natural inflection baked in — leave them at
+    // engine defaults. Legacy SAPI voices (Zira, Hazel, etc.) sound smoother
+    // at a touch slower than default, which reads less clipped/robotic.
+    if (isNeuralVoice(voiceRef.current)) {
+      utter.rate = 1.0;
+      utter.pitch = 1.0;
+    } else {
+      utter.rate = 0.95;
+      utter.pitch = 1.0;
+    }
 
     speakingRef.current = true; setSpeaking(true);
 
@@ -181,7 +203,7 @@ export function AiAssistantWidget() {
   const startMic = useCallback(() => {
     if (!callActiveRef.current) return;
     const SR = getSR();
-    if (!SR) return;
+    if (!SR) { setMicError("Voice isn't supported in this browser. Try Chrome or Edge."); return; }
 
     micRestartLock.current = false;
     const r = new SR();
@@ -193,16 +215,33 @@ export function AiAssistantWidget() {
 
     r.onresult = (e) => {
       gotResult = true;
+      micFailCount.current = 0;
       const transcript = e.results[0]?.[0]?.transcript?.trim();
       if (transcript && callActiveRef.current) handleUserSpeechRef.current(transcript);
     };
 
     r.onerror = (e) => {
       setListening(false);
-      if (!gotResult && callActiveRef.current && e.error !== "aborted" && !micRestartLock.current) {
-        micRestartLock.current = true;
-        setTimeout(() => { if (callActiveRef.current) startMic(); }, 700);
+      if (!callActiveRef.current || gotResult) return;
+
+      if (FATAL_MIC_ERRORS.has(e.error)) {
+        setMicError(
+          e.error === "audio-capture"
+            ? "No microphone was found. Please connect one and try again."
+            : "Microphone access is blocked. Please allow microphone permission in your browser's site settings, then try again."
+        );
+        return; // stop retrying — the browser will just deny it again
       }
+
+      if (e.error === "aborted" || micRestartLock.current) return;
+
+      micFailCount.current += 1;
+      if (micFailCount.current >= 5) {
+        setMicError("We're having trouble hearing you. Please check your microphone and try again.");
+        return;
+      }
+      micRestartLock.current = true;
+      setTimeout(() => { if (callActiveRef.current) startMic(); }, 700);
     };
 
     r.onend = () => {
@@ -216,9 +255,15 @@ export function AiAssistantWidget() {
     recognitionRef.current = r;
     try {
       r.start();
+      setMicError(null);
       setListening(true); // only set after start() succeeds
     } catch {
-      // start() failed (permission denied, double-start, etc.) — retry
+      // Synchronous start() failure (e.g. double-start) — safe to retry a few times
+      micFailCount.current += 1;
+      if (micFailCount.current >= 5) {
+        setMicError("Something went wrong starting the microphone. Please try again.");
+        return;
+      }
       if (callActiveRef.current) setTimeout(() => startMic(), 1_000);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -270,9 +315,11 @@ export function AiAssistantWidget() {
   function startCall() {
     callActiveRef.current = true;
     callSecsRef.current = 0;
+    micFailCount.current = 0;
     chatRef.current = [];
     setCallActive(true);
     setCallSecs(0);
+    setMicError(null);
 
     timerRef.current = setInterval(() => {
       callSecsRef.current += 1;
@@ -293,6 +340,7 @@ export function AiAssistantWidget() {
   const GRADIENT = "linear-gradient(135deg,#18A7B8,#5B21B6)";
 
   function statusLabel() {
+    if (micError)  return "Mic unavailable";
     if (thinking)  return "Thinking…";
     if (speaking)  return "Speaking…";
     if (listening) return "Listening… speak now";
@@ -360,10 +408,26 @@ export function AiAssistantWidget() {
                   <p className="text-sm font-mono text-slate-500">{formatTimer(callSecs)}</p>
                   <p className="text-xs text-slate-400">{statusLabel()}</p>
 
-                  <button onClick={endCall}
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-full text-white text-sm font-semibold bg-red-500 hover:bg-red-600 transition-colors shadow">
-                    <PhoneOff className="h-4 w-4" /> End Call
-                  </button>
+                  {micError && (
+                    <div className="w-full rounded-lg px-3 py-2 text-xs text-center"
+                      style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
+                      {micError}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    {micError && (
+                      <button onClick={retryMic}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full text-white text-sm font-semibold transition-colors shadow"
+                        style={{ background: PURPLE }}>
+                        Try Again
+                      </button>
+                    )}
+                    <button onClick={endCall}
+                      className="flex items-center gap-2 px-6 py-2.5 rounded-full text-white text-sm font-semibold bg-red-500 hover:bg-red-600 transition-colors shadow">
+                      <PhoneOff className="h-4 w-4" /> End Call
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>

@@ -1,1653 +1,979 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  ArrowRight, Check, Star, ChevronDown, Sparkles, Zap,
-  Mail, BarChart3, Users, Inbox, Target, Globe,
-  Menu, X, MessageSquare, TrendingUp, CheckCircle,
-  Play, Layers, Megaphone, PieChart, Rss, Lock, CheckCircle2,
+  Check, ChevronDown, Zap, Mail, BarChart3, Users,
+  Inbox, Target, Bot, Play, X, CheckCircle2, Plus, Mic, ArrowUp,
+  ArrowRight, Paperclip, Sparkles, Search, Send, Database,
+  Cpu, Globe, Building2, ShieldCheck, Layers, Flame,
+  Briefcase, Radio, MessageSquare, TrendingUp, Filter, CheckCheck
 } from "lucide-react";
 import { BookDemoModal } from "./book-demo-modal";
 import { AiAssistantWidget } from "./ai-assistant-widget";
-import { LogoMark } from "@/components/brand/logo";
+import type { LandingChatMessage } from "@/lib/ai/landing-chat";
 
-// ─── Infographic colour palette ───────────────────────────────────────────────
-// Primary teal + 7 vivid accent hues — no dark backgrounds anywhere
-const P = {
-  teal:    { bg:"#E0F7FA", border:"#B2EBF2", icon:"#18A7B8", text:"#006064" },
-  coral:   { bg:"#FFF0EE", border:"#FFCDD2", icon:"#F4511E", text:"#BF360C" },
-  violet:  { bg:"#EDE7F6", border:"#D1C4E9", icon:"#7E57C2", text:"#4527A0" },
-  amber:   { bg:"#FFF8E1", border:"#FFECB3", icon:"#FF9800", text:"#E65100" },
-  blue:    { bg:"#E3F2FD", border:"#BBDEFB", icon:"#2196F3", text:"#0D47A1" },
-  green:   { bg:"#E8F5E9", border:"#C8E6C9", icon:"#43A047", text:"#1B5E20" },
-  pink:    { bg:"#FCE4EC", border:"#F8BBD0", icon:"#E91E63", text:"#880E4F" },
-  orange:  { bg:"#FFF3E0", border:"#FFE0B2", icon:"#FF6F00", text:"#BF360C" },
-};
+export interface LandingPageNotice { kind: "signed_up" | "verified"; email?: string; }
 
-// ─── Real features only ───────────────────────────────────────────────────────
-const FEATURES = [
-  {
-    icon: Users,
-    title: "Lead Management",
-    desc: "Import leads via CSV or public capture form. View, filter, and manage your full prospect database in one place.",
-    pal: P.teal,
-    href: "/leads",
-  },
-  {
-    icon: Mail,
-    title: "Email Campaigns",
-    desc: "Build and send outreach sequences to your leads with AI-written, personalised email copy.",
-    pal: P.blue,
-    href: "/campaigns",
-  },
-  {
-    icon: Inbox,
-    title: "Smart Inbox",
-    desc: "All email replies land in a unified inbox. Quickly spot hot leads and follow up from one view.",
-    pal: P.violet,
-    href: "/inbox",
-  },
-  {
-    icon: Target,
-    title: "Opportunities",
-    desc: "Track every deal through your pipeline — from first contact to closed won. Full kanban board.",
-    pal: P.amber,
-    href: "/opportunities",
-  },
-  {
-    icon: Layers,
-    title: "Segments",
-    desc: "Group your leads into smart segments with AND/OR filter logic. Target the right people every time.",
-    pal: P.coral,
-    href: "/segments",
-  },
-  {
-    icon: Rss,
-    title: "Newsletters",
-    desc: "Design and send beautiful newsletters to your contact lists. Track opens and clicks in real time.",
-    pal: P.pink,
-    href: "/newsletters",
-  },
-  {
-    icon: BarChart3,
-    title: "Analytics",
-    desc: "Campaign performance charts, open/click/reply rates, and lead engagement metrics at a glance.",
-    pal: P.green,
-    href: "/analytics",
-  },
-  {
-    icon: Globe,
-    title: "Capture Forms",
-    desc: "Publish a branded capture form and collect new leads directly into your workspace automatically.",
-    pal: P.orange,
-    href: "/capture-form",
-  },
-];
-
-// ─── Steps ────────────────────────────────────────────────────────────────────
-const STEPS = [
-  { n:"1", icon: Users,      title:"Import or Capture Leads",  desc:"Upload a CSV or share your public capture form link. New leads flow straight into your workspace.",         pal: P.teal   },
-  { n:"2", icon: Mail,       title:"Run Email Campaigns",       desc:"Build a sequence, approve AI-drafted copy, and send personalised emails to your entire segment.",           pal: P.blue   },
-  { n:"3", icon: Inbox,      title:"Manage Replies in Inbox",   desc:"All replies come to your Smart Inbox. Flag hot leads, reply, and keep every conversation in context.",     pal: P.violet },
-  { n:"4", icon: TrendingUp, title:"Track Deals & Revenue",     desc:"Move qualified leads into Opportunities, advance them through your pipeline, and close revenue.",          pal: P.amber  },
-];
-
-// ─── Pricing ──────────────────────────────────────────────────────────────────
-const PLANS = [
-  {
-    name:"Basic",    price:"14.99", credits:200,  leads:0,    trial:"7-day free trial",
-    color:"#18A7B8", bg:"#E0F7FA", border:"#B2EBF2", popular:false,
-    features:["Bring your own leads (CSV import)","AI lead enrichment","AI lead scoring","Email outreach","LinkedIn outreach","Reply tracking","Meetings & calendar sync","Core workflows","Standard support","7-day free trial on monthly billing — card required, no charge until day 7"],
-  },
-  {
-    name:"Starter",  price:"149.99", credits:700,  leads:1000, trial:null,
-    color:"#7E57C2", bg:"#EDE7F6", border:"#7E57C2", popular:true,
-    features:["Everything in Basic","1,000 AI-discovered leads / month","Automated lead discovery","700 AI credits / month"],
-  },
-  {
-    name:"Pro",      price:"299.99", credits:1500, leads:2000, trial:null,
-    color:"#F4511E", bg:"#FFF0EE", border:"#FFCDD2", popular:false,
-    features:["Everything in Starter","2,000 AI-discovered leads / month","1,500 AI credits / month","Priority support"],
-  },
-];
-
-// ─── Testimonials ─────────────────────────────────────────────────────────────
-const TESTIMONIALS = [
-  { quote:"Nxelio Nurture turned our outbound from a grind into a machine. Pipeline is up 3× in 90 days — the inbox alone saves my team hours every week.",        name:"Sarah Chen",       role:"Head of Sales",    co:"TechVenture", init:"SC", color:"#18A7B8" },
-  { quote:"The capture form + campaigns combo is unbeatable. We published a form, ran a sequence, and had 40 replies in the first week. Zero tech setup.",  name:"Marcus Rodriguez", role:"Founder & CEO",   co:"GrowthLabs",  init:"MR", color:"#7E57C2" },
-  { quote:"The Opportunities pipeline gives my team full visibility. We know exactly where every deal is and what to do next. Closed 18 deals last month.", name:"Priya Sharma",     role:"Revenue Director", co:"Enterprise.io", init:"PS", color:"#43A047" },
-  { quote:"Segments + Newsletters changed our nurture game. We send the right message to the right people every time — open rates doubled.",               name:"Alex Kim",         role:"Marketing Lead",   co:"ScaleStack",  init:"AK", color:"#FF9800" },
-];
-
-// ─── FAQs ─────────────────────────────────────────────────────────────────────
-const FAQS = [
-  { q:"What is Nxelio Nurture?",                       a:"Nxelio Nurture is a B2B revenue platform. It lets you import leads, run email campaigns, manage replies in a unified inbox, track deals through an opportunities pipeline, segment your contacts, send newsletters, and view analytics — all from one workspace.", pal: P.teal   },
-  { q:"What's the difference between Basic, Starter, and Pro?",
-    a:"Basic ($14.99/mo) gives you the full outreach toolkit — AI enrichment, scoring, email + LinkedIn outreach, reply tracking, and meetings — for leads you bring in yourself (CSV import). Starter ($149.99/mo) adds automated lead discovery, so Nxelio Nurture finds new leads for you (1,000/month), plus a bigger AI-credit allowance (300/month). Pro ($299.99/mo) raises discovery to 2,000/month and AI credits to 1,000/month, and adds priority support. Every plan includes the same core feature set — higher tiers mainly unlock automated discovery and more monthly volume.", pal: P.violet },
-  { q:"How do AI credits work?",               a:"Each AI action (generating email copy, scoring a lead, enriching a contact) uses credits. Basic gives 200/month, Starter 300/month, Pro 1,000/month. Unused monthly credits reset at renewal — they don't roll over.", pal: P.blue   },
-  { q:"What's the difference between lead discovery and enrichment/scoring?",
-    a:"Discovery is Nxelio Nurture finding brand-new leads for you automatically (Starter and Pro only — Basic brings your own via CSV). Enrichment and scoring work on leads you already have, regardless of how they got there — enrichment fills in company/contact details, scoring ranks how promising a lead is. Enrichment and scoring are included on every plan, including Basic.", pal: P.coral  },
-  { q:"What is reply tracking?",               a:"Reply tracking shows you opens, clicks, and replies on every email you send, right in your Smart Inbox — so you always know who's engaging before you follow up. It's included on every plan.", pal: P.green  },
-  { q:"How do promo codes and coupons work?",  a:"Enter a code at checkout or when upgrading your plan. Depending on the code, it can apply a percentage or fixed-amount discount to your subscription price, grant bonus AI credits, grant bonus leads, or some combination — we'll show you exactly what a code does before you confirm. Each code can only be redeemed once per account, and every redemption is recorded in your billing history.", pal: P.pink },
-  { q:"Does Basic include a free trial?",      a:"Yes — Basic on monthly billing includes a 7-day free trial with 200 AI credits. A card is required to start the trial, but you won't be charged until day 7, and you can cancel anytime before then at no cost. Annual billing doesn't include a trial. You get full access to leads, campaigns, inbox, and capture forms during the trial.", pal: P.orange },
-  { q:"How does annual billing work?",         a:"Switching to annual billing gets you 20% off every plan, billed once a year instead of monthly. All the same features and monthly credit/lead allowances apply — the discount is purely on price.", pal: P.teal   },
-  { q:"What happens when I upgrade my plan?", a:"Upgrades take effect immediately and are prorated — you're only charged the difference for the rest of your current billing period, and your new credits/leads allowance is available right away. Moving to a lower plan isn't available self-serve — contact support if you need to change to a lower plan.", pal: P.violet },
-  { q:"What support level do I get?",          a:"Basic and Starter include standard support. Pro includes priority support with faster response times.", pal: P.blue },
-  { q:"How does the capture form work?",       a:"Go to Capture Form in settings, customise your form fields and branding, then publish. You get a public link (nxelio.ai/capture/your-slug) to share. Every submission lands directly in your Leads list.", pal: P.amber  },
-  { q:"Can I import my existing contacts?",    a:"Yes. Upload any CSV from Settings or Leads. Nxelio Nurture maps your columns automatically and imports every contact into your workspace instantly.", pal: P.coral  },
-  { q:"Is my data secure?",                    a:"Yes. Nxelio Nurture is built on Supabase with row-level security and workspace isolation. Your contacts, campaigns, and analytics are never shared across workspaces.", pal: P.green  },
-  { q:"Can I cancel anytime?",                 a:"Yes. Cancel from your billing dashboard at any time — no cancellation fees. Your subscription stays fully active until the end of your current billing period, then won't renew.", pal: P.pink   },
-];
-
-// ─── Brand logos for marquee ───────────────────────────────────────────────────
-const BRANDS = [
-  "Acme Corp","TechVenture","GrowthLabs","ScaleStack",
-  "Nexus AI","Orion SaaS","Apex Revenue","Prismatic",
-  "Quantum CRM","Velocity GTM","PipeFlow","Outbound OS",
-  "Acme Corp","TechVenture","GrowthLabs","ScaleStack",
-  "Nexus AI","Orion SaaS","Apex Revenue","Prismatic",
-];
-
-// Brand colours for marquee dots
-const BRAND_COLS = ["#18A7B8","#7E57C2","#F4511E","#FF9800","#2196F3","#43A047","#E91E63","#FF6F00"];
-
-// ─── Typewriter hook ──────────────────────────────────────────────────────────
-const WORDS = ["Revenue.", "More Deals.", "Real Pipeline.", "B2B Growth."];
-
-function useTypewriter() {
-  const [idx, setIdx]           = useState(0);
-  const [text, setText]         = useState("");
-  const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    const target = WORDS[idx];
-    const speed  = deleting ? 45 : 85;
-    const id = setTimeout(() => {
-      if (!deleting) {
-        if (text.length < target.length) setText(target.slice(0, text.length + 1));
-        else setTimeout(() => setDeleting(true), 2000);
-      } else {
-        if (text.length > 0) setText(text.slice(0, -1));
-        else { setDeleting(false); setIdx((i) => (i + 1) % WORDS.length); }
-      }
-    }, speed);
-    return () => clearTimeout(id);
-  }, [text, deleting, idx]);
-
-  return text;
-}
-
-// ─── Scroll-reveal ────────────────────────────────────────────────────────────
-function useReveal() {
-  useEffect(() => {
-    const els = document.querySelectorAll<HTMLElement>(".nxl-reveal,.nxl-reveal-left,.nxl-reveal-right,.nxl-reveal-scale");
-    const io  = new IntersectionObserver(
-      (entries) => entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add("nxl-revealed"); }),
-      { threshold: 0.1 },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
-}
-
-// ─── Counter hook ─────────────────────────────────────────────────────────────
-function useCounter(end: number, active: boolean) {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    const start = performance.now();
-    const dur   = 1500;
-    const tick  = (now: number) => {
-      const t = Math.min((now - start) / dur, 1);
-      setVal(Math.round((1 - Math.pow(1 - t, 3)) * end));
-      if (t < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [active, end]);
-  return val;
-}
-
-// ─── NAVBAR ───────────────────────────────────────────────────────────────────
-function Navbar({ scrolled, mobileOpen, toggle, onBookDemo }: { scrolled: boolean; mobileOpen: boolean; toggle: () => void; onBookDemo: () => void }) {
-  return (
-    <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${
-      scrolled ? "bg-white/95 backdrop-blur-lg shadow-sm border-b border-slate-100" : "bg-transparent"
-    }`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-sm"
-            style={scrolled ? { boxShadow:"0 4px 12px rgba(24,167,184,.3)" } : { border:"1.5px solid rgba(255,255,255,.35)" }}>
-            <LogoMark className="h-full w-full" />
-          </div>
-          <span className={`font-bold text-lg tracking-tight transition-colors duration-300 ${scrolled ? "text-slate-900" : "text-white"}`}>
-            Nx<span style={{ color: scrolled ? "#18A7B8" : "rgba(255,255,255,.9)" }}>elio</span>
-          </span>
-        </div>
-
-        {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-0.5">
-          {[
-            { label:"Features",    href:"#features" },
-            { label:"How it works",href:"#how"      },
-            { label:"Pricing",     href:"#pricing"  },
-            { label:"Help",        href:"/help"     },
-          ].map((l) => (
-            <Link key={l.label} href={l.href}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                scrolled
-                  ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  : "text-white/85 hover:text-white hover:bg-white/15"
-              }`}>
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="hidden lg:flex items-center gap-2">
-          <Link href="/login"
-            className={`px-4 py-2 text-sm font-semibold transition-colors ${
-              scrolled ? "text-slate-600 hover:text-slate-900" : "text-white/85 hover:text-white"
-            }`}>
-            Sign In
-          </Link>
-          <button type="button" onClick={onBookDemo}
-            className="px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all hover:scale-[1.03] hover:shadow-xl"
-            style={scrolled
-              ? { background:"linear-gradient(135deg,#18A7B8,#7E57C2)", color:"white", boxShadow:"0 4px 16px rgba(24,167,184,.3)" }
-              : { background:"white", color:"#18A7B8", boxShadow:"0 4px 20px rgba(0,0,0,.18)" }}>
-            Book Demo <ArrowRight className="h-3.5 w-3.5"/>
-          </button>
-        </div>
-
-        <button type="button" onClick={toggle}
-          className={`lg:hidden p-2 rounded-lg transition-colors ${scrolled ? "text-slate-600 hover:bg-slate-100" : "text-white hover:bg-white/15"}`}>
-          {mobileOpen ? <X className="h-5 w-5"/> : <Menu className="h-5 w-5"/>}
-        </button>
-      </div>
-
-      {mobileOpen && (
-        <div className="lg:hidden bg-white border-t border-slate-100 px-4 py-4 space-y-1">
-          {[
-            { label:"Features",   href:"#features" },
-            { label:"How it works",href:"#how"     },
-            { label:"Pricing",    href:"#pricing"  },
-            { label:"Help",       href:"/help"     },
-          ].map((l) => (
-            <Link key={l.label} href={l.href} onClick={toggle}
-              className="block px-3 py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-lg">
-              {l.label}
-            </Link>
-          ))}
-          <div className="pt-3 flex flex-col gap-2 border-t border-slate-100 mt-3">
-            <Link href="/login" className="block px-3 py-2.5 text-sm font-semibold text-center border border-slate-200 rounded-xl text-slate-700">Sign In</Link>
-            <button type="button" onClick={() => { toggle(); onBookDemo(); }} className="block w-full px-3 py-2.5 text-sm font-bold text-center text-white rounded-xl"
-              style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)" }}>Book Demo</button>
-          </div>
-        </div>
-      )}
-    </header>
-  );
-}
-
-// ─── HERO ─────────────────────────────────────────────────────────────────────
-function Hero({ onBookDemo }: { onBookDemo: () => void }) {
-  const word = useTypewriter();
-  return (
-    <section className="relative overflow-hidden pt-24 pb-16" style={{ background:"#18A7B8" }}>
-      {/* Subtle wave pattern overlay */}
-      <div className="absolute inset-0 pointer-events-none opacity-10" style={{
-        backgroundImage:"radial-gradient(circle at 15% 50%, white 0%, transparent 50%), radial-gradient(circle at 85% 20%, white 0%, transparent 40%)",
-      }}/>
-      {/* Bottom wave */}
-      <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none" style={{
-        background:"linear-gradient(to bottom, transparent, rgba(255,255,255,0.08))",
-      }}/>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-8 nxl-section-in"
-          style={{ background:"rgba(255,255,255,0.15)", borderColor:"rgba(255,255,255,0.3)" }}>
-          <Sparkles className="h-3.5 w-3.5 text-white"/>
-          <span className="text-xs font-bold text-white">B2B Revenue Platform — Everything in one workspace</span>
-        </div>
-
-        {/* Headline */}
-        <h1 className="text-5xl sm:text-6xl lg:text-8xl font-black tracking-tight leading-[1.04] text-white max-w-4xl mx-auto nxl-section-in" style={{ animationDelay:"0.1s" }}>
-          Turn Every Lead Into
-        </h1>
-        <h1 className="text-5xl sm:text-6xl lg:text-8xl font-black tracking-tight leading-[1.04] max-w-4xl mx-auto mt-1 mb-7 min-h-[1.15em] nxl-section-in" style={{ animationDelay:"0.15s", color:"rgba(255,255,255,0.9)" }}>
-          {word}
-          <span className="nxl-cursor" style={{ color:"white", marginLeft:"4px" }}>|</span>
-        </h1>
-
-        <p className="text-lg sm:text-xl max-w-2xl mx-auto font-medium leading-relaxed mb-10 nxl-section-in" style={{ animationDelay:"0.25s", color:"rgba(255,255,255,0.85)" }}>
-          Nxelio Nurture puts your entire outreach workflow in one place — leads, campaigns,
-          inbox, pipeline, segments, newsletters, and analytics.
-        </p>
-
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12 nxl-section-in" style={{ animationDelay:"0.35s" }}>
-          <button type="button" onClick={onBookDemo}
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-base transition-all hover:scale-[1.03] hover:shadow-2xl"
-            style={{ background:"white", color:"#18A7B8", boxShadow:"0 8px 32px rgba(0,0,0,0.18)" }}>
-            Book Demo <ArrowRight className="h-4 w-4"/>
-          </button>
-          <Link href="/login"
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white border transition-all hover:bg-white/10"
-            style={{ borderColor:"rgba(255,255,255,0.4)" }}>
-            <Play className="h-4 w-4"/> Sign In
-          </Link>
-        </div>
-
-        {/* Trust row */}
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm nxl-section-in mb-14" style={{ animationDelay:"0.45s", color:"rgba(255,255,255,0.8)" }}>
-          <div className="flex items-center gap-1">
-            {[...Array(5)].map((_,i)=><Star key={i} className="h-4 w-4 fill-amber-300 text-amber-300"/>)}
-            <span className="ml-1 font-semibold text-white">4.9 / 5</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <CheckCircle className="h-4 w-4 text-white"/>
-            <span className="font-semibold text-white">2,400+ revenue teams</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Lock className="h-4 w-4" style={{ color:"rgba(255,255,255,0.7)" }}/>
-            <span>SOC 2-ready · Workspace-isolated data</span>
-          </div>
-        </div>
-
-        {/* Feature pill grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto nxl-section-in" style={{ animationDelay:"0.55s" }}>
-          {FEATURES.slice(0,8).map((f,i) => {
-            const Icon = f.icon;
-            return (
-              <div key={f.title}
-                className="flex items-center gap-2.5 px-4 py-3 rounded-xl font-medium text-sm hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200"
-                style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(255,255,255,0.25)", color:"white", backdropFilter:"blur(4px)" }}>
-                <div className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background:"rgba(255,255,255,0.2)" }}>
-                  <Icon className="h-4 w-4 text-white"/>
-                </div>
-                <span>{f.title}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── BRANDS MARQUEE ───────────────────────────────────────────────────────────
-function BrandsSection() {
-  return (
-    <section className="py-14 overflow-hidden border-t border-b border-slate-100 bg-slate-50">
-      <p className="text-center text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 mb-8">
-        Trusted by innovative revenue teams worldwide
-      </p>
-      <div className="relative">
-        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-slate-50 to-transparent z-10 pointer-events-none"/>
-        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-slate-50 to-transparent z-10 pointer-events-none"/>
-        <div className="flex overflow-hidden">
-          <div className="flex gap-6 nxl-marquee flex-shrink-0">
-            {BRANDS.map((name, i) => (
-              <div key={`${name}-${i}`} className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-slate-200 shadow-sm flex-shrink-0 hover:shadow-md transition-shadow">
-                <div className="h-4 w-4 rounded" style={{ background: BRAND_COLS[i % BRAND_COLS.length] + "33", border:`1px solid ${BRAND_COLS[i % BRAND_COLS.length]}44` }}>
-                  <div className="h-full w-full rounded" style={{ background: BRAND_COLS[i % BRAND_COLS.length], opacity:0.6 }}/>
-                </div>
-                <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">{name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── STATS ────────────────────────────────────────────────────────────────────
-const STAT_DATA = [
-  { end:2400, suffix:"+", label:"Teams worldwide",   color:"#18A7B8" },
-  { end:48,   suffix:"M+",label:"Revenue tracked",   color:"#7E57C2" },
-  { end:94,   suffix:"%", label:"Lead score accuracy",color:"#43A047" },
-  { end:7,    suffix:"×", label:"Avg pipeline growth",color:"#FF9800" },
-];
-
-function StatNum({ s, active }: { s: typeof STAT_DATA[0]; active: boolean }) {
-  const v = useCounter(s.end, active);
-  return (
-    <div className="text-center p-6 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow nxl-reveal">
-      <p className="text-5xl font-black mb-1" style={{ color:s.color }}>
-        {v.toLocaleString()}{s.suffix}
-      </p>
-      <p className="text-sm font-semibold text-slate-500">{s.label}</p>
-    </div>
-  );
-}
-
-function StatsSection() {
-  const ref    = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current; if (!el) return;
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setActive(true); io.disconnect(); } }, { threshold: 0.4 });
-    io.observe(el); return () => io.disconnect();
-  }, []);
-
-  return (
-    <section ref={ref} className="py-20 bg-white">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {STAT_DATA.map((s) => <StatNum key={s.label} s={s} active={active}/>)}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── FEATURES ─────────────────────────────────────────────────────────────────
-function FeaturesSection() {
-  return (
-    <section id="features" className="py-28 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-6"
-            style={{ background:"#E0F7FA", borderColor:"#B2EBF2" }}>
-            <Zap className="h-3.5 w-3.5" style={{ color:"#18A7B8" }}/>
-            <span className="text-xs font-bold" style={{ color:"#006064" }}>Everything you need in one workspace</span>
-          </div>
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 max-w-3xl mx-auto leading-tight">
-            8 powerful tools,{" "}
-            <span className="nxl-text-shimmer">zero switching</span>
-          </h2>
-          <p className="mt-5 text-lg text-slate-500 font-medium max-w-xl mx-auto">
-            Every feature your team needs to find leads, run outreach, and close deals — built into a single platform.
-          </p>
-        </div>
-
-        {/* Feature cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {FEATURES.map((f, i) => {
-            const Icon = f.icon;
-            return (
-              <div key={f.title}
-                className={`group relative bg-white rounded-2xl overflow-hidden p-6 hover:-translate-y-2 transition-all duration-300 nxl-reveal-scale nxl-d${i + 1}`}
-                style={{
-                  border: `1.5px solid ${f.pal.border}`,
-                  boxShadow: `0 2px 8px ${f.pal.icon}18`,
-                  transitionTimingFunction: "cubic-bezier(.34,1.56,.64,1)",
-                }}>
-
-                {/* Top colour bar */}
-                <div className="absolute top-0 left-0 right-0 h-1 transition-all duration-300 group-hover:h-1.5"
-                  style={{ background: `linear-gradient(90deg, ${f.pal.icon}, ${f.pal.icon}99)` }}/>
-
-                {/* Vivid gradient icon block */}
-                <div
-                  className="h-14 w-14 rounded-2xl flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300"
-                  style={{ background: `linear-gradient(135deg, ${f.pal.icon}, ${f.pal.icon}cc)` }}>
-                  <Icon className="h-7 w-7 text-white" strokeWidth={1.8}/>
-                </div>
-
-                <h3 className="text-base font-bold mb-2" style={{ color: f.pal.text }}>{f.title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
-
-                {/* Hover: radial glow wash */}
-                <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                  style={{ background: `radial-gradient(ellipse at 20% 20%, ${f.pal.icon}12 0%, transparent 65%)` }}/>
-
-                {/* Hover shadow ring */}
-                <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-all duration-300"
-                  style={{ boxShadow: `0 16px 40px ${f.pal.icon}30` }}/>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── CRM DEMO VIDEOS ──────────────────────────────────────────────────────────
-const CRM_DEMOS = [
-  {
-    title:   "Lead Management",
-    desc:    "Import a CSV, search, filter, and score your prospect database in seconds.",
-    dur:     "1:42",
-    pal:     P.teal,
-    icon:    Users,
-    // Thumbnail mockup: table rows
-    thumb: () => (
-      <div className="w-full h-full flex flex-col p-4 gap-2">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-5 w-5 rounded" style={{ background:"#18A7B8" }}/>
-          <div className="h-2.5 w-20 rounded-full bg-white/60"/>
-          <div className="ml-auto h-6 w-16 rounded-lg" style={{ background:"rgba(255,255,255,.25)" }}/>
-        </div>
-        {[90,70,80,65,75].map((w,i) => (
-          <div key={i} className="flex items-center gap-2 py-1.5 rounded-lg px-2" style={{ background:i===0?"rgba(255,255,255,.18)":"transparent" }}>
-            <div className="h-6 w-6 rounded-full flex-shrink-0" style={{ background:`rgba(255,255,255,${0.15+i*0.04})` }}/>
-            <div className="flex-1 flex gap-2">
-              <div className="h-2 rounded-full" style={{ width:`${w}%`, background:"rgba(255,255,255,.5)" }}/>
-              <div className="h-2 w-12 rounded-full" style={{ background:"rgba(255,255,255,.25)" }}/>
-            </div>
-            <div className="h-4 w-10 rounded-full text-[8px] font-bold flex items-center justify-center" style={{ background:"rgba(255,255,255,.25)", color:"white" }}>Hot</div>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title:   "Email Campaigns",
-    desc:    "Build a multi-step sequence, approve AI copy, and launch to a segment.",
-    dur:     "2:05",
-    pal:     P.blue,
-    icon:    Mail,
-    thumb: () => (
-      <div className="w-full h-full flex flex-col p-4 gap-3">
-        <div className="flex items-center gap-2">
-          <div className="h-5 w-5 rounded" style={{ background:"#2196F3" }}/>
-          <div className="h-2.5 w-24 rounded-full bg-white/60"/>
-        </div>
-        {/* Timeline steps */}
-        <div className="flex-1 flex gap-2 items-stretch">
-          <div className="flex flex-col items-center gap-0">
-            {[1,2,3].map((n) => (
-              <div key={n} className="flex flex-col items-center">
-                <div className="h-7 w-7 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background:"rgba(255,255,255,.35)" }}>{n}</div>
-                {n<3 && <div className="w-0.5 h-5" style={{ background:"rgba(255,255,255,.2)" }}/>}
-              </div>
-            ))}
-          </div>
-          <div className="flex-1 flex flex-col gap-2">
-            {["Welcome email","Follow-up #1","Closing offer"].map((s,i) => (
-              <div key={s} className="flex-1 rounded-lg px-3 flex items-center" style={{ background:"rgba(255,255,255,.15)" }}>
-                <div className="flex flex-col gap-1">
-                  <div className="h-2 rounded-full" style={{ width:`${70-i*10}%`, background:"rgba(255,255,255,.7)" }}/>
-                  <div className="h-1.5 w-12 rounded-full" style={{ background:"rgba(255,255,255,.35)" }}/>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white" style={{ background:"rgba(255,255,255,.3)" }}>Launch Campaign →</div>
-      </div>
-    ),
-  },
-  {
-    title:   "Smart Inbox",
-    desc:    "See every reply in one place, flag hot leads, and reply without leaving Nxelio Nurture.",
-    dur:     "1:18",
-    pal:     P.violet,
-    icon:    Inbox,
-    thumb: () => (
-      <div className="w-full h-full flex p-3 gap-3">
-        {/* Thread list */}
-        <div className="w-2/5 flex flex-col gap-1.5">
-          {[
-            { init:"SC", dot:"#FF6B6B", read:false },
-            { init:"MR", dot:"#18A7B8", read:true  },
-            { init:"AK", dot:"#FFD93D", read:false },
-            { init:"PS", dot:"#6BCB77", read:true  },
-          ].map((t,i) => (
-            <div key={i} className="flex items-center gap-2 p-2 rounded-lg" style={{ background:i===0?"rgba(255,255,255,.22)":"rgba(255,255,255,.08)" }}>
-              <div className="h-7 w-7 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0" style={{ background:"rgba(255,255,255,.3)" }}>{t.init}</div>
-              <div className="flex-1 min-w-0">
-                <div className="h-2 rounded-full mb-1" style={{ width:"70%", background:"rgba(255,255,255,.7)" }}/>
-                <div className="h-1.5 rounded-full" style={{ width:"50%", background:"rgba(255,255,255,.3)" }}/>
-              </div>
-              {!t.read && <div className="h-2 w-2 rounded-full flex-shrink-0" style={{ background:t.dot }}/>}
-            </div>
-          ))}
-        </div>
-        {/* Email view */}
-        <div className="flex-1 rounded-xl p-3 flex flex-col gap-2" style={{ background:"rgba(255,255,255,.12)" }}>
-          <div className="h-2.5 w-20 rounded-full" style={{ background:"rgba(255,255,255,.7)" }}/>
-          <div className="h-1.5 w-32 rounded-full" style={{ background:"rgba(255,255,255,.35)" }}/>
-          <div className="flex-1 flex flex-col gap-1.5 mt-1">
-            {[90,75,60,80].map((w,i)=>(
-              <div key={i} className="h-1.5 rounded-full" style={{ width:`${w}%`, background:"rgba(255,255,255,.25)" }}/>
-            ))}
-          </div>
-          <div className="h-7 rounded-lg mt-auto" style={{ background:"rgba(255,255,255,.25)" }}/>
-        </div>
-      </div>
-    ),
-  },
-  {
-    title:   "Opportunities Pipeline",
-    desc:    "Drag deals across kanban columns and track every stage to closed won.",
-    dur:     "1:55",
-    pal:     P.amber,
-    icon:    Target,
-    thumb: () => (
-      <div className="w-full h-full flex flex-col p-4 gap-3">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-5 w-5 rounded" style={{ background:"#FF9800" }}/>
-          <div className="h-2.5 w-28 rounded-full bg-white/60"/>
-        </div>
-        <div className="flex-1 grid grid-cols-3 gap-2">
-          {[
-            { label:"Prospecting", cards:[75,55] },
-            { label:"Qualified",   cards:[80,60,45] },
-            { label:"Closed Won",  cards:[70] },
-          ].map((col) => (
-            <div key={col.label} className="flex flex-col gap-2">
-              <div className="h-1.5 rounded-full" style={{ width:"70%", background:"rgba(255,255,255,.5)" }}/>
-              {col.cards.map((w,i) => (
-                <div key={i} className="rounded-lg p-2 flex flex-col gap-1" style={{ background:"rgba(255,255,255,.18)" }}>
-                  <div className="h-1.5 rounded-full" style={{ width:`${w}%`, background:"rgba(255,255,255,.7)" }}/>
-                  <div className="h-1 w-10 rounded-full" style={{ background:"rgba(255,255,255,.35)" }}/>
-                  <div className="h-3 w-12 rounded-full text-[7px] font-bold flex items-center justify-center mt-1" style={{ background:"rgba(255,255,255,.3)", color:"white" }}>$12k</div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
-  },
-  {
-    title:   "Newsletters",
-    desc:    "Design a branded newsletter and send it to your entire contact list in minutes.",
-    dur:     "1:30",
-    pal:     P.pink,
-    icon:    Rss,
-    thumb: () => (
-      <div className="w-full h-full flex flex-col p-4 gap-2.5">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-5 w-5 rounded" style={{ background:"#E91E63" }}/>
-          <div className="h-2.5 w-20 rounded-full bg-white/60"/>
-        </div>
-        {/* Email preview */}
-        <div className="flex-1 rounded-xl p-3 flex flex-col gap-2" style={{ background:"rgba(255,255,255,.15)" }}>
-          <div className="h-10 rounded-lg" style={{ background:"rgba(255,255,255,.3)" }}/>
-          <div className="h-2 rounded-full w-3/4 mx-auto" style={{ background:"rgba(255,255,255,.6)" }}/>
-          <div className="h-1.5 rounded-full w-1/2 mx-auto" style={{ background:"rgba(255,255,255,.35)" }}/>
-          <div className="flex gap-2 mt-1">
-            {[0,1].map(i=>(
-              <div key={i} className="flex-1 rounded-lg p-2" style={{ background:"rgba(255,255,255,.18)" }}>
-                <div className="h-8 rounded mb-1" style={{ background:"rgba(255,255,255,.25)" }}/>
-                <div className="h-1.5 rounded-full w-full" style={{ background:"rgba(255,255,255,.4)" }}/>
-                <div className="h-1.5 rounded-full w-3/4 mt-1" style={{ background:"rgba(255,255,255,.25)" }}/>
-              </div>
-            ))}
-          </div>
-          <div className="h-6 rounded-lg mx-auto w-24" style={{ background:"rgba(255,255,255,.35)" }}/>
-        </div>
-        <div className="h-6 rounded-lg flex items-center justify-center text-[9px] font-bold text-white" style={{ background:"rgba(255,255,255,.3)" }}>Send to 1,200 subscribers</div>
-      </div>
-    ),
-  },
-  {
-    title:   "Analytics Dashboard",
-    desc:    "Track open rates, reply rates, and pipeline performance across all campaigns.",
-    dur:     "1:48",
-    pal:     P.green,
-    icon:    BarChart3,
-    thumb: () => (
-      <div className="w-full h-full flex flex-col p-4 gap-3">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-5 w-5 rounded" style={{ background:"#43A047" }}/>
-          <div className="h-2.5 w-20 rounded-full bg-white/60"/>
-        </div>
-        {/* Mini stat row */}
-        <div className="grid grid-cols-3 gap-2">
-          {[["48%","Open rate"],["12%","Reply rate"],["$92k","Revenue"]].map(([n,l]) => (
-            <div key={l} className="rounded-lg p-2 text-center" style={{ background:"rgba(255,255,255,.18)" }}>
-              <div className="text-sm font-black text-white">{n}</div>
-              <div className="text-[8px] text-white/60">{l}</div>
-            </div>
-          ))}
-        </div>
-        {/* Bar chart */}
-        <div className="flex-1 flex items-end gap-1.5">
-          {[55,80,40,95,65,70,85,50].map((h,i) => (
-            <div key={i} className="flex-1 rounded-t-lg" style={{ height:`${h}%`, background:`rgba(255,255,255,${0.2+i*0.04})` }}/>
-          ))}
-        </div>
-        <div className="flex gap-1.5">
-          {["Mon","Tue","Wed","Thu","Fri","Sat","Sun","Mon"].map((d,i)=>(
-            <div key={i} className="flex-1 text-center text-[7px] text-white/40">{d.slice(0,2)}</div>
-          ))}
-        </div>
-      </div>
-    ),
-  },
-];
-
-function CRMDemos() {
-  const [active, setActive] = useState<number | null>(null);
-
-  return (
-    <>
-      <section className="py-28 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center mb-14 nxl-reveal">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-6"
-              style={{ background:"#FCE4EC", borderColor:"#F8BBD0" }}>
-              <Play className="h-3.5 w-3.5" style={{ color:"#E91E63" }}/>
-              <span className="text-xs font-bold" style={{ color:"#880E4F" }}>Feature walkthroughs</span>
-            </div>
-            <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 leading-tight max-w-2xl mx-auto">
-              Watch every feature{" "}
-              <span className="nxl-text-shimmer">in 2 minutes</span>
-            </h2>
-            <p className="mt-5 text-lg text-slate-500 font-medium max-w-xl mx-auto">
-              Short, focused demos for each part of the platform — no fluff, just the workflow.
-            </p>
-          </div>
-
-          {/* Video grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {CRM_DEMOS.map((demo, i) => {
-              const Icon = demo.icon;
-              const Thumb = demo.thumb;
-              return (
-                <div
-                  key={demo.title}
-                  onClick={() => setActive(i)}
-                  className={`group relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-2 nxl-reveal nxl-d${(i % 6) + 1}`}
-                  style={{
-                    boxShadow: `0 4px 20px ${demo.pal.icon}22`,
-                    border: `1.5px solid ${demo.pal.border}`,
-                  }}
-                >
-                  {/* Thumbnail */}
-                  <div
-                    className="relative h-48 overflow-hidden"
-                    style={{ background: `linear-gradient(135deg, ${demo.pal.icon}, ${demo.pal.icon}bb)` }}
-                  >
-                    <Thumb />
-
-                    {/* Play overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center transition-all duration-300"
-                      style={{ background: "rgba(0,0,0,0)" }}>
-                      <div
-                        className="flex items-center justify-center rounded-full shadow-xl transition-all duration-300 opacity-85 group-hover:opacity-100 group-hover:scale-110"
-                        style={{ height:"52px", width:"52px", background:"white", boxShadow:`0 4px 20px rgba(0,0,0,.25)` }}>
-                        <div className="flex items-center justify-center rounded-full"
-                          style={{ height:"38px", width:"38px", background:`linear-gradient(135deg, ${demo.pal.icon}, ${demo.pal.icon}cc)` }}>
-                          <Play className="h-4 w-4 text-white" style={{ marginLeft:"2px" }}/>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Duration badge */}
-                    <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded-md text-[10px] font-bold text-white"
-                      style={{ background: "rgba(0,0,0,.45)", backdropFilter:"blur(4px)" }}>
-                      {demo.dur}
-                    </div>
-                  </div>
-
-                  {/* Card body */}
-                  <div className="bg-white p-5">
-                    <div className="flex items-center gap-2.5 mb-2">
-                      <div className="h-8 w-8 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0"
-                        style={{ background: demo.pal.bg }}>
-                        <Icon className="h-4 w-4" style={{ color: demo.pal.icon }}/>
-                      </div>
-                      <h3 className="text-sm font-bold" style={{ color: demo.pal.text }}>{demo.title}</h3>
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed">{demo.desc}</p>
-                    <div className="mt-4 flex items-center gap-1 text-xs font-bold transition-colors"
-                      style={{ color: demo.pal.icon }}>
-                      Watch demo <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1"/>
-                    </div>
-                  </div>
-
-                  {/* Hover border glow */}
-                  <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{ boxShadow: `inset 0 0 0 2px ${demo.pal.icon}` }}/>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Modal */}
-      {active !== null && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8"
-          style={{ background: "rgba(10,15,25,.85)", backdropFilter: "blur(8px)" }}
-          onClick={() => setActive(null)}
-        >
-          <div
-            className="relative w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#0D1627" }}
-          >
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: "rgba(255,255,255,.08)" }}>
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="h-7 w-7 rounded-lg flex items-center justify-center"
-                  style={{ background: `linear-gradient(135deg, ${CRM_DEMOS[active].pal.icon}, ${CRM_DEMOS[active].pal.icon}99)` }}>
-                  {(() => { const Icon = CRM_DEMOS[active].icon; return <Icon className="h-4 w-4 text-white"/>; })()}
-                </div>
-                <span className="text-sm font-bold text-white">{CRM_DEMOS[active].title} — Demo</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold text-white/70"
-                  style={{ background:"rgba(255,255,255,.08)" }}>
-                  {CRM_DEMOS[active].dur}
-                </div>
-                <button type="button" onClick={() => setActive(null)}
-                  className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors">
-                  <X className="h-4 w-4 text-white/70"/>
-                </button>
-              </div>
-            </div>
-
-            {/* Video area */}
-            <div className="relative" style={{ paddingBottom: "56.25%" }}>
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4"
-                style={{ background: `linear-gradient(135deg, ${CRM_DEMOS[active].pal.icon}33, #0D1627)` }}>
-                <div
-                  className="flex items-center justify-center rounded-full shadow-2xl"
-                  style={{ height:"72px", width:"72px", background:`linear-gradient(135deg,${CRM_DEMOS[active].pal.icon},${CRM_DEMOS[active].pal.icon}aa)`, boxShadow:`0 8px 40px ${CRM_DEMOS[active].pal.icon}60` }}>
-                  <Play className="h-7 w-7 text-white" style={{ marginLeft:"3px" }}/>
-                </div>
-                <p className="text-white/60 text-sm font-medium">
-                  Add your {CRM_DEMOS[active].title} demo video URL here
-                </p>
-                <p className="text-white/30 text-xs">Swap placeholder div for a YouTube / Loom iframe</p>
-              </div>
-              {/*
-                Replace div above with a real embed, e.g.:
-                <iframe
-                  className="absolute inset-0 w-full h-full"
-                  src="https://www.youtube.com/embed/YOUR_VIDEO_ID?autoplay=1"
-                  allow="autoplay; fullscreen"
-                  allowFullScreen
-                />
-              */}
-            </div>
-
-            {/* Nav: prev / next */}
-            <div className="flex items-center justify-between px-5 py-3 border-t" style={{ borderColor:"rgba(255,255,255,.08)" }}>
-              <button type="button"
-                onClick={() => setActive((p) => (p! - 1 + CRM_DEMOS.length) % CRM_DEMOS.length)}
-                className="flex items-center gap-1.5 text-xs font-bold text-white/50 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/08">
-                ← Previous
-              </button>
-              <div className="flex items-center gap-1.5">
-                {CRM_DEMOS.map((_, i) => (
-                  <button key={i} type="button" onClick={() => setActive(i)}
-                    className="h-1.5 rounded-full transition-all duration-300"
-                    style={{ width: active === i ? "20px" : "6px", background: active === i ? CRM_DEMOS[active].pal.icon : "rgba(255,255,255,.2)" }}/>
-                ))}
-              </div>
-              <button type="button"
-                onClick={() => setActive((p) => (p! + 1) % CRM_DEMOS.length)}
-                className="flex items-center gap-1.5 text-xs font-bold text-white/50 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/08">
-                Next →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-// ─── HOW IT WORKS ─────────────────────────────────────────────────────────────
-function HowItWorks() {
-  return (
-    <section id="how" className="py-28 bg-white">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-6"
-            style={{ background:"#EDE7F6", borderColor:"#D1C4E9" }}>
-            <MessageSquare className="h-3.5 w-3.5" style={{ color:"#7E57C2" }}/>
-            <span className="text-xs font-bold" style={{ color:"#4527A0" }}>Get started in minutes</span>
-          </div>
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 leading-tight">
-            From zero to{" "}
-            <span className="nxl-text-shimmer">closed deals</span>
-            {" "}in 4 steps
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {STEPS.map((s, i) => {
-            const Icon = s.icon;
-            return (
-              <div key={s.n} className={`relative nxl-reveal-scale nxl-d${i + 1}`}>
-                {/* Arrow connector between cards */}
-                {i < STEPS.length - 1 && (
-                  <div className="hidden lg:flex absolute top-12 left-full z-10 items-center -translate-x-1/2">
-                    <div className="h-0.5 w-5" style={{ background:`linear-gradient(to right,${s.pal.icon},${STEPS[i+1].pal.icon})` }}/>
-                    <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink:0 }}>
-                      <path d="M1 1L7 5L1 9" stroke={STEPS[i+1].pal.icon} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                )}
-
-                <div className="rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 h-full"
-                  style={{ border:`1.5px solid ${s.pal.border}` }}>
-
-                  {/* Vivid gradient top */}
-                  <div className="relative px-6 pt-6 pb-5 flex items-start justify-between"
-                    style={{ background:`linear-gradient(135deg, ${s.pal.icon}, ${s.pal.icon}cc)` }}>
-
-                    {/* Big step number watermark */}
-                    <span className="absolute right-4 top-2 text-7xl font-black leading-none select-none pointer-events-none"
-                      style={{ color:"rgba(255,255,255,.15)", lineHeight:1 }}>{s.n}</span>
-
-                    {/* Icon */}
-                    <div className="h-14 w-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                      style={{ background:"rgba(255,255,255,.22)", backdropFilter:"blur(4px)" }}>
-                      <Icon className="h-7 w-7 text-white" strokeWidth={1.8}/>
-                    </div>
-
-                    {/* Step badge */}
-                    <span className="mt-1 text-xs font-bold px-2.5 py-1 rounded-full text-white"
-                      style={{ background:"rgba(255,255,255,.25)" }}>
-                      Step {s.n}
-                    </span>
-                  </div>
-
-                  {/* White body */}
-                  <div className="bg-white px-6 py-5">
-                    <h3 className="text-base font-bold mb-2" style={{ color: s.pal.text }}>{s.title}</h3>
-                    <p className="text-sm text-slate-500 leading-relaxed">{s.desc}</p>
-
-                    {/* Bottom colour bar */}
-                    <div className="mt-5 h-1 rounded-full"
-                      style={{ background:`linear-gradient(to right,${s.pal.icon},${s.pal.icon}44)` }}/>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── PRICING ──────────────────────────────────────────────────────────────────
-function Pricing() {
-  const [annual, setAnnual] = useState(false);
-
-  return (
-    <section id="pricing" className="py-28 bg-slate-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-6"
-            style={{ background:"#FFF8E1", borderColor:"#FFECB3" }}>
-            <Sparkles className="h-3 w-3" style={{ color:"#FF9800" }}/>
-            <span className="text-xs font-bold" style={{ color:"#E65100" }}>Simple, honest pricing</span>
-          </div>
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 leading-tight max-w-2xl mx-auto">
-            Pick your plan,{" "}
-            <span className="nxl-text-shimmer">grow revenue</span>
-          </h2>
-
-          {/* Toggle */}
-          <div className="flex items-center justify-center gap-3 mt-8">
-            <span className={`text-sm font-semibold ${!annual?"text-slate-900":"text-slate-400"}`}>Monthly</span>
-            <button type="button" onClick={() => setAnnual((v)=>!v)}
-              className="relative rounded-full transition-colors duration-300 flex-shrink-0"
-              style={{ height:"28px", width:"52px", background:annual?"#18A7B8":"#e2e8f0" }}>
-              <span className="absolute top-[3px] rounded-full bg-white shadow-md transition-all duration-300"
-                style={{ height:"22px", width:"22px", left: annual ? "27px" : "3px" }}/>
-            </button>
-            <span className={`text-sm font-semibold ${annual?"text-slate-900":"text-slate-400"}`}>Annual</span>
-            {annual && (
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full"
-                style={{ background:"#E8F5E9", color:"#1B5E20" }}>Save 20%</span>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-          {PLANS.map((plan) => {
-            const price = annual
-              ? (Number(plan.price) * 0.8).toFixed(2)
-              : plan.price;
-
-            return (
-              <div key={plan.name}
-                className={`relative bg-white rounded-3xl border flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl overflow-hidden ${plan.popular ? "scale-[1.03] shadow-xl" : "shadow-sm border-slate-200"}`}
-                style={{ borderColor:plan.popular ? plan.color : undefined, borderWidth:plan.popular ? "2px" : undefined }}>
-
-                {plan.popular && (
-                  <div className="w-full py-2 text-center text-xs font-bold text-white tracking-wide"
-                    style={{ background:"linear-gradient(135deg,#FF9800,#F4511E)" }}>
-                    ⚡ Most Popular
-                  </div>
-                )}
-
-                <div className="p-7 flex flex-col flex-1">
-                {/* Header */}
-                <div className="mb-6">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4"
-                    style={{ background:plan.bg, color:plan.color }}>
-                    {plan.name}
-                  </div>
-                  <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-5xl font-black text-slate-900">${price}</span>
-                    <span className="text-sm text-slate-400">/mo</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color:plan.color }}>
-                    <Zap className="h-3 w-3"/> {plan.credits.toLocaleString()} AI credits / month
-                  </div>
-                  {plan.leads > 0 && (
-                    <div className="flex items-center gap-1.5 text-xs font-semibold mt-1" style={{ color:plan.color }}>
-                      <Target className="h-3 w-3"/> {plan.leads.toLocaleString()} AI-discovered leads / month
-                    </div>
-                  )}
-                  {plan.trial && !annual && (
-                    <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-                      style={{ background:plan.bg, color:plan.color }}>
-                      <CheckCircle className="h-3 w-3"/> {plan.trial}
-                    </div>
-                  )}
-                </div>
-
-                {/* Features */}
-                <ul className="space-y-2.5 flex-1 mb-7">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2.5 text-sm">
-                      <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color:plan.color }}/>
-                      <span className="text-slate-600">{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Link href="/signup"
-                  className="block w-full text-center px-5 py-3.5 rounded-2xl font-bold text-sm transition-all hover:scale-[1.02]"
-                  style={plan.popular
-                    ? { background:`linear-gradient(135deg,${plan.color},#F4511E)`, color:"white", boxShadow:`0 8px 24px ${plan.color}40` }
-                    : { background:plan.bg, color:plan.color, border:`1.5px solid ${plan.border}` }}>
-                  {plan.trial ? "Start Free Trial →" : "Get Started →"}
-                </Link>
-                </div>{/* end inner p-7 wrapper */}
-              </div>
-            );
-          })}
-        </div>
-        <p className="text-center text-sm text-slate-400 mt-6">
-          Manage promo codes and billing anytime from your billing dashboard.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-// ─── TESTIMONIALS ─────────────────────────────────────────────────────────────
-function Testimonials() {
-  return (
-    <section id="testimonials" className="py-28 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-14">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-6"
-            style={{ background:"#FCE4EC", borderColor:"#F8BBD0" }}>
-            <Star className="h-3 w-3 fill-current" style={{ color:"#E91E63" }}/>
-            <span className="text-xs font-bold" style={{ color:"#880E4F" }}>Customer stories</span>
-          </div>
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 leading-tight max-w-2xl mx-auto">
-            Teams that{" "}<span className="nxl-text-shimmer">love Nxelio Nurture</span>
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {TESTIMONIALS.map((t) => (
-            <div key={t.name}
-              className="bg-white rounded-2xl border border-slate-100 p-7 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 nxl-reveal">
-              {/* Stars */}
-              <div className="flex gap-0.5 mb-4">
-                {[...Array(5)].map((_,i)=><Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400"/>)}
-              </div>
-              <p className="text-slate-600 text-base leading-relaxed italic mb-6">&quot;{t.quote}&quot;</p>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                  style={{ background:t.color }}>
-                  {t.init}
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-900">{t.name}</p>
-                  <p className="text-xs text-slate-400">{t.role} · {t.co}</p>
-                </div>
-              </div>
-              {/* Bottom colour accent */}
-              <div className="mt-5 h-1 rounded-full" style={{ background:`linear-gradient(to right, ${t.color}40, ${t.color}10)` }}/>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── FAQ ──────────────────────────────────────────────────────────────────────
-function FAQ() {
-  const [open, setOpen] = useState<number|null>(null);
-  return (
-    <section className="py-28 bg-slate-50">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-14">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-6"
-            style={{ background:"#E0F7FA", borderColor:"#B2EBF2" }}>
-            <MessageSquare className="h-3.5 w-3.5" style={{ color:"#18A7B8" }}/>
-            <span className="text-xs font-bold" style={{ color:"#006064" }}>Got questions?</span>
-          </div>
-          <h2 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900">
-            Frequently asked{" "}<span className="nxl-text-shimmer">questions</span>
-          </h2>
-        </div>
-
-        <div className="space-y-3">
-          {FAQS.map((faq, i) => {
-            const isOpen = open === i;
-            const { pal } = faq;
-            return (
-              <div key={i}
-                className={`rounded-2xl overflow-hidden transition-all duration-300 nxl-reveal nxl-d${(i % 4) + 1}`}
-                style={{
-                  border: `1.5px solid ${isOpen ? pal.icon : pal.border}`,
-                  background: isOpen ? pal.bg : "white",
-                  boxShadow: isOpen ? `0 4px 20px ${pal.icon}18` : "0 1px 3px rgba(0,0,0,.04)",
-                }}>
-                <button type="button" onClick={() => setOpen(isOpen ? null : i)}
-                  className="w-full flex items-center gap-4 p-5 text-left">
-
-                  {/* Coloured number badge */}
-                  <div className="h-8 w-8 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 transition-all duration-300"
-                    style={{
-                      background: isOpen ? pal.icon : pal.bg,
-                      color:      isOpen ? "white"  : pal.icon,
-                      border:     `1.5px solid ${pal.border}`,
-                    }}>
-                    {String(i + 1).padStart(2, "0")}
-                  </div>
-
-                  <span className="flex-1 text-sm font-bold transition-colors duration-200"
-                    style={{ color: isOpen ? pal.text : "#1e293b" }}>
-                    {faq.q}
-                  </span>
-
-                  {/* Chevron */}
-                  <div className="h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300"
-                    style={{
-                      background: isOpen ? pal.icon : pal.bg,
-                      border:     `1.5px solid ${isOpen ? pal.icon : pal.border}`,
-                      transform:  isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    }}>
-                    <ChevronDown className="h-4 w-4" style={{ color: isOpen ? "white" : pal.icon }}/>
-                  </div>
-                </button>
-
-                {isOpen && (
-                  <div className="px-5 pb-5 pl-[68px]">
-                    {/* Coloured left rule */}
-                    <div className="relative pl-4 border-l-2" style={{ borderColor: pal.icon }}>
-                      <p className="text-sm leading-relaxed" style={{ color: pal.text }}>{faq.a}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── CTA BANNER ───────────────────────────────────────────────────────────────
-function CTABanner({ onBookDemo }: { onBookDemo: () => void }) {
-  return (
-    <section className="py-8 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="max-w-5xl mx-auto">
-        <div className="relative overflow-hidden rounded-3xl p-12 sm:p-20 text-center"
-          style={{ background:"linear-gradient(135deg,#E0F7FA 0%,#EDE7F6 50%,#E0F7FA 100%)" }}>
-          {/* Colour blobs */}
-          <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full opacity-60 nxl-blob"
-            style={{ background:"radial-gradient(circle,#18A7B8 0%,transparent 70%)", filter:"blur(40px)" }}/>
-          <div className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full opacity-40 nxl-blob-slow"
-            style={{ background:"radial-gradient(circle,#7E57C2 0%,transparent 70%)", filter:"blur(40px)" }}/>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full opacity-20 nxl-blob-fast"
-            style={{ background:"radial-gradient(circle,#F4511E 0%,transparent 70%)", filter:"blur(60px)" }}/>
-
-          <div className="relative">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-6"
-              style={{ background:"white", borderColor:"#B2EBF2" }}>
-              <Sparkles className="h-3 w-3" style={{ color:"#18A7B8" }}/>
-              <span className="text-xs font-bold" style={{ color:"#006064" }}>Ready in under 60 seconds</span>
-            </div>
-            <h2 className="text-4xl sm:text-6xl font-black text-slate-900 leading-tight tracking-tight max-w-3xl mx-auto">
-              Stop juggling tools.
-              <span className="block mt-1 nxl-text-shimmer">Start closing deals.</span>
-            </h2>
-            <p className="mt-6 text-lg text-slate-600 max-w-xl mx-auto font-medium leading-relaxed">
-              Join 2,400+ revenue teams using Nxelio Nurture to run their entire outreach workflow
-              from a single, beautifully simple workspace.
-            </p>
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button type="button" onClick={onBookDemo}
-                className="inline-flex items-center gap-2 px-9 py-4 rounded-xl font-bold text-white text-base transition-all hover:scale-[1.03] hover:shadow-xl"
-                style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow:"0 12px 40px rgba(24,167,184,.35)", padding:"1rem 2.25rem" }}>
-                Book Demo — No card needed <ArrowRight className="h-4 w-4"/>
-              </button>
-              <Link href="/login"
-                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-slate-700 text-sm bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all">
-                <Play className="h-4 w-4" style={{ color:"#18A7B8" }}/> Sign In
-              </Link>
-            </div>
-            <p className="mt-5 text-xs text-slate-400">Basic plan · 7-day free trial · 200 AI credits · Cancel anytime</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── FOOTER ───────────────────────────────────────────────────────────────────
-function Footer() {
-  const NAV = [
-    {
-      heading: "Product",
-      links: [
-        { l:"Leads",         h:"/leads"         },
-        { l:"Campaigns",     h:"/campaigns"     },
-        { l:"Inbox",         h:"/inbox"         },
-        { l:"Opportunities", h:"/opportunities" },
-        { l:"Segments",      h:"/segments"      },
-      ],
-    },
-    {
-      heading: "More",
-      links: [
-        { l:"Newsletters",  h:"/newsletters"  },
-        { l:"Analytics",    h:"/analytics"    },
-        { l:"Capture Forms",h:"/capture-form" },
-        { l:"Pricing",      h:"#pricing"      },
-        { l:"Help",         h:"/help"         },
-      ],
-    },
-    {
-      heading: "Legal",
-      links: [
-        { l:"Privacy", h:"/privacy" },
-        { l:"Terms",   h:"/terms"   },
-        { l:"Sign up", h:"/signup"  },
-        { l:"Log in",  h:"/login"   },
-      ],
-    },
-  ];
-
-  return (
-    <footer className="relative overflow-hidden" style={{ background:"#18A7B8" }}>
-      {/* Subtle background glow blobs */}
-      <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full pointer-events-none"
-        style={{ background:"radial-gradient(circle,rgba(255,255,255,.12) 0%,transparent 70%)" }}/>
-      <div className="absolute -bottom-24 -right-24 w-72 h-72 rounded-full pointer-events-none"
-        style={{ background:"radial-gradient(circle,rgba(126,87,194,.25) 0%,transparent 70%)" }}/>
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
-
-        {/* Main grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
-
-          {/* Brand col */}
-          <div className="col-span-2">
-            {/* Glass logo card */}
-            <div className="inline-flex items-center gap-2.5 mb-5 px-4 py-3 rounded-2xl"
-              style={{ background:"rgba(255,255,255,.15)", border:"1.5px solid rgba(255,255,255,.25)", backdropFilter:"blur(8px)" }}>
-              <div className="h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center bg-white"
-                style={{ border:"1.5px solid rgba(255,255,255,.35)" }}>
-                <LogoMark className="h-full w-full" />
-              </div>
-              <div>
-                <p className="font-bold text-white text-lg leading-none">Nxelio Nurture</p>
-                <p className="text-[10px] text-white/60 uppercase tracking-[0.14em] mt-0.5">Turn Leads into Revenue</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-white/75 max-w-xs leading-relaxed mb-6">
-              The all-in-one B2B revenue platform — leads, campaigns, inbox, pipeline, and analytics in one workspace.
-            </p>
-
-            {/* Social / trust pills */}
-            <div className="flex flex-wrap gap-2">
-              {["SOC 2-ready","GDPR","Workspace-isolated"].map((t) => (
-                <span key={t} className="text-[10px] font-bold px-3 py-1 rounded-full"
-                  style={{ background:"rgba(255,255,255,.15)", border:"1px solid rgba(255,255,255,.25)", color:"rgba(255,255,255,.85)" }}>
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Link columns */}
-          {NAV.map((col) => (
-            <div key={col.heading}
-              className="p-5 rounded-2xl"
-              style={{ background:"rgba(255,255,255,.12)", border:"1px solid rgba(255,255,255,.18)", backdropFilter:"blur(6px)" }}>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white mb-4">{col.heading}</p>
-              <ul className="space-y-2.5">
-                {col.links.map((lk) => (
-                  <li key={lk.l}>
-                    <Link href={lk.h}
-                      className="text-sm font-medium text-white/70 hover:text-white transition-colors duration-200 flex items-center gap-1.5 group">
-                      <span className="h-1 w-1 rounded-full bg-white/30 group-hover:bg-white/80 transition-colors flex-shrink-0"/>
-                      {lk.l}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom bar */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3"
-          style={{ borderTop:"1px solid rgba(255,255,255,.18)" }}>
-          <p className="text-xs text-white/55">© 2026 Nxelio Nurture, Inc. All rights reserved.</p>
-          <div className="flex items-center gap-2 text-xs text-white/55">
-            <Lock className="h-3.5 w-3.5 text-white/70"/>
-            <span>Secured by Supabase · Row-level security</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/privacy" className="text-xs text-white/55 hover:text-white transition-colors">Privacy</Link>
-            <span className="text-white/25">·</span>
-            <Link href="/terms"   className="text-xs text-white/55 hover:text-white transition-colors">Terms</Link>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-// ─── DEMO VIDEO ───────────────────────────────────────────────────────────────
-function DemoVideo() {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <section className="py-20 bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10 nxl-section-in">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-5"
-              style={{ background:"#EDE7F6", borderColor:"#D1C4E9" }}>
-              <Play className="h-3.5 w-3.5" style={{ color:"#7E57C2" }}/>
-              <span className="text-xs font-bold" style={{ color:"#4527A0" }}>2-minute product tour</span>
-            </div>
-            <h2 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 leading-tight">
-              See Nxelio Nurture in{" "}
-              <span className="nxl-text-shimmer">action</span>
-            </h2>
-            <p className="mt-4 text-base text-slate-500 font-medium max-w-lg mx-auto">
-              Watch how teams go from lead import to closed deal — all inside one workspace.
-            </p>
-          </div>
-
-          {/* Video panel */}
-          <div
-            className="relative rounded-3xl overflow-hidden cursor-pointer group nxl-reveal-scale"
-            onClick={() => setOpen(true)}
-            style={{
-              boxShadow: "0 32px 80px rgba(24,167,184,.18), 0 8px 24px rgba(0,0,0,.10)",
-              border: "1.5px solid #B2EBF2",
-            }}
-          >
-            {/* Browser chrome */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ background:"#F8FAFB", borderColor:"#E2E8F0" }}>
-              <span className="h-3 w-3 rounded-full inline-block" style={{ background:"#FF5F57" }}/>
-              <span className="h-3 w-3 rounded-full inline-block" style={{ background:"#FEBC2E" }}/>
-              <span className="h-3 w-3 rounded-full inline-block" style={{ background:"#28C840" }}/>
-              <div className="ml-3 flex-1 max-w-xs mx-auto h-5 rounded-full flex items-center px-3 gap-2 border"
-                style={{ background:"#FFFFFF", borderColor:"#E2E8F0" }}>
-                <Lock className="h-2.5 w-2.5 text-slate-400"/>
-                <span className="text-[10px] text-slate-400 font-medium">app.nxelio.ai/dashboard</span>
-              </div>
-            </div>
-
-            {/* App mockup */}
-            <div className="relative" style={{ background:"#F1F5F9", minHeight:"420px" }}>
-              {/* Sidebar */}
-              <div className="absolute top-0 left-0 bottom-0 w-48 border-r" style={{ background:"white", borderColor:"#E2E8F0" }}>
-                <div className="p-4 border-b" style={{ borderColor:"#E2E8F0" }}>
-                  <div className="flex items-center gap-2">
-                    <div className="h-7 w-7 rounded-lg" style={{ background:"linear-gradient(135deg,#18A7B8,#7E57C2)" }}/>
-                    <div className="h-3 w-14 rounded-full bg-slate-200"/>
-                  </div>
-                </div>
-                <div className="p-3 space-y-1">
-                  {[
-                    { color:"#18A7B8", label:"Dashboard", active:true },
-                    { color:"#2196F3", label:"Leads",     active:false },
-                    { color:"#7E57C2", label:"Inbox",     active:false },
-                    { color:"#FF9800", label:"Opportunities",active:false },
-                    { color:"#F4511E", label:"Segments",  active:false },
-                    { color:"#E91E63", label:"Newsletters",active:false },
-                    { color:"#43A047", label:"Analytics", active:false },
-                  ].map((item) => (
-                    <div key={item.label}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
-                      style={{ background: item.active ? item.color+"18" : "transparent" }}>
-                      <div className="h-3 w-3 rounded" style={{ background: item.color, opacity: item.active ? 1 : 0.4 }}/>
-                      <div className="h-2.5 rounded-full" style={{ width:`${item.label.length * 6}px`, background: item.active ? item.color : "#CBD5E1" }}/>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Main content */}
-              <div className="ml-48 p-6">
-                {/* Stat cards row */}
-                <div className="grid grid-cols-4 gap-4 mb-6">
-                  {[
-                    { color:"#18A7B8", n:"2,481", sub:"Total Leads"   },
-                    { color:"#2196F3", n:"14",    sub:"Active Campaigns" },
-                    { color:"#7E57C2", n:"38",    sub:"Inbox Replies" },
-                    { color:"#FF9800", n:"$92k",  sub:"Pipeline Value" },
-                  ].map((s) => (
-                    <div key={s.sub} className="bg-white rounded-xl p-4 border" style={{ borderColor:"#E2E8F0" }}>
-                      <div className="h-7 w-7 rounded-lg mb-3" style={{ background: s.color+"22" }}>
-                        <div className="h-full w-full rounded-lg" style={{ background: s.color, opacity:0.5 }}/>
-                      </div>
-                      <div className="text-lg font-black text-slate-900">{s.n}</div>
-                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">{s.sub}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Chart + list row */}
-                <div className="grid grid-cols-5 gap-4">
-                  {/* Bar chart */}
-                  <div className="col-span-3 bg-white rounded-xl p-4 border" style={{ borderColor:"#E2E8F0" }}>
-                    <div className="h-2.5 w-24 rounded-full bg-slate-200 mb-4"/>
-                    <div className="flex items-end gap-2 h-28">
-                      {[60,85,45,100,70,55,90].map((h,i) => (
-                        <div key={i} className="flex-1 rounded-t-lg transition-all"
-                          style={{ height:`${h}%`, background:`linear-gradient(to top, #18A7B8, #7E57C2)`, opacity:0.7+i*0.04 }}/>
-                      ))}
-                    </div>
-                    <div className="flex gap-2 mt-2">
-                      {["M","T","W","T","F","S","S"].map((d,i) => (
-                        <div key={i} className="flex-1 text-center text-[9px] text-slate-400">{d}</div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Lead list */}
-                  <div className="col-span-2 bg-white rounded-xl p-4 border" style={{ borderColor:"#E2E8F0" }}>
-                    <div className="h-2.5 w-16 rounded-full bg-slate-200 mb-3"/>
-                    <div className="space-y-2.5">
-                      {[
-                        { init:"SC", color:"#18A7B8", w:60 },
-                        { init:"MR", color:"#7E57C2", w:75 },
-                        { init:"PS", color:"#43A047", w:50 },
-                        { init:"AK", color:"#FF9800", w:65 },
-                      ].map((r) => (
-                        <div key={r.init} className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0"
-                            style={{ background: r.color }}>{r.init}</div>
-                          <div className="h-2 rounded-full flex-1 bg-slate-100">
-                            <div className="h-full rounded-full" style={{ width:`${r.w}%`, background: r.color+"88" }}/>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Play button overlay */}
-            <div className="absolute inset-0 flex items-center justify-center transition-all duration-300"
-              style={{ background:"rgba(15,23,42,0.18)" }}>
-              <div
-                className="flex items-center justify-center rounded-full shadow-2xl transition-all duration-300 group-hover:scale-110"
-                style={{
-                  height:"84px", width:"84px",
-                  background:"white",
-                  boxShadow:"0 8px 40px rgba(24,167,184,.45), 0 2px 12px rgba(0,0,0,.12)",
-                }}>
-                <div className="flex items-center justify-center rounded-full"
-                  style={{ height:"60px", width:"60px", background:"linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-                  <Play className="h-6 w-6 text-white" style={{ marginLeft:"3px" }}/>
-                </div>
-              </div>
-            </div>
-
-            {/* Animated pulse rings */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="absolute rounded-full animate-ping"
-                style={{ height:"108px", width:"108px", background:"rgba(24,167,184,.15)", animationDuration:"1.8s" }}/>
-              <div className="absolute rounded-full animate-ping"
-                style={{ height:"136px", width:"136px", background:"rgba(24,167,184,.08)", animationDuration:"1.8s", animationDelay:"0.4s" }}/>
-            </div>
-          </div>
-
-          <p className="text-center text-xs text-slate-400 mt-5">
-            No sign-up required to watch · 2 min · HD
-          </p>
-        </div>
-      </section>
-
-      {/* Lightbox modal */}
-      {open && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8"
-          style={{ background:"rgba(10,15,25,.85)", backdropFilter:"blur(8px)" }}
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="relative w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-            style={{ background:"#0D1627" }}
-          >
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor:"rgba(255,255,255,.08)" }}>
-              <div className="flex items-center gap-2.5">
-                <div className="h-7 w-7 rounded-lg overflow-hidden flex items-center justify-center bg-white">
-                  <LogoMark className="h-full w-full" />
-                </div>
-                <span className="text-sm font-bold text-white">Nxelio Nurture — Product Demo</span>
-              </div>
-              <button type="button" onClick={() => setOpen(false)}
-                className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors">
-                <X className="h-4 w-4 text-white/70"/>
-              </button>
-            </div>
-
-            {/* Video placeholder — swap src for real video embed URL */}
-            <div className="relative" style={{ paddingBottom:"56.25%" }}>
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4"
-                style={{ background:"linear-gradient(135deg,#0D1627,#1a1f35)" }}>
-                <div className="flex items-center justify-center rounded-full"
-                  style={{ height:"72px", width:"72px", background:"linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow:"0 8px 32px rgba(24,167,184,.4)" }}>
-                  <Play className="h-7 w-7 text-white" style={{ marginLeft:"3px" }}/>
-                </div>
-                <p className="text-white/60 text-sm font-medium">Replace with your video embed URL</p>
-                <p className="text-white/30 text-xs">e.g. YouTube or Loom iframe src</p>
-              </div>
-              {/*
-                To embed a real video, replace the div above with:
-                <iframe
-                  className="absolute inset-0 w-full h-full"
-                  src="https://www.youtube.com/embed/YOUR_VIDEO_ID?autoplay=1"
-                  allow="autoplay; fullscreen"
-                  allowFullScreen
-                />
-              */}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-// ─── ROOT ─────────────────────────────────────────────────────────────────────
-export interface LandingPageNotice {
-  kind: "signed_up" | "verified";
-  email?: string;
-}
-
-/** Post-signup / post-verification toast — a bottom banner deliberately, so it
- * never has to coordinate z-index/offset with the fixed top Navbar above. */
 function PostSignupNotice({ notice }: { notice: LandingPageNotice }) {
   const [hidden, setHidden] = useState(false);
   if (hidden) return null;
   const loginHref = `/login${notice.email ? `?email=${encodeURIComponent(notice.email)}` : ""}`;
-  const message = notice.kind === "signed_up"
-    ? "Account created — log in to continue setting up your workspace."
-    : "Email verified — you can now log in.";
+  const message = notice.kind === "signed_up" ? "Account created — log in to continue." : "Email verified — you can now log in.";
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[60] flex flex-wrap items-center justify-center gap-3 bg-slate-900 px-4 py-3 text-sm text-white">
-      <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-400" />
+    <div className="fixed inset-x-0 bottom-0 z-[60] flex items-center justify-center gap-3 bg-blue-600 px-4 py-3 text-sm text-white font-bold shadow-2xl">
+      <CheckCircle2 className="h-5 w-5 shrink-0" />
       <span>{message}</span>
-      <Link href={loginHref} className="rounded-lg px-3 py-1.5 font-bold" style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)" }}>
-        Log in
-      </Link>
-      <button onClick={() => setHidden(true)} aria-label="Dismiss" className="ml-2 text-white/50 hover:text-white flex-shrink-0">
-        <X className="h-4 w-4" />
-      </button>
+      <Link href={loginHref} className="rounded-lg px-4 py-1.5 bg-white text-blue-600 ml-2 font-semibold hover:bg-slate-100 transition-colors">Log in</Link>
+      <button onClick={() => setHidden(true)} className="ml-4 hover:opacity-75"><X className="h-5 w-5" /></button>
     </div>
   );
 }
 
-export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = {}) {
-  const [scrolled,    setScrolled]    = useState(false);
-  const [mobileOpen,  setMobileOpen]  = useState(false);
-  const [showDemoModal, setShowDemoModal] = useState(false);
-  useReveal();
-
+function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
+  const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", fn, { passive:true });
-    return () => window.removeEventListener("scroll", fn);
+    function onScroll() { setScrolled(window.scrollY > 20); }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const openDemoModal = () => setShowDemoModal(true);
+  return (
+    <header
+      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+        scrolled ? "bg-white/90 backdrop-blur-md border-b border-slate-200/80 py-3.5 shadow-sm" : "bg-white py-5 border-b border-transparent"
+      }`}
+    >
+      <div className="max-w-[1360px] mx-auto px-5 sm:px-8 flex justify-between items-center gap-4">
+        <Link href="/" className="flex items-center gap-2 shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+            <Zap className="w-4 h-4 fill-white" />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-[#1f2223]">
+            Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-medium">Nurture</span>
+          </span>
+        </Link>
+
+        <nav className="hidden lg:flex items-center gap-8">
+          <a href="#capabilities" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Capabilities</a>
+          <a href="#comparison" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Comparison</a>
+          <a href="#playbooks" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Playbooks</a>
+          <a href="#integrations" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Integrations</a>
+          <a href="#pricing" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Pricing</a>
+          <a href="#faq" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">FAQ</a>
+        </nav>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="hidden sm:inline-flex h-9 px-4 items-center justify-center rounded-full border border-slate-200/90 text-sm font-medium text-[#1f2223] hover:bg-slate-50 transition-colors"
+          >
+            Log In
+          </Link>
+          <button
+            onClick={onBookDemo}
+            className="inline-flex h-9 sm:h-10 px-4 sm:px-5 items-center justify-center gap-2 rounded-full bg-[#1f2223] text-white text-xs sm:text-sm font-semibold hover:bg-black transition-all shadow-sm hover:shadow active:scale-95"
+          >
+            <span>Start for Free</span>
+            <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+const SAMPLE_PROMPTS = [
+  "Find VPs of Sales at Series-A voice agent startups that shipped product in the last 6 months.",
+  "Identify 100 Head of RevOps in the US using HubSpot and currently hiring SDRs.",
+  "Track competitor accounts evaluating Gong and trigger a personalized intro email.",
+  "Target e-commerce founders in Europe scaling beyond $5M ARR with high ad spend."
+];
+
+function HeroPromptSearch() {
+  const router = useRouter();
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<LandingChatMessage[]>([]);
+  const [pending, setPending] = useState(false);
+  const [activePromptIdx, setActivePromptIdx] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, pending]);
+
+  function submit(textToSubmit?: string) {
+    const text = (textToSubmit || input).trim();
+    if (!text || pending) return;
+    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setInput("");
+    setPending(true);
+    setTimeout(() => router.push(`/login?prompt=${encodeURIComponent(text)}`), 650);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
+  }
+
+  function handleChipClick(sampleText: string, idx: number) {
+    setActivePromptIdx(idx);
+    setInput(sampleText);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }
 
   return (
-    <div className="landing-page min-h-screen bg-white text-slate-900 overflow-x-hidden">
+    <div className="w-full max-w-[940px] mx-auto mt-8 sm:mt-12 text-left">
+      {/* Glow frame container matching Lev8 */}
+      <div className="relative rounded-[28px] sm:rounded-[34px] p-[2px] shadow-[0_20px_50px_rgba(0,0,0,0.08)] bg-gradient-to-r from-teal-400 via-indigo-500 to-amber-400">
+        <div className="relative rounded-[26px] sm:rounded-[32px] bg-white p-4 sm:p-7 md:p-8 flex flex-col justify-between min-h-[220px] sm:min-h-[250px]">
+          
+          {/* Chat history if user enters a query */}
+          {messages.length > 0 && (
+            <div ref={scrollRef} className="max-h-60 overflow-y-auto space-y-3 mb-4 pr-1">
+              {messages.map((m, i) => (
+                <div
+                  key={i}
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm sm:text-base leading-relaxed ${
+                    m.role === "user"
+                      ? "ml-auto bg-[#1f2223] text-white rounded-br-sm"
+                      : "bg-slate-100 text-slate-800 rounded-bl-sm"
+                  }`}
+                >
+                  {m.content}
+                </div>
+              ))}
+              {pending && (
+                <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-blue-50 text-blue-900 border border-blue-200 px-4 py-3 text-sm sm:text-base flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-blue-600 animate-spin" />
+                  <span>Searching live web intelligence — redirecting to workspace…</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Prompt textarea */}
+          <div className="flex-1 flex flex-col justify-center">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Find VPs of Sales at Bay Area AI startups that shipped their product in the last year…"
+              rows={3}
+              className="w-full bg-transparent text-[#1f2223] placeholder:text-slate-400 text-base sm:text-lg md:text-xl font-normal leading-relaxed resize-none outline-none border-none focus:ring-0 p-0"
+            />
+          </div>
+
+          {/* Action toolbar */}
+          <div className="pt-4 mt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setInput("Enrich my existing CSV lead list with verified emails and LinkedIn signals.")}
+                className="inline-flex h-9 px-3 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/70 hover:bg-slate-100 text-slate-600 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+              >
+                <Paperclip className="w-3.5 h-3.5 text-slate-500" />
+                <span>Upload CSV / Leads</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const nextIdx = (activePromptIdx + 1) % SAMPLE_PROMPTS.length;
+                  handleChipClick(SAMPLE_PROMPTS[nextIdx], nextIdx);
+                }}
+                className="hidden sm:inline-flex h-9 px-3 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/70 hover:bg-slate-100 text-slate-600 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+                title="Cycle sample prompt"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Try prompt #{activePromptIdx + 1}</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => submit()}
+              disabled={pending || !input.trim()}
+              className="inline-flex h-10 px-5 items-center justify-center gap-2 rounded-xl rounded-tr-2xl rounded-bl-[4px] bg-[#1f2223] text-white text-sm font-medium hover:bg-black disabled:opacity-40 transition-all cursor-pointer shadow-md"
+            >
+              <span>Start for Free</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Clickable prompt suggestions underneath */}
+      <div className="mt-4 flex items-center gap-2 flex-wrap justify-center text-xs text-slate-500">
+        <span className="font-semibold text-slate-700">Popular plays:</span>
+        {SAMPLE_PROMPTS.slice(0, 3).map((p, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => handleChipClick(p, idx)}
+            className="rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 text-xs transition-colors truncate max-w-[280px] sm:max-w-none text-left"
+          >
+            "{p.slice(0, 42)}..."
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Hero({ onBookDemo }: { onBookDemo: () => void }) {
+  return (
+    <section className="pt-32 sm:pt-40 pb-20 sm:pb-28 bg-white overflow-hidden text-center">
+      <div className="max-w-[1360px] mx-auto px-5 sm:px-8">
+        
+        {/* Main Headline (Lev8 style) */}
+        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-semibold text-[#1f2223] leading-[1.12] tracking-tight max-w-4xl mx-auto">
+          Turn the live web into <br className="hidden md:inline" />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
+            people and revenue intelligence
+          </span>
+        </h1>
+
+        {/* Capability Icons Bar (Lev8 signature pills) */}
+        <ul className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2.5 mt-8 text-xs sm:text-sm font-medium text-slate-600">
+          <li className="inline-flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-xs">🟣</span>
+            <span className="text-slate-800">Find the right people</span>
+          </li>
+          <span className="hidden sm:inline text-slate-300">|</span>
+          <li className="inline-flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-xs">🔴</span>
+            <span className="text-slate-800">Research buying signals</span>
+          </li>
+          <span className="hidden sm:inline text-slate-300">|</span>
+          <li className="inline-flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">🔵</span>
+            <span className="text-slate-800">Launch personalized outbound</span>
+          </li>
+          <span className="hidden sm:inline text-slate-300">|</span>
+          <li className="inline-flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-xs">🟡</span>
+            <span className="text-slate-800">Automate pipeline tasks</span>
+          </li>
+        </ul>
+
+        {/* Lev8-Style Prompt Box Centerpiece */}
+        <HeroPromptSearch />
+
+        {/* Product proof badges */}
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs sm:text-sm text-slate-500 font-medium">
+          <div className="flex items-center gap-1.5 text-slate-700">
+            <span className="flex text-amber-400">★★★★★</span>
+            <span className="font-semibold">4.9/5</span> on G2 & Capterra
+          </div>
+          <span className="text-slate-300">·</span>
+          <div>Over <strong>350,000+</strong> verified decision makers found this month</div>
+          <span className="text-slate-300">·</span>
+          <div><strong>0 Setup time</strong> — Live in 2 minutes</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TrustLogos() {
+  return (
+    <section className="py-12 border-y border-slate-100 bg-slate-50/50">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
+        <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-400 mb-6">
+          Powering outbound growth for modern B2B teams
+        </p>
+        <div className="flex justify-center items-center gap-8 sm:gap-14 md:gap-20 flex-wrap opacity-65 grayscale hover:grayscale-0 transition-all font-bold text-lg sm:text-xl text-slate-700">
+          <span>TechFlow</span>
+          <span>GrowthSync</span>
+          <span>HyperScale</span>
+          <span>VenturePeak</span>
+          <span>CloudScale</span>
+          <span>SaaSMetrics</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CapabilitiesSection() {
+  const [activeTab, setActiveTab] = useState(0);
+
+  const capabilities = [
+    {
+      id: "prospecting",
+      tabTitle: "One-Prompt Prospecting",
+      badge: "Discovery",
+      heading: "Search the live web for exact ICP matches in seconds.",
+      description: "Stop relying on 6-month-old static databases. Nxelio deploys parallel AI agents to crawl live company websites, press releases, hiring boards, and social posts to find active decision makers.",
+      features: [
+        "Natural language query interface",
+        "Live web scraping with zero stale records",
+        "Filtered by hiring roles, recent funding, and tech stack"
+      ],
+      preview: {
+        title: "Live Prospecting Query",
+        query: "Found 124 VP-level leaders at AI startups expanding their European sales footprint.",
+        metrics: [
+          { label: "Precision", value: "98.4%" },
+          { label: "Freshness", value: "Real-time" },
+          { label: "Cost / Lead", value: "$0.04" }
+        ]
+      }
+    },
+    {
+      id: "enrichment",
+      tabTitle: "Waterfall Enrichment",
+      badge: "Enrichment",
+      heading: "Enrich every contact with verified work emails and direct dials.",
+      description: "Our multi-provider waterfall ensures 95%+ email deliverability. Every contact record includes verified business email, LinkedIn URL, mobile number, company headcount, and revenue tier.",
+      features: [
+        "15+ data provider waterfall validation",
+        "Zero-bounce email verification guarantee",
+        "Direct company signals & LinkedIn sync"
+      ],
+      preview: {
+        title: "Waterfall Contact Card",
+        query: "Alex Rivera · VP Sales @ Synthetix AI\n✉️ alex.r@synthetix.ai (Verified 100% Deliverable)\n📱 +1 (415) 890-3211 · San Francisco, CA",
+        metrics: [
+          { label: "Deliverability", value: "99.1%" },
+          { label: "Valid Phones", value: "84%" },
+          { label: "Data Providers", value: "15+" }
+        ]
+      }
+    },
+    {
+      id: "signals",
+      tabTitle: "Live Buying Signals",
+      badge: "Signals",
+      heading: "Reach buyers at the exact moment their budget unlocks.",
+      description: "Track trigger events that signal buying intent: new executive hires, funding rounds, new job postings for your buyer personas, and tech stack changes. Reach out before competitors even notice.",
+      features: [
+        "Track job openings and department growth",
+        "Real-time funding and M&A alert triggers",
+        "Competitor tool displacement alerts"
+      ],
+      preview: {
+        title: "Active Trigger Alert",
+        query: "Trigger Detected: ScaleUp Tech posted 4 new 'Account Executive' roles on LinkedIn 3 hours ago.\nAction: AI generated personalized congratulatory sequence.",
+        metrics: [
+          { label: "Signal Speed", value: "< 15 mins" },
+          { label: "Response Lift", value: "+340%" },
+          { label: "Trigger Accuracy", value: "96.7%" }
+        ]
+      }
+    },
+    {
+      id: "outbound",
+      tabTitle: "Autonomous Multi-Channel",
+      badge: "Outreach",
+      heading: "Hyper-personalized email & LinkedIn copy written for each prospect.",
+      description: "No robotic templates. Nxelio AI drafts context-aware emails referencing their latest news, podcast appearances, and company pain points. Sent with smart inbox rotation to protect domain reputation.",
+      features: [
+        "1-to-1 personalized first lines and subject lines",
+        "Automated multi-step follow-ups until booked",
+        "Smart unified inbox handles objections automatically"
+      ],
+      preview: {
+        title: "AI Drafted Outreach",
+        query: "Subject: Congrats on the Series A, Alex — question on AE ramping\n\n'Hey Alex, saw your team just posted 4 AE roles following your $12M round. Usually sales ramps get bottlenecked by manual prospecting...'",
+        metrics: [
+          { label: "Open Rate", value: "78.2%" },
+          { label: "Reply Rate", value: "14.6%" },
+          { label: "Time Saved", value: "18 hrs/wk" }
+        ]
+      }
+    }
+  ];
+
+  const current = capabilities[activeTab];
+
+  return (
+    <section id="capabilities" className="py-24 sm:py-32 bg-white">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
+        
+        {/* Section Header */}
+        <div className="max-w-3xl mx-auto text-center mb-16">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+            What Nxelio Handles For You
+          </p>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight leading-tight">
+            Here's what I actually handle for you.
+          </h2>
+          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+            Find the right people. Reach out with context. Track new buying signals. Automate what's next.
+          </p>
+        </div>
+
+        {/* Interactive Capability Tabs (Lev8 style) */}
+        <div className="flex justify-center mb-12 overflow-x-auto pb-2 scrollbar-none">
+          <div className="inline-flex p-1.5 bg-slate-100 rounded-full border border-slate-200/80 max-w-full">
+            {capabilities.map((cap, i) => (
+              <button
+                key={cap.id}
+                onClick={() => setActiveTab(i)}
+                className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === i
+                    ? "bg-[#1f2223] text-white shadow-md"
+                    : "text-slate-600 hover:text-[#1f2223]"
+                }`}
+              >
+                {cap.tabTitle}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Feature showcase card */}
+        <div className="bg-slate-50/70 border border-slate-200/90 rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-14 grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          
+          <div className="lg:col-span-6 text-left">
+            <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold mb-4">
+              {current.badge}
+            </span>
+            <h3 className="text-2xl sm:text-3xl font-bold text-[#1f2223] leading-snug mb-4">
+              {current.heading}
+            </h3>
+            <p className="text-slate-600 text-base leading-relaxed mb-6">
+              {current.description}
+            </p>
+
+            <ul className="space-y-3 mb-8">
+              {current.features.map((f, i) => (
+                <li key={i} className="flex items-center gap-3 text-sm font-medium text-slate-800">
+                  <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </div>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+
+            <Link
+              href="/signup"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-[#1f2223] hover:text-blue-600 group"
+            >
+              <span>Explore this capability</span>
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </div>
+
+          <div className="lg:col-span-6 bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-sm">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  {current.preview.title}
+                </span>
+              </div>
+              <span className="text-[11px] font-medium bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full">
+                AI Agent Active
+              </span>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-4 sm:p-5 font-mono text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border border-slate-100 mb-6">
+              {current.preview.query}
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 pt-2">
+              {current.preview.metrics.map((m, idx) => (
+                <div key={idx} className="bg-slate-50/90 rounded-xl p-3 text-center border border-slate-100">
+                  <div className="text-base sm:text-xl font-bold text-[#1f2223]">{m.value}</div>
+                  <div className="text-[11px] font-medium text-slate-500 mt-0.5">{m.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
+function ProductComparison() {
+  const comparisonRows = [
+    {
+      feature: "Data Freshness",
+      nxelio: "Live Real-Time Web Scraping (< 1 day)",
+      others: "Static Database (3–6 months old)",
+      winner: true
+    },
+    {
+      feature: "Prospecting Method",
+      nxelio: "Natural Language Prompt ('Find Series A VPs')",
+      others: "Manual Boolean filters & 40 dropdowns",
+      winner: true
+    },
+    {
+      feature: "Waterfall Email Deliverability",
+      nxelio: "15+ Provider Waterfall (99% Guaranteed)",
+      others: "Single provider (60–75% bounce risk)",
+      winner: true
+    },
+    {
+      feature: "Outreach Execution",
+      nxelio: "Built-in Autonomous Sequences & Unified Inbox",
+      others: "Requires 3 separate tools (Clay + Smartlead + CRM)",
+      winner: true
+    },
+    {
+      feature: "Time to First Campaign",
+      nxelio: "Under 3 minutes",
+      others: "2 to 4 weeks of webhook configuration",
+      winner: true
+    },
+    {
+      feature: "Total Monthly Cost",
+      nxelio: "$49 / month all-inclusive",
+      others: "$350–$800 / month across 4 tool subscriptions",
+      winner: true
+    }
+  ];
+
+  return (
+    <section id="comparison" className="py-24 sm:py-32 bg-slate-50/70 border-t border-slate-200">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
+        
+        <div className="max-w-3xl mx-auto text-center mb-16">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+            Product Comparison
+          </p>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+            Precise. Deeper. Wider. Faster. Cheaper.
+          </h2>
+          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+            Compare search accuracy, setup speed, and cost across the platforms GTM teams use for pipeline generation.
+          </p>
+        </div>
+
+        {/* Comparison Table */}
+        <div className="max-w-4xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="grid grid-cols-12 bg-slate-100/70 p-4 sm:p-6 border-b border-slate-200 font-bold text-xs sm:text-sm uppercase tracking-wider text-slate-600">
+            <div className="col-span-5 sm:col-span-4">Capability</div>
+            <div className="col-span-4 sm:col-span-4 text-blue-600 flex items-center gap-1.5">
+              <Zap className="w-4 h-4 fill-blue-600" />
+              <span>Nxelio Nurture</span>
+            </div>
+            <div className="col-span-3 sm:col-span-4 text-slate-400">Legacy Tools / Clay / Apollo</div>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {comparisonRows.map((row, idx) => (
+              <div key={idx} className="grid grid-cols-12 p-4 sm:p-6 items-center text-xs sm:text-sm hover:bg-slate-50/50 transition-colors">
+                <div className="col-span-5 sm:col-span-4 font-semibold text-[#1f2223]">
+                  {row.feature}
+                </div>
+                <div className="col-span-4 sm:col-span-4 text-slate-900 font-medium flex items-center gap-2 pr-2">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0 stroke-[2.5]" />
+                  <span>{row.nxelio}</span>
+                </div>
+                <div className="col-span-3 sm:col-span-4 text-slate-500 line-through decoration-slate-300">
+                  {row.others}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8 text-center">
+          <Link
+            href="/signup"
+            className="inline-flex h-11 px-7 items-center justify-center gap-2 rounded-full bg-[#1f2223] text-white text-sm font-semibold hover:bg-black transition-transform hover:-translate-y-0.5 shadow-md"
+          >
+            <span>Replace your fragmented stack today</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
+function PlaybooksSection() {
+  const plays = [
+    {
+      icon: "🎯",
+      title: "Competitor Displacement",
+      desc: "Monitor competitor pricing changes, downtime, or customer complaints. Automatically identify their users and pitch your solution with exact comparison data.",
+      tag: "High Intent"
+    },
+    {
+      icon: "👔",
+      title: "New Executive Job Changes",
+      desc: "70% of new VPs buy new software within their first 90 days. Get notified the day they update LinkedIn and send a warm onboarding congratulations.",
+      tag: "Fast Close"
+    },
+    {
+      icon: "📈",
+      title: "Hiring Surge & Role Triggers",
+      desc: "Detect companies opening 3+ roles in your target departments. Outbound to the hiring manager before their inbox gets flooded.",
+      tag: "Budget Ready"
+    },
+    {
+      icon: "⚡",
+      title: "Funding & Expansion Signals",
+      desc: "Target accounts right after their Seed, Series A, or Series B announcements with custom congratulatory outreach tailored to their new growth goals.",
+      tag: "Fresh Capital"
+    }
+  ];
+
+  return (
+    <section id="playbooks" className="py-24 sm:py-32 bg-white">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
+        
+        <div className="max-w-3xl mx-auto text-center mb-16">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+            One Search · Every Opportunity
+          </p>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+            Pick a play. Tell Nxelio to run it.
+          </h2>
+          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+            Run inbound qualification, competitor monitoring, executive job changes, and automated meeting booking with AI agents.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {plays.map((play, i) => (
+            <div
+              key={i}
+              className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/80 hover:border-slate-300 rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:-translate-y-1 text-left"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-2xl">
+                    {play.icon}
+                  </div>
+                  <span className="text-[11px] font-semibold tracking-wide bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100">
+                    {play.tag}
+                  </span>
+                </div>
+                <h4 className="text-lg font-bold text-[#1f2223] mb-2">{play.title}</h4>
+                <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6">{play.desc}</p>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-700">
+                <span>Run with AI Agent</span>
+                <ArrowRight className="w-4 h-4 text-slate-400" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
+function IntegrationsSection() {
+  const tools = [
+    { name: "Salesforce", category: "CRM", icon: "☁️" },
+    { name: "HubSpot", category: "CRM", icon: "🟠" },
+    { name: "Gmail / GSuite", category: "Email", icon: "✉️" },
+    { name: "Microsoft 365", category: "Email", icon: "🟦" },
+    { name: "LinkedIn Sales Nav", category: "Social", icon: "💼" },
+    { name: "Slack", category: "Alerts", icon: "💬" },
+    { name: "Zapier", category: "Automation", icon: "⚡" },
+    { name: "Custom Webhooks", category: "API", icon: "🔗" }
+  ];
+
+  return (
+    <section id="integrations" className="py-24 bg-slate-50/70 border-y border-slate-200">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8 text-center">
+        
+        <div className="max-w-3xl mx-auto mb-14">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+            Ecosystem & Native Sync
+          </p>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+            I work where you work, integrating 1,000+ apps.
+          </h2>
+          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+            Zero setup. Connect Nxelio to your existing GTM stack and move verified research directly into the systems your team already uses.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto">
+          {tools.map((t, idx) => (
+            <div
+              key={idx}
+              className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-3.5 text-left shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="text-2xl">{t.icon}</div>
+              <div>
+                <div className="font-bold text-sm text-[#1f2223]">{t.name}</div>
+                <div className="text-xs text-slate-400">{t.category}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
+function TestimonialsSection() {
+  const [current, setCurrent] = useState(0);
+  const quotes = [
+    {
+      text: "Nxelio Nurture replaced our entire SDR team's tech stack. We're booking 3.4x more qualified demos while cutting software costs by $1,200 every month.",
+      author: "Sarah Jenkins",
+      role: "VP of Revenue, TechFlow",
+      metric: "3.4x Demo Volume"
+    },
+    {
+      text: "The real-time live web search is incredible. It finds hiring signals and verified contact emails that Apollo and ZoomInfo missed completely.",
+      author: "Marcus Reed",
+      role: "Founder & CEO, GrowthSync",
+      metric: "+$64k New ARR in 60 Days"
+    },
+    {
+      text: "Having discovery, email sequences, and a smart unified inbox in one place saved our sales reps 18 hours of repetitive busywork every single week.",
+      author: "Elena Rodriguez",
+      role: "Head of RevOps, ScaleB2B",
+      metric: "70% Time Saved"
+    }
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrent((c) => (c + 1) % quotes.length), 6000);
+    return () => clearInterval(timer);
+  }, [quotes.length]);
+
+  return (
+    <section className="py-24 sm:py-32 bg-white overflow-hidden">
+      <div className="max-w-4xl mx-auto px-5 sm:px-8 text-center">
+        
+        <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+          Customer Results
+        </p>
+        <h2 className="text-3xl sm:text-4xl font-semibold text-[#1f2223] tracking-tight mb-14">
+          Loved by fast-growing revenue teams.
+        </h2>
+
+        <div className="relative min-h-[220px] flex items-center justify-center">
+          {quotes.map((q, i) => (
+            <div
+              key={i}
+              className={`transition-opacity duration-500 absolute inset-0 flex flex-col justify-center items-center ${
+                i === current ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+              }`}
+            >
+              <div className="inline-block bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full mb-5 border border-emerald-200">
+                {q.metric}
+              </div>
+              <p className="text-xl sm:text-2xl md:text-3xl font-medium text-[#1f2223] leading-relaxed mb-6 max-w-3xl">
+                "{q.text}"
+              </p>
+              <div className="font-bold text-base text-slate-900">{q.author}</div>
+              <div className="text-xs sm:text-sm text-slate-500">{q.role}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-center gap-2 mt-8">
+          {quotes.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrent(i)}
+              className={`w-3 h-3 rounded-full transition-colors cursor-pointer ${
+                i === current ? "bg-[#1f2223]" : "bg-slate-200 hover:bg-slate-300"
+              }`}
+              aria-label={`Slide ${i + 1}`}
+            />
+          ))}
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
+function FAQSection() {
+  const faqs = [
+    {
+      q: "How is Nxelio different from static databases like ZoomInfo or Apollo?",
+      a: "Traditional databases rely on stale lists that are updated only once every few months. Nxelio uses parallel AI agents to search the live web in real time, validating current employee titles, company announcements, tech stack changes, and hiring signals right when you query."
+    },
+    {
+      q: "How does the 7-day free trial work?",
+      a: "You get full access to Nxelio Nurture for 7 days without commitment. Discover verified leads, launch personalized multi-step sequences, test AI agents, and manage replies risk-free. No credit card is required to get started."
+    },
+    {
+      q: "Can I bring my existing CSV list or sync my CRM?",
+      a: "Yes! You can import existing CSV prospect lists or integrate natively with Salesforce, HubSpot, or custom webhooks. Nxelio will enrich your list with verified emails, phones, and live company signals."
+    },
+    {
+      q: "How does email deliverability and spam protection work?",
+      a: "Nxelio includes automated inbox warmup, domain rotation, bounce-rate protection, and AI tone check to ensure your emails consistently hit the primary inbox rather than promotions or spam folders."
+    },
+    {
+      q: "Do I need technical skills or complex Zapier tables?",
+      a: "None at all. Nxelio is built as a single, intuitive platform with zero setup needed. Just type what kind of accounts you need in natural English, and the AI handles the discovery, enrichment, copy drafting, and sending."
+    }
+  ];
+
+  const [openIdx, setOpenIdx] = useState<number | null>(0);
+
+  return (
+    <section id="faq" className="py-24 bg-slate-50/70 border-t border-slate-200">
+      <div className="max-w-3xl mx-auto px-5 sm:px-8">
+        <h2 className="text-3xl sm:text-4xl font-semibold text-center text-[#1f2223] tracking-tight mb-12">
+          Frequently Asked Questions
+        </h2>
+
+        <div className="space-y-4">
+          {faqs.map((item, idx) => (
+            <div key={idx} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <button
+                onClick={() => setOpenIdx(openIdx === idx ? null : idx)}
+                className="w-full px-6 py-5 flex items-center justify-between text-left text-[#1f2223] font-semibold text-base sm:text-lg hover:bg-slate-50/50 transition-colors cursor-pointer"
+              >
+                <span>{item.q}</span>
+                <ChevronDown
+                  className={`h-5 w-5 text-slate-400 transition-transform shrink-0 ml-4 ${
+                    openIdx === idx ? "rotate-180 text-slate-700" : ""
+                  }`}
+                />
+              </button>
+              {openIdx === idx && (
+                <div className="px-6 pb-6 text-slate-600 text-sm sm:text-base leading-relaxed bg-white border-t border-slate-50">
+                  {item.a}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DramaticBottomCTAAndFooter() {
+  return (
+    <section className="rounded-t-[36px] sm:rounded-t-[48px] md:rounded-t-[56px] bg-[#121417] px-5 sm:px-10 lg:px-20 pb-12 pt-16 md:pt-24 text-white">
+      <div className="max-w-[1280px] mx-auto flex flex-col">
+        
+        {/* Massive Lev8-Style Bottom CTA */}
+        <div className="max-w-3xl mx-auto text-center flex flex-col items-center gap-8 mb-20 md:mb-28">
+          <div>
+            <p className="text-sm sm:text-lg text-slate-400 line-through decoration-slate-400 mb-3">
+              Stop buying 5 fragmented sales tools.
+            </p>
+            <h2 className="text-3xl sm:text-5xl md:text-6xl font-semibold leading-tight tracking-tight">
+              The fastest way to <br />
+              <span className="text-amber-400">find and close anyone.</span>
+            </h2>
+          </div>
+
+          <Link
+            href="/signup"
+            className="group inline-flex items-center gap-3 sm:gap-5 rounded-full border-2 sm:border-4 border-white/90 p-1.5 sm:p-2 pr-5 sm:pr-8 text-white transition-all hover:border-amber-400 hover:bg-amber-400 hover:text-black cursor-pointer shadow-2xl"
+          >
+            <span className="flex size-12 sm:size-16 shrink-0 items-center justify-center rounded-full bg-amber-400 text-black transition-colors group-hover:bg-black group-hover:text-amber-400">
+              <ArrowRight className="size-6 sm:size-8" strokeWidth={2.5} />
+            </span>
+            <span className="text-xl sm:text-3xl md:text-4xl font-semibold">
+              Start your 7-day free trial
+            </span>
+          </Link>
+
+          <p className="text-xs sm:text-sm text-slate-400">
+            No credit card required · Setup in under 2 minutes · Cancel anytime
+          </p>
+        </div>
+
+        {/* Divider */}
+        <hr className="h-px w-full border-0 bg-white/10 mb-14" />
+
+        {/* Structured Multi-Column Footer (Lev8 style) */}
+        <footer className="w-full">
+          <div className="grid grid-cols-2 min-[430px]:grid-cols-3 md:grid-cols-5 gap-8 mb-16 text-left">
+            
+            <div className="col-span-2 min-[430px]:col-span-3 md:col-span-1">
+              <Link href="/" className="flex items-center gap-2 mb-4">
+                <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-xs">
+                  ⚡
+                </div>
+                <span className="text-lg font-bold tracking-tight text-white">Nxelio</span>
+              </Link>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-xs mb-4">
+                Your AI radar for companies ready to buy. Live web prospect intelligence, enrichment, and multi-channel outreach.
+              </p>
+              <div className="text-xs text-slate-500">
+                &copy; {new Date().getFullYear()} Nxelio Inc. All rights reserved.
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
+              <p className="font-semibold text-white mb-1">Capabilities</p>
+              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">One-Prompt Prospecting</a>
+              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Waterfall Enrichment</a>
+              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Live Buying Signals</a>
+              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Multi-Channel Outbound</a>
+            </div>
+
+            <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
+              <p className="font-semibold text-white mb-1">Compare</p>
+              <a href="#comparison" className="text-slate-400 hover:text-white transition-colors">Nxelio vs. Clay</a>
+              <a href="#comparison" className="text-slate-400 hover:text-white transition-colors">Nxelio vs. Apollo</a>
+              <a href="#comparison" className="text-slate-400 hover:text-white transition-colors">Nxelio vs. ZoomInfo</a>
+              <a href="#comparison" className="text-slate-400 hover:text-white transition-colors">Nxelio vs. Manual SDRs</a>
+            </div>
+
+            <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
+              <p className="font-semibold text-white mb-1">Playbooks</p>
+              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Competitor Displacement</a>
+              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Executive Job Changes</a>
+              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Hiring Triggers</a>
+              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Funding Announcements</a>
+            </div>
+
+            <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
+              <p className="font-semibold text-white mb-1">Company</p>
+              <a href="#faq" className="text-slate-400 hover:text-white transition-colors">FAQ</a>
+              <Link href="/login" className="text-slate-400 hover:text-white transition-colors">Log In</Link>
+              <Link href="/signup" className="text-slate-400 hover:text-white transition-colors">Get Started</Link>
+              <a href="#" className="text-slate-400 hover:text-white transition-colors">Privacy & Terms</a>
+            </div>
+
+          </div>
+        </footer>
+
+      </div>
+    </section>
+  );
+}
+
+export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = {}) {
+  const [showDemoModal, setShowDemoModal] = useState(false);
+
+  return (
+    <div className="landing-page min-h-screen font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden text-[#1f2223] bg-white">
       {notice && <PostSignupNotice notice={notice} />}
-      <Navbar scrolled={scrolled} mobileOpen={mobileOpen} toggle={() => setMobileOpen((v)=>!v)} onBookDemo={openDemoModal}/>
-      <Hero onBookDemo={openDemoModal}/>
-      <DemoVideo/>
-      <BrandsSection/>
-      <StatsSection/>
-      <FeaturesSection/>
-      <CRMDemos/>
-      <HowItWorks/>
-      <Pricing/>
-      <Testimonials/>
-      <FAQ/>
-      <CTABanner onBookDemo={openDemoModal}/>
-      <Footer/>
-      <BookDemoModal open={showDemoModal} onClose={() => setShowDemoModal(false)}/>
-      <AiAssistantWidget/>
+      <Navbar onBookDemo={() => setShowDemoModal(true)} />
+      <Hero onBookDemo={() => setShowDemoModal(true)} />
+      <TrustLogos />
+      <CapabilitiesSection />
+      <ProductComparison />
+      <PlaybooksSection />
+      <IntegrationsSection />
+      <TestimonialsSection />
+      <FAQSection />
+      <DramaticBottomCTAAndFooter />
+
+      <BookDemoModal open={showDemoModal} onClose={() => setShowDemoModal(false)} />
+      <AiAssistantWidget />
     </div>
   );
 }
