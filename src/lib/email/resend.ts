@@ -96,6 +96,11 @@ async function sendViaBrevo({ to, subject, html, text, tags, fromName, replyTo, 
     const errText = await res.text();
     let msg = errText;
     try { msg = JSON.parse(errText).message || errText; } catch {}
+    // Swallowed everywhere it's called (callers show a generic user-facing
+    // message) — log it here so a real provider failure (bad/disabled key,
+    // unverified sender, rate limit) is diagnosable from server logs instead
+    // of silently failing every email-dependent flow.
+    console.error(`[sendEmail/brevo] ${res.status} sending to ${to}: ${msg.slice(0, 280)}`);
     return { ok: false, error: `Brevo: ${msg.slice(0, 280)}`, provider: "brevo" };
   }
   const data = await res.json().catch(() => ({}));

@@ -7,7 +7,8 @@ import {
   Inbox, Target, Bot, Play, X, CheckCircle2, Plus, Mic, ArrowUp,
   ArrowRight, Paperclip, Sparkles, Search, Send, Database,
   Cpu, Globe, Building2, ShieldCheck, Layers, Flame,
-  Briefcase, Radio, MessageSquare, TrendingUp, Filter, CheckCheck
+  Briefcase, Radio, MessageSquare, TrendingUp, Filter, CheckCheck,
+  Phone, Calendar, Megaphone
 } from "lucide-react";
 import { BookDemoModal } from "./book-demo-modal";
 import { AiAssistantWidget } from "./ai-assistant-widget";
@@ -270,6 +271,225 @@ function Hero({ onBookDemo }: { onBookDemo: () => void }) {
           <div>Over <strong>350,000+</strong> verified decision makers found this month</div>
           <span className="text-slate-300">·</span>
           <div><strong>0 Setup time</strong> — Live in 2 minutes</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PainPointHighlights() {
+  const cards = [
+    {
+      pillIcon: Filter,
+      pillLabel: "Manual Prospecting",
+      pillClass: "bg-fuchsia-50 text-fuchsia-700",
+      iconBg: "bg-gradient-to-br from-fuchsia-500 to-purple-600",
+      Icon: Search,
+      heading: "Find leads in seconds",
+      desc: "Live web search for verified decision-makers matching your exact ICP — emails, phones, and buying signals included.",
+      preview: (
+        <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 mb-3">
+            <Sparkles className="w-3.5 h-3.5" /> AI Discovered
+          </div>
+          <div className="space-y-2.5">
+            {["Alex Rivera · VP Sales", "Dana Kim · Head of RevOps"].map((row) => (
+              <div key={row} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
+                <div className="w-6 h-6 rounded-full bg-slate-200 shrink-0" />
+                <span className="text-xs font-medium text-slate-700 truncate">{row}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-1.5 mt-3 flex-wrap">
+            {["Verified Email", "LinkedIn", "Direct Dial"].map((tag) => (
+              <span key={tag} className="text-[10px] font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">{tag}</span>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      pillIcon: Globe,
+      pillLabel: "Scattered Outreach",
+      pillClass: "bg-blue-50 text-blue-700",
+      iconBg: "bg-gradient-to-br from-blue-500 to-indigo-600",
+      Icon: Send,
+      heading: "Launch campaigns instantly",
+      desc: "AI writes personalized multi-step email and LinkedIn sequences in your brand voice. Describe your ICP and watch outreach go live.",
+      preview: (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-4">
+          <div className="flex gap-1.5 mb-3">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-300" />
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-300" />
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-300" />
+          </div>
+          <div className="space-y-2 mb-4">
+            <div className="h-2.5 bg-slate-100 rounded-full w-3/4" />
+            <div className="h-2.5 bg-slate-100 rounded-full w-1/2" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center px-3 text-[11px] text-slate-400">
+              Follow up with VPs who opened 3x…
+            </div>
+            <span className="h-9 px-3 rounded-lg bg-blue-600 text-white text-[11px] font-semibold flex items-center shrink-0">Generate</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      pillIcon: Layers,
+      pillLabel: "Manual Follow-ups",
+      pillClass: "bg-emerald-50 text-emerald-700",
+      iconBg: "bg-gradient-to-br from-emerald-500 to-teal-600",
+      Icon: Cpu,
+      heading: "Automate your pipeline",
+      desc: "Build deal-stage automations with intelligent guidance. Tell it what you want and watch leads flow through your entire funnel.",
+      preview: (
+        <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm flex flex-col items-center">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-emerald-500 px-3 py-1.5 rounded-full mb-4">
+            New Lead
+          </span>
+          <div className="w-px h-4 bg-slate-200" />
+          <div className="grid grid-cols-3 gap-3 w-full mt-1">
+            {[
+              { icon: Target, label: "Score Lead" },
+              { icon: Mail, label: "Send Email" },
+              { icon: CheckCheck, label: "Book Meeting" },
+            ].map(({ icon: StepIcon, label }) => (
+              <div key={label} className="flex flex-col items-center gap-1.5">
+                <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center">
+                  <StepIcon className="w-3.5 h-3.5 text-slate-500" />
+                </div>
+                <span className="text-[10px] font-medium text-slate-600 text-center leading-tight">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <section className="py-20 sm:py-28 bg-gradient-to-b from-sky-50 via-cyan-50/60 to-white">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
+        <div className="max-w-2xl mx-auto text-center mb-14">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+            Why Teams Switch to Nxelio
+          </p>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+            Every manual step, replaced by AI.
+          </h2>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6 md:gap-5 items-stretch">
+          {cards.map((card, i) => {
+            const featured = i === 1;
+            const PillIcon = card.pillIcon;
+            return (
+              <div
+                key={card.heading}
+                className={`rounded-3xl p-6 sm:p-7 flex flex-col transition-transform ${
+                  featured
+                    ? "bg-white border-2 border-blue-400 shadow-xl md:-translate-y-3"
+                    : "bg-white/70 border border-slate-200/80 shadow-sm"
+                }`}
+              >
+                <span className={`inline-flex self-start items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-6 ${card.pillClass}`}>
+                  <PillIcon className="w-3.5 h-3.5" /> {card.pillLabel}
+                </span>
+
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-10 h-10 rounded-xl ${card.iconBg} flex items-center justify-center shadow-sm shrink-0`}>
+                    <card.Icon className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-[#1f2223]">{card.heading}</h3>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed mb-6">{card.desc}</p>
+
+                <div className="mt-auto">{card.preview}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AITeamSection() {
+  const agents = [
+    {
+      pillLabel: "Never miss a lead",
+      pillClass: "bg-blue-50 text-blue-700",
+      avatarBg: "bg-gradient-to-br from-blue-500 to-indigo-600",
+      Avatar: Search,
+      BadgeIcon: Phone,
+      badgeBg: "bg-blue-600",
+      name: "AI Prospector",
+      desc: "Finds and qualifies high-intent leads around the clock from live web signals, so no opportunity slips through.",
+    },
+    {
+      pillLabel: "Fill your calendar",
+      pillClass: "bg-purple-50 text-purple-700",
+      avatarBg: "bg-gradient-to-br from-purple-500 to-fuchsia-600",
+      Avatar: Users,
+      BadgeIcon: Calendar,
+      badgeBg: "bg-purple-600",
+      name: "AI Scheduler",
+      desc: "Books meetings automatically by syncing calendars and handling the back-and-forth — no more email tag.",
+    },
+    {
+      pillLabel: "Automate campaigns",
+      pillClass: "bg-amber-50 text-amber-700",
+      avatarBg: "bg-gradient-to-br from-amber-500 to-orange-600",
+      Avatar: Bot,
+      BadgeIcon: Megaphone,
+      badgeBg: "bg-amber-600",
+      name: "AI Outreach Agent",
+      desc: "Drafts, sends, and follows up on personalized sequences until a reply lands in your inbox.",
+    },
+  ];
+
+  return (
+    <section className="py-20 sm:py-28 bg-white">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
+        <div className="max-w-2xl mx-auto text-center mb-14">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+            Always-On Workforce
+          </p>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+            Meet your 24/7 AI team.
+          </h2>
+          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+            Three AI specialists working your pipeline while you focus on closing.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-6">
+          {agents.map((agent) => (
+            <div
+              key={agent.name}
+              className="bg-slate-50/70 hover:bg-white border border-slate-200/80 hover:border-slate-300 rounded-3xl p-6 sm:p-7 transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+            >
+              <span className={`inline-flex items-center text-xs font-semibold px-3 py-1.5 rounded-full mb-6 ${agent.pillClass}`}>
+                {agent.pillLabel}
+              </span>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="relative shrink-0">
+                  <div className={`w-14 h-14 rounded-2xl ${agent.avatarBg} flex items-center justify-center shadow-sm`}>
+                    <agent.Avatar className="w-6 h-6 text-white" />
+                  </div>
+                  <span className={`absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full ${agent.badgeBg} flex items-center justify-center ring-2 ring-white`}>
+                    <agent.BadgeIcon className="w-3 h-3 text-white" />
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-[#1f2223]">{agent.name}</h3>
+              </div>
+
+              <p className="text-sm text-slate-600 leading-relaxed">{agent.desc}</p>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -956,6 +1176,8 @@ export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = 
       {notice && <PostSignupNotice notice={notice} />}
       <Navbar onBookDemo={() => setShowDemoModal(true)} />
       <Hero onBookDemo={() => setShowDemoModal(true)} />
+      <PainPointHighlights />
+      <AITeamSection />
       <TrustLogos />
       <CapabilitiesSection />
       <ProductComparison />
