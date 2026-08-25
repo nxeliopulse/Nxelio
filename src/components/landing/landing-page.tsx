@@ -167,33 +167,26 @@ function HeroPromptSearch() {
               onKeyDown={onKeyDown}
               placeholder="Find VPs of Sales at Bay Area AI startups that shipped their product in the last year…"
               rows={3}
-              className="w-full bg-transparent text-[#1f2223] placeholder:text-slate-400 text-base sm:text-lg md:text-xl font-normal leading-relaxed resize-none outline-none border-none focus:ring-0 p-0"
+              spellCheck={false}
+              data-gramm="false"
+              data-gramm_editor="false"
+              data-enable-grammarly="false"
+              style={{ outline: "none", border: "none", boxShadow: "none" }}
+              className="hero-chat-textarea landing-hero-textarea border-0 border-none w-full bg-transparent text-[#1f2223] placeholder:text-slate-400 text-base sm:text-lg md:text-xl font-normal leading-relaxed resize-none outline-none ring-0 shadow-none focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none p-0"
             />
           </div>
 
           {/* Action toolbar */}
-          <div className="pt-4 mt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <div className="pt-3 mt-1 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setInput("Enrich my existing CSV lead list with verified emails and LinkedIn signals.")}
-                className="inline-flex h-9 px-3 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/70 hover:bg-slate-100 text-slate-600 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50/70 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                title="Attach CSV / Leads"
+                aria-label="Attach CSV or Leads"
               >
-                <Paperclip className="w-3.5 h-3.5 text-slate-500" />
-                <span>Upload CSV / Leads</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const nextIdx = (activePromptIdx + 1) % SAMPLE_PROMPTS.length;
-                  handleChipClick(SAMPLE_PROMPTS[nextIdx], nextIdx);
-                }}
-                className="hidden sm:inline-flex h-9 px-3 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/70 hover:bg-slate-100 text-slate-600 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
-                title="Cycle sample prompt"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Try prompt #{activePromptIdx + 1}</span>
+                <Plus className="w-4 h-4 text-slate-600" />
               </button>
             </div>
 

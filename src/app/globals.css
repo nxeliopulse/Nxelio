@@ -1113,10 +1113,24 @@ select:disabled {
 /* Landing page hero AI chat box — opts its textarea out of the app-wide
    bordered-input styling above so it reads as a borderless chat field. */
 textarea.hero-chat-textarea,
+textarea.landing-hero-textarea,
+textarea.border-none,
+textarea.border-0,
+textarea[class*="border-0"],
+textarea[class*="border-none"],
 textarea.hero-chat-textarea:hover,
-textarea.hero-chat-textarea:focus {
+textarea.landing-hero-textarea:hover,
+textarea.hero-chat-textarea:focus,
+textarea.landing-hero-textarea:focus,
+textarea.hero-chat-textarea:focus-visible,
+textarea.landing-hero-textarea:focus-visible,
+textarea.hero-chat-textarea:active,
+textarea.landing-hero-textarea:active {
   border: none !important;
   box-shadow: none !important;
+  outline: none !important;
+  outline-width: 0 !important;
+  resize: none !important;
 }
 
 /* Error states */
