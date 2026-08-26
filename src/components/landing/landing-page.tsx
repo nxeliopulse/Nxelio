@@ -46,8 +46,8 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
     <header
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-white/40 dark:border-slate-800 py-3 shadow-lg shadow-blue-900/5"
-          : "bg-white/35 backdrop-blur-md py-5 border-b border-white/20"
+          ? "bg-white/95 backdrop-blur-xl border-b border-white/80 py-3 shadow-lg shadow-blue-950/10 text-[#1f2223]"
+          : "bg-white/40 backdrop-blur-md py-5 border-b border-white/25 text-[#1f2223]"
       }`}
     >
       <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center gap-3">
@@ -57,7 +57,7 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
             <Zap className="w-4 h-4 fill-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-[#1f2223] dark:text-white">
+          <span className="text-xl font-bold tracking-tight text-[#1f2223]">
             Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-medium text-sm sm:text-base">Nurture</span>
           </span>
         </Link>
@@ -65,28 +65,28 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
         {/* Center: When Scrolled -> "7 Days Free Trial Claim" Offer Pill; When Not Scrolled -> Standard Nav Links */}
         <div className="hidden md:flex items-center justify-center transition-all duration-300">
           {scrolled ? (
-            <div className="animate-fade-in flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50 dark:from-blue-950/60 dark:to-emerald-950/60 border border-blue-200/80 dark:border-blue-800 shadow-sm">
+            <div className="animate-fade-in flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50 border border-blue-200/90 shadow-sm">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              <span className="text-xs font-bold text-slate-900">
                 🎉 Claim Your 7-Day Free Trial
               </span>
-              <span className="text-slate-300 dark:text-slate-700">·</span>
-              <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+              <span className="text-slate-300">·</span>
+              <span className="text-xs text-slate-600 font-medium">
                 Full AI Access · No Setup Fee
               </span>
             </div>
           ) : (
             <nav className="flex items-center gap-6 lg:gap-8">
-              <a href="#features" className="text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 transition-colors">Features</a>
-              <a href="#capabilities" className="text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 transition-colors">Capabilities</a>
-              <a href="#testimonials" className="text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 transition-colors">Reviews</a>
-              <a href="#playbooks" className="text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 transition-colors">Playbooks</a>
-              <a href="#integrations" className="text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 transition-colors">Integrations</a>
-              <a href="#pricing" className="text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 transition-colors">Pricing</a>
-              <a href="#faq" className="text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 transition-colors">FAQ</a>
+              <a href="#features" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Features</a>
+              <a href="#capabilities" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Capabilities</a>
+              <a href="#testimonials" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Reviews</a>
+              <a href="#playbooks" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Playbooks</a>
+              <a href="#integrations" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Integrations</a>
+              <a href="#pricing" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Pricing</a>
+              <a href="#faq" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">FAQ</a>
             </nav>
           )}
         </div>
@@ -95,7 +95,7 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
         <div className="flex items-center gap-2.5 sm:gap-3">
           <Link
             href="/login"
-            className="hidden sm:inline-flex h-9 px-3.5 items-center justify-center rounded-full border border-slate-200/80 dark:border-slate-700 text-xs sm:text-sm font-medium text-[#1f2223] dark:text-white hover:bg-white/80 transition-colors"
+            className="hidden sm:inline-flex h-9 px-3.5 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-xs sm:text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm"
           >
             Log In
           </Link>
