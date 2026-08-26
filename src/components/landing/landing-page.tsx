@@ -1226,86 +1226,125 @@ function FAQSection() {
 
 function DramaticBottomCTAAndFooter() {
   return (
-    <section className="rounded-t-[36px] sm:rounded-t-[48px] md:rounded-t-[56px] bg-[#121417] px-5 sm:px-10 lg:px-20 pb-12 pt-16 md:pt-24 text-white">
-      <div className="max-w-[1280px] mx-auto flex flex-col">
+    <section className="bg-transparent px-5 sm:px-10 lg:px-16 pb-12 pt-16 md:pt-24 text-white relative overflow-hidden">
+      
+      {/* Radiant ambient glow */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-gradient-to-tr from-blue-400/20 via-sky-300/15 to-transparent rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="max-w-[1280px] mx-auto flex flex-col relative z-10">
         
-        <div className="max-w-3xl mx-auto text-center flex flex-col items-center gap-8 mb-20 md:mb-28">
+        {/* Floating Glass CTA Card */}
+        <div className="max-w-4xl mx-auto w-full text-center flex flex-col items-center gap-6 sm:gap-8 mb-16 sm:mb-24 p-8 sm:p-14 md:p-16 rounded-[38px] sm:rounded-[44px] bg-white/20 backdrop-blur-2xl border border-white/30 shadow-2xl shadow-blue-950/20">
+          
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/25 backdrop-blur-md border border-white/30 text-xs font-semibold text-blue-100 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300 animate-star-twinkle" />
+            <span>Ready to 10x your sales pipeline?</span>
+          </div>
+
           <div>
-            <p className="text-sm sm:text-lg text-slate-400 mb-3">
-              Replace fragmented tools with one complete platform.
-            </p>
-            <h2 className="text-3xl sm:text-5xl md:text-6xl font-semibold leading-tight tracking-tight">
+            <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold text-white leading-[1.15] tracking-tight">
               The fastest way to <br />
-              <span className="text-amber-400">find and close anyone.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-200 to-cyan-200">
+                find and close anyone.
+              </span>
             </h2>
+            <p className="text-sm sm:text-lg text-blue-100 mt-4 max-w-xl mx-auto font-medium">
+              Replace 5 fragmented tools with one complete AI revenue platform. Find verified leads, run smart campaigns, and close deals faster.
+            </p>
           </div>
 
           <Link
             href="/signup"
-            className="group inline-flex items-center gap-3 sm:gap-5 rounded-full border-2 sm:border-4 border-white/90 p-1.5 sm:p-2 pr-5 sm:pr-8 text-white transition-all hover:border-amber-400 hover:bg-amber-400 hover:text-black cursor-pointer shadow-2xl"
+            className="group inline-flex items-center gap-3 sm:gap-4 rounded-full bg-white hover:bg-slate-50 text-[#1f2223] font-bold p-2 pr-6 sm:pr-8 shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
           >
-            <span className="flex size-12 sm:size-16 shrink-0 items-center justify-center rounded-full bg-amber-400 text-black transition-colors group-hover:bg-black group-hover:text-amber-400">
-              <ArrowRight className="size-6 sm:size-8" strokeWidth={2.5} />
+            <span className="flex size-11 sm:size-13 shrink-0 items-center justify-center rounded-full bg-[#1f2223] text-white transition-colors group-hover:bg-blue-600">
+              <ArrowRight className="size-5 sm:size-6" strokeWidth={2.5} />
             </span>
-            <span className="text-xl sm:text-3xl md:text-4xl font-semibold">
+            <span className="text-lg sm:text-2xl font-bold tracking-tight">
               Start your 7-day free trial
             </span>
           </Link>
 
-          <p className="text-xs sm:text-sm text-slate-400">
-            Credit card required · Setup in under 2 minutes · Cancel anytime
-          </p>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm text-blue-100 font-medium">
+            <span>✨ Full platform access</span>
+            <span>·</span>
+            <span>⚡ Setup in under 2 minutes</span>
+            <span>·</span>
+            <span>🛡️ Cancel anytime</span>
+          </div>
         </div>
 
-        <hr className="h-px w-full border-0 bg-white/10 mb-14" />
+        {/* Translucent Glass Separator */}
+        <hr className="h-px w-full border-0 bg-white/25 mb-14" />
 
+        {/* Footer Navigation */}
         <footer className="w-full">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16 text-left">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 mb-14 text-left">
             
+            {/* Column 1: Brand */}
             <div className="col-span-2 md:col-span-1">
-              <Link href="/" className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-xs">
-                  ⚡
+              <Link href="/" className="flex items-center gap-2 mb-4 group">
+                <div className="w-8 h-8 rounded-xl bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                  <Zap className="w-4 h-4 fill-blue-600" />
                 </div>
-                <span className="text-lg font-bold tracking-tight text-white">Nxelio</span>
+                <span className="text-xl font-bold tracking-tight text-white">
+                  Nx<span className="text-cyan-200">elio</span> <span className="text-blue-100 font-medium text-sm">Nurture</span>
+                </span>
               </Link>
-              <p className="text-xs text-slate-400 leading-relaxed max-w-xs mb-4">
-                All-in-one AI platform for lead discovery, waterfall enrichment, cold outreach sequences, CRM pipeline, and automated booking.
+              <p className="text-xs sm:text-sm text-blue-100 leading-relaxed max-w-xs mb-4 font-medium">
+                All-in-one AI sales intelligence platform for lead discovery, waterfall enrichment, multi-channel outreach, CRM pipeline, and booking.
               </p>
-              <div className="text-xs text-slate-500">
-                &copy; {new Date().getFullYear()} Nxelio Inc. All rights reserved.
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-xs text-blue-100 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>All Systems Operational</span>
               </div>
             </div>
 
+            {/* Column 2: Capabilities */}
             <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
-              <p className="font-semibold text-white mb-1">Capabilities</p>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Prospects & Verified Jobs</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Waterfall Enrichment</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Campaigns & Sequences</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Opportunities & Pipeline</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Segments & Capture Forms</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Meetings & Newsletters</a>
+              <p className="font-bold text-white mb-1.5 text-sm sm:text-base">Capabilities</p>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Prospects &amp; Verified Jobs</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Waterfall Enrichment</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Campaigns &amp; Sequences</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Opportunities &amp; Pipeline</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Segments &amp; Capture Forms</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Meetings &amp; Newsletters</a>
             </div>
 
+            {/* Column 3: Playbooks */}
             <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
-              <p className="font-semibold text-white mb-1">Playbooks</p>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Cold Email Outbound</a>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Verified Hiring Trigger</a>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Inbound Lead Follow-Up</a>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Deal Re-Engagement</a>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Product Newsletters</a>
+              <p className="font-bold text-white mb-1.5 text-sm sm:text-base">Playbooks</p>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Cold Email Outbound</a>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Verified Hiring Trigger</a>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Inbound Lead Follow-Up</a>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Deal Re-Engagement</a>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Product Newsletters</a>
             </div>
 
+            {/* Column 4: Company */}
             <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
-              <p className="font-semibold text-white mb-1">Company</p>
-              <a href="#pricing" className="text-slate-400 hover:text-white transition-colors">Pricing</a>
-              <a href="#faq" className="text-slate-400 hover:text-white transition-colors">FAQ</a>
-              <Link href="/login" className="text-slate-400 hover:text-white transition-colors">Log In</Link>
-              <Link href="/signup" className="text-slate-400 hover:text-white transition-colors">Get Started</Link>
-              <Link href="/privacy" className="text-slate-400 hover:text-white transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="text-slate-400 hover:text-white transition-colors">Terms of Service</Link>
+              <p className="font-bold text-white mb-1.5 text-sm sm:text-base">Company</p>
+              <a href="#pricing" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Pricing</a>
+              <a href="#testimonials" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Customer Stories</a>
+              <a href="#faq" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">FAQ</a>
+              <Link href="/login" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Log In</Link>
+              <Link href="/signup" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Get Started</Link>
+              <Link href="/privacy" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Privacy Policy</Link>
+              <Link href="/terms" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Terms of Service</Link>
             </div>
 
+          </div>
+
+          {/* Copyright & Security Strip */}
+          <div className="pt-6 border-t border-white/15 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-blue-100 font-medium">
+            <div>
+              &copy; {new Date().getFullYear()} Nxelio Inc. All rights reserved.
+            </div>
+            <div className="flex items-center gap-4 text-blue-100">
+              <span>🔒 SOC-2 &amp; GDPR Ready</span>
+              <span>·</span>
+              <span>256-bit Encryption</span>
+            </div>
           </div>
         </footer>
 
