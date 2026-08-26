@@ -1318,7 +1318,7 @@ export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = 
   const [showDemoModal, setShowDemoModal] = useState(false);
 
   return (
-    <div className="landing-page min-h-screen font-sans selection:bg-blue-200 selection:text-blue-950 overflow-x-hidden text-[#1f2223] landing-page-mesh-bg">
+    <div className="landing-page light min-h-screen font-sans selection:bg-blue-200 selection:text-blue-950 overflow-x-hidden text-[#1f2223] landing-page-mesh-bg">
       {notice && <PostSignupNotice notice={notice} />}
       <Navbar onBookDemo={() => setShowDemoModal(true)} />
       <Hero onBookDemo={() => setShowDemoModal(true)} />

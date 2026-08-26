@@ -1234,29 +1234,23 @@ textarea.landing-hero-textarea:active {
   box-shadow: 0 25px 40px -10px rgba(0, 0, 0, 0.12), 0 10px 20px -8px rgba(0, 0, 0, 0.08);
 }
 
-/* Glossy Glassmorphic Effects */
-.glossy-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.72) 100%) !important;
+/* Glossy Glassmorphic Effects - Pure White Format (Image 2 Style) */
+.glossy-card,
+.landing-page .glossy-card,
+html.dark .landing-page .glossy-card,
+html.dark .landing-page .landing-glass-card,
+.landing-page .landing-glass-card,
+.landing-glass-card {
+  background: rgba(255, 255, 255, 0.96) !important;
   backdrop-filter: blur(20px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.90) !important;
   box-shadow: 
-    0 12px 36px -8px rgba(0, 0, 0, 0.07),
-    0 4px 12px -2px rgba(0, 0, 0, 0.04),
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1.5px 1.5px 0 rgba(0, 0, 0, 0.03) !important;
+    0 18px 40px -10px rgba(15, 23, 42, 0.08),
+    0 6px 16px -4px rgba(15, 23, 42, 0.04),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.98) !important;
+  color: #1f2223 !important;
   position: relative;
-  overflow: visible !important;
-}
-
-html.dark .glossy-card {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.88) 0%, rgba(30, 41, 59, 0.70) 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 
-    0 16px 40px -10px rgba(0, 0, 0, 0.5),
-    0 4px 12px -2px rgba(0, 0, 0, 0.3),
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1.5px 1.5px 0 rgba(0, 0, 0, 0.4) !important;
   overflow: visible !important;
 }
 
@@ -1273,10 +1267,6 @@ html.dark .glossy-card {
   border-top-right-radius: inherit;
   pointer-events: none;
   z-index: 1;
-}
-
-html.dark .glossy-reflection::before {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.0) 100%);
 }
 
 /* Light sweep shimmer on hover */
@@ -1307,27 +1297,13 @@ html.dark .glossy-reflection::before {
   transform: rotate(25deg) translate(340%, 0);
 }
 
-html.dark .glossy-sweep::after {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.15),
-    rgba(255, 255, 255, 0.28),
-    rgba(255, 255, 255, 0.15),
-    transparent
-  );
-}
-
 /* Glossy bubble tail */
-.glossy-tail {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.75) 100%) !important;
+.glossy-tail,
+.landing-page .glossy-tail,
+html.dark .landing-page .glossy-tail {
+  background: rgba(255, 255, 255, 0.96) !important;
   backdrop-filter: blur(12px) !important;
-  border-color: rgba(255, 255, 255, 0.85) !important;
-}
-
-html.dark .glossy-tail {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.8) 100%) !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: #e2e8f0 !important;
 }
 
 /* Full Landing Page Radiant Blue Aurora / Gradient Mesh Background */
@@ -1345,30 +1321,6 @@ html.dark .glossy-tail {
   background-repeat: no-repeat;
 }
 
-/* Glassmorphic Landing Cards for clean contrast over the blue mesh (Image 2 format) */
-.landing-page .landing-glass-card,
-.landing-glass-card {
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.90) !important;
-  box-shadow: 
-    0 18px 40px -10px rgba(15, 23, 42, 0.09),
-    0 6px 16px -4px rgba(15, 23, 42, 0.04),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.98) !important;
-  color: #1f2223 !important;
-}
-
-.landing-page .glossy-card {
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.90) !important;
-  box-shadow: 
-    0 18px 40px -10px rgba(15, 23, 42, 0.09),
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.98) !important;
-  color: #1f2223 !important;
-}
 
 
 
