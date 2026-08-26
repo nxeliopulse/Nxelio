@@ -172,6 +172,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, ignored: "no-matching-lead" });
   }
 
+  // A reply is a real response from the lead — auto-advance them to
+  // "Contacted". Only moves New/Nurturing leads forward; never downgrades a
+  // lead already marked Qualified/Converted by later-stage work.
+  await db.from("leads").update({ status: "Contacted" }).eq("id", lead.id).in("status", ["New", "Nurturing"]);
+
   // Stop every active enrollment for this lead and count the reply.
   const { data: enrollments } = await db
     .from("outreach_enrollments")
