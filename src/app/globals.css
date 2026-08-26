@@ -1246,7 +1246,7 @@ textarea.landing-hero-textarea:active {
     inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.95),
     inset 0 -1.5px 1.5px 0 rgba(0, 0, 0, 0.03) !important;
   position: relative;
-  overflow: hidden;
+  overflow: visible !important;
 }
 
 html.dark .glossy-card {
@@ -1257,6 +1257,7 @@ html.dark .glossy-card {
     0 4px 12px -2px rgba(0, 0, 0, 0.3),
     inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.22),
     inset 0 -1.5px 1.5px 0 rgba(0, 0, 0, 0.4) !important;
+  overflow: visible !important;
 }
 
 /* Specular top glass reflection layer */
