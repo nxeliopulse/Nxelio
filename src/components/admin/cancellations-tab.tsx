@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import {
   ChevronDown, ChevronUp, Loader2, AlertTriangle, Video, CalendarCheck,
-  UserCheck, XCircle, Clock, PhoneOff, HelpCircle, RotateCcw,
+  UserCheck, XCircle, Clock, PhoneOff, HelpCircle, RotateCcw, Search, X,
 } from "lucide-react";
 import {
   updateCancellationTicket,
@@ -321,10 +321,26 @@ interface CancellationsTabProps {
 
 export function CancellationsTab({ initialRequests, calendarAccounts, calendarProviderStatus }: CancellationsTabProps) {
   const [requests, setRequests] = useState(initialRequests);
+  const [search, setSearch] = useState("");
 
   function updateTicket(id: string, patch: Record<string, unknown>) {
     setRequests(prev => prev.map(r => r.id === id ? { ...r, ...patch } as CancellationRequest : r));
   }
+
+  // Search only narrows the ticket list below — the stat cards and reason
+  // chart above stay computed from the full set, so a search doesn't make
+  // the overview numbers look like something changed on the account.
+  const filteredRequests = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return requests;
+    return requests.filter(r =>
+      r.customer_email.toLowerCase().includes(q) ||
+      (r.customer_name ?? "").toLowerCase().includes(q) ||
+      (r.plan_id ?? "").toLowerCase().includes(q) ||
+      REASON_LABELS[r.reason].toLowerCase().includes(q) ||
+      STATUS_LABELS[r.status].toLowerCase().includes(q)
+    );
+  }, [requests, search]);
 
   // Analytics from current state
   const total = requests.length;
@@ -408,17 +424,43 @@ export function CancellationsTab({ initialRequests, calendarAccounts, calendarPr
 
       {/* Tickets list */}
       <div>
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-          Cancellation Requests {total > 0 && `(${total})`}
-        </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Cancellation Requests {total > 0 && `(${filteredRequests.length === total ? total : `${filteredRequests.length} of ${total}`})`}
+          </h3>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by email, name, reason, status…"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-9 pr-8 py-2 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                title="Clear search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="h-3.5 w-3.5 text-slate-400" />
+              </button>
+            )}
+          </div>
+        </div>
         {requests.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-200 p-12 text-center">
             <XCircle className="h-8 w-8 text-slate-300 mx-auto mb-2" />
             <p className="text-sm text-slate-500 dark:text-slate-400">No cancellation requests yet.</p>
           </div>
+        ) : filteredRequests.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 p-12 text-center">
+            <Search className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">No requests match &quot;{search}&quot;.</p>
+          </div>
         ) : (
           <div className="space-y-3">
-            {requests.map(r => (
+            {filteredRequests.map(r => (
               <TicketRow key={r.id} ticket={r} onUpdate={updateTicket} />
             ))}
           </div>
