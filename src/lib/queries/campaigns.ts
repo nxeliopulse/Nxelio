@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/queries/audit-log";
 import { hasConnectedOutreachChannel } from "@/lib/queries/outreach-accounts";
+import { resolveUniqueName } from "@/lib/queries/name-uniqueness";
 import { revalidatePath } from "next/cache";
 
 const NO_OUTREACH_ACCOUNT_MESSAGE =
@@ -122,30 +123,58 @@ export async function getCampaignRecipients(campaignId: string): Promise<{ name:
   return { name: campaign?.campaign_name ?? null, leadIds };
 }
 
-export async function createCampaign(payload: Partial<CampaignRow>) {
-  if (!(await hasConnectedOutreachChannel())) throw new Error(NO_OUTREACH_ACCOUNT_MESSAGE);
+export type CampaignActionResult = { ok: true; campaign: CampaignRow } | { ok: false; error: string };
+
+/** `fallbackNameBase` is the name to auto-generate from (numbered "(1)", "(2)"...)
+ *  when `payload.campaign_name` is left blank — e.g. the chosen sequence template's
+ *  name. Defaults to "Untitled Campaign" when no template context is available.
+ *
+ *  Returns a result instead of throwing: this is invoked directly from client
+ *  event handlers (not a <form action>), and a thrown Error there surfaces as
+ *  a raw HTTP 500 instead of a catchable rejection — see name-uniqueness.ts. */
+export async function createCampaign(payload: Partial<CampaignRow>, fallbackNameBase: string = "Untitled Campaign"): Promise<CampaignActionResult> {
+  if (!(await hasConnectedOutreachChannel())) return { ok: false, error: NO_OUTREACH_ACCOUNT_MESSAGE };
   const supabase = await createClient();
+  const nameResult = await resolveUniqueName(supabase, {
+    table: "campaigns",
+    column: "campaign_name",
+    desiredName: payload.campaign_name,
+    fallbackBase: fallbackNameBase,
+    label: "campaign",
+  });
+  if (!nameResult.ok) return { ok: false, error: nameResult.error };
   const { data, error } = await supabase
     .from("campaigns")
-    .insert({ campaign_name: payload.campaign_name || "Untitled Campaign", status: "Draft", approval_status: "Draft", generated_by_ai: false, ...payload })
+    .insert({ status: "Draft", approval_status: "Draft", generated_by_ai: false, ...payload, campaign_name: nameResult.name })
     .select()
     .single();
-  // Throw a real Error (not the raw Postgrest object) — plain objects thrown from
-  // a server action can lose their message crossing back to the client, which
-  // then shows up as a blank/"null" error instead of the actual DB message.
-  if (error) throw new Error(error.message || "Couldn't create the campaign.");
+  if (error) return { ok: false, error: error.message || "Couldn't create the campaign." };
   revalidatePath("/campaigns");
   await logAudit({ action: "campaign.created", entityType: "campaign", entityId: data.id, entityLabel: data.campaign_name });
-  return data;
+  return { ok: true, campaign: data as CampaignRow };
 }
 
-export async function updateCampaign(id: string, payload: Partial<CampaignRow>) {
-  if (!(await hasConnectedOutreachChannel())) throw new Error(NO_OUTREACH_ACCOUNT_MESSAGE);
+export async function updateCampaign(id: string, payload: Partial<CampaignRow>, fallbackNameBase: string = "Untitled Campaign"): Promise<CampaignActionResult> {
+  if (!(await hasConnectedOutreachChannel())) return { ok: false, error: NO_OUTREACH_ACCOUNT_MESSAGE };
   const supabase = await createClient();
-  const { error } = await supabase.from("campaigns").update(payload).eq("id", id);
-  if (error) throw new Error(error.message || "Couldn't update the campaign.");
+  const finalPayload: Partial<CampaignRow> = { ...payload };
+  if (payload.campaign_name !== undefined) {
+    const nameResult = await resolveUniqueName(supabase, {
+      table: "campaigns",
+      column: "campaign_name",
+      desiredName: payload.campaign_name,
+      fallbackBase: fallbackNameBase,
+      excludeId: id,
+      label: "campaign",
+    });
+    if (!nameResult.ok) return { ok: false, error: nameResult.error };
+    finalPayload.campaign_name = nameResult.name;
+  }
+  const { data, error } = await supabase.from("campaigns").update(finalPayload).eq("id", id).select().single();
+  if (error) return { ok: false, error: error.message || "Couldn't update the campaign." };
   revalidatePath("/campaigns");
-  await logAudit({ action: "campaign.updated", entityType: "campaign", entityId: id, metadata: payload as Record<string, unknown> });
+  await logAudit({ action: "campaign.updated", entityType: "campaign", entityId: id, metadata: finalPayload as Record<string, unknown> });
+  return { ok: true, campaign: data as CampaignRow };
 }
 
 export async function deleteCampaign(id: string) {
@@ -156,7 +185,7 @@ export async function deleteCampaign(id: string) {
   await logAudit({ action: "campaign.deleted", entityType: "campaign", entityId: id });
 }
 
-export async function setCampaignStatus(id: string, status: string) {
+export async function setCampaignStatus(id: string, status: string): Promise<CampaignActionResult> {
   return updateCampaign(id, { status });
 }
 

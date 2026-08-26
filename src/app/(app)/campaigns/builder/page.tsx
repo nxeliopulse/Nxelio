@@ -92,7 +92,7 @@ export default function CampaignBuilderPage() {
   const { enabled: launchEnabled } = useFeatureKillSwitch("launch_campaign");
 
   const [tab, setTab] = useState<TabId>("leads");
-  const [name, setName] = useState("Untitled Campaign");
+  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<CampaignRow | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -432,20 +432,21 @@ export default function CampaignBuilderPage() {
       requires_approval: requiresApproval,
       generated_by_ai: usedAiGeneration,
     };
-    if (campaign) {
-      await updateCampaign(campaign.id, payload);
-      const updated = { ...campaign, ...payload } as CampaignRow;
-      setCampaign(updated);
-      return updated;
-    }
-    const created = await createCampaign(payload);
-    setCampaign(created);
-    return created;
+    // When the name is left blank, the server auto-names it from the chosen
+    // sequence template (falling back to "Untitled Campaign") — numbered to
+    // stay unique, since no two campaigns may share a name.
+    const templateBase = chosenTpl ? getCampaignTemplate(chosenTpl)?.name : undefined;
+    const result = campaign
+      ? await updateCampaign(campaign.id, payload, templateBase)
+      : await createCampaign(payload, templateBase);
+    if (!result.ok) throw new Error(result.error);
+    setCampaign(result.campaign);
+    setName(result.campaign.campaign_name);
+    return result.campaign;
   }
 
   function saveDraft() {
     setError(null);
-    if (!name.trim()) { setError("Campaign name required"); setTab("settings"); return; }
     start(async () => {
       try {
         await persist("Draft");
@@ -483,7 +484,6 @@ export default function CampaignBuilderPage() {
     setError(null);
     if (lists.length === 0) { setError("Add at least one list of leads before launching."); setTab("leads"); return; }
     if (!chosenTpl || sequence.length === 0 || !sequence.some((s) => s.subject || s.body)) { setError("Build a sequence first."); setTab("sequence"); return; }
-    if (!name.trim()) { setError("Campaign name required"); setTab("settings"); return; }
     if (!approvalGate) { setError("This campaign isn't approved yet — submit it for review first."); return; }
     const isScheduled = schedule === "Schedule for later";
     if (isScheduled && (!scheduledAt || new Date(scheduledAt).getTime() <= Date.now())) {
@@ -524,7 +524,7 @@ export default function CampaignBuilderPage() {
           <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" /> Back
           </Link>
-          <Input value={name} onChange={(e) => setName(e.target.value)} className="max-w-[280px] font-medium" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Untitled Campaign" className="max-w-[280px] font-medium" />
         </div>
         <div className="flex items-center gap-2">
           {/* One badge, not two — operational status (Active/Scheduled) only matters
@@ -1093,7 +1093,7 @@ export default function CampaignBuilderPage() {
           <Card className="p-5 space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Campaign name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Untitled Campaign" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Audience</label>

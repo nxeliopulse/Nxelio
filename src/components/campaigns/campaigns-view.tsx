@@ -306,8 +306,12 @@ export function CampaignsView({
     if (next === "Active" && r.kind === "email" && !accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); return; }
     start(async () => {
       try {
-        if (r.kind === "email") await setCampaignStatus(r.id, next);
-        else await setSequenceStatus(r.id, next);
+        if (r.kind === "email") {
+          const result = await setCampaignStatus(r.id, next);
+          if (!result.ok) toast(result.error, "error");
+        } else {
+          await setSequenceStatus(r.id, next);
+        }
       } catch (err) {
         toast(err instanceof Error ? err.message : "Couldn't update campaign status.", "error");
       }

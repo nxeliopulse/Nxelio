@@ -420,14 +420,15 @@ const create_campaign = def({
       const match = segments.find((s) => s.segment_name === args.segment_name) || segments.find((s) => s.segment_name.toLowerCase() === String(args.segment_name).toLowerCase());
       segmentId = match?.id ?? null;
     }
-    const c = await createCampaign({
+    const result = await createCampaign({
       campaign_name: String(args.campaign_name),
       subject: args.subject ? String(args.subject) : null,
       content: args.body ? String(args.body) : null,
       segment_id: segmentId,
       generated_by_ai: true,
     });
-    const id = c?.id ? String(c.id) : null;
+    if (!result.ok) throw ToolError.validation(result.error);
+    const id = result.campaign?.id ? String(result.campaign.id) : null;
     return {
       ok: true,
       detail: `Created draft campaign "${args.campaign_name}" (id ${String(id ?? "?").slice(0, 8)}...)`,
@@ -501,7 +502,8 @@ const update_campaign = def({
         return { day: `Day ${current.length + i + 1}`, subject, body };
       });
       const next = [...current, ...added].map((s) => `${s.day} — ${s.subject}\n${s.body}`).join("\n---\n");
-      await updateCampaign(campaignId, { content: next });
+      const stepResult = await updateCampaign(campaignId, { content: next });
+      if (!stepResult.ok) throw ToolError.provider(stepResult.error);
       return {
         ok: true,
         detail: `Added ${added.length} step${added.length === 1 ? "" : "s"} to campaign "${args.display}": ${added.map((s) => s.subject).join(" | ")}`,
@@ -513,7 +515,8 @@ const update_campaign = def({
       if (args[k] !== undefined) fields[k] = args[k];
     }
     if (!Object.keys(fields).length) throw ToolError.validation("No fields to update.");
-    await updateCampaign(campaignId, fields);
+    const updateResult = await updateCampaign(campaignId, fields);
+    if (!updateResult.ok) throw ToolError.validation(updateResult.error);
     return {
       ok: true,
       detail: `Updated campaign ${args.display}: ${Object.keys(fields).join(", ")}`,
@@ -556,8 +559,9 @@ const create_segment = def({
           field: r.field, operator: r.operator, value: r.value,
         }))
       : [];
-    const segment = await createSegment(String(args.name), String(args.description || ""), "Dynamic", flatRulesToTree(rules, "AND"));
-    const id = segment?.id ? String(segment.id) : null;
+    const result = await createSegment(String(args.name), String(args.description || ""), "Dynamic", flatRulesToTree(rules, "AND"));
+    if (!result.ok) throw ToolError.validation(result.error);
+    const id = result.segment?.id ? String(result.segment.id) : null;
     return {
       ok: true,
       detail: `Created segment "${args.name}" with ${rules.length} rule${rules.length === 1 ? "" : "s"}`,

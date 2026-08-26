@@ -132,7 +132,7 @@ export default function SegmentBuilderPage() {
   const [loading, setLoading] = useState(false);
   
   // Basic Settings
-  const [name, setName] = useState("Untitled Segment");
+  const [name, setName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [description, setDescription] = useState("");
   const [type, setType] = useState("Dynamic");
@@ -272,7 +272,6 @@ export default function SegmentBuilderPage() {
 
   function handleSave(targetStatus: "Draft" | "Active") {
     setError(null);
-    if (!name.trim()) { setError("Segment name is required"); return; }
     const ruleErrors = validateRuleTree(root);
     if (ruleErrors.length) { setError(ruleErrors[0]); return; }
     // A Static segment's membership is a fixed hand-picked list (see
@@ -286,8 +285,10 @@ export default function SegmentBuilderPage() {
     const effectiveType = hasAnyComplete(root) ? "Dynamic" : type;
     start(async () => {
       try {
-        if (editId) await updateSegment(editId, name.trim(), description, effectiveType, root, targetStatus);
-        else await createSegment(name.trim(), description, effectiveType, root, targetStatus);
+        const result = editId
+          ? await updateSegment(editId, name.trim(), description, effectiveType, root, targetStatus)
+          : await createSegment(name.trim(), description, effectiveType, root, targetStatus);
+        if (!result.ok) { setError(result.error); return; }
         setStatus(targetStatus);
         toast(targetStatus === "Draft" ? "Draft saved" : "Segment published", "success");
         router.push("/segments");
@@ -411,15 +412,16 @@ export default function SegmentBuilderPage() {
                 onChange={(e) => setName(e.target.value)}
                 onBlur={() => setIsEditingName(false)}
                 onKeyDown={(e) => e.key === "Enter" && setIsEditingName(false)}
+                placeholder="Untitled Segment"
                 className="text-2xl font-bold border-slate-200 h-9 bg-white text-slate-900 focus:border-[var(--primary)] w-[300px]"
                 autoFocus
               />
             ) : (
-              <h1 
-                onClick={() => setIsEditingName(true)} 
+              <h1
+                onClick={() => setIsEditingName(true)}
                 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 px-2 py-0.5 rounded cursor-pointer select-none transition-all group"
               >
-                {name} <Pencil className="h-4 w-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                {name || "Untitled Segment"} <Pencil className="h-4 w-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
               </h1>
             )}
             

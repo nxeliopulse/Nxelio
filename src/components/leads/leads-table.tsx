@@ -763,7 +763,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     setSegmentDialogOpen(false);
     setSelected([]);
     start(async () => {
-      await createStaticSegment(name, segmentDescription.trim(), ids);
+      const result = await createStaticSegment(name, segmentDescription.trim(), ids);
+      if (!result.ok) { toast(result.error, "error"); return; }
       toast(`Segment "${name}" created with ${ids.length} lead${ids.length === 1 ? "" : "s"}.`, "success");
     });
   }
@@ -785,8 +786,9 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     }
     setSelected([]);
     start(async () => {
-      const seg = await createStaticSegment(`Campaign audience (${count} leads)`, "", ids);
-      router.push(`/campaigns/builder?segment=${seg.id}`);
+      const result = await createStaticSegment(`Campaign audience (${count} leads)`, "", ids, { autoUnique: true });
+      if (!result.ok) { toast(result.error, "error"); return; }
+      router.push(`/campaigns/builder?segment=${result.segment.id}`);
     });
   }
 

@@ -170,13 +170,13 @@ export function CampaignDetailView({
     setEditIndex(null);
     const content = next.map(serializeStep).join("\n\n---\n\n").slice(0, 5000);
     start(async () => {
-      try {
-        await updateCampaign(campaign.id, { content, subject: next[0]?.subject || null });
-        toast("Step updated", "success");
-      } catch (err) {
+      const result = await updateCampaign(campaign.id, { content, subject: next[0]?.subject || null });
+      if (!result.ok) {
         setSteps(steps); // revert the optimistic edit
-        toast(err instanceof Error ? err.message : "Couldn't update this step.", "error");
+        toast(result.error, "error");
+        return;
       }
+      toast("Step updated", "success");
     });
   }
 
@@ -210,11 +210,10 @@ export function CampaignDetailView({
     if (next === "Active" && !accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); return; }
     setStatusLocal(next);
     start(async () => {
-      try {
-        await setCampaignStatus(campaign.id, next);
-      } catch (err) {
+      const result = await setCampaignStatus(campaign.id, next);
+      if (!result.ok) {
         setStatusLocal(original); // revert the optimistic flip
-        toast(err instanceof Error ? err.message : "Couldn't update campaign status.", "error");
+        toast(result.error, "error");
       }
     });
   }
@@ -249,26 +248,27 @@ export function CampaignDetailView({
   }
   function saveName() {
     start(async () => {
-      try {
-        await updateCampaign(campaign.id, { campaign_name: name.trim() || "Untitled Campaign" });
-        toast("Campaign updated", "success");
-      } catch (err) {
+      const result = await updateCampaign(campaign.id, { campaign_name: name.trim() });
+      if (!result.ok) {
         setName(campaign.campaign_name); // revert the optimistic edit
-        toast(err instanceof Error ? err.message : "Couldn't update the campaign name.", "error");
+        toast(result.error, "error");
+        return;
       }
+      setName(result.campaign.campaign_name);
+      toast("Campaign updated", "success");
     });
   }
   function toggleRequiresApproval(next: boolean) {
     if (status !== "Draft") return; // locked once the campaign has run — the Switch is also disabled, this is the backstop
     setRequiresApprovalLocal(next);
     start(async () => {
-      try {
-        await updateCampaign(campaign.id, { requires_approval: next });
-        toast(next ? "This campaign now requires approval before it can launch." : "Approval requirement removed — this campaign can launch directly.", "success");
-      } catch (err) {
+      const result = await updateCampaign(campaign.id, { requires_approval: next });
+      if (!result.ok) {
         setRequiresApprovalLocal(!next);
-        toast(err instanceof Error ? err.message : "Couldn't update this setting.", "error");
+        toast(result.error, "error");
+        return;
       }
+      toast(next ? "This campaign now requires approval before it can launch." : "Approval requirement removed — this campaign can launch directly.", "success");
     });
   }
   return (
@@ -605,11 +605,10 @@ export function CampaignDetailView({
                   if (nextStatus === "Active" && !accountsGate) { toast(ACCOUNTS_GATE_MESSAGE, "error"); return; }
                   setStatusLocal(nextStatus);
                   start(async () => {
-                    try {
-                      await setCampaignStatus(campaign.id, nextStatus);
-                    } catch (err) {
+                    const result = await setCampaignStatus(campaign.id, nextStatus);
+                    if (!result.ok) {
                       setStatusLocal(original);
-                      toast(err instanceof Error ? err.message : "Couldn't update campaign status.", "error");
+                      toast(result.error, "error");
                     }
                   });
                 }}

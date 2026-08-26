@@ -4,6 +4,7 @@ import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import { leadMatchesTree, hasAnyComplete, flatRulesToTree, isSuppressed, validateRuleTree, SEGMENT_FIELDS, type Group, type EvalRule } from "@/lib/segments";
 import type { LeadRow } from "@/lib/queries/leads";
+import { resolveUniqueName } from "@/lib/queries/name-uniqueness";
 
 // Only the columns a rule can match (see SEGMENT_FIELDS in lib/segments.ts),
 // plus the three suppression flags and the fields the sample-prospect preview
@@ -80,46 +81,69 @@ export async function getSegmentWithRules(id: string): Promise<{ segment: Segmen
   return { segment: withCreator, rule };
 }
 
-export async function createSegment(name: string, description: string, type: string, rule: Group, status: string = "Active") {
+export type SegmentActionResult = { ok: true; segment: SegmentRow } | { ok: false; error: string };
+
+/** Returns a result instead of throwing for a name collision: this is invoked
+ *  directly from client event handlers (not a <form action>), and a thrown
+ *  Error there surfaces as a raw HTTP 500 instead of a catchable rejection —
+ *  see name-uniqueness.ts. */
+export async function createSegment(name: string, description: string, type: string, rule: Group, status: string = "Active"): Promise<SegmentActionResult> {
   const errors = validateRuleTree(rule);
   if (errors.length) throw new Error(errors[0]);
 
   const supabase = await createClient();
+  const nameResult = await resolveUniqueName(supabase, {
+    table: "segments",
+    column: "segment_name",
+    desiredName: name,
+    fallbackBase: "Segment",
+    label: "segment",
+  });
+  if (!nameResult.ok) return { ok: false, error: nameResult.error };
   const { data: userData } = await supabase.auth.getUser();
   const { data: segment, error } = await supabase
     .from("segments")
-    .insert({ segment_name: name, description, segment_type: type, status, rule_json: rule, created_by: userData?.user?.id ?? null })
+    .insert({ segment_name: nameResult.name, description, segment_type: type, status, rule_json: rule, created_by: userData?.user?.id ?? null })
     .select()
     .single();
-  if (error) throw error;
+  if (error) return { ok: false, error: error.message || "Couldn't create the segment." };
 
   // Evaluate the rules now so the segment actually has members.
   await materializeSegmentMembers(segment.id);
 
   revalidatePath("/segments");
   await logAudit({ action: "segment.created", entityType: "segment", entityId: segment.id, entityLabel: segment.segment_name });
-  return segment;
+  return { ok: true, segment: segment as SegmentRow };
 }
 
 /** Updates an existing segment's name/rules and re-evaluates its members.
  *  `status` is optional — omit it to leave the segment's current status
  *  untouched (e.g. an Archived segment being re-materialized shouldn't
  *  silently flip back to Active). */
-export async function updateSegment(id: string, name: string, description: string, type: string, rule: Group, status?: string) {
+export async function updateSegment(id: string, name: string, description: string, type: string, rule: Group, status?: string): Promise<SegmentActionResult> {
   const errors = validateRuleTree(rule);
   if (errors.length) throw new Error(errors[0]);
 
   const supabase = await createClient();
-  const payload: Record<string, unknown> = { segment_name: name, description, segment_type: type, rule_json: rule };
+  const nameResult = await resolveUniqueName(supabase, {
+    table: "segments",
+    column: "segment_name",
+    desiredName: name,
+    fallbackBase: "Segment",
+    excludeId: id,
+    label: "segment",
+  });
+  if (!nameResult.ok) return { ok: false, error: nameResult.error };
+  const payload: Record<string, unknown> = { segment_name: nameResult.name, description, segment_type: type, rule_json: rule };
   if (status) payload.status = status;
-  const { error } = await supabase.from("segments").update(payload).eq("id", id);
-  if (error) throw error;
+  const { data: segment, error } = await supabase.from("segments").update(payload).eq("id", id).select().single();
+  if (error) return { ok: false, error: error.message || "Couldn't update the segment." };
 
   await materializeSegmentMembers(id);
 
   revalidatePath("/segments");
-  await logAudit({ action: "segment.updated", entityType: "segment", entityId: id, entityLabel: name });
-  return { id };
+  await logAudit({ action: "segment.updated", entityType: "segment", entityId: id, entityLabel: nameResult.name });
+  return { ok: true, segment: segment as SegmentRow };
 }
 
 export interface SegmentPreview {
@@ -362,26 +386,39 @@ export async function getSegmentPreviewBundle(rule: Group, days: number = 30): P
  * (see the segment_type guard there), which would otherwise wipe this exact
  * hand-picked list back down to whatever a (nonexistent) rule set matches.
  */
-export async function createStaticSegment(name: string, description: string, leadIds: string[]) {
+/** `autoUnique` — when true, a name collision is silently resolved with a
+ *  "(n)" suffix instead of being rejected; use this for names the caller
+ *  generated on the user's behalf (e.g. "Campaign audience (12 leads)")
+ *  rather than ones the user typed themselves. */
+export async function createStaticSegment(name: string, description: string, leadIds: string[], opts?: { autoUnique?: boolean }): Promise<SegmentActionResult> {
   const supabase = await createClient();
+  const nameResult = await resolveUniqueName(supabase, {
+    table: "segments",
+    column: "segment_name",
+    desiredName: name,
+    fallbackBase: "Segment",
+    label: "segment",
+    autoUnique: opts?.autoUnique,
+  });
+  if (!nameResult.ok) return { ok: false, error: nameResult.error };
   const { data: segment, error } = await supabase
     .from("segments")
-    .insert({ segment_name: name, description, segment_type: "Static", status: "Active" })
+    .insert({ segment_name: nameResult.name, description, segment_type: "Static", status: "Active" })
     .select()
     .single();
-  if (error) throw error;
+  if (error) return { ok: false, error: error.message || "Couldn't create the segment." };
 
   if (leadIds.length > 0) {
     const { error: memberErr } = await supabase
       .from("segment_members")
       .insert(leadIds.map((lead_id) => ({ segment_id: segment.id, lead_id })));
-    if (memberErr) throw memberErr;
+    if (memberErr) return { ok: false, error: memberErr.message || "Couldn't add leads to the segment." };
   }
 
   revalidatePath("/segments");
   revalidatePath("/leads");
   await logAudit({ action: "segment.created", entityType: "segment", entityId: segment.id, entityLabel: segment.segment_name, metadata: { type: "Static", count: leadIds.length } });
-  return segment;
+  return { ok: true, segment: segment as SegmentRow };
 }
 
 /**
