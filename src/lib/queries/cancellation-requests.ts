@@ -1,11 +1,11 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { isPlatformAdmin } from "@/lib/queries/platform-admin";
+import { isPlatformAdmin, getPlatformAdminWorkspaceId } from "@/lib/queries/platform-admin";
 import { sendEmail } from "@/lib/email/resend";
 import { stripe } from "@/lib/stripe";
 import { syncSubscriptionFromStripe } from "@/lib/queries/subscriptions";
 import { createZoomMeetingLink } from "@/lib/queries/zoom-accounts";
-import { createGoogleMeetLink } from "@/lib/queries/calendar-accounts";
+import { createGoogleMeetLinkForWorkspace } from "@/lib/queries/calendar-accounts";
 import type { PlanId, BillingInterval } from "@/lib/queries/subscriptions";
 import { mapStripeStatus } from "@/lib/queries/subscription-types";
 import { PLAN_CREDITS, PLAN_LEADS } from "@/lib/stripe";
@@ -45,12 +45,14 @@ export async function submitCancellationRequest(
 
   const admin = createAdminClient();
 
-  // Block duplicate submissions — one open ticket per workspace is enough
+  // Block duplicate submissions — one open ticket per workspace is enough.
+  // "cancelled"/"retained"/"reactivated" are all resolved/closed states, so
+  // they don't block a customer from opening a fresh request later.
   const { data: existing } = await admin
     .from("cancellation_requests")
     .select("id")
     .eq("workspace_id", workspaceId)
-    .not("status", "in", '("cancelled","retained")')
+    .not("status", "in", '("cancelled","retained","reactivated")')
     .maybeSingle();
   if (existing) return { ok: false, error: "A cancellation request is already open for your account. Our team will be in touch shortly." };
 
@@ -91,7 +93,83 @@ export async function submitCancellationRequest(
     html: adminNotificationHtml({ input, ticketId: row.id }),
   }).catch(() => null);
 
+  // Google Meet is generated automatically right here using the company's
+  // shared calendar connection — the customer never needs their own calendar
+  // connected, and no admin action is required. Zoom stays manual (admin
+  // clicks "Create Meeting Link") — out of scope for this automation.
+  if (input.wantsMeeting && input.meetingProvider === "google_meet" && input.preferredDate) {
+    await generateAndAttachMeeting(admin, {
+      id: row.id,
+      meeting_provider: "google_meet",
+      preferred_date: input.preferredDate,
+      preferred_time: input.preferredTime ?? null,
+      customer_email: input.customerEmail,
+      customer_name: input.customerName ?? null,
+    });
+    // Failure is non-fatal — the ticket still exists, the ack email already
+    // went out, and the admin's manual "Create Meeting Link" button remains
+    // a working retry path (e.g. if the company calendar token expired).
+  }
+
   return { ok: true, ticketId: row.id };
+}
+
+// ── Shared meeting-generation logic ─────────────────────────────────────────────
+// Used both by the automatic path above (Google Meet, at submission time) and
+// the admin's manual "Create Meeting Link" button below — one place owns
+// "create the link, save it on the ticket, email the customer."
+
+interface MeetingTicketFields {
+  id: string;
+  meeting_provider: "zoom" | "google_meet" | null;
+  preferred_date: string | null;
+  preferred_time: string | null;
+  customer_email: string;
+  customer_name: string | null;
+}
+
+async function generateAndAttachMeeting(
+  admin: ReturnType<typeof createAdminClient>,
+  ticket: MeetingTicketFields
+): Promise<{ ok: boolean; joinUrl?: string; error?: string }> {
+  if (!ticket.meeting_provider) return { ok: false, error: "No meeting provider specified on this ticket" };
+  if (!ticket.preferred_date) return { ok: false, error: "No preferred date specified" };
+
+  const startIso = buildStartIso(ticket.preferred_date, ticket.preferred_time ?? "10:00");
+  const endIso = new Date(new Date(startIso).getTime() + 30 * 60 * 1000).toISOString();
+  const title = `Nxelio Retention Call — ${ticket.customer_email}`;
+
+  let joinUrl: string;
+  if (ticket.meeting_provider === "zoom") {
+    const res = await createZoomMeetingLink({ title, startIso, endIso });
+    if (!res.ok) return { ok: false, error: res.error };
+    joinUrl = res.joinUrl;
+  } else {
+    // Uses the platform admin's own connected calendar as the one shared
+    // "company account" — never the requesting customer's workspace, which
+    // has no connection of its own and shouldn't need one for this.
+    const companyWorkspaceId = await getPlatformAdminWorkspaceId();
+    if (!companyWorkspaceId) return { ok: false, error: "Company calendar isn't set up yet." };
+    const res = await createGoogleMeetLinkForWorkspace(companyWorkspaceId, {
+      title, startIso, endIso, attendeeEmails: [ticket.customer_email],
+    });
+    if (!res.ok) return { ok: false, error: res.error };
+    joinUrl = res.joinUrl;
+  }
+
+  await admin.from("cancellation_requests").update({
+    meeting_link: joinUrl,
+    meeting_scheduled_at: startIso,
+    status: "meeting_scheduled",
+  }).eq("id", ticket.id);
+
+  await sendEmail({
+    to: ticket.customer_email,
+    subject: "Your meeting with the Nxelio team is confirmed",
+    html: meetingConfirmedHtml({ name: ticket.customer_name, joinUrl, preferredDate: ticket.preferred_date, preferredTime: ticket.preferred_time }),
+  }).catch(() => null);
+
+  return { ok: true, joinUrl };
 }
 
 // ── Admin actions ──────────────────────────────────────────────────────────────
@@ -140,38 +218,14 @@ export async function createMeetingForTicket(
   if (!ticket) return { ok: false, error: "Ticket not found" };
 
   const t = ticket as CancellationRequest;
-  if (!t.meeting_provider) return { ok: false, error: "No meeting provider specified on this ticket" };
-  if (!t.preferred_date) return { ok: false, error: "No preferred date specified" };
-
-  const startIso = buildStartIso(t.preferred_date, t.preferred_time ?? "10:00");
-  const endIso = new Date(new Date(startIso).getTime() + 30 * 60 * 1000).toISOString();
-  const title = `Nxelio Retention Call — ${t.customer_email}`;
-
-  let joinUrl: string;
-  if (t.meeting_provider === "zoom") {
-    const res = await createZoomMeetingLink({ title, startIso, endIso });
-    if (!res.ok) return { ok: false, error: res.error };
-    joinUrl = res.joinUrl;
-  } else {
-    const res = await createGoogleMeetLink({ title, startIso, endIso, attendeeEmails: [t.customer_email] });
-    if (!res.ok) return { ok: false, error: res.error };
-    joinUrl = res.joinUrl;
-  }
-
-  await admin.from("cancellation_requests").update({
-    meeting_link: joinUrl,
-    meeting_scheduled_at: startIso,
-    status: "meeting_scheduled",
-  }).eq("id", ticketId);
-
-  // Email the customer their meeting link
-  await sendEmail({
-    to: t.customer_email,
-    subject: "Your meeting with the Nxelio team is confirmed",
-    html: meetingConfirmedHtml({ name: t.customer_name, joinUrl, preferredDate: t.preferred_date!, preferredTime: t.preferred_time }),
-  }).catch(() => null);
-
-  return { ok: true, joinUrl };
+  return generateAndAttachMeeting(admin, {
+    id: t.id,
+    meeting_provider: t.meeting_provider,
+    preferred_date: t.preferred_date,
+    preferred_time: t.preferred_time,
+    customer_email: t.customer_email,
+    customer_name: t.customer_name,
+  });
 }
 
 export async function adminCancelSubscription(

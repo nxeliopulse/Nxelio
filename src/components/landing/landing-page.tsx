@@ -214,7 +214,7 @@ function HeroPromptSearch() {
             onClick={() => handleChipClick(p, idx)}
             className="rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 text-xs transition-colors truncate max-w-[280px] sm:max-w-none text-left"
           >
-            "{p.slice(0, 42)}..."
+            {`"${p.slice(0, 42)}..."`}
           </button>
         ))}
       </div>
@@ -287,6 +287,7 @@ function PainPointHighlights() {
       Icon: Search,
       heading: "Find leads in seconds",
       desc: "Live web search for verified decision-makers matching your exact ICP — emails, phones, and buying signals included.",
+      image: "/illustrations/landing-prospecting.png",
       preview: (
         <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
           <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 mb-3">
@@ -316,6 +317,7 @@ function PainPointHighlights() {
       Icon: Send,
       heading: "Launch campaigns instantly",
       desc: "AI writes personalized multi-step email and LinkedIn sequences in your brand voice. Describe your ICP and watch outreach go live.",
+      image: "/illustrations/landing-outreach.png",
       preview: (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-4">
           <div className="flex gap-1.5 mb-3">
@@ -344,6 +346,7 @@ function PainPointHighlights() {
       Icon: Cpu,
       heading: "Automate your pipeline",
       desc: "Build deal-stage automations with intelligent guidance. Tell it what you want and watch leads flow through your entire funnel.",
+      image: "/illustrations/landing-analytics.png",
       preview: (
         <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm flex flex-col items-center">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-emerald-500 px-3 py-1.5 rounded-full mb-4">
@@ -394,7 +397,7 @@ function PainPointHighlights() {
                     : "bg-white/70 border border-slate-200/80 shadow-sm"
                 }`}
               >
-                <span className={`inline-flex self-start items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-6 ${card.pillClass}`}>
+                <span className={`inline-flex self-start items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-5 ${card.pillClass}`}>
                   <PillIcon className="w-3.5 h-3.5" /> {card.pillLabel}
                 </span>
 
@@ -404,7 +407,16 @@ function PainPointHighlights() {
                   </div>
                   <h3 className="text-lg font-bold text-[#1f2223]">{card.heading}</h3>
                 </div>
-                <p className="text-sm text-slate-600 leading-relaxed mb-6">{card.desc}</p>
+                <p className="text-sm text-slate-600 leading-relaxed mb-5">{card.desc}</p>
+
+                {/* Illustration Card Image */}
+                <div className="mb-5 flex justify-center items-center h-44 bg-slate-50/90 rounded-2xl p-3 border border-slate-100 overflow-hidden group">
+                  <img
+                    src={card.image}
+                    alt={card.heading}
+                    className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                  />
+                </div>
 
                 <div className="mt-auto">{card.preview}</div>
               </div>
@@ -524,6 +536,7 @@ function CapabilitiesSection() {
       id: "prospecting",
       tabTitle: "One-Prompt Prospecting",
       badge: "Discovery",
+      image: "/illustrations/landing-prospecting.png",
       heading: "Search the live web for exact ICP matches in seconds.",
       description: "Stop relying on 6-month-old static databases. Nxelio deploys parallel AI agents to crawl live company websites, press releases, hiring boards, and social posts to find active decision makers.",
       features: [
@@ -545,6 +558,7 @@ function CapabilitiesSection() {
       id: "enrichment",
       tabTitle: "Waterfall Enrichment",
       badge: "Enrichment",
+      image: "/illustrations/landing-analytics.png",
       heading: "Enrich every contact with verified work emails and direct dials.",
       description: "Our multi-provider waterfall ensures 95%+ email deliverability. Every contact record includes verified business email, LinkedIn URL, mobile number, company headcount, and revenue tier.",
       features: [
@@ -566,6 +580,7 @@ function CapabilitiesSection() {
       id: "signals",
       tabTitle: "Live Buying Signals",
       badge: "Signals",
+      image: "/illustrations/landing-analytics.png",
       heading: "Reach buyers at the exact moment their budget unlocks.",
       description: "Track trigger events that signal buying intent: new executive hires, funding rounds, new job postings for your buyer personas, and tech stack changes. Reach out before competitors even notice.",
       features: [
@@ -587,6 +602,7 @@ function CapabilitiesSection() {
       id: "outbound",
       tabTitle: "Autonomous Multi-Channel",
       badge: "Outreach",
+      image: "/illustrations/landing-outreach.png",
       heading: "Hyper-personalized email & LinkedIn copy written for each prospect.",
       description: "No robotic templates. Nxelio AI drafts context-aware emails referencing their latest news, podcast appearances, and company pain points. Sent with smart inbox rotation to protect domain reputation.",
       features: [
@@ -618,10 +634,10 @@ function CapabilitiesSection() {
             What Nxelio Handles For You
           </p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight leading-tight">
-            Here's what I actually handle for you.
+            Here&apos;s what I actually handle for you.
           </h2>
           <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
-            Find the right people. Reach out with context. Track new buying signals. Automate what's next.
+            Find the right people. Reach out with context. Track new buying signals. Automate what&apos;s next.
           </p>
         </div>
 
@@ -689,6 +705,15 @@ function CapabilitiesSection() {
               <span className="text-[11px] font-medium bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full">
                 AI Agent Active
               </span>
+            </div>
+
+            {/* Capability Illustration */}
+            <div className="mb-5 flex items-center justify-center h-44 bg-slate-50/70 rounded-2xl p-3 border border-slate-100 overflow-hidden">
+              <img
+                src={current.image}
+                alt={current.heading}
+                className="max-h-full max-w-full object-contain transition-all duration-300"
+              />
             </div>
 
             <div className="bg-slate-50 rounded-xl p-4 sm:p-5 font-mono text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border border-slate-100 mb-6">
@@ -986,7 +1011,7 @@ function TestimonialsSection() {
                 {q.metric}
               </div>
               <p className="text-xl sm:text-2xl md:text-3xl font-medium text-[#1f2223] leading-relaxed mb-6 max-w-3xl">
-                "{q.text}"
+                &ldquo;{q.text}&rdquo;
               </p>
               <div className="font-bold text-base text-slate-900">{q.author}</div>
               <div className="text-xs sm:text-sm text-slate-500">{q.role}</div>

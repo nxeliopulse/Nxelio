@@ -30,6 +30,14 @@ function fmtCents(cents: number) {
 function annualMonthly(cents: number) {
   return `$${((cents / 100) / 12).toFixed(2)}`;
 }
+/** Real annual discount vs. paying monthly all year — computed from the
+ *  actual DB prices so it can never drift out of sync after a reprice
+ *  (a previous version hardcoded "17%" and a stale price table that both
+ *  stopped matching the real prices after several repricings). */
+function annualSavePct(monthlyCents: number, annualCents: number): number {
+  if (!monthlyCents) return 0;
+  return Math.round((1 - annualCents / (monthlyCents * 12)) * 100);
+}
 function trialDaysLeft(endsAt: string | null) {
   if (!endsAt) return 0;
   return Math.max(0, Math.ceil((new Date(endsAt).getTime() - Date.now()) / 86_400_000));
@@ -90,13 +98,6 @@ const PLAN_ROWS: Record<string, Array<{ label: string; included: boolean }>> = {
     { label: "2,000 AI-discovered leads / mo", included: true  },
     { label: "Priority support",         included: true  },
   ],
-};
-
-// Annual prices — 2 months free (~17% off monthly), rounded to clean values
-const ANNUAL_DISPLAY: Record<string, { monthly: number; yearly: number; savePct: number }> = {
-  basic:   { monthly: 7.50,  yearly: 90.00,   savePct: 17 },
-  starter: { monthly: 49.00, yearly: 588.00,  savePct: 17 },
-  pro:     { monthly: 116.00, yearly: 1392.00, savePct: 17 },
 };
 
 const TOP_UP_PACKS = [
@@ -200,6 +201,13 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
   const leadsPct       = credPct(leadsRemaining, leadsTotal);
 
   const planOrder: Record<string, number> = { basic: 0, starter: 1, pro: 2 };
+
+  // Shown on the Monthly/Annual toggle before a specific plan is picked —
+  // averaged across plans so it stays representative even if plans ever
+  // diverge from a single flat discount rate.
+  const avgAnnualSavePct = plans.length
+    ? Math.round(plans.reduce((sum, p) => sum + annualSavePct(p.monthly_price_cents, p.annual_price_cents), 0) / plans.length)
+    : 0;
 
   // ── Actions ────────────────────────────────────────────────
 
@@ -525,8 +533,8 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                 className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${interval === iv ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
               >
                 {iv === "monthly" ? "Monthly" : "Annual"}
-                {iv === "annual" && (
-                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Save 17%</span>
+                {iv === "annual" && avgAnnualSavePct > 0 && (
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Save {avgAnnualSavePct}%</span>
                 )}
               </button>
             ))}
@@ -568,15 +576,13 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
             const isCurrent            = plan.id === currentPlanId && interval === currentInterval;
             const isSamePlanDiffInterval = plan.id === currentPlanId && interval !== currentInterval;
             const isPopular            = plan.id === "starter";
-            const annualData           = ANNUAL_DISPLAY[plan.id];
             const price = interval === "monthly"
               ? fmtCents(plan.monthly_price_cents)
-              : annualData ? `$${annualData.monthly.toFixed(2)}` : annualMonthly(plan.annual_price_cents);
+              : annualMonthly(plan.annual_price_cents);
             const annualNote = interval === "annual"
-              ? annualData
-                ? `Billed $${annualData.yearly.toFixed(2)}/year`
-                : `Billed ${fmtCents(plan.annual_price_cents)}/year`
+              ? `Billed ${fmtCents(plan.annual_price_cents)}/year`
               : null;
+            const planSavePct = annualSavePct(plan.monthly_price_cents, plan.annual_price_cents);
             const isUp      = planOrder[plan.id] > planOrder[currentPlanId];
             const rows      = PLAN_ROWS[plan.id] ?? [];
 
@@ -609,8 +615,8 @@ export function BillingView({ subscription: sub, plans, leadsCount, sentCount, p
                   </div>
                   <h3 className="font-bold text-lg text-slate-900">{plan.name}</h3>
                   {isCurrent && <Badge className="ml-auto text-xs">Current</Badge>}
-                  {isSamePlanDiffInterval && interval === "annual" && (
-                    <Badge className="ml-auto text-xs bg-emerald-50 text-emerald-700">Save {annualData?.savePct ?? 17}%</Badge>
+                  {isSamePlanDiffInterval && interval === "annual" && planSavePct > 0 && (
+                    <Badge className="ml-auto text-xs bg-emerald-50 text-emerald-700">Save {planSavePct}%</Badge>
                   )}
                 </div>
                 <p className="text-sm text-slate-500 mb-4">{PLAN_DESC[plan.id]}</p>

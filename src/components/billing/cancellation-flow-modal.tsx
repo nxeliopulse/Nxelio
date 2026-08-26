@@ -72,17 +72,26 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
         preferredDate: wantsMeeting ? preferredDate : undefined,
         preferredTime: wantsMeeting ? preferredTime : undefined,
       };
-      const res = await fetch("/api/billing/cancel-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        setError(json.error ?? "Something went wrong — please try again.");
-        return;
+      // The app patches window.fetch to throw on any non-2xx response (for the
+      // background-error toast system) instead of just returning it — without
+      // a try/catch here, a server error would throw past this component and
+      // trip the nearest route error boundary (a full-page "Internal Server
+      // Error" screen) instead of the inline red banner this modal already has.
+      try {
+        const res = await fetch("/api/billing/cancel-request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (!res.ok || json.error) {
+          setError(json.error ?? "Something went wrong — please try again.");
+          return;
+        }
+        setSubmitted(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong — please try again.");
       }
-      setSubmitted(true);
     });
   }
 
@@ -98,11 +107,11 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
       <div className="p-5 space-y-5">
         {submitted ? (
           <div className="text-center py-4 space-y-3">
-            <div className="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
-              <Calendar className="h-7 w-7 text-emerald-600" />
+            <div className="h-14 w-14 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center mx-auto">
+              <Calendar className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900">We&apos;ve received your request</h3>
-            <p className="text-sm text-slate-600">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">We&apos;ve received your request</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
               Your subscription stays <strong>active</strong> while we review your request.
               {wantsMeeting ? " We'll send you a meeting invite at your preferred time." : " A member of our team will reach out to you shortly."}
             </p>
@@ -114,32 +123,50 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
             {step === 1 && (
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-slate-700 mb-2">What&apos;s your main reason for cancelling?</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-2">What&apos;s your main reason for cancelling?</p>
                   <div className="space-y-2">
-                    {REASON_OPTIONS.map(([value, label]) => (
-                      <label key={value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${reason === value ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}>
-                        <input
-                          type="radio"
-                          name="reason"
-                          value={value}
-                          checked={reason === value}
-                          onChange={() => setReason(value)}
-                          className="accent-blue-600"
-                        />
-                        <span className="text-sm text-slate-700">{label}</span>
-                      </label>
-                    ))}
+                    {REASON_OPTIONS.map(([value, label]) => {
+                      const isSelected = reason === value;
+                      return (
+                        <label
+                          key={value}
+                          className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                            isSelected
+                              ? "border-blue-500 bg-blue-50/80 dark:bg-blue-950/60 dark:border-blue-500 shadow-xs"
+                              : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="reason"
+                            value={value}
+                            checked={isSelected}
+                            onChange={() => setReason(value)}
+                            className="accent-blue-600 h-4 w-4"
+                          />
+                          <span
+                            className={`text-sm ${
+                              isSelected
+                                ? "text-blue-950 dark:text-blue-100 font-semibold"
+                                : "text-slate-700 dark:text-slate-200 font-normal"
+                            }`}
+                          >
+                            {label}
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-700 mb-1 block">Additional feedback (optional)</label>
+                  <label className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-1 block">Additional feedback (optional)</label>
                   <textarea
                     value={feedback}
                     onChange={e => setFeedback(e.target.value)}
                     rows={3}
                     maxLength={1000}
                     placeholder="Tell us more about your experience…"
-                    className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -149,18 +176,26 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
             {step === 2 && (
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-slate-700 mb-1">Would you like to speak with our team before cancelling?</p>
-                  <p className="text-xs text-slate-500 mb-3">We may be able to help resolve your concerns or make a special offer.</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-1">Would you like to speak with our team before cancelling?</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">We may be able to help resolve your concerns or make a special offer.</p>
                   <div className="flex gap-3">
                     <button
                       onClick={() => setWantsMeeting(true)}
-                      className={`flex-1 p-3 rounded-lg border text-sm font-medium transition-colors ${wantsMeeting === true ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-700 hover:border-slate-300"}`}
+                      className={`flex-1 p-3 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
+                        wantsMeeting === true
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-100 font-semibold"
+                          : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700"
+                      }`}
                     >
                       Yes, I&apos;d like a call
                     </button>
                     <button
                       onClick={() => setWantsMeeting(false)}
-                      className={`flex-1 p-3 rounded-lg border text-sm font-medium transition-colors ${wantsMeeting === false ? "border-slate-400 bg-slate-50 text-slate-700" : "border-slate-200 text-slate-700 hover:border-slate-300"}`}
+                      className={`flex-1 p-3 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
+                        wantsMeeting === false
+                          ? "border-slate-400 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold"
+                          : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700"
+                      }`}
                     >
                       No thanks
                     </button>
@@ -168,9 +203,9 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
                 </div>
 
                 {wantsMeeting && (
-                  <div className="space-y-3 p-4 rounded-lg bg-slate-50 border border-slate-200">
+                  <div className="space-y-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                     <div>
-                      <label className="text-sm font-medium text-slate-700 mb-1 block flex items-center gap-1.5">
+                      <label className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-1 block flex items-center gap-1.5">
                         <Video className="h-4 w-4 text-slate-400" /> Meeting platform
                       </label>
                       <div className="flex gap-2">
@@ -178,7 +213,11 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
                           <button
                             key={p}
                             onClick={() => setMeetingProvider(p)}
-                            className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${meetingProvider === p ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-700 hover:border-slate-300"}`}
+                            className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors cursor-pointer ${
+                              meetingProvider === p
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-100 font-semibold"
+                                : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600"
+                            }`}
                           >
                             {p === "zoom" ? "Zoom" : "Google Meet"}
                           </button>
@@ -186,7 +225,7 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-slate-700 mb-1 block flex items-center gap-1.5">
+                      <label className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-1 block flex items-center gap-1.5">
                         <Calendar className="h-4 w-4 text-slate-400" /> Preferred date
                       </label>
                       <input
@@ -194,17 +233,17 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
                         value={preferredDate}
                         min={todayIso}
                         onChange={e => setPreferredDate(e.target.value)}
-                        className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-slate-700 mb-1 block flex items-center gap-1.5">
+                      <label className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-1 block flex items-center gap-1.5">
                         <Clock className="h-4 w-4 text-slate-400" /> Preferred time (UTC)
                       </label>
                       <select
                         value={preferredTime}
                         onChange={e => setPreferredTime(e.target.value)}
-                        className="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
@@ -217,36 +256,36 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
             {/* ── Step 3: Review ─────────────────────────────────── */}
             {step === 3 && (
               <div className="space-y-3">
-                <p className="text-sm font-medium text-slate-700">Please review your request before submitting:</p>
-                <div className="rounded-lg border border-slate-200 divide-y divide-slate-100">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Please review your request before submitting:</p>
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 divide-y divide-slate-100 dark:divide-slate-800">
                   <div className="px-4 py-3 flex justify-between text-sm">
-                    <span className="text-slate-500">Reason</span>
-                    <span className="font-medium text-slate-800">{reason ? REASON_LABELS[reason as CancellationReason] : "—"}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Reason</span>
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{reason ? REASON_LABELS[reason as CancellationReason] : "—"}</span>
                   </div>
                   {feedback && (
                     <div className="px-4 py-3 text-sm">
-                      <span className="text-slate-500 block mb-1">Feedback</span>
-                      <span className="text-slate-800">{feedback}</span>
+                      <span className="text-slate-500 dark:text-slate-400 block mb-1">Feedback</span>
+                      <span className="text-slate-900 dark:text-slate-100">{feedback}</span>
                     </div>
                   )}
                   <div className="px-4 py-3 flex justify-between text-sm">
-                    <span className="text-slate-500">Meeting requested</span>
-                    <span className="font-medium text-slate-800">{wantsMeeting ? "Yes" : "No"}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Meeting requested</span>
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{wantsMeeting ? "Yes" : "No"}</span>
                   </div>
                   {wantsMeeting && (
                     <>
                       <div className="px-4 py-3 flex justify-between text-sm">
-                        <span className="text-slate-500">Platform</span>
-                        <span className="font-medium text-slate-800">{meetingProvider === "zoom" ? "Zoom" : "Google Meet"}</span>
+                        <span className="text-slate-500 dark:text-slate-400">Platform</span>
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{meetingProvider === "zoom" ? "Zoom" : "Google Meet"}</span>
                       </div>
                       <div className="px-4 py-3 flex justify-between text-sm">
-                        <span className="text-slate-500">Preferred date & time</span>
-                        <span className="font-medium text-slate-800">{preferredDate} {preferredTime} UTC</span>
+                        <span className="text-slate-500 dark:text-slate-400">Preferred date & time</span>
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{preferredDate} {preferredTime} UTC</span>
                       </div>
                     </>
                   )}
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Your subscription will remain <strong>active</strong> while we review your request.
                   We&apos;ll follow up via email.
                 </p>
@@ -255,9 +294,9 @@ export function CancellationFlowModal({ open, onClose, subscription }: Props) {
 
             {/* ── Error ──────────────────────────────────────────── */}
             {error && (
-              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2.5">
+              <div className="flex items-start gap-2 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 px-3 py-2.5">
                 <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-red-700">{error}</p>
+                <p className="text-xs text-red-700 dark:text-red-300">{error}</p>
               </div>
             )}
 

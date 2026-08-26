@@ -50,10 +50,6 @@ export async function submitDemoRequest(input: DemoRequestInput): Promise<DemoRe
 
   if (!fullName) return { ok: false, error: "Please enter your name." };
   if (!businessEmail.includes("@")) return { ok: false, error: "Please enter a valid business email." };
-  if (!phone) return { ok: false, error: "Please enter your phone number." };
-  if (!input.industry) return { ok: false, error: "Please select your industry." };
-  if (!input.employeeCount) return { ok: false, error: "Please select your company size." };
-  if (!input.monthlyRevenue) return { ok: false, error: "Please select your monthly revenue." };
   if (!input.date) return { ok: false, error: "Please pick an available date." };
 
   const meetingStartAt = combineDateTime(input.date, input.hour, input.minute, input.meridiem);
@@ -100,10 +96,10 @@ export async function submitDemoRequest(input: DemoRequestInput): Promise<DemoRe
     `New demo request booked via the landing page.\n\n` +
     `Name: ${fullName}\n` +
     `Business email: ${businessEmail}\n` +
-    `Phone: ${phone}\n` +
-    `Industry: ${input.industry}\n` +
-    `Employees: ${input.employeeCount}\n` +
-    `Monthly revenue: ${input.monthlyRevenue}\n` +
+    `Phone: ${phone || "-"}\n` +
+    `Industry: ${input.industry || "-"}\n` +
+    `Employees: ${input.employeeCount || "-"}\n` +
+    `Monthly revenue: ${input.monthlyRevenue || "-"}\n` +
     `Purpose: ${purpose || "-"}\n` +
     `How they heard about us: ${input.referralSource || "-"}\n` +
     `Requested time: ${formattedDate} at ${requestedTime}\n` +

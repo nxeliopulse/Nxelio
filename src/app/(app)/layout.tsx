@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { isDeviceTrusted } from "@/lib/queries/email-verification";
 import { AppShell } from "@/components/layout/app-shell";
 import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { getSubscription } from "@/lib/queries/subscriptions";
@@ -21,16 +20,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // reasons, so without this it would hit the same onboarding/subscription
   // gates as any customer. Send it straight to the admin panel instead.
   if (await isPlatformAdmin()) redirect("/admin");
-
-  // OAuth users (Google, LinkedIn) skip the login OTP gate — they already
-  // went through their provider's own 2FA. Email+password users only need to
-  // verify a code once per device (at signup or their first login on it) —
-  // isDeviceTrusted() checks the long-lived trust cookie set by that step.
-  const provider = (user.app_metadata as { provider?: string } | null)?.provider;
-  const isOAuth = provider === "google" || provider === "linkedin_oidc";
-  if (!isOAuth && !(await isDeviceTrusted(user.id))) {
-    redirect(`/verify-login?email=${encodeURIComponent(user.email ?? "")}`);
-  }
 
   // If an admin removed this login's access to its currently-active workspace
   // (updateUserStatus on workspace_members) since their last request, their

@@ -7,7 +7,7 @@
  * period-ends Stripe state.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { stripe, PLAN_CREDITS, PLAN_LEADS } from "@/lib/stripe";
 import { syncSubscriptionFromStripe } from "@/lib/queries/subscriptions";
 import { mapStripeStatus } from "@/lib/queries/subscription-types";
@@ -55,6 +55,16 @@ export async function POST(_req: NextRequest) {
       cancelAtPeriodEnd:    updated.cancel_at_period_end,
       canceledAt:           updated.canceled_at ? new Date(updated.canceled_at * 1000) : null,
     });
+
+    // If this workspace had a cancellation ticket that was actually cancelled,
+    // reflect the reversal in the admin panel — otherwise it would show
+    // "Cancelled" forever even though the subscription is active again.
+    const admin = createAdminClient();
+    await admin
+      .from("cancellation_requests")
+      .update({ status: "reactivated", resolved_at: new Date().toISOString() })
+      .eq("workspace_id", profile.workspace_id)
+      .eq("status", "cancelled");
 
     return NextResponse.json({ ok: true, cancelAtPeriodEnd: updated.cancel_at_period_end });
   } catch (err: unknown) {

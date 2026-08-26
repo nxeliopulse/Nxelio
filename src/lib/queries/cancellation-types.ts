@@ -27,7 +27,8 @@ export type CancellationStatus =
   | "retained"
   | "cancelled"
   | "follow_up_required"
-  | "no_response";
+  | "no_response"
+  | "reactivated";
 
 export interface CancellationRequest {
   id: string;

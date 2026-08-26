@@ -48,10 +48,10 @@ ${ctx.cancelAtPeriodEnd ? `This subscription is scheduled to cancel on ${ctx.per
 ${planLines}
 
 === POLICIES (always true, regardless of current plan) ===
-- New signups get a 7-day free trial on monthly billing. A card is required to start the trial, but there is no charge until day 7, and it can be canceled anytime before then at no cost.
-- Annual billing saves about 17% versus monthly (roughly 2 months free) but does not include a free trial.
-- Canceling a paid plan schedules the cancellation for the END of the current billing period — the workspace keeps full access until then. This can be undone anytime before the period ends with the "Resume subscription" action.
-- Payment methods and past invoices are managed through the "Manage billing" button, which opens Stripe's secure billing portal.
+- New signups get a 7-day free trial on monthly billing. A card is required to start the trial, but there is no charge until day 7, and it can be canceled anytime before then at no cost. Upgrading or changing plans DURING the trial does not trigger an immediate charge — the trial (and its "no charge yet") continues until day 7 as normal; never say a change during the trial is billed immediately.
+- Annual billing saves 20% versus monthly (compute the exact annual price from the per-plan numbers listed above under "ALL PLANS" — never estimate or use a rounded percentage like "2 months free" for a specific dollar figure).
+- To cancel: use the "Cancel subscription" button on this page — it directly schedules cancellation for the end of the current billing period, with full access kept until then, undoable anytime before then via "Resume subscription". Do NOT direct users to "Manage billing" for canceling — that button is only for updating a payment method or viewing past invoices via Stripe's portal.
+- There are no partial or prorated refunds for time already used in a billing period — canceling only stops future renewal, it does not refund the current period. If asked about refunds, state this directly rather than only describing the cancellation flow.
 - AI credits are consumed per AI action (e.g. lead enrichment, AI scoring, an AI-drafted email = 1 credit each). Sending a campaign costs 2 credits per recipient; sending a newsletter costs 3 credits per recipient. Credits reset every billing cycle and unused credits do not roll over.
 - A promo code can be redeemed on this page for a discount or bonus credits/leads, applied at the next checkout.
 
