@@ -16,6 +16,7 @@ import { DemoCallAdminTab } from "@/components/admin/demo-call-admin-tab";
 import type { DemoCallPerson, DemoCallSlot } from "@/lib/queries/demo-call-admin";
 import { CancellationsTab } from "@/components/admin/cancellations-tab";
 import type { CancellationRequest } from "@/lib/queries/cancellation-types";
+import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 import { Modal } from "@/components/ui/modal";
 import { WhatsAppConnectorView } from "@/components/settings/connectors-view";
 import type { OutreachAccountRow } from "@/lib/queries/outreach-accounts";
@@ -68,6 +69,8 @@ export function AdminDashboard({
   demoCallPeople,
   demoCallSlots,
   cancellationRequests,
+  calendarAccounts,
+  calendarProviderStatus,
 }: {
   stats: PlatformOverviewStats;
   hotCustomers: HotCustomerRow[];
@@ -86,6 +89,8 @@ export function AdminDashboard({
   demoCallPeople: DemoCallPerson[];
   demoCallSlots: DemoCallSlot[];
   cancellationRequests: CancellationRequest[];
+  calendarAccounts: CalendarAccountRow[];
+  calendarProviderStatus: { google: boolean; microsoft: boolean };
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
@@ -96,6 +101,16 @@ export function AdminDashboard({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from the DOM class on mount (SSR has no access to it)
     setIsDark(document.documentElement.classList.contains("dark"));
+
+    // Land on the requested tab after an OAuth round-trip (e.g. the calendar
+    // connect flow returns to /admin?tab=cancellations) — the tab list here
+    // is client-side state, not URL-driven, so without this the user would
+    // land back on "Overview" and have to re-find their way to Cancellations.
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && TABS.some(t => t.id === requested)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from a URL param on mount
+      setTab(requested as (typeof TABS)[number]["id"]);
+    }
   }, []);
 
   function toggleTheme() {
@@ -237,7 +252,13 @@ export function AdminDashboard({
           <WhatsAppConnectorView isSuperAdmin whatsappAccounts={whatsappAccounts} connectorReady={unipileConfigured} />
         )}
         {tab === "feature-access" && <FeatureKillSwitchesTab initialSwitches={featureKillSwitches} />}
-        {tab === "cancellations" && <CancellationsTab initialRequests={cancellationRequests} />}
+        {tab === "cancellations" && (
+          <CancellationsTab
+            initialRequests={cancellationRequests}
+            calendarAccounts={calendarAccounts}
+            calendarProviderStatus={calendarProviderStatus}
+          />
+        )}
       </div>
     </div>
   );

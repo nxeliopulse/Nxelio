@@ -12,6 +12,8 @@ import {
 } from "@/lib/queries/cancellation-requests";
 import type { CancellationRequest, CancellationStatus } from "@/lib/queries/cancellation-types";
 import { REASON_LABELS } from "@/lib/queries/cancellation-types";
+import { CalendarConnections } from "@/components/settings/calendar-connections";
+import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 
 // "pending" is labeled differently depending on audience: the customer's own
 // confirmation screen/email says "cancellation request received" (unchanged),
@@ -313,9 +315,11 @@ function Field({ label, value }: { label: string; value: string }) {
 
 interface CancellationsTabProps {
   initialRequests: CancellationRequest[];
+  calendarAccounts: CalendarAccountRow[];
+  calendarProviderStatus: { google: boolean; microsoft: boolean };
 }
 
-export function CancellationsTab({ initialRequests }: CancellationsTabProps) {
+export function CancellationsTab({ initialRequests, calendarAccounts, calendarProviderStatus }: CancellationsTabProps) {
   const [requests, setRequests] = useState(initialRequests);
 
   function updateTicket(id: string, patch: Record<string, unknown>) {
@@ -344,8 +348,28 @@ export function CancellationsTab({ initialRequests }: CancellationsTabProps) {
     { label: "Follow-up Required", value: byStatus("follow_up_required"), color: "text-purple-700 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-900/20" },
   ];
 
+  const googleConnected = calendarAccounts.some(a => a.provider === "google" && a.status === "connected");
+
   return (
     <div className="space-y-6">
+      {/* Calendar connection — lives here (not under Settings) because the
+          platform-admin login can't reach /settings at all; the (app) layout
+          redirects it straight back to /admin. This is the only place it can
+          actually connect Google Calendar, which "Create Meeting Link" below
+          depends on. */}
+      {!googleConnected && (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+          <CalendarConnections
+            accounts={calendarAccounts}
+            providerStatus={calendarProviderStatus}
+            zoomAccounts={[]}
+            zoomConfigured={false}
+            bookingSlug={null}
+            redirectTo="/admin?tab=cancellations"
+          />
+        </div>
+      )}
+
       {/* Analytics */}
       <div>
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Overview</h3>
