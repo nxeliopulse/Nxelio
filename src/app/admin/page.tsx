@@ -15,6 +15,7 @@ import { getFeatureKillSwitches } from "@/lib/queries/feature-kill-switches";
 import { getDemoRequests } from "@/lib/queries/demo-requests-admin";
 import { getDemoCallPeople, getDemoCallSlots } from "@/lib/queries/demo-call-admin";
 import { getCancellationRequests } from "@/lib/queries/cancellation-requests";
+import { getCalendarAccounts, getCalendarProviderStatus } from "@/lib/queries/calendar-accounts";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 
 export default async function AdminPage() {
@@ -36,6 +37,8 @@ export default async function AdminPage() {
     demoCallPeople,
     demoCallSlots,
     cancellationRequests,
+    calendarAccounts,
+    calendarProviderStatus,
   ] = await Promise.all([
     getPlatformOverviewStats(),
     getHotCustomers(),
@@ -54,6 +57,8 @@ export default async function AdminPage() {
     getDemoCallPeople(),
     getDemoCallSlots(),
     getCancellationRequests(),
+    getCalendarAccounts(),
+    getCalendarProviderStatus(),
   ]);
   const whatsappAccounts = outreachAccounts.filter((a) => a.channel === "whatsapp");
 
@@ -76,6 +81,8 @@ export default async function AdminPage() {
       demoCallPeople={demoCallPeople}
       demoCallSlots={demoCallSlots}
       cancellationRequests={cancellationRequests}
+      calendarAccounts={calendarAccounts}
+      calendarProviderStatus={calendarProviderStatus}
     />
   );
 }

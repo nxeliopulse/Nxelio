@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
     preferredTime: (body.preferredTime as string | undefined) || undefined,
   });
 
-  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 });
+  // Honour the status the query layer chose (409 duplicate, 400 no-subscription,
+  // 401 signed-out); only a genuine failure falls through to 500.
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status ?? 500 });
   return NextResponse.json({ ok: true, ticketId: result.ticketId });
 }

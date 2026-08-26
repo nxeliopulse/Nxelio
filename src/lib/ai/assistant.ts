@@ -159,7 +159,7 @@ Q: Can I cancel anytime?
 A: Yes — you can cancel and unsubscribe for next month at any time. You'll still be charged for the current month, and that charge is non-refundable.
 
 Q: Is there a free trial?
-A: You can start free and upgrade whenever you're ready — a credit card is required to begin on Basic.
+A: Yes — every new workspace starts on a 7-day free trial of the Basic plan. A credit card is required to begin. Upgrade whenever you're ready.
 
 Q: Can I buy more leads without upgrading to the next plan?
 A: Yes. If you need extra volume, you can purchase a top-up of 1,000 additional leads (1,000 credits) for the same price as the Pro plan ($149), on top of your current plan — no need to upgrade tiers to get more leads.

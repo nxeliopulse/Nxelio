@@ -12,18 +12,29 @@ import { disconnectZoom, type ZoomAccountRow } from "@/lib/queries/zoom-accounts
 
 const PROVIDER_LABEL: Record<string, string> = { google: "Google Calendar", microsoft: "Microsoft / Outlook" };
 
+function withNext(href: string, redirectTo: string | undefined): string {
+  return redirectTo ? `${href}?next=${encodeURIComponent(redirectTo)}` : href;
+}
+
 export function CalendarConnections({
   accounts,
   providerStatus,
   zoomAccounts,
   zoomConfigured,
   bookingSlug,
+  redirectTo,
 }: {
   accounts: CalendarAccountRow[];
   providerStatus: { google: boolean; microsoft: boolean };
   zoomAccounts: ZoomAccountRow[];
   zoomConfigured: boolean;
   bookingSlug?: string | null;
+  // Where the OAuth round-trip should land afterward. Defaults to Settings
+  // (unset), but the platform-admin login can never reach /settings — the
+  // (app) layout redirects it straight to /admin — so the admin dashboard
+  // renders this same component with redirectTo="/admin" to keep the whole
+  // connect → consent → land-back flow on a page that account can see.
+  redirectTo?: string;
 }) {
   const [pending, start] = useTransition();
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
@@ -101,13 +112,13 @@ export function CalendarConnections({
 
       {/* Connect buttons */}
       <div className="flex flex-wrap gap-3">
-        <a href="/api/calendar/google/connect" aria-disabled={!providerStatus.google} className={!providerStatus.google ? "pointer-events-none opacity-50" : ""}>
+        <a href={withNext("/api/calendar/google/connect", redirectTo)} aria-disabled={!providerStatus.google} className={!providerStatus.google ? "pointer-events-none opacity-50" : ""}>
           <Button variant="outline"><Plus className="h-4 w-4" /> Connect Google Calendar</Button>
         </a>
-        <a href="/api/calendar/microsoft/connect" aria-disabled={!providerStatus.microsoft} className={!providerStatus.microsoft ? "pointer-events-none opacity-50" : ""}>
+        <a href={withNext("/api/calendar/microsoft/connect", redirectTo)} aria-disabled={!providerStatus.microsoft} className={!providerStatus.microsoft ? "pointer-events-none opacity-50" : ""}>
           <Button variant="outline"><Plus className="h-4 w-4" /> Connect Outlook Calendar</Button>
         </a>
-        <a href="/api/zoom/connect" aria-disabled={!zoomConfigured} className={!zoomConfigured ? "pointer-events-none opacity-50" : ""}>
+        <a href={withNext("/api/zoom/connect", redirectTo)} aria-disabled={!zoomConfigured} className={!zoomConfigured ? "pointer-events-none opacity-50" : ""}>
           <Button variant="outline"><Plus className="h-4 w-4" /> Connect Zoom</Button>
         </a>
       </div>

@@ -4,7 +4,7 @@ import { sendEmail } from "@/lib/email/resend";
 import { generateConferenceLink } from "@/lib/meetings/conference-link";
 import { getLiveRepForSlot } from "@/lib/queries/demo-call-admin";
 
-const SALES_NOTIFY_EMAIL = "anu.ramachandran@gmail.com";
+const SALES_NOTIFY_EMAIL = "anu@nxelio.ai";
 
 export interface DemoRequestInput {
   fullName: string;
