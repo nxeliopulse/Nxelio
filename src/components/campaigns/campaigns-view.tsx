@@ -19,6 +19,7 @@ import { formatDate, cn } from "@/lib/utils";
 import { usePageTour } from "@/components/tour/use-page-tour";
 import { CAMPAIGNS_TOUR_STEPS } from "@/components/tour/tour-registry";
 import { getOutreachAccounts } from "@/lib/queries/outreach-accounts";
+import { detectCampaignChannel } from "@/lib/campaigns/channel";
 
 const ACCOUNTS_GATE_MESSAGE = "Connect an email or LinkedIn account before creating, editing, or running campaigns.";
 
@@ -41,21 +42,13 @@ interface UnifiedRow {
   href: string;
 }
 
-/** A campaign's own step content decides its channel — multichannel sequences
- *  embed LinkedIn steps as "[li:...]" header markers alongside plain email
- *  steps (see parseCampaignSteps in campaign-scheduler.ts), so a campaign with
- *  both kinds of step is genuinely multichannel, not just "email". */
+/** A campaign's own step content decides its channel — see detectCampaignChannel
+ *  in @/lib/campaigns/channel for the shared parsing logic (also used by
+ *  enrollment eligibility, so a campaign's badge and its actual send
+ *  requirements never drift apart). */
 export function campaignChannelLabel(content: string | null): "Email" | "LinkedIn" | "Multichannel" {
-  if (!content || !content.trim()) return "Email";
-  const blocks = content.split(/\n+\s*---\s*\n+/);
-  let hasLinkedIn = false, hasEmail = false;
-  for (const block of blocks) {
-    const header = (block.trim().split("\n")[0] || "");
-    if (/\[li:(connection_request|linkedin_message|message)\]/i.test(header)) hasLinkedIn = true;
-    else hasEmail = true;
-  }
-  if (hasLinkedIn && hasEmail) return "Multichannel";
-  return hasLinkedIn ? "LinkedIn" : "Email";
+  const channel = detectCampaignChannel(content);
+  return channel === "linkedin" ? "LinkedIn" : channel === "multichannel" ? "Multichannel" : "Email";
 }
 
 export function ChannelBadge({ label }: { label: "Email" | "LinkedIn" | "Multichannel" }) {

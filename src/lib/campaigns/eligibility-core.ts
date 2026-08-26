@@ -30,7 +30,7 @@ export interface EligibilityResult {
 
 export interface CampaignEligibilityRules {
   requireVerifiedEmail?: boolean;
-  channel?: "email" | "linkedin";
+  channel?: "email" | "linkedin" | "multichannel";
   /** Max campaigns this lead may be simultaneously active in (this campaign's own setting). */
   maxActivePerLead?: number;
   minDaysBetweenCampaigns?: number;
@@ -46,6 +46,7 @@ export function checkLeadEligibility(
 
   if (channel === "email" && !lead.email) reasons.push("no_email");
   if (channel === "linkedin" && !lead.linkedin) reasons.push("missing_channel_contact");
+  if (channel === "multichannel" && !lead.email && !lead.linkedin) reasons.push("missing_channel_contact");
   if (rules.requireVerifiedEmail && lead.email_verification_status !== "valid") reasons.push("email_unverified");
   if (lead.email_opt_out) reasons.push("unsubscribed");
   if (lead.do_not_contact) reasons.push("do_not_contact");

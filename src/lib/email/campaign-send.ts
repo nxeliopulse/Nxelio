@@ -134,7 +134,8 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow, 
   // in the Enrollment Monitor with a real reason, never silently dropped),
   // then only the real ELIGIBLE subset actually gets sent to below. This is
   // the fix for campaign sends never having rechecked suppression before.
-  await createEnrollments(campaignId, campaign.segment_id ?? null, matchedLeads);
+  const enrollChannel = usedChannels.length > 1 ? "multichannel" : usedChannels[0];
+  await createEnrollments(campaignId, campaign.segment_id ?? null, matchedLeads, { channel: enrollChannel });
   const leads = matchedLeads.filter((l) => !isSuppressed(l));
 
   if (leads.length === 0) {

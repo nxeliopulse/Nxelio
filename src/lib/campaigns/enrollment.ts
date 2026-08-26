@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { checkLeadEligibility, type CampaignEligibilityRules, type EligibilityLead } from "./eligibility-core";
 import { isSuppressed } from "@/lib/segments";
+import { detectCampaignChannel } from "./channel";
 
 /** Minimal shape needed to create an enrollment — works with LeadRow or StepLead. */
 type EnrollableLead = EligibilityLead & { id: string };
@@ -74,6 +75,13 @@ export async function createEnrollments(
   if (!rows.length) return { created: 0, skipped: leads.length };
   const { error } = await supabase.from("campaign_enrollments").insert(rows);
   if (error) { console.error("createEnrollments error:", error); return { created: 0, skipped: leads.length }; }
+
+  // Actively-enrolled leads move to "Nurturing" — they're now being worked by
+  // a campaign. Skip Converted leads: enrollment shouldn't regress a closed lead.
+  const activeLeadIds = rows.filter((r) => r.status === "active").map((r) => r.lead_id);
+  if (activeLeadIds.length) {
+    await supabase.from("leads").update({ status: "Nurturing" }).in("id", activeLeadIds).neq("status", "Converted");
+  }
 
   revalidatePath("/campaigns");
   return { created: rows.length, skipped: leads.length - rows.length };
@@ -223,10 +231,13 @@ export async function addProspectsToCampaign(
   // client-side once a campaign has launched, but that alone can't be trusted
   // (a direct call could bypass it). A running campaign's audience is a
   // frozen snapshot, same principle as the Launch-button re-click guard.
-  const { data: campaignRow } = await supabase.from("campaigns").select("status").eq("id", campaignId).single();
+  const { data: campaignRow } = await supabase.from("campaigns").select("status, content").eq("id", campaignId).single();
   if (campaignRow && campaignRow.status !== "Draft") {
     return { convertedSegmentToStatic: false, created: 0, skipped: leads.length, locked: true };
   }
+  // Which contact field a lead must have depends on the campaign's actual
+  // channel — a LinkedIn sequence needs a LinkedIn URL, not an email.
+  const channel = detectCampaignChannel(campaignRow?.content ?? null);
 
   let convertedSegmentToStatic = false;
 
@@ -242,7 +253,7 @@ export async function addProspectsToCampaign(
     );
   }
 
-  const { created, skipped } = await createEnrollments(campaignId, segmentId, leads);
+  const { created, skipped } = await createEnrollments(campaignId, segmentId, leads, { channel });
   revalidatePath("/campaigns");
   return { convertedSegmentToStatic, created, skipped };
 }

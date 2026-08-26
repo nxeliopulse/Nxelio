@@ -256,11 +256,13 @@ export default function CampaignBuilderPage() {
   // send path uses (never a separate ad-hoc count).
   useEffect(() => {
     let cancelled = false;
-    summarizeAudienceEligibility(campaign?.id ?? null, audienceLeads).then((s) => {
+    const channels = new Set(sequence.map((s) => s.channel));
+    const channel = channels.size > 1 ? "multichannel" : (sequence[0]?.channel ?? "email");
+    summarizeAudienceEligibility(campaign?.id ?? null, audienceLeads, { channel }).then((s) => {
       if (!cancelled) setEligibilitySummary(s.matched === 0 ? null : s);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [audienceLeads, campaign?.id]);
+  }, [audienceLeads, campaign?.id, sequence]);
 
   /** Opens a full leads table for one list — cached per list so repeat clicks are instant. */
   async function viewList(l: LeadList) {
