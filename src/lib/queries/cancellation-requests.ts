@@ -33,15 +33,15 @@ export interface SubmitCancellationInput {
 
 export async function submitCancellationRequest(
   input: SubmitCancellationInput
-): Promise<{ ok: boolean; ticketId?: string; error?: string }> {
+): Promise<{ ok: boolean; ticketId?: string; error?: string; status?: number }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not authenticated" };
+  if (!user) return { ok: false, error: "Not authenticated", status: 401 };
 
   // Resolve workspace from subscriptions (RLS scopes to current user's workspace)
   const { data: sub } = await supabase.from("subscriptions").select("workspace_id").maybeSingle();
   const workspaceId = sub?.workspace_id;
-  if (!workspaceId) return { ok: false, error: "No subscription found" };
+  if (!workspaceId) return { ok: false, error: "No subscription found", status: 400 };
 
   const admin = createAdminClient();
 
@@ -53,8 +53,10 @@ export async function submitCancellationRequest(
     .select("id")
     .eq("workspace_id", workspaceId)
     .not("status", "in", '("cancelled","retained","reactivated")')
+    .limit(1)
     .maybeSingle();
-  if (existing) return { ok: false, error: "A cancellation request is already open for your account. Our team will be in touch shortly." };
+  // 409, not 500 — the request was understood and refused on purpose.
+  if (existing) return { ok: false, error: "A cancellation request is already open for your account. Our team will be in touch shortly.", status: 409 };
 
   const { data: row, error } = await admin.from("cancellation_requests").insert({
     workspace_id: workspaceId,
@@ -70,7 +72,7 @@ export async function submitCancellationRequest(
     status: "pending",
   }).select("id").single();
 
-  if (error || !row) return { ok: false, error: error?.message ?? "Failed to create ticket" };
+  if (error || !row) return { ok: false, error: error?.message ?? "Failed to create ticket", status: 500 };
 
   // Email to customer
   await sendEmail({

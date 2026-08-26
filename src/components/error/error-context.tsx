@@ -153,9 +153,28 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
         const response = await originalFetch(input, init);
         
         if (!response.ok) {
+          // Read the server's own JSON error first. Routes return actionable
+          // messages ("a cancellation request is already open for your
+          // account"), and this interceptor used to discard them and throw a
+          // generic status-code message instead — so a normal business rule
+          // reached the user as "something went wrong on our servers".
+          // Clone, because the caller still needs to read the body itself.
+          let serverMessage: string | undefined;
+          try {
+            const data = await response.clone().json();
+            const m = (data as Record<string, unknown> | null)?.error ?? (data as Record<string, unknown> | null)?.message;
+            if (typeof m === "string" && m.trim()) serverMessage = m.trim();
+          } catch { /* non-JSON body — fall back to the status-code message */ }
+
           const errorDetails = mapErrorDetails(response.status, response.statusText, url);
+          // Only trust the server's wording for 4xx. A 5xx message is usually a
+          // raw internal error (a Postgres message, a stack detail) that should
+          // not be shown to a customer, so those keep the generic text.
+          if (serverMessage && response.status >= 400 && response.status < 500) {
+            errorDetails.message = serverMessage;
+          }
           const appError = new AppError(errorDetails);
-          
+
           // 404 is ignored for suggestion/autocomplete APIs to prevent toast spam.
           const isSilent = url.includes("/suggest") || url.includes("/search") || url.includes("/autocomplete");
 
@@ -167,7 +186,7 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
           ) {
             pushToast(appError);
           }
-          
+
           throw appError;
         }
         
