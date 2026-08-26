@@ -347,16 +347,16 @@ export function TestimonialsBentoSection() {
 
             {/* CARD 7: Side-by-Side Split Card with Deep Curved Corners */}
             {(activeTab === "all" || activeTab === "sales") && (
-              <div className={`relative glossy-card rounded-[38px] overflow-hidden hover-lift-card group ${animationsEnabled ? "animate-float-2" : ""}`}>
-                <div className="grid grid-cols-5 items-stretch min-h-[180px]">
+              <div className={`relative glossy-card rounded-[38px] overflow-hidden isolate hover-lift-card group ${animationsEnabled ? "animate-float-2" : ""}`}>
+                <div className="grid grid-cols-5 items-stretch min-h-[180px] rounded-[38px] overflow-hidden">
                   
-                  {/* Left Half: Photo */}
-                  <div className="col-span-2 relative bg-slate-200">
+                  {/* Left Half: Photo with matching left rounded curve */}
+                  <div className="col-span-2 relative bg-slate-200 rounded-l-[38px] overflow-hidden">
                     <Image
                       src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80"
                       alt="Henry Vance"
                       fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="object-cover rounded-l-[38px] group-hover:scale-105 transition-transform duration-500"
                       unoptimized
                     />
                   </div>

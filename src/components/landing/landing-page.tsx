@@ -272,6 +272,26 @@ function Hero({ onBookDemo }: { onBookDemo: () => void }) {
           </span>
         </h1>
 
+        {/* Big 7-Day Free Trial CTA Button */}
+        <div className="mt-8 sm:mt-10 flex flex-col items-center justify-center gap-3">
+          <Link
+            href="/signup"
+            className="group inline-flex items-center gap-3.5 sm:gap-4 rounded-full bg-white hover:bg-slate-50 text-[#1f2223] font-extrabold px-7 sm:px-9 py-4 sm:py-4.5 shadow-2xl shadow-blue-950/20 hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer text-base sm:text-xl border-2 border-white/80"
+          >
+            <span className="flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md group-hover:scale-110 transition-transform">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-300 text-amber-300 animate-star-twinkle" />
+            </span>
+            <span className="tracking-tight">
+              Start Your 7-Day Free Trial
+            </span>
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 group-hover:translate-x-1 transition-transform" />
+          </Link>
+
+          <p className="text-xs sm:text-sm text-blue-100 font-medium">
+            ⚡ Full AI Access · Setup in under 2 minutes · Cancel anytime
+          </p>
+        </div>
+
         <ul className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2.5 mt-8 text-xs sm:text-sm font-medium text-blue-50">
           <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1">
             <span className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center font-bold text-xs">🎯</span>
@@ -886,12 +906,13 @@ function PlaybooksSection() {
 function IntegrationsSection() {
   const tools = [
     { name: "Email", category: "Gmail & Outlook", icon: "✉️" },
-    { name: "LinkedIn", category: "Outreach", icon: "💼" },
-    { name: "WhatsApp", category: "Outreach", icon: "💬" },
+    { name: "LinkedIn", category: "Outreach & Sync", icon: "💼" },
     { name: "Google Calendar", category: "Meeting Scheduling", icon: "📅" },
     { name: "Microsoft Calendar", category: "Meeting Scheduling", icon: "🗓️" },
     { name: "Zoom", category: "Video Meeting Links", icon: "🎥" },
-    { name: "CSV Import", category: "Bring Your Own List", icon: "📄" }
+    { name: "CSV Import", category: "Bring Your Own List", icon: "📄" },
+    { name: "Stripe Billing", category: "Payments & Invoicing", icon: "💳" },
+    { name: "Custom Webhooks", category: "API & Automations", icon: "⚡" }
   ];
 
   return (
@@ -906,7 +927,7 @@ function IntegrationsSection() {
             Connect seamlessly with the tools you rely on.
           </h2>
           <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
-            Connect your email, LinkedIn, and WhatsApp for outreach, sync your calendar for automated booking, generate Zoom links, and import your existing CSV lists.
+            Connect your email and LinkedIn for outreach, sync your calendar for automated booking, generate Zoom links, and import your existing CSV lists.
           </p>
         </div>
 
