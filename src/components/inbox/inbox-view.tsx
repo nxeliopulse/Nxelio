@@ -269,23 +269,23 @@ export function InboxView({ conversations, embedded = false, campaignId }: Inbox
       {!embedded && <PageHeader title="Smart Inbox" description="Unified inbox for all campaign replies" />}
 
       <Card className="overflow-hidden border border-slate-200/90 shadow-sm">
-        <div className={cn("grid grid-cols-1 lg:grid-cols-[300px_1fr]", embedded ? "h-[520px]" : "h-[calc(100vh-220px)] min-h-[520px]")}>
+        <div className={cn("grid grid-cols-1 lg:grid-cols-[300px_1fr]", embedded ? "h-[700px]" : "h-[calc(100vh-220px)] min-h-[520px]")}>
           {/* Conversation list */}
           <div className="border-r border-slate-100 flex flex-col bg-white">
-            <div className="p-3 border-b border-slate-100 space-y-2">
+            <div className="p-2 border-b border-slate-100 space-y-1.5">
               <Input
                 leftIcon={<Search className="h-4 w-4" />}
                 placeholder="Search messages..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-8 text-xs bg-slate-50 border-slate-200"
+                className="h-7 text-xs bg-slate-50 border-slate-200"
               />
               <div className="flex items-center gap-1">
                 {(["all", "unread", "replied"] as const).map((f) => (
                   <button
                     key={f}
                     onClick={() => setFilter(f)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize transition-colors ${
                       filter === f ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-600 hover:bg-slate-100"
                     }`}
                   >
@@ -335,9 +335,9 @@ export function InboxView({ conversations, embedded = false, campaignId }: Inbox
           {/* Conversation view */}
           {active ? (
             <div className="flex flex-col h-full min-h-0 bg-white">
-              <div className="p-3 px-5 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold flex items-center justify-center shadow-xs">
+              <div className="p-2 px-4 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-bold flex items-center justify-center shadow-xs">
                     {(active.lead_name || "??").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
                   <div>

@@ -159,7 +159,6 @@ export function CampaignDetailView({
   // editing it afterward would silently diverge from what people actually got.
   const contentLocked = status !== "Draft";
   function openStep(i: number) {
-    if (contentLocked) return;
     setEditIndex(i);
     setDraft({ ...steps[i] });
   }
@@ -642,7 +641,13 @@ export function CampaignDetailView({
       )}
 
       {/* Inline step editor — opens when a node on the canvas is clicked */}
-      <Modal open={editIndex !== null} onClose={() => setEditIndex(null)} title={`Edit step ${editIndex !== null ? editIndex + 1 : ""}`} description="Modify this step in the sequence" size="lg">
+      <Modal
+        open={editIndex !== null}
+        onClose={() => setEditIndex(null)}
+        title={`${contentLocked ? "Preview" : "Edit"} step ${editIndex !== null ? editIndex + 1 : ""}`}
+        description={contentLocked ? "This campaign has launched — its sequence content is locked and can no longer be edited." : "Modify this step in the sequence"}
+        size="lg"
+      >
         <div className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Wait before this step</label>
@@ -651,11 +656,13 @@ export function CampaignDetailView({
                 type="number" min={0}
                 value={parseDelay(draft.day).value}
                 onChange={(e) => setDraft({ ...draft, day: formatDelay(Math.max(0, parseInt(e.target.value || "0", 10)), parseDelay(draft.day).unit) })}
-                className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                disabled={contentLocked}
+                className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-50 disabled:text-slate-500"
               />
               <Select
                 value={parseDelay(draft.day).unit}
                 onChange={(e) => setDraft({ ...draft, day: formatDelay(parseDelay(draft.day).value, e.target.value as (typeof DELAY_UNITS)[number]) })}
+                disabled={contentLocked}
                 className="max-w-[160px]"
               >
                 {DELAY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -668,15 +675,17 @@ export function CampaignDetailView({
             <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
               <button
                 type="button"
+                disabled={contentLocked}
                 onClick={() => setDraft({ ...draft, channel: "email", action: "email" })}
-                className={`px-3 py-1 text-xs font-medium rounded-md ${draft.channel !== "linkedin" ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}
+                className={`px-3 py-1 text-xs font-medium rounded-md disabled:cursor-not-allowed ${draft.channel !== "linkedin" ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}
               >
                 Email
               </button>
               <button
                 type="button"
+                disabled={contentLocked}
                 onClick={() => setDraft({ ...draft, channel: "linkedin", action: draft.action && draft.action !== "email" ? draft.action : "connection_request" })}
-                className={`px-3 py-1 text-xs font-medium rounded-md ${draft.channel === "linkedin" ? "bg-white shadow-sm text-sky-700" : "text-slate-500"}`}
+                className={`px-3 py-1 text-xs font-medium rounded-md disabled:cursor-not-allowed ${draft.channel === "linkedin" ? "bg-white shadow-sm text-sky-700" : "text-slate-500"}`}
               >
                 LinkedIn
               </button>
@@ -689,6 +698,7 @@ export function CampaignDetailView({
                 <Select
                   value={draft.action === "linkedin_message" ? "linkedin_message" : "connection_request"}
                   onChange={(e) => setDraft({ ...draft, action: e.target.value as "connection_request" | "linkedin_message" })}
+                  disabled={contentLocked}
                 >
                   <option value="connection_request">Connection request</option>
                   <option value="linkedin_message">LinkedIn message</option>
@@ -698,25 +708,31 @@ export function CampaignDetailView({
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
                   {draft.action === "linkedin_message" ? "Message" : "Invite note (optional)"}
                 </label>
-                <Textarea value={draft.body || ""} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={6} placeholder={draft.action === "linkedin_message" ? "Message…" : "Note to include with invite…"} />
+                <Textarea value={draft.body || ""} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={6} placeholder={draft.action === "linkedin_message" ? "Message…" : "Note to include with invite…"} disabled={contentLocked} />
               </div>
             </>
           ) : (
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Subject</label>
-                <Input value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} placeholder="Subject line" />
+                <Input value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} placeholder="Subject line" disabled={contentLocked} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Body</label>
-                <Textarea value={draft.body || ""} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={8} placeholder="Email body…" />
+                <Textarea value={draft.body || ""} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={8} placeholder="Email body…" disabled={contentLocked} />
               </div>
             </>
           )}
         </div>
         <div className="p-4 border-t border-slate-100 flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setEditIndex(null)}>Cancel</Button>
-          <Button onClick={saveStep} disabled={pending || !accountsGate} title={!accountsGate ? ACCOUNTS_GATE_MESSAGE : undefined}>{pending ? "Saving…" : "Save step"}</Button>
+          {contentLocked ? (
+            <Button variant="outline" onClick={() => setEditIndex(null)}>Close</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setEditIndex(null)}>Cancel</Button>
+              <Button onClick={saveStep} disabled={pending || !accountsGate} title={!accountsGate ? ACCOUNTS_GATE_MESSAGE : undefined}>{pending ? "Saving…" : "Save step"}</Button>
+            </>
+          )}
         </div>
       </Modal>
     </div>
