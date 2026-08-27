@@ -43,85 +43,97 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
   }, []);
 
   return (
-    <header
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "bg-white/95 backdrop-blur-xl border-b border-white/80 py-3 shadow-lg shadow-blue-950/10 text-[#1f2223]"
-          : "bg-white/40 backdrop-blur-md py-5 border-b border-white/25 text-[#1f2223]"
-      }`}
-    >
-      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center gap-3">
-        
-        {/* Left: Brand Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0 group">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-            <Zap className="w-4 h-4 fill-white" />
-          </div>
-          <span className="text-xl font-bold tracking-tight text-[#1f2223]">
-            Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-medium text-sm sm:text-base">Nurture</span>
-          </span>
-        </Link>
-
-        {/* Center: When Scrolled -> "7 Days Free Trial Claim" Offer Pill; When Not Scrolled -> Standard Nav Links */}
-        <div className="hidden md:flex items-center justify-center transition-all duration-300">
+    <header className="fixed top-3 sm:top-5 inset-x-0 z-50 px-3 sm:px-6 pointer-events-none flex justify-center transition-all duration-300">
+      <div
+        className={`w-full max-w-[1360px] pointer-events-auto rounded-full transition-all duration-300 ${
+          scrolled
+            ? "bg-[#007bfb] border border-blue-400/50 py-2 sm:py-2.5 px-4 sm:px-6 shadow-2xl shadow-blue-950/30 text-white"
+            : "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/80 dark:border-white/10 py-3 sm:py-3.5 px-5 sm:px-7 shadow-lg shadow-black/5 text-[#1f2223]"
+        }`}
+      >
+        <div className="flex justify-between items-center gap-3 sm:gap-4">
+          
           {scrolled ? (
-            <div className="animate-fade-in flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50 border border-blue-200/90 shadow-sm">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-bold text-slate-900">
-                🎉 Claim Your 7-Day Free Trial
-              </span>
-              <span className="text-slate-300">·</span>
-              <span className="text-xs text-slate-600 font-medium">
-                Full AI Access · No Setup Fee
-              </span>
+            /* ============ SCROLLED STATE: Floating GoHighLevel Style Conversion Bar ============ */
+            <div className="w-full flex items-center justify-between gap-3 sm:gap-6 animate-fade-in">
+              
+              {/* Left: Brand / Logo in white */}
+              <Link href="/" className="flex items-center gap-2 shrink-0 group">
+                <div className="w-8 h-8 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                  <Zap className="w-4 h-4 fill-blue-600" />
+                </div>
+                <span className="text-lg sm:text-xl font-bold tracking-tight text-white hidden sm:inline">
+                  Nx<span className="text-amber-300">elio</span>
+                </span>
+              </Link>
+
+              {/* Center: Bold Headline */}
+              <div className="flex-1 text-center px-2">
+                <h2 className="text-xs sm:text-base md:text-lg font-extrabold text-white tracking-tight leading-snug">
+                  Take your marketing &amp; sales to the next level!
+                </h2>
+              </div>
+
+              {/* Right: Golden 2-Line Action Button */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <Link
+                  href="/signup"
+                  className="inline-flex flex-col items-center justify-center bg-[#fdb813] hover:bg-[#e5a60f] active:scale-95 text-slate-950 px-4 sm:px-6 py-1 sm:py-1.5 rounded-full shadow-lg transition-all text-center leading-tight hover:shadow-amber-500/30 cursor-pointer"
+                >
+                  <span className="text-xs sm:text-sm font-black tracking-wide uppercase">
+                    7 DAY FREE TRIAL
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] font-semibold text-slate-900/90 tracking-tight hidden min-[480px]:inline">
+                    No obligation, cancel at any time
+                  </span>
+                </Link>
+              </div>
+
             </div>
           ) : (
-            <nav className="flex items-center gap-6 lg:gap-8">
-              <a href="#features" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Features</a>
-              <a href="#capabilities" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Capabilities</a>
-              <a href="#testimonials" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Reviews</a>
-              <a href="#playbooks" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Playbooks</a>
-              <a href="#integrations" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Integrations</a>
-              <a href="#pricing" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Pricing</a>
-              <a href="#faq" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">FAQ</a>
-            </nav>
+            /* ============ INITIAL TOP STATE: Floating Modern Glass Pill Navigation ============ */
+            <>
+              {/* Left: Brand Logo */}
+              <Link href="/" className="flex items-center gap-2 shrink-0 group">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                  <Zap className="w-4 h-4 fill-white" />
+                </div>
+                <span className="text-xl font-bold tracking-tight text-[#1f2223]">
+                  Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-medium text-sm sm:text-base">Nurture</span>
+                </span>
+              </Link>
+
+              {/* Center: Nav Links */}
+              <nav className="hidden lg:flex items-center gap-6 lg:gap-8">
+                <a href="#features" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Features</a>
+                <a href="#capabilities" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Capabilities</a>
+                <a href="#testimonials" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Reviews</a>
+                <a href="#playbooks" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Playbooks</a>
+                <a href="#integrations" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Integrations</a>
+                <a href="#pricing" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Pricing</a>
+                <a href="#faq" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">FAQ</a>
+              </nav>
+
+              {/* Right: Actions */}
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <Link
+                  href="/login"
+                  className="hidden sm:inline-flex h-9 px-3.5 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-xs sm:text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  Log In
+                </Link>
+                <Link
+                  href="/signup"
+                  className="inline-flex h-9 sm:h-10 px-4 sm:px-5 items-center justify-center gap-2 rounded-full bg-[#1f2223] text-white text-xs sm:text-sm font-semibold hover:bg-black transition-all shadow-sm hover:shadow hover:scale-102 active:scale-95 cursor-pointer"
+                >
+                  <span>Start Free Trial</span>
+                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </Link>
+              </div>
+            </>
           )}
+
         </div>
-
-        {/* Right: Actions */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
-          <Link
-            href="/login"
-            className="hidden sm:inline-flex h-9 px-3.5 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-xs sm:text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm"
-          >
-            Log In
-          </Link>
-
-          {scrolled ? (
-            /* Scrolled CTA -> High-converting "Claim 7-Day Free Trial" Button */
-            <Link
-              href="/signup"
-              className="inline-flex h-9 sm:h-10 px-4 sm:px-5 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all cursor-pointer animate-fade-in"
-            >
-              <Sparkles className="w-3.5 h-3.5 fill-amber-300 text-amber-300 animate-star-twinkle" />
-              <span>Claim 7 Days Free</span>
-              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </Link>
-          ) : (
-            /* Initial CTA -> Start Free Trial Button */
-            <Link
-              href="/signup"
-              className="inline-flex h-9 sm:h-10 px-4 sm:px-5 items-center justify-center gap-2 rounded-full bg-[#1f2223] dark:bg-white text-white dark:text-slate-950 text-xs sm:text-sm font-semibold hover:bg-black dark:hover:bg-slate-100 transition-all shadow-sm hover:shadow hover:scale-102 active:scale-95 cursor-pointer"
-            >
-              <span>Start Free Trial</span>
-              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </Link>
-          )}
-        </div>
-
       </div>
     </header>
   );
