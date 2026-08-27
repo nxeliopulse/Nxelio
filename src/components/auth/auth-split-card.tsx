@@ -103,11 +103,15 @@ export function AuthButtonRow({
   submitDisabled,
   switchHref,
   switchLabel,
+  switchLoading,
+  onSwitchClick,
 }: {
   submitLabel: string;
   submitDisabled: boolean;
   switchHref: string;
   switchLabel: string;
+  switchLoading?: boolean;
+  onSwitchClick?: () => void;
 }) {
   return (
     <div className="flex items-center gap-3">
@@ -120,9 +124,11 @@ export function AuthButtonRow({
       </button>
       <Link
         href={switchHref}
-        className="flex-1 py-2.5 rounded-lg text-[15px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 text-center transition-colors"
+        onClick={onSwitchClick}
+        aria-disabled={switchLoading}
+        className="flex-1 py-2.5 rounded-lg text-[15px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 text-center transition-colors aria-disabled:opacity-60 aria-disabled:pointer-events-none"
       >
-        {switchLabel}
+        {switchLoading ? "Loading…" : switchLabel}
       </Link>
     </div>
   );
