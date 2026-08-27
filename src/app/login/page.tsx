@@ -112,24 +112,27 @@ function LoginForm() {
     <AuthSplitCard
       heading="Welcome Back"
       subheading="Please log in to your account to continue."
+      activeAuthTab="login"
       leftEyebrow="You can easily"
       leftTitle="Speed up your work with our Web App"
     >
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
-          <div role="alert" className="flex items-start gap-2 rounded-lg p-3 text-sm"
+          <div role="alert" className="flex items-start gap-2 rounded-lg p-2.5 text-xs sm:text-sm"
             style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{error}{lockedUntil ? ` (${lockSecondsLeft}s)` : ""}</span>
           </div>
         )}
         {notice && (
-          <div className="flex items-start gap-2 rounded-lg p-3 text-sm"
+          <div className="flex items-start gap-2 rounded-lg p-2.5 text-xs sm:text-sm"
             style={{ background: "rgba(79,95,239,.08)", border: "1.5px solid rgba(79,95,239,.25)", color: "#3D4FEA" }}>
             <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{notice}</span>
           </div>
         )}
+
+        <OAuthButtons label="or" />
 
         <div>
           <label className={FIELD_LABEL}>Email</label>
@@ -175,7 +178,7 @@ function LoginForm() {
           {fieldErrors.password && <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>}
         </div>
 
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center justify-between pt-0.5">
           <RadioToggle checked={rememberMe} onChange={setRememberMe} label="Remember me" />
           <Link
             href={`/forgot-password${form.email.includes("@") ? `?email=${encodeURIComponent(form.email)}` : ""}`}
@@ -185,7 +188,7 @@ function LoginForm() {
           </Link>
         </div>
 
-        <div className="pt-2">
+        <div className="pt-1">
           <AuthButtonRow
             submitLabel={loading ? "Signing in…" : lockedUntil ? `Try again in ${lockSecondsLeft}s` : "Sign In"}
             submitDisabled={loading || !!lockedUntil}
@@ -194,10 +197,6 @@ function LoginForm() {
             switchLoading={signUpLoading}
             onSwitchClick={() => setSignUpLoading(true)}
           />
-        </div>
-
-        <div className="pt-2">
-          <OAuthButtons label="sign in with" />
         </div>
       </form>
     </AuthSplitCard>

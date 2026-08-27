@@ -577,6 +577,14 @@ html, body {
   --color-slate-300: #cbd5e1 !important;
   --color-slate-400: #94a3b8 !important;
   --color-slate-500: #64748b !important;
+  /* Restore real blue — the app-wide --color-blue-* tokens above are
+     hijacked to the dashboard's teal accent, which is correct everywhere
+     except this deliberately blue-branded auth shell. */
+  --color-blue-50:  #eff6ff !important;
+  --color-blue-100: #dbeafe !important;
+  --color-blue-500: #3b82f6 !important;
+  --color-blue-600: #2563eb !important;
+  --color-blue-700: #1d4ed8 !important;
   --background: #0a0a0d !important;
   --foreground: #ffffff !important;
   background-color: #0a0a0d !important;

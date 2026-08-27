@@ -68,17 +68,20 @@ export default function SignupPage() {
     <AuthSplitCard
       heading="Get Started Now"
       subheading="Please enter your details to create your account."
+      activeAuthTab="signup"
       leftEyebrow="You can easily"
       leftTitle="Speed up your work with our Web App"
     >
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
-          <div className="flex items-start gap-2 rounded-lg p-3 text-sm"
+          <div className="flex items-start gap-2 rounded-lg p-2.5 text-xs sm:text-sm"
             style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
+
+        <OAuthButtons label="or" />
 
         <div>
           <label className={FIELD_LABEL}>Full name</label>
@@ -132,7 +135,7 @@ export default function SignupPage() {
               {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Minimum 8 characters</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Minimum 8 characters</p>
         </div>
 
         <RadioToggle
@@ -148,17 +151,13 @@ export default function SignupPage() {
           }
         />
 
-        <div className="pt-2">
+        <div className="pt-1">
           <AuthButtonRow
             submitLabel={loading ? "Creating account…" : "Sign Up"}
             submitDisabled={!valid || loading}
             switchHref="/login"
             switchLabel="Sign In"
           />
-        </div>
-
-        <div className="pt-2">
-          <OAuthButtons label="sign in with" />
         </div>
       </form>
     </AuthSplitCard>
