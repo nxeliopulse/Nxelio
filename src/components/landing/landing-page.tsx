@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { BookDemoModal } from "./book-demo-modal";
 import { AiAssistantWidget } from "./ai-assistant-widget";
+import { TestimonialsBentoSection } from "./testimonials-bento";
 import type { LandingChatMessage } from "@/lib/ai/landing-chat";
 
 export interface LandingPageNotice { kind: "signed_up" | "verified"; email?: string; }
@@ -35,7 +36,7 @@ function PostSignupNotice({ notice }: { notice: LandingPageNotice }) {
 function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    function onScroll() { setScrolled(window.scrollY > 20); }
+    function onScroll() { setScrolled(window.scrollY > 60); }
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -44,43 +45,83 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
   return (
     <header
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled ? "bg-white/90 backdrop-blur-md border-b border-slate-200/80 py-3.5 shadow-sm" : "bg-white py-5 border-b border-transparent"
+        scrolled
+          ? "bg-white/95 backdrop-blur-xl border-b border-white/80 py-3 shadow-lg shadow-blue-950/10 text-[#1f2223]"
+          : "bg-white/40 backdrop-blur-md py-5 border-b border-white/25 text-[#1f2223]"
       }`}
     >
-      <div className="max-w-[1360px] mx-auto px-5 sm:px-8 flex justify-between items-center gap-4">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+      <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center gap-3">
+        
+        {/* Left: Brand Logo */}
+        <Link href="/" className="flex items-center gap-2 shrink-0 group">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
             <Zap className="w-4 h-4 fill-white" />
           </div>
           <span className="text-xl font-bold tracking-tight text-[#1f2223]">
-            Nx<span className="text-blue-600">elio</span>
+            Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-medium text-sm sm:text-base">Nurture</span>
           </span>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-8">
-          <a href="#features" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Features</a>
-          <a href="#capabilities" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Capabilities</a>
-          <a href="#playbooks" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Playbooks</a>
-          <a href="#integrations" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Integrations</a>
-          <a href="#pricing" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">Pricing</a>
-          <a href="#faq" className="text-sm font-medium text-slate-600 hover:text-[#1f2223] transition-colors">FAQ</a>
-        </nav>
+        {/* Center: When Scrolled -> "7 Days Free Trial Claim" Offer Pill; When Not Scrolled -> Standard Nav Links */}
+        <div className="hidden md:flex items-center justify-center transition-all duration-300">
+          {scrolled ? (
+            <div className="animate-fade-in flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50 border border-blue-200/90 shadow-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs font-bold text-slate-900">
+                🎉 Claim Your 7-Day Free Trial
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="text-xs text-slate-600 font-medium">
+                Full AI Access · No Setup Fee
+              </span>
+            </div>
+          ) : (
+            <nav className="flex items-center gap-6 lg:gap-8">
+              <a href="#features" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Features</a>
+              <a href="#capabilities" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Capabilities</a>
+              <a href="#testimonials" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Reviews</a>
+              <a href="#playbooks" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Playbooks</a>
+              <a href="#integrations" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Integrations</a>
+              <a href="#pricing" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Pricing</a>
+              <a href="#faq" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">FAQ</a>
+            </nav>
+          )}
+        </div>
 
-        <div className="flex items-center gap-3">
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
           <Link
             href="/login"
-            className="hidden sm:inline-flex h-9 px-4 items-center justify-center rounded-full border border-slate-200/90 text-sm font-medium text-[#1f2223] hover:bg-slate-50 transition-colors"
+            className="hidden sm:inline-flex h-9 px-3.5 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-xs sm:text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm"
           >
             Log In
           </Link>
-          <button
-            onClick={onBookDemo}
-            className="inline-flex h-9 sm:h-10 px-4 sm:px-5 items-center justify-center gap-2 rounded-full bg-[#1f2223] text-white text-xs sm:text-sm font-semibold hover:bg-black transition-all shadow-sm hover:shadow active:scale-95"
-          >
-            <span>Start Free Trial</span>
-            <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
+
+          {scrolled ? (
+            /* Scrolled CTA -> High-converting "Claim 7-Day Free Trial" Button */
+            <Link
+              href="/signup"
+              className="inline-flex h-9 sm:h-10 px-4 sm:px-5 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all cursor-pointer animate-fade-in"
+            >
+              <Sparkles className="w-3.5 h-3.5 fill-amber-300 text-amber-300 animate-star-twinkle" />
+              <span>Claim 7 Days Free</span>
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </Link>
+          ) : (
+            /* Initial CTA -> Start Free Trial Button */
+            <Link
+              href="/signup"
+              className="inline-flex h-9 sm:h-10 px-4 sm:px-5 items-center justify-center gap-2 rounded-full bg-[#1f2223] dark:bg-white text-white dark:text-slate-950 text-xs sm:text-sm font-semibold hover:bg-black dark:hover:bg-slate-100 transition-all shadow-sm hover:shadow hover:scale-102 active:scale-95 cursor-pointer"
+            >
+              <span>Start Free Trial</span>
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </Link>
+          )}
         </div>
+
       </div>
     </header>
   );
@@ -132,7 +173,7 @@ function HeroPromptSearch() {
 
   return (
     <div className="w-full max-w-[940px] mx-auto mt-8 sm:mt-12 text-left">
-      <div className="relative rounded-[28px] sm:rounded-[34px] p-[2px] shadow-[0_20px_50px_rgba(0,0,0,0.08)] bg-gradient-to-r from-blue-500 via-indigo-500 to-teal-400">
+      <div className="relative rounded-[28px] sm:rounded-[34px] p-[2px] shadow-[0_20px_60px_rgba(0,0,0,0.25)] bg-gradient-to-r from-amber-300 via-white to-cyan-300">
         <div className="relative rounded-[26px] sm:rounded-[32px] bg-white p-4 sm:p-7 md:p-8 flex flex-col justify-between min-h-[220px] sm:min-h-[250px]">
           
           {messages.length > 0 && (
@@ -152,7 +193,7 @@ function HeroPromptSearch() {
               {pending && (
                 <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-blue-50 text-blue-900 border border-blue-200 px-4 py-3 text-sm sm:text-base flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-blue-600 animate-spin" />
-                  <span>Processing with Nxelio AI — redirecting to workspace…</span>
+                  <span>Processing with Nxelio Nurture AI — redirecting to workspace…</span>
                 </div>
               )}
             </div>
@@ -202,14 +243,14 @@ function HeroPromptSearch() {
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2 flex-wrap justify-center text-xs text-slate-500">
-        <span className="font-semibold text-slate-700">Try asking:</span>
+      <div className="mt-4 flex items-center gap-2 flex-wrap justify-center text-xs text-blue-100">
+        <span className="font-semibold text-white">Try asking:</span>
         {SAMPLE_PROMPTS.slice(0, 3).map((p, idx) => (
           <button
             key={idx}
             type="button"
             onClick={() => handleChipClick(p, idx)}
-            className="rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 text-xs transition-colors truncate max-w-[280px] sm:max-w-none text-left"
+            className="rounded-full bg-white/20 hover:bg-white/30 text-white border border-white/25 px-3 py-1 text-xs transition-colors truncate max-w-[280px] sm:max-w-none text-left backdrop-blur-sm shadow-sm cursor-pointer"
           >
             {`"${p.slice(0, 42)}..."`}
           </button>
@@ -221,54 +262,71 @@ function HeroPromptSearch() {
 
 function Hero({ onBookDemo }: { onBookDemo: () => void }) {
   return (
-    <section className="pt-32 sm:pt-40 pb-20 sm:pb-28 bg-white overflow-hidden text-center">
+    <section className="pt-32 sm:pt-40 pb-20 sm:pb-28 overflow-hidden text-center bg-transparent">
       <div className="max-w-[1360px] mx-auto px-5 sm:px-8">
-        
-        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-semibold text-[#1f2223] leading-[1.12] tracking-tight max-w-4xl mx-auto">
+
+        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-semibold text-white leading-[1.12] tracking-tight max-w-4xl mx-auto">
           The all-in-one AI platform to <br className="hidden md:inline" />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-teal-600">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-200 to-cyan-200">
             find leads, run outreach & close deals
           </span>
         </h1>
 
-        <ul className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2.5 mt-8 text-xs sm:text-sm font-medium text-slate-600">
-          <li className="inline-flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">🎯</span>
-            <span className="text-slate-800">Verified Prospect Discovery</span>
+        {/* Big 7-Day Free Trial CTA Button */}
+        <div className="mt-8 sm:mt-10 flex flex-col items-center justify-center gap-3">
+          <Link
+            href="/signup"
+            className="group inline-flex items-center gap-3.5 sm:gap-4 rounded-full bg-white hover:bg-slate-50 text-[#1f2223] font-extrabold px-7 sm:px-9 py-4 sm:py-4.5 shadow-2xl shadow-blue-950/20 hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer text-base sm:text-xl border-2 border-white/80"
+          >
+            <span className="flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md group-hover:scale-110 transition-transform">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-300 text-amber-300 animate-star-twinkle" />
+            </span>
+            <span className="tracking-tight">
+              Start Your 7-Day Free Trial
+            </span>
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 group-hover:translate-x-1 transition-transform" />
+          </Link>
+
+          <p className="text-xs sm:text-sm text-blue-100 font-medium">
+            ⚡ Full AI Access · Setup in under 2 minutes · Cancel anytime
+          </p>
+        </div>
+
+        <ul className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2.5 mt-8 text-xs sm:text-sm font-medium text-blue-50">
+          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1">
+            <span className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center font-bold text-xs">🎯</span>
+            <span>Verified Prospect Discovery</span>
           </li>
-          <span className="hidden sm:inline text-slate-300">|</span>
-          <li className="inline-flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">✉️</span>
-            <span className="text-slate-800">Multichannel Campaigns & Inbox</span>
+          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1">
+            <span className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center font-bold text-xs">✉️</span>
+            <span>Multichannel Campaigns & Inbox</span>
           </li>
-          <span className="hidden sm:inline text-slate-300">|</span>
-          <li className="inline-flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xs">💼</span>
-            <span className="text-slate-800">Visual Deal Pipeline CRM</span>
+          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1">
+            <span className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center font-bold text-xs">💼</span>
+            <span>Visual Deal Pipeline CRM</span>
           </li>
-          <span className="hidden sm:inline text-slate-300">|</span>
-          <li className="inline-flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-xs">📅</span>
-            <span className="text-slate-800">Integrated Calendar & Meetings</span>
+          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1">
+            <span className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center font-bold text-xs">📅</span>
+            <span>Integrated Calendar & Meetings</span>
           </li>
         </ul>
 
         <HeroPromptSearch />
 
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs sm:text-sm text-slate-500 font-medium">
-          <div className="flex items-center gap-1.5 text-slate-700">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span><strong>7-day free trial</strong> — Credit card required</span>
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs sm:text-sm text-blue-50 font-medium">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+            <span><strong className="text-white">7-day free trial</strong> — Credit card required</span>
           </div>
-          <span className="text-slate-300">·</span>
-          <div className="flex items-center gap-1.5 text-slate-700">
-            <CheckCircle2 className="w-4 h-4 text-blue-500" />
-            <span><strong>Zero setup delay</strong> — Ready in 2 minutes</span>
+          <span className="text-white/30">·</span>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-amber-300" />
+            <span><strong className="text-white">Zero setup delay</strong> — Ready in 2 minutes</span>
           </div>
-          <span className="text-slate-300">·</span>
-          <div className="flex items-center gap-1.5 text-slate-700">
-            <CheckCircle2 className="w-4 h-4 text-indigo-500" />
-            <span><strong>15+ data providers</strong> — Waterfall verified</span>
+          <span className="text-white/30">·</span>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-cyan-300" />
+            <span><strong className="text-white">15+ data providers</strong> — Waterfall verified</span>
           </div>
         </div>
       </div>
@@ -372,17 +430,17 @@ function CoreFeaturesGrid() {
   ];
 
   return (
-    <section id="features" className="py-20 sm:py-28 bg-gradient-to-b from-sky-50 via-cyan-50/60 to-white">
+    <section id="features" className="py-20 sm:py-28 bg-transparent">
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
         <div className="max-w-2xl mx-auto text-center mb-14">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
             The Complete GTM Platform
           </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight">
             Everything your sales team needs to win.
           </h2>
-          <p className="text-base text-slate-600 mt-3">
-            Stop switching between 5 different tools. Nxelio combines lead research, automated outreach, CRM pipelines, and booking in one place.
+          <p className="text-base text-blue-50 mt-3">
+            Stop switching between 5 different tools. Nxelio Nurture combines lead research, automated outreach, CRM pipelines, and booking in one place.
           </p>
         </div>
 
@@ -393,10 +451,10 @@ function CoreFeaturesGrid() {
             return (
               <div
                 key={card.heading}
-                className={`rounded-3xl p-6 sm:p-7 flex flex-col transition-transform ${
+                className={`rounded-3xl p-6 sm:p-7 flex flex-col transition-transform landing-glass-card hover-lift-card ${
                   featured
-                    ? "bg-white border-2 border-blue-400 shadow-xl md:-translate-y-3"
-                    : "bg-white/70 border border-slate-200/80 shadow-sm"
+                    ? "border-2 border-blue-400/80 shadow-2xl md:-translate-y-3"
+                    : "shadow-lg"
                 }`}
               >
                 <span className={`inline-flex self-start items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-5 ${card.pillClass}`}>
@@ -464,16 +522,16 @@ function AITeamSection() {
   ];
 
   return (
-    <section className="py-20 sm:py-28 bg-white">
+    <section className="py-20 sm:py-28 bg-transparent">
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
         <div className="max-w-2xl mx-auto text-center mb-14">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
             Intelligent Copilot
           </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight">
             Built-in AI working across every workflow.
           </h2>
-          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+          <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
             From discovering leads to drafting emails and booking calls, AI accelerates every part of your revenue cycle.
           </p>
         </div>
@@ -482,7 +540,7 @@ function AITeamSection() {
           {agents.map((agent) => (
             <div
               key={agent.name}
-              className="bg-slate-50/70 hover:bg-white border border-slate-200/80 hover:border-slate-300 rounded-3xl p-6 sm:p-7 transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+              className="landing-glass-card rounded-3xl p-6 sm:p-7 transition-all duration-300 hover:shadow-2xl hover-lift-card"
             >
               <span className={`inline-flex items-center text-xs font-semibold px-3 py-1.5 rounded-full mb-6 ${agent.pillClass}`}>
                 {agent.pillLabel}
@@ -519,7 +577,7 @@ function CapabilitiesSection() {
       badge: "Lead Discovery",
       image: "/illustrations/landing-prospecting.png",
       heading: "Find decision makers and track active hiring signals.",
-      description: "Search for target accounts by job titles, location, and verified company job postings. Import custom CSV lists or discover new prospects directly in Nxelio.",
+      description: "Search for target accounts by job titles, location, and verified company job postings. Import custom CSV lists or discover new prospects directly in Nxelio Nurture.",
       features: [
         "Natural language prospect search and bulk company lookup",
         "Verified hiring jobs crawler to identify accounts ready to buy",
@@ -650,31 +708,31 @@ function CapabilitiesSection() {
   const current = capabilities[activeTab];
 
   return (
-    <section id="capabilities" className="py-24 sm:py-32 bg-white">
+    <section id="capabilities" className="py-24 sm:py-32 bg-transparent">
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
         
         <div className="max-w-3xl mx-auto text-center mb-16">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
             Core Modules
           </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight leading-tight">
-            Explore every capability in Nxelio.
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight leading-tight">
+            Explore every capability in Nxelio Nurture.
           </h2>
-          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+          <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
             A cohesive suite designed to take prospects from initial discovery all the way to closed revenue.
           </p>
         </div>
 
-        <div className="flex justify-center mb-12 overflow-x-auto pb-2 scrollbar-none">
-          <div className="inline-flex p-1.5 bg-slate-100 rounded-full border border-slate-200/80">
+        <div className="max-w-4xl mx-auto mb-12 px-2">
+          <div className="flex flex-wrap items-center justify-center gap-2 p-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl sm:rounded-full border border-white/80 dark:border-slate-700/60 shadow-lg">
             {capabilities.map((cap, i) => (
               <button
                 key={cap.id}
                 onClick={() => setActiveTab(i)}
-                className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === i
-                    ? "bg-[#1f2223] text-white shadow-md"
-                    : "text-slate-600 hover:text-[#1f2223]"
+                    ? "bg-[#1f2223] text-white dark:bg-blue-600 shadow-md scale-102"
+                    : "text-slate-700 dark:text-slate-300 hover:text-black dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-800"
                 }`}
               >
                 {cap.tabTitle}
@@ -683,7 +741,7 @@ function CapabilitiesSection() {
           </div>
         </div>
 
-        <div className="bg-slate-50/70 border border-slate-200/90 rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-14 grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        <div className="landing-glass-card rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-14 grid lg:grid-cols-12 gap-8 lg:gap-12 items-center shadow-2xl">
           
           <div className="lg:col-span-6 text-left">
             <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold mb-4">
@@ -798,17 +856,17 @@ function PlaybooksSection() {
   ];
 
   return (
-    <section id="playbooks" className="py-24 sm:py-32 bg-white">
+    <section id="playbooks" className="py-24 sm:py-32 bg-transparent">
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
         
         <div className="max-w-3xl mx-auto text-center mb-16">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
             Ready-To-Run Playbooks
           </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight">
             Launch pre-built campaigns in one click.
           </h2>
-          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+          <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
             Tested workflows for outbound prospecting, inbound lead capture, meeting scheduling, and newsletters.
           </p>
         </div>
@@ -817,7 +875,7 @@ function PlaybooksSection() {
           {plays.map((play, i) => (
             <div
               key={i}
-              className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/80 hover:border-slate-300 rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:-translate-y-1 text-left"
+              className="landing-glass-card rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 hover:shadow-2xl hover-lift-card text-left"
             >
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -848,27 +906,28 @@ function PlaybooksSection() {
 function IntegrationsSection() {
   const tools = [
     { name: "Email", category: "Gmail & Outlook", icon: "✉️" },
-    { name: "LinkedIn", category: "Outreach", icon: "💼" },
-    { name: "WhatsApp", category: "Outreach", icon: "💬" },
+    { name: "LinkedIn", category: "Outreach & Sync", icon: "💼" },
     { name: "Google Calendar", category: "Meeting Scheduling", icon: "📅" },
     { name: "Microsoft Calendar", category: "Meeting Scheduling", icon: "🗓️" },
     { name: "Zoom", category: "Video Meeting Links", icon: "🎥" },
-    { name: "CSV Import", category: "Bring Your Own List", icon: "📄" }
+    { name: "CSV Import", category: "Bring Your Own List", icon: "📄" },
+    { name: "Stripe Billing", category: "Payments & Invoicing", icon: "💳" },
+    { name: "Custom Webhooks", category: "API & Automations", icon: "⚡" }
   ];
 
   return (
-    <section id="integrations" className="py-24 bg-slate-50/70 border-y border-slate-200">
+    <section id="integrations" className="py-24 bg-transparent">
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8 text-center">
         
         <div className="max-w-3xl mx-auto mb-14">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
             Native Integrations
           </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight">
             Connect seamlessly with the tools you rely on.
           </h2>
-          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
-            Connect your email, LinkedIn, and WhatsApp for outreach, sync your calendar for automated booking, generate Zoom links, and import your existing CSV lists.
+          <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
+            Connect your email and LinkedIn for outreach, sync your calendar for automated booking, generate Zoom links, and import your existing CSV lists.
           </p>
         </div>
 
@@ -876,7 +935,7 @@ function IntegrationsSection() {
           {tools.map((t, idx) => (
             <div
               key={idx}
-              className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-3.5 text-left shadow-sm hover:shadow-md transition-shadow"
+              className="landing-glass-card rounded-2xl p-5 flex items-center gap-3.5 text-left shadow-md hover-lift-card"
             >
               <div className="text-2xl">{t.icon}</div>
               <div>
@@ -941,17 +1000,17 @@ function PricingSection() {
   ];
 
   return (
-    <section id="pricing" className="py-24 sm:py-32 bg-slate-50/70 border-y border-slate-200">
+    <section id="pricing" className="py-24 sm:py-32 bg-transparent">
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
 
         <div className="max-w-2xl mx-auto text-center mb-16">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
             Simple, Transparent Pricing
           </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight">
             Pick a plan. Start free for 7 days.
           </h2>
-          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+          <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
             A credit card is required to start your trial. Upgrade, downgrade, or cancel any time.
           </p>
         </div>
@@ -960,10 +1019,10 @@ function PricingSection() {
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`rounded-3xl p-6 sm:p-8 flex flex-col transition-transform ${
+              className={`rounded-3xl p-6 sm:p-8 flex flex-col transition-transform hover-lift-card ${
                 plan.featured
-                  ? "bg-[#1f2223] text-white shadow-xl md:-translate-y-3"
-                  : "bg-white border border-slate-200/80 shadow-sm"
+                  ? "bg-[#1f2223] text-white shadow-2xl md:-translate-y-3 border border-white/20"
+                  : "landing-glass-card shadow-lg"
               }`}
             >
               {plan.featured && (
@@ -1068,16 +1127,16 @@ function TrustSection() {
   const visible = [0, 1, 2].map((offset) => points[(current + offset) % points.length]);
 
   return (
-    <section className="py-24 sm:py-28 bg-slate-50/70 border-y border-slate-200">
+    <section className="py-24 sm:py-28 bg-transparent">
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
         <div className="max-w-2xl mx-auto text-center mb-14">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
             Built To Be Trusted
           </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-[#1f2223] tracking-tight">
-            Why teams trust Nxelio.
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight">
+            Why teams trust Nxelio Nurture.
           </h2>
-          <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
+          <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
             We&apos;re an early-stage product without customer reviews yet — so here&apos;s what&apos;s actually true instead.
           </p>
         </div>
@@ -1090,7 +1149,7 @@ function TrustSection() {
           {visible.map((p) => (
             <div
               key={p.label}
-              className="relative bg-white border border-slate-200 rounded-2xl p-6 pt-8 flex flex-col shadow-sm transition-opacity duration-500"
+              className="relative landing-glass-card rounded-2xl p-6 pt-8 flex flex-col shadow-lg transition-opacity duration-500 hover-lift-card"
             >
               <span className="absolute -top-4 left-6 w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-lg font-serif shadow-lg shadow-blue-600/30">
                 &ldquo;
@@ -1153,28 +1212,28 @@ function FAQSection() {
   const [openIdx, setOpenIdx] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="py-24 bg-slate-50/70 border-t border-slate-200">
+    <section id="faq" className="py-24 bg-transparent">
       <div className="max-w-3xl mx-auto px-5 sm:px-8">
-        <h2 className="text-3xl sm:text-4xl font-semibold text-center text-[#1f2223] tracking-tight mb-12">
+        <h2 className="text-3xl sm:text-4xl font-semibold text-center text-white tracking-tight mb-12">
           Frequently Asked Questions
         </h2>
 
         <div className="space-y-4">
           {faqs.map((item, idx) => (
-            <div key={idx} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div key={idx} className="landing-glass-card rounded-2xl overflow-hidden shadow-md">
               <button
                 onClick={() => setOpenIdx(openIdx === idx ? null : idx)}
-                className="w-full px-6 py-5 flex items-center justify-between text-left text-[#1f2223] font-semibold text-base sm:text-lg hover:bg-slate-50/50 transition-colors cursor-pointer"
+                className="w-full px-6 py-5 flex items-center justify-between text-left text-[#1f2223] font-semibold text-base sm:text-lg hover:bg-white/40 transition-colors cursor-pointer"
               >
                 <span>{item.q}</span>
                 <ChevronDown
-                  className={`h-5 w-5 text-slate-400 transition-transform shrink-0 ml-4 ${
-                    openIdx === idx ? "rotate-180 text-slate-700" : ""
+                  className={`h-5 w-5 text-slate-500 transition-transform shrink-0 ml-4 ${
+                    openIdx === idx ? "rotate-180 text-slate-800" : ""
                   }`}
                 />
               </button>
               {openIdx === idx && (
-                <div className="px-6 pb-6 text-slate-600 text-sm sm:text-base leading-relaxed bg-white border-t border-slate-50">
+                <div className="px-6 pb-6 text-slate-700 text-sm sm:text-base leading-relaxed border-t border-slate-200/50">
                   {item.a}
                 </div>
               )}
@@ -1188,86 +1247,125 @@ function FAQSection() {
 
 function DramaticBottomCTAAndFooter() {
   return (
-    <section className="rounded-t-[36px] sm:rounded-t-[48px] md:rounded-t-[56px] bg-[#121417] px-5 sm:px-10 lg:px-20 pb-12 pt-16 md:pt-24 text-white">
-      <div className="max-w-[1280px] mx-auto flex flex-col">
+    <section className="bg-transparent px-5 sm:px-10 lg:px-16 pb-12 pt-16 md:pt-24 text-white relative overflow-hidden">
+      
+      {/* Radiant ambient glow */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-gradient-to-tr from-blue-400/20 via-sky-300/15 to-transparent rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="max-w-[1280px] mx-auto flex flex-col relative z-10">
         
-        <div className="max-w-3xl mx-auto text-center flex flex-col items-center gap-8 mb-20 md:mb-28">
+        {/* Floating Glass CTA Card */}
+        <div className="max-w-4xl mx-auto w-full text-center flex flex-col items-center gap-6 sm:gap-8 mb-16 sm:mb-24 p-8 sm:p-14 md:p-16 rounded-[38px] sm:rounded-[44px] bg-white/20 backdrop-blur-2xl border border-white/30 shadow-2xl shadow-blue-950/20">
+          
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/25 backdrop-blur-md border border-white/30 text-xs font-semibold text-blue-100 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300 animate-star-twinkle" />
+            <span>Ready to 10x your sales pipeline?</span>
+          </div>
+
           <div>
-            <p className="text-sm sm:text-lg text-slate-400 mb-3">
-              Replace fragmented tools with one complete platform.
-            </p>
-            <h2 className="text-3xl sm:text-5xl md:text-6xl font-semibold leading-tight tracking-tight">
+            <h2 className="text-3xl sm:text-5xl md:text-6xl font-bold text-white leading-[1.15] tracking-tight">
               The fastest way to <br />
-              <span className="text-amber-400">find and close anyone.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-200 to-cyan-200">
+                find and close anyone.
+              </span>
             </h2>
+            <p className="text-sm sm:text-lg text-blue-100 mt-4 max-w-xl mx-auto font-medium">
+              Replace 5 fragmented tools with one complete AI revenue platform. Find verified leads, run smart campaigns, and close deals faster.
+            </p>
           </div>
 
           <Link
             href="/signup"
-            className="group inline-flex items-center gap-3 sm:gap-5 rounded-full border-2 sm:border-4 border-white/90 p-1.5 sm:p-2 pr-5 sm:pr-8 text-white transition-all hover:border-amber-400 hover:bg-amber-400 hover:text-black cursor-pointer shadow-2xl"
+            className="group inline-flex items-center gap-3 sm:gap-4 rounded-full bg-white hover:bg-slate-50 text-[#1f2223] font-bold p-2 pr-6 sm:pr-8 shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
           >
-            <span className="flex size-12 sm:size-16 shrink-0 items-center justify-center rounded-full bg-amber-400 text-black transition-colors group-hover:bg-black group-hover:text-amber-400">
-              <ArrowRight className="size-6 sm:size-8" strokeWidth={2.5} />
+            <span className="flex size-11 sm:size-13 shrink-0 items-center justify-center rounded-full bg-[#1f2223] text-white transition-colors group-hover:bg-blue-600">
+              <ArrowRight className="size-5 sm:size-6" strokeWidth={2.5} />
             </span>
-            <span className="text-xl sm:text-3xl md:text-4xl font-semibold">
+            <span className="text-lg sm:text-2xl font-bold tracking-tight">
               Start your 7-day free trial
             </span>
           </Link>
 
-          <p className="text-xs sm:text-sm text-slate-400">
-            Credit card required · Setup in under 2 minutes · Cancel anytime
-          </p>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm text-blue-100 font-medium">
+            <span>✨ Full platform access</span>
+            <span>·</span>
+            <span>⚡ Setup in under 2 minutes</span>
+            <span>·</span>
+            <span>🛡️ Cancel anytime</span>
+          </div>
         </div>
 
-        <hr className="h-px w-full border-0 bg-white/10 mb-14" />
+        {/* Translucent Glass Separator */}
+        <hr className="h-px w-full border-0 bg-white/25 mb-14" />
 
+        {/* Footer Navigation */}
         <footer className="w-full">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16 text-left">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 mb-14 text-left">
             
+            {/* Column 1: Brand */}
             <div className="col-span-2 md:col-span-1">
-              <Link href="/" className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-xs">
-                  ⚡
+              <Link href="/" className="flex items-center gap-2 mb-4 group">
+                <div className="w-8 h-8 rounded-xl bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                  <Zap className="w-4 h-4 fill-blue-600" />
                 </div>
-                <span className="text-lg font-bold tracking-tight text-white">Nxelio</span>
+                <span className="text-xl font-bold tracking-tight text-white">
+                  Nx<span className="text-cyan-200">elio</span> <span className="text-blue-100 font-medium text-sm">Nurture</span>
+                </span>
               </Link>
-              <p className="text-xs text-slate-400 leading-relaxed max-w-xs mb-4">
-                All-in-one AI platform for lead discovery, waterfall enrichment, cold outreach sequences, CRM pipeline, and automated booking.
+              <p className="text-xs sm:text-sm text-blue-100 leading-relaxed max-w-xs mb-4 font-medium">
+                All-in-one AI sales intelligence platform for lead discovery, waterfall enrichment, multi-channel outreach, CRM pipeline, and booking.
               </p>
-              <div className="text-xs text-slate-500">
-                &copy; {new Date().getFullYear()} Nxelio Inc. All rights reserved.
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-xs text-blue-100 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>All Systems Operational</span>
               </div>
             </div>
 
+            {/* Column 2: Capabilities */}
             <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
-              <p className="font-semibold text-white mb-1">Capabilities</p>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Prospects & Verified Jobs</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Waterfall Enrichment</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Campaigns & Sequences</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Opportunities & Pipeline</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Segments & Capture Forms</a>
-              <a href="#capabilities" className="text-slate-400 hover:text-white transition-colors">Meetings & Newsletters</a>
+              <p className="font-bold text-white mb-1.5 text-sm sm:text-base">Capabilities</p>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Prospects &amp; Verified Jobs</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Waterfall Enrichment</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Campaigns &amp; Sequences</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Opportunities &amp; Pipeline</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Segments &amp; Capture Forms</a>
+              <a href="#capabilities" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Meetings &amp; Newsletters</a>
             </div>
 
+            {/* Column 3: Playbooks */}
             <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
-              <p className="font-semibold text-white mb-1">Playbooks</p>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Cold Email Outbound</a>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Verified Hiring Trigger</a>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Inbound Lead Follow-Up</a>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Deal Re-Engagement</a>
-              <a href="#playbooks" className="text-slate-400 hover:text-white transition-colors">Product Newsletters</a>
+              <p className="font-bold text-white mb-1.5 text-sm sm:text-base">Playbooks</p>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Cold Email Outbound</a>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Verified Hiring Trigger</a>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Inbound Lead Follow-Up</a>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Deal Re-Engagement</a>
+              <a href="#playbooks" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Product Newsletters</a>
             </div>
 
+            {/* Column 4: Company */}
             <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
-              <p className="font-semibold text-white mb-1">Company</p>
-              <a href="#pricing" className="text-slate-400 hover:text-white transition-colors">Pricing</a>
-              <a href="#faq" className="text-slate-400 hover:text-white transition-colors">FAQ</a>
-              <Link href="/login" className="text-slate-400 hover:text-white transition-colors">Log In</Link>
-              <Link href="/signup" className="text-slate-400 hover:text-white transition-colors">Get Started</Link>
-              <Link href="/privacy" className="text-slate-400 hover:text-white transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="text-slate-400 hover:text-white transition-colors">Terms of Service</Link>
+              <p className="font-bold text-white mb-1.5 text-sm sm:text-base">Company</p>
+              <a href="#pricing" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Pricing</a>
+              <a href="#testimonials" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Customer Stories</a>
+              <a href="#faq" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">FAQ</a>
+              <Link href="/login" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Log In</Link>
+              <Link href="/signup" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Get Started</Link>
+              <Link href="/privacy" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Privacy Policy</Link>
+              <Link href="/terms" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Terms of Service</Link>
             </div>
 
+          </div>
+
+          {/* Copyright & Security Strip */}
+          <div className="pt-6 border-t border-white/15 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-blue-100 font-medium">
+            <div>
+              &copy; {new Date().getFullYear()} Nxelio Inc. All rights reserved.
+            </div>
+            <div className="flex items-center gap-4 text-blue-100">
+              <span>🔒 SOC-2 &amp; GDPR Ready</span>
+              <span>·</span>
+              <span>256-bit Encryption</span>
+            </div>
           </div>
         </footer>
 
@@ -1280,7 +1378,7 @@ export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = 
   const [showDemoModal, setShowDemoModal] = useState(false);
 
   return (
-    <div className="landing-page min-h-screen font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden text-[#1f2223] bg-white">
+    <div className="landing-page light min-h-screen font-sans selection:bg-blue-200 selection:text-blue-950 overflow-x-hidden text-[#1f2223] landing-page-mesh-bg">
       {notice && <PostSignupNotice notice={notice} />}
       <Navbar onBookDemo={() => setShowDemoModal(true)} />
       <Hero onBookDemo={() => setShowDemoModal(true)} />
@@ -1290,6 +1388,7 @@ export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = 
       <PlaybooksSection />
       <IntegrationsSection />
       <PricingSection />
+      <TestimonialsBentoSection />
       <TrustSection />
       <FAQSection />
       <DramaticBottomCTAAndFooter />
