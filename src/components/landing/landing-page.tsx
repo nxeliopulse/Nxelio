@@ -9,7 +9,7 @@ import {
   Cpu, Globe, Building2, ShieldCheck, Layers, Flame,
   Briefcase, Radio, MessageSquare, TrendingUp, Filter, CheckCheck,
   Phone, Calendar, Megaphone, Contact, FileText, Link2, Clock,
-  DollarSign, PieChart, Sparkle, UserCheck, RefreshCw, Eye
+  DollarSign, PieChart, Sparkle, UserCheck, RefreshCw, Eye, Video, CreditCard
 } from "lucide-react";
 import { BookDemoModal } from "./book-demo-modal";
 import { AiAssistantWidget } from "./ai-assistant-widget";
@@ -43,33 +43,33 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
   }, []);
 
   return (
-    <header className="fixed top-3 sm:top-5 inset-x-0 z-50 px-3 sm:px-6 pointer-events-none flex justify-center transition-all duration-300">
+    <header className="fixed top-3.5 sm:top-5 inset-x-0 z-50 px-3 sm:px-6 lg:px-8 pointer-events-none flex justify-center transition-all duration-300">
       <div
-        className={`w-full max-w-[1360px] pointer-events-auto rounded-full transition-all duration-300 ${
+        className={`w-full max-w-[1380px] pointer-events-auto rounded-full transition-all duration-300 ${
           scrolled
-            ? "bg-[#007bfb] border border-blue-400/50 py-2 sm:py-2.5 px-4 sm:px-6 shadow-2xl shadow-blue-950/30 text-white"
-            : "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/80 dark:border-white/10 py-3 sm:py-3.5 px-5 sm:px-7 shadow-lg shadow-black/5 text-[#1f2223]"
+            ? "bg-[#007bfb] border border-blue-400/50 py-3 sm:py-3.5 px-5 sm:px-8 shadow-2xl shadow-blue-950/30 text-white"
+            : "bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white/85 dark:border-white/10 py-3.5 sm:py-4 px-6 sm:px-8 shadow-xl shadow-black/5 text-[#1f2223]"
         }`}
       >
-        <div className="flex justify-between items-center gap-3 sm:gap-4">
+        <div className="flex justify-between items-center gap-4 sm:gap-6">
           
           {scrolled ? (
-            /* ============ SCROLLED STATE: Floating GoHighLevel Style Conversion Bar ============ */
+            /* ============ SCROLLED STATE: Generous Floating Conversion Bar ============ */
             <div className="w-full flex items-center justify-between gap-3 sm:gap-6 animate-fade-in">
               
               {/* Left: Brand / Logo in white */}
-              <Link href="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-8 h-8 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-                  <Zap className="w-4 h-4 fill-blue-600" />
+              <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                  <Zap className="w-5 h-5 fill-blue-600" />
                 </div>
-                <span className="text-lg sm:text-xl font-bold tracking-tight text-white hidden sm:inline">
+                <span className="text-xl sm:text-2xl font-bold tracking-tight text-white hidden sm:inline">
                   Nx<span className="text-amber-300">elio</span>
                 </span>
               </Link>
 
               {/* Center: Bold Headline */}
               <div className="flex-1 text-center px-2">
-                <h2 className="text-xs sm:text-base md:text-lg font-extrabold text-white tracking-tight leading-snug">
+                <h2 className="text-sm sm:text-base md:text-xl font-extrabold text-white tracking-tight leading-snug">
                   Take your marketing &amp; sales to the next level!
                 </h2>
               </div>
@@ -78,12 +78,12 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
               <div className="flex items-center gap-2.5 shrink-0">
                 <Link
                   href="/signup"
-                  className="inline-flex flex-col items-center justify-center bg-[#fdb813] hover:bg-[#e5a60f] active:scale-95 text-slate-950 px-4 sm:px-6 py-1 sm:py-1.5 rounded-full shadow-lg transition-all text-center leading-tight hover:shadow-amber-500/30 cursor-pointer"
+                  className="inline-flex flex-col items-center justify-center bg-[#fdb813] hover:bg-[#e5a60f] active:scale-95 text-slate-950 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full shadow-lg transition-all text-center leading-tight hover:shadow-amber-500/30 cursor-pointer"
                 >
                   <span className="text-xs sm:text-sm font-black tracking-wide uppercase">
                     7 DAY FREE TRIAL
                   </span>
-                  <span className="text-[9px] sm:text-[10px] font-semibold text-slate-900/90 tracking-tight hidden min-[480px]:inline">
+                  <span className="text-[10px] sm:text-xs font-semibold text-slate-900/90 tracking-tight hidden min-[480px]:inline">
                     No obligation, cancel at any time
                   </span>
                 </Link>
@@ -94,40 +94,40 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
             /* ============ INITIAL TOP STATE: Floating Modern Glass Pill Navigation ============ */
             <>
               {/* Left: Brand Logo */}
-              <Link href="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                  <Zap className="w-4 h-4 fill-white" />
+              <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform">
+                  <Zap className="w-5 h-5 fill-white" />
                 </div>
-                <span className="text-xl font-bold tracking-tight text-[#1f2223]">
+                <span className="text-xl sm:text-2xl font-bold tracking-tight text-[#1f2223]">
                   Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-medium text-sm sm:text-base">Nurture</span>
                 </span>
               </Link>
 
               {/* Center: Nav Links */}
-              <nav className="hidden lg:flex items-center gap-6 lg:gap-8">
-                <a href="#features" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Features</a>
-                <a href="#capabilities" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Capabilities</a>
-                <a href="#testimonials" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Reviews</a>
-                <a href="#playbooks" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Playbooks</a>
-                <a href="#integrations" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Integrations</a>
-                <a href="#pricing" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">Pricing</a>
-                <a href="#faq" className="text-sm font-semibold text-slate-800 hover:text-blue-600 transition-colors">FAQ</a>
+              <nav className="hidden lg:flex items-center gap-7 lg:gap-8">
+                <a href="#features" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Features</a>
+                <a href="#capabilities" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Capabilities</a>
+                <a href="#testimonials" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Reviews</a>
+                <a href="#playbooks" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Playbooks</a>
+                <a href="#integrations" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Integrations</a>
+                <a href="#pricing" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Pricing</a>
+                <a href="#faq" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">FAQ</a>
               </nav>
 
               {/* Right: Actions */}
-              <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="flex items-center gap-3 sm:gap-3.5">
                 <Link
                   href="/login"
-                  className="hidden sm:inline-flex h-9 px-3.5 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-xs sm:text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm"
+                  className="hidden sm:inline-flex h-10 px-4 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm"
                 >
                   Log In
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex h-9 sm:h-10 px-4 sm:px-5 items-center justify-center gap-2 rounded-full bg-[#1f2223] text-white text-xs sm:text-sm font-semibold hover:bg-black transition-all shadow-sm hover:shadow hover:scale-102 active:scale-95 cursor-pointer"
+                  className="inline-flex h-10 sm:h-11 px-5 sm:px-6 items-center justify-center gap-2 rounded-full bg-[#1f2223] text-white text-sm sm:text-[15px] font-semibold hover:bg-black transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-95 cursor-pointer"
                 >
                   <span>Start Free Trial</span>
-                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </>
@@ -299,27 +299,36 @@ function Hero({ onBookDemo }: { onBookDemo: () => void }) {
             <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 group-hover:translate-x-1 transition-transform" />
           </Link>
 
-          <p className="text-xs sm:text-sm text-blue-100 font-medium">
-            ⚡ Full AI Access · Setup in under 2 minutes · Cancel anytime
-          </p>
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-blue-100 font-medium">
+            <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+            <span>Full AI Access · Setup in under 2 minutes · Cancel anytime</span>
+          </div>
         </div>
 
         <ul className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2.5 mt-8 text-xs sm:text-sm font-medium text-blue-50">
-          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1">
-            <span className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center font-bold text-xs">🎯</span>
+          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-2 pr-3.5 py-1">
+            <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              <Target className="w-3 h-3" />
+            </span>
             <span>Verified Prospect Discovery</span>
           </li>
-          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1">
-            <span className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center font-bold text-xs">✉️</span>
-            <span>Multichannel Campaigns & Inbox</span>
+          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-2 pr-3.5 py-1">
+            <span className="w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              <Mail className="w-3 h-3" />
+            </span>
+            <span>Multichannel Campaigns &amp; Inbox</span>
           </li>
-          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1">
-            <span className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center font-bold text-xs">💼</span>
+          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-2 pr-3.5 py-1">
+            <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              <Briefcase className="w-3 h-3" />
+            </span>
             <span>Visual Deal Pipeline CRM</span>
           </li>
-          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1">
-            <span className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center font-bold text-xs">📅</span>
-            <span>Integrated Calendar & Meetings</span>
+          <li className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-2 pr-3.5 py-1">
+            <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              <Calendar className="w-3 h-3" />
+            </span>
+            <span>Integrated Calendar &amp; Meetings</span>
           </li>
         </ul>
 
@@ -830,37 +839,43 @@ function CapabilitiesSection() {
 function PlaybooksSection() {
   const plays = [
     {
-      icon: "✉️",
+      icon: Mail,
+      iconColor: "text-blue-600 bg-blue-50 border-blue-100",
       title: "Cold Email Outbound",
       desc: "A proven multi-step email sequence with personalized opening lines and deliverability-safe spacing.",
       tag: "4 steps · 10 days"
     },
     {
-      icon: "🎯",
+      icon: Target,
+      iconColor: "text-rose-600 bg-rose-50 border-rose-100",
       title: "Verified Hiring Trigger",
       desc: "Reach out to executives at companies actively posting jobs in your target domain right when budgets open.",
       tag: "3 steps · 7 days"
     },
     {
-      icon: "⚡",
+      icon: Zap,
+      iconColor: "text-amber-600 bg-amber-50 border-amber-100",
       title: "Inbound Lead Follow-Up",
       desc: "Automatically respond to leads captured via web forms within minutes to maximize conversion.",
       tag: "3 steps · 5 days"
     },
     {
-      icon: "💼",
+      icon: Briefcase,
+      iconColor: "text-indigo-600 bg-indigo-50 border-indigo-100",
       title: "Deal Re-Engagement",
       desc: "Warm up stalled opportunities with tailored check-ins and updated case study collateral.",
       tag: "3 steps · 8 days"
     },
     {
-      icon: "🤝",
+      icon: Users,
+      iconColor: "text-emerald-600 bg-emerald-50 border-emerald-100",
       title: "Meeting No-Show Rescheduler",
       desc: "Automatically send helpful rebooking links if a prospect misses a scheduled demo.",
       tag: "2 steps · 3 days"
     },
     {
-      icon: "📰",
+      icon: FileText,
+      iconColor: "text-purple-600 bg-purple-50 border-purple-100",
       title: "Monthly Product Newsletter",
       desc: "Send beautifully formatted customer updates using the built-in rich text newsletter builder.",
       tag: "Broadcast · Scheduled"
@@ -884,30 +899,33 @@ function PlaybooksSection() {
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {plays.map((play, i) => (
-            <div
-              key={i}
-              className="landing-glass-card rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 hover:shadow-2xl hover-lift-card text-left"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-2xl">
-                    {play.icon}
+          {plays.map((play, i) => {
+            const PlayIcon = play.icon;
+            return (
+              <div
+                key={i}
+                className="landing-glass-card rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 hover:shadow-2xl hover-lift-card text-left"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`w-12 h-12 rounded-2xl ${play.iconColor} border shadow-sm flex items-center justify-center`}>
+                      <PlayIcon className="w-5 h-5" />
+                    </div>
+                    <span className="text-[11px] font-semibold tracking-wide bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100">
+                      {play.tag}
+                    </span>
                   </div>
-                  <span className="text-[11px] font-semibold tracking-wide bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100">
-                    {play.tag}
-                  </span>
+                  <h4 className="text-lg font-bold text-[#1f2223] mb-2">{play.title}</h4>
+                  <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6">{play.desc}</p>
                 </div>
-                <h4 className="text-lg font-bold text-[#1f2223] mb-2">{play.title}</h4>
-                <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6">{play.desc}</p>
-              </div>
 
-              <div className="pt-4 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-700">
-                <span>Use playbook</span>
-                <ArrowRight className="w-4 h-4 text-slate-400" />
+                <div className="pt-4 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-700">
+                  <span>Use playbook</span>
+                  <ArrowRight className="w-4 h-4 text-slate-400" />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
       </div>
@@ -917,14 +935,14 @@ function PlaybooksSection() {
 
 function IntegrationsSection() {
   const tools = [
-    { name: "Email", category: "Gmail & Outlook", icon: "✉️" },
-    { name: "LinkedIn", category: "Outreach & Sync", icon: "💼" },
-    { name: "Google Calendar", category: "Meeting Scheduling", icon: "📅" },
-    { name: "Microsoft Calendar", category: "Meeting Scheduling", icon: "🗓️" },
-    { name: "Zoom", category: "Video Meeting Links", icon: "🎥" },
-    { name: "CSV Import", category: "Bring Your Own List", icon: "📄" },
-    { name: "Stripe Billing", category: "Payments & Invoicing", icon: "💳" },
-    { name: "Custom Webhooks", category: "API & Automations", icon: "⚡" }
+    { name: "Email", category: "Gmail & Outlook", icon: Mail, iconColor: "text-blue-600 bg-blue-50 border-blue-100" },
+    { name: "LinkedIn", category: "Outreach & Sync", icon: Globe, iconColor: "text-sky-600 bg-sky-50 border-sky-100" },
+    { name: "Google Calendar", category: "Meeting Scheduling", icon: Calendar, iconColor: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+    { name: "Microsoft Calendar", category: "Meeting Scheduling", icon: Clock, iconColor: "text-indigo-600 bg-indigo-50 border-indigo-100" },
+    { name: "Zoom", category: "Video Meeting Links", icon: Video, iconColor: "text-purple-600 bg-purple-50 border-purple-100" },
+    { name: "CSV Import", category: "Bring Your Own List", icon: FileText, iconColor: "text-amber-600 bg-amber-50 border-amber-100" },
+    { name: "Stripe Billing", category: "Payments & Invoicing", icon: CreditCard, iconColor: "text-teal-600 bg-teal-50 border-teal-100" },
+    { name: "Custom Webhooks", category: "API & Automations", icon: Zap, iconColor: "text-orange-600 bg-orange-50 border-orange-100" }
   ];
 
   return (
@@ -944,18 +962,23 @@ function IntegrationsSection() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto">
-          {tools.map((t, idx) => (
-            <div
-              key={idx}
-              className="landing-glass-card rounded-2xl p-5 flex items-center gap-3.5 text-left shadow-md hover-lift-card"
-            >
-              <div className="text-2xl">{t.icon}</div>
-              <div>
-                <div className="font-bold text-sm text-[#1f2223]">{t.name}</div>
-                <div className="text-xs text-slate-400">{t.category}</div>
+          {tools.map((t, idx) => {
+            const ToolIcon = t.icon;
+            return (
+              <div
+                key={idx}
+                className="landing-glass-card rounded-2xl p-5 flex items-center gap-3.5 text-left shadow-md hover-lift-card"
+              >
+                <div className={`w-11 h-11 rounded-xl ${t.iconColor} border flex items-center justify-center shrink-0 shadow-xs`}>
+                  <ToolIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-[#1f2223]">{t.name}</div>
+                  <div className="text-xs text-slate-500 font-medium">{t.category}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
       </div>
@@ -966,125 +989,134 @@ function IntegrationsSection() {
 function PricingSection() {
   const plans = [
     {
+      title: "Basic",
       name: "Basic",
       price: "$14.99",
-      period: "/mo",
-      annualNote: "or $143.90/yr — save 20%",
-      trialNote: "7-day free trial · Credit card required",
-      featured: false,
+      period: "permonth",
+      gradient: "from-[#38bdf8] via-[#6366f1] to-[#7c3aed]",
+      ringColor: "bg-blue-400/20",
       features: [
         "400 AI credits / month",
-        "Deal pipeline (Opportunities)",
-        "CSV import & core workflows",
+        "Verified Waterfall Enrichment",
+        "Deal Pipeline (Opportunities)",
+        "CSV Import & Lead Discovery",
+        "Integrated Calendar Booking",
+        "Deliverability Warmup Engine",
+        "Full Support"
       ],
     },
     {
+      title: "Starter",
       name: "Starter",
       price: "$149.99",
-      period: "/mo",
-      annualNote: "or $1,439.90/yr — save 20%",
-      trialNote: null,
+      period: "permonth",
+      gradient: "from-[#fb923c] via-[#f97316] to-[#f43f5e]",
+      ringColor: "bg-orange-400/20",
       featured: true,
       features: [
         "1,400 AI credits / month",
-        "1,000 AI-discovered leads / month",
-        "LinkedIn outreach & contact enrichment",
-        "Deal scoring & CRM export",
-        "Everything in Basic",
+        "1,000 Verified AI Leads / month",
+        "LinkedIn Outreach & Contact Sync",
+        "Deal Scoring & Pipeline Analytics",
+        "Automated Multichannel Sequences",
+        "Custom Capture Forms & Segments",
+        "Full Support"
       ],
     },
     {
+      title: "Pro",
       name: "Pro",
       price: "$299.99",
-      period: "/mo",
-      annualNote: "or $2,879.90/yr — save 20%",
-      trialNote: null,
-      featured: false,
+      period: "permonth",
+      gradient: "from-[#22d3ee] via-[#06b6d4] to-[#10b981]",
+      ringColor: "bg-teal-400/20",
       features: [
         "2,400 AI credits / month",
-        "2,000 AI-discovered leads / month",
-        "Reply tracking",
-        "Meeting booking links & Zoom sync",
-        "Priority support",
-        "Everything in Starter",
+        "2,000 Verified AI Leads / month",
+        "Multi-Inbox Automated Reply Tracking",
+        "Instant Zoom Meeting Link Generator",
+        "Custom Webhooks & API Integration",
+        "TipTap Rich Text Newsletter Builder",
+        "Full Support"
       ],
     },
   ];
 
   return (
     <section id="pricing" className="py-24 sm:py-32 bg-transparent">
-      <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
+      <div className="max-w-[1240px] mx-auto px-5 sm:px-8">
 
-        <div className="max-w-2xl mx-auto text-center mb-16">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
-            Simple, Transparent Pricing
-          </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight">
-            Pick a plan. Start free for 7 days.
-          </h2>
-          <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
-            A credit card is required to start your trial. Upgrade, downgrade, or cancel any time.
-          </p>
-        </div>
+        {/* Outer Dark Frame matching reference mockup */}
+        <div className="bg-[#151726]/90 backdrop-blur-2xl border border-white/15 rounded-[40px] p-6 sm:p-10 lg:p-14 shadow-2xl relative overflow-hidden">
+          
+          {/* Subtle radiant ambient lights */}
+          <div className="absolute -top-24 -left-24 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="grid md:grid-cols-3 gap-6 items-stretch">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`rounded-3xl p-6 sm:p-8 flex flex-col transition-transform hover-lift-card ${
-                plan.featured
-                  ? "bg-[#1f2223] text-white shadow-2xl md:-translate-y-3 border border-white/20"
-                  : "landing-glass-card shadow-lg"
-              }`}
-            >
-              {plan.featured && (
-                <span className="inline-flex self-start items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-5 bg-blue-500/20 text-blue-300">
-                  Most Popular
-                </span>
-              )}
-              <h3 className={`text-lg font-bold mb-1 ${plan.featured ? "text-white" : "text-[#1f2223]"}`}>
-                {plan.name}
-              </h3>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className={`text-4xl font-semibold tracking-tight ${plan.featured ? "text-white" : "text-[#1f2223]"}`}>
-                  {plan.price}
-                </span>
-                <span className={plan.featured ? "text-slate-400" : "text-slate-500"}>{plan.period}</span>
-              </div>
-              <p className={`text-xs mb-6 ${plan.featured ? "text-slate-400" : "text-slate-500"}`}>
-                {plan.annualNote}
-              </p>
+          {/* Section Header */}
+          <div className="max-w-2xl mx-auto text-center mb-12 sm:mb-16 relative z-10">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight">
+              Choose your best plan
+            </h2>
+            <p className="text-sm sm:text-base text-slate-300 mt-3 font-medium">
+              Start your 7-day free trial today. Cancel anytime with zero obligation.
+            </p>
+          </div>
 
-              <ul className="space-y-3 mb-8 flex-1">
-                {plan.features.map((f, i) => (
-                  <li key={i} className="flex items-center gap-3 text-sm font-medium">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                      plan.featured ? "bg-blue-500/20 text-blue-300" : "bg-emerald-100 text-emerald-600"
-                    }`}>
-                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                    </div>
-                    <span className={plan.featured ? "text-slate-200" : "text-slate-700"}>{f}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {plan.trialNote && (
-                <p className="text-xs text-slate-500 mb-3 text-center">{plan.trialNote}</p>
-              )}
-
-              <Link
-                href="/signup"
-                className={`inline-flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-semibold transition-all ${
-                  plan.featured
-                    ? "bg-white text-[#1f2223] hover:bg-slate-100"
-                    : "bg-[#1f2223] text-white hover:bg-black"
-                }`}
+          {/* 3 Pricing Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch relative z-10">
+            {plans.map((plan, idx) => (
+              <div
+                key={idx}
+                className={`relative rounded-[32px] sm:rounded-[36px] bg-gradient-to-b ${plan.gradient} p-7 sm:p-8 text-white shadow-2xl flex flex-col justify-between overflow-hidden transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_20px_50px_rgba(0,0,0,0.4)]`}
               >
-                <span>Start with {plan.name}</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          ))}
+                {/* Decorative translucent curved background glows */}
+                <div className={`absolute -top-12 -right-12 w-48 h-48 rounded-full ${plan.ringColor} blur-xl pointer-events-none`} />
+                <div className="absolute top-1/3 -left-12 w-36 h-36 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+
+                <div className="relative z-10">
+                  {/* Card Title */}
+                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white mb-6 text-left">
+                    {plan.title}
+                  </h3>
+
+                  {/* Checklist */}
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feature, fIdx) => (
+                      <li key={fIdx} className="flex items-start gap-2.5 text-xs sm:text-[13.5px] font-medium text-white/95 leading-snug text-left">
+                        <span className="font-bold text-white shrink-0 mt-0.5">✓</span>
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Bottom Row: Price on Left & Dark Recessed Sign-up Button on Right */}
+                <div className="pt-6 border-t border-white/20 flex items-end justify-between gap-3 relative z-10">
+                  {/* Price */}
+                  <div>
+                    <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-none">
+                      {plan.price}
+                    </div>
+                    <div className="text-xs sm:text-[13px] text-white/80 font-medium mt-1">
+                      {plan.period}
+                    </div>
+                  </div>
+
+                  {/* Sign Up Button */}
+                  <Link
+                    href="/signup"
+                    className="inline-flex items-center gap-2 bg-[#171828] hover:bg-[#0c0d18] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 group/btn cursor-pointer shrink-0 border border-white/10"
+                  >
+                    <span>Sign up</span>
+                    <span className="text-[10px] group-hover/btn:translate-x-0.5 transition-transform">▶</span>
+                  </Link>
+                </div>
+
+              </div>
+            ))}
+          </div>
+
         </div>
 
       </div>
@@ -1299,11 +1331,20 @@ function DramaticBottomCTAAndFooter() {
           </Link>
 
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm text-blue-100 font-medium">
-            <span>✨ Full platform access</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+              <span>Full platform access</span>
+            </span>
             <span>·</span>
-            <span>⚡ Setup in under 2 minutes</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-blue-300 fill-blue-300" />
+              <span>Setup in under 2 minutes</span>
+            </span>
             <span>·</span>
-            <span>🛡️ Cancel anytime</span>
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Cancel anytime</span>
+            </span>
           </div>
         </div>
 

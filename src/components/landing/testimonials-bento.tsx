@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Star, Sparkles } from "lucide-react";
+import { Star, Sparkles, Pause } from "lucide-react";
 
 export function TestimonialsBentoSection() {
   const [activeTab, setActiveTab] = useState<"all" | "founders" | "sales" | "growth">("all");
@@ -444,9 +444,19 @@ export function TestimonialsBentoSection() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setAnimationsEnabled(!animationsEnabled)}
-              className="text-xs font-semibold px-4 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all border border-slate-200 cursor-pointer shadow-sm"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all border border-slate-200 cursor-pointer shadow-sm"
             >
-              {animationsEnabled ? "✨ Floating: On" : "⏸️ Floating: Off"}
+              {animationsEnabled ? (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                  <span>Floating: On</span>
+                </>
+              ) : (
+                <>
+                  <Pause className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Floating: Off</span>
+                </>
+              )}
             </button>
             <a
               href="#pricing"
