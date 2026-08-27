@@ -1124,132 +1124,27 @@ function PricingSection() {
   );
 }
 
-function TrustSection() {
-  // Styled like customer-quote cards (big quote mark, avatar row, dot
-  // navigation, auto-rotating carousel) on purpose — but the "avatar" is an
-  // icon and the "name" is a category, never a fake person. We have no real
-  // customers to quote yet; faking one would be a false, deceptive statement
-  // placed on a real site visitors act on.
-  const points = [
-    {
-      Icon: Cpu,
-      quote: "Prospecting, enrichment, and outreach copy are powered by OpenAI and Groq — not a scripted demo.",
-      label: "Real AI",
-      sub: "Not hype",
-    },
-    {
-      Icon: ShieldCheck,
-      quote: "Payments are processed by Stripe, the same infrastructure trusted by millions of businesses worldwide.",
-      label: "Secure Billing",
-      sub: "Powered by Stripe",
-    },
-    {
-      Icon: Database,
-      quote: "Authentication, storage, and database security are built on Supabase — audited, encrypted, industry-standard.",
-      label: "Your Data",
-      sub: "Protected by design",
-    },
-    {
-      Icon: RefreshCw,
-      quote: "Start with a 7-day free trial. A credit card is required to begin, but you can cancel, downgrade, or upgrade any time.",
-      label: "No Lock-In",
-      sub: "Cancel anytime",
-    },
-  ];
-
-  const [current, setCurrent] = useState(0);
-  const [paused, setPaused] = useState(false);
-
-  useEffect(() => {
-    if (paused) return;
-    const timer = setInterval(() => setCurrent((c) => (c + 1) % points.length), 5000);
-    return () => clearInterval(timer);
-  }, [paused, points.length]);
-
-  // 3-wide sliding window (matches a real multi-card carousel) that wraps
-  // around, so it always shows `points.length` cards no matter which is active.
-  const visible = [0, 1, 2].map((offset) => points[(current + offset) % points.length]);
-
-  return (
-    <section className="py-24 sm:py-28 bg-transparent">
-      <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
-        <div className="max-w-2xl mx-auto text-center mb-14">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
-            Built To Be Trusted
-          </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight">
-            Why teams trust Nxelio Nurture.
-          </h2>
-          <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
-            We&apos;re an early-stage product without customer reviews yet — so here&apos;s what&apos;s actually true instead.
-          </p>
-        </div>
-
-        <div
-          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-4xl mx-auto"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-        >
-          {visible.map((p) => (
-            <div
-              key={p.label}
-              className="relative landing-glass-card rounded-2xl p-6 pt-8 flex flex-col shadow-lg transition-opacity duration-500 hover-lift-card"
-            >
-              <span className="absolute -top-4 left-6 w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-lg font-serif shadow-lg shadow-blue-600/30">
-                &ldquo;
-              </span>
-              <p className="text-sm text-slate-700 leading-relaxed mb-6 flex-1">{p.quote}</p>
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                  <p.Icon className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-[#1f2223]">{p.label}</div>
-                  <div className="text-xs text-slate-500">{p.sub}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex justify-center gap-2 mt-10">
-          {points.map((p, i) => (
-            <button
-              key={p.label}
-              onClick={() => setCurrent(i)}
-              className={`w-2.5 h-2.5 rounded-full transition-colors cursor-pointer ${
-                i === current ? "bg-blue-600" : "bg-slate-200 hover:bg-slate-300"
-              }`}
-              aria-label={`Show ${p.label}`}
-            />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function FAQSection() {
   const faqs = [
     {
-      q: "What is Nxelio?",
-      a: "Nxelio is an all-in-one AI Sales and GTM platform. It combines prospect discovery, 15+ provider waterfall contact enrichment, cold email sequence campaigns, visual deal pipeline CRM, calendar meeting scheduling, and newsletter broadcasting into a single unified workspace."
+      q: "What is Nxelio Nurture?",
+      a: "Nxelio Nurture is an all-in-one AI sales platform. It combines prospect discovery, verified contact enrichment, cold email sequence campaigns, a visual deal pipeline, and calendar meeting scheduling into a single unified workspace."
     },
     {
       q: "How does contact enrichment work?",
-      a: "Nxelio queries a waterfall of over 15 verified data providers to find deliverable business emails, direct phone numbers, and company firmographics. This multi-layer lookup ensures high accuracy and prevents emails from bouncing."
+      a: "Nxelio Nurture looks up verified business emails and phone numbers through trusted contact data providers, so you're not guessing or pattern-matching addresses by hand."
     },
     {
       q: "Can I bring my own contact list?",
-      a: "Yes. You can import any CSV file with leads or accounts. Nxelio automatically maps your columns, enriches missing phone numbers or emails, and allows you to instantly enroll them into campaigns or segments."
+      a: "Yes. You can import any CSV file with leads or accounts. Nxelio Nurture automatically maps your columns, enriches missing phone numbers or emails, and allows you to instantly enroll them into campaigns or segments."
     },
     {
       q: "How does the meeting booking feature work?",
-      a: "Nxelio includes a built-in calendar scheduler. You can create public booking pages (e.g. nxelio.com/book/your-name), connect Google Calendar or Microsoft 365 to check real-time availability, and automatically create Zoom video meeting links."
+      a: "Nxelio Nurture includes a built-in calendar scheduler. You can create public booking pages (e.g. nxelio.com/book/your-name), connect Google Calendar or Microsoft/Outlook Calendar to check real-time availability, and automatically create Zoom video meeting links."
     },
     {
       q: "How does the 7-day free trial work?",
-      a: "You get full access to Nxelio for 7 days. You can discover prospects, run campaign sequences, test meeting bookings, and manage your pipeline risk-free. A credit card is required to start, and you can cancel anytime before you're charged."
+      a: "You get full access to Nxelio Nurture for 7 days. You can discover prospects, run campaign sequences, test meeting bookings, and manage your pipeline risk-free. A credit card is required to start, and you can cancel anytime before you're charged."
     }
   ];
 
@@ -1442,7 +1337,6 @@ export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = 
       <IntegrationsSection />
       <PricingSection />
       <TestimonialsBentoSection />
-      <TrustSection />
       <FAQSection />
       <DramaticBottomCTAAndFooter />
 

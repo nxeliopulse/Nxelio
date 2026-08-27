@@ -110,16 +110,10 @@ function LoginForm() {
 
   return (
     <AuthSplitCard
-      pageLabel="Sign In"
-      heading={["Welcome back to Nxelio Nurture.", "Sign in to see the latest updates."]}
-      subheading="Enter your details to proceed further"
-      illustration={
-        <img
-          src="/login-illustration.svg"
-          alt="Sign in illustration"
-          className="w-full h-auto"
-        />
-      }
+      heading="Welcome Back"
+      subheading="Please log in to your account to continue."
+      leftEyebrow="You can easily"
+      leftTitle="Speed up your work with our Web App"
     >
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && (
@@ -142,7 +136,7 @@ function LoginForm() {
           <div className="relative">
             <input
               type="email"
-              placeholder="john.doe@gmail.com"
+              placeholder="enter your email"
               value={form.email}
               maxLength={254}
               onChange={(e) => { setForm({ ...form, email: e.target.value }); setFieldErrors((f) => ({ ...f, email: undefined })); }}
@@ -185,7 +179,7 @@ function LoginForm() {
           <RadioToggle checked={rememberMe} onChange={setRememberMe} label="Remember me" />
           <Link
             href={`/forgot-password${form.email.includes("@") ? `?email=${encodeURIComponent(form.email)}` : ""}`}
-            className="text-xs font-semibold text-indigo-600 hover:underline"
+            className="text-xs font-semibold text-blue-400 hover:text-blue-300 hover:underline"
           >
             Recover password
           </Link>

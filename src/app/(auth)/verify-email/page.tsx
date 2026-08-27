@@ -84,10 +84,10 @@ function VerifyEmailForm() {
         </div>
       </div>
 
-      <h1 className="text-2xl font-black text-slate-900 mb-2 text-center">Confirm your email address</h1>
-      <p className="text-sm mb-8 text-center text-slate-500">
+      <h1 className="text-2xl font-black text-white mb-2 text-center">Confirm your email address</h1>
+      <p className="text-sm mb-8 text-center text-slate-400">
         For security, we&apos;ve sent a code to{" "}
-        <span className="font-semibold text-slate-700">{email || "your email"}</span>.
+        <span className="font-semibold text-slate-200">{email || "your email"}</span>.
         Enter it below to finish setting up your account.
       </p>
 
@@ -119,33 +119,35 @@ function VerifyEmailForm() {
               onChange={(e) => handleDigitChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onPaste={handlePaste}
-              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold text-slate-800 rounded-xl outline-none transition-all"
-              style={{ background: "#F3F4F8", border: "1.5px solid transparent" }}
-              onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.25)"; }}
-              onBlur={(e) => { e.currentTarget.style.boxShadow = "none"; }}
+              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold text-white rounded-xl border border-white/15 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/15 bg-white/[0.06] backdrop-blur-sm outline-none transition-all"
             />
           ))}
         </div>
 
-        <button type="submit" disabled={verifying || digits.join("").length !== CODE_LENGTH}
-          className="w-full py-3.5 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow: "0 4px 20px rgba(24,167,184,.3)" }}>
+        <button
+          type="submit"
+          disabled={verifying || digits.join("").length !== CODE_LENGTH}
+          className="w-full py-3.5 px-6 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:scale-[0.99] transition-all shadow-md shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+        >
           {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {verifying ? "Verifying…" : "Verify email"}
         </button>
 
-        <div className="text-center text-sm text-slate-500">
+        <div className="text-center text-xs text-slate-400 font-medium">
           Haven&apos;t received the code?{" "}
-          <button type="button" onClick={handleResend} disabled={resending || cooldown > 0}
-            className="font-bold hover:underline disabled:opacity-50 disabled:no-underline"
-            style={{ color: "#18A7B8" }}>
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resending || cooldown > 0}
+            className="font-bold text-blue-400 hover:text-blue-300 hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer"
+          >
             {resending ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
           </button>
         </div>
 
-        <p className="text-center text-sm pt-2 text-slate-500">
+        <p className="text-center text-xs pt-2 text-slate-400 font-medium">
           Wrong email?{" "}
-          <Link href="/signup" className="font-bold hover:underline" style={{ color: "#18A7B8" }}>
+          <Link href="/signup" className="font-bold text-blue-400 hover:text-blue-300 hover:underline">
             Sign up again
           </Link>
         </p>

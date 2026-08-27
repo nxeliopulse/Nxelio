@@ -66,16 +66,10 @@ export default function SignupPage() {
 
   return (
     <AuthSplitCard
-      pageLabel="Sign Up"
-      heading={["Welcome to Nxelio Nurture.", "Sign up to get started."]}
-      subheading="7-day free trial — card required, no charge until day 7"
-      illustration={
-        <img
-          src="/signup-illustration.svg"
-          alt="Sign up illustration"
-          className="w-full h-auto"
-        />
-      }
+      heading="Get Started Now"
+      subheading="Please enter your details to create your account."
+      leftEyebrow="You can easily"
+      leftTitle="Speed up your work with our Web App"
     >
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && (
@@ -108,7 +102,7 @@ export default function SignupPage() {
           <div className="relative">
             <input
               type="email"
-              placeholder="you@company.com"
+              placeholder="enter your email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className={UNDERLINE_INPUT}
@@ -147,9 +141,9 @@ export default function SignupPage() {
           label={
             <>
               I agree with{" "}
-              <Link href="/terms" onClick={(e) => e.stopPropagation()} className="text-slate-700 font-medium hover:underline">terms</Link>
+              <Link href="/terms" onClick={(e) => e.stopPropagation()} className="text-slate-200 font-medium hover:underline">terms</Link>
               {" "}&{" "}
-              <Link href="/privacy" onClick={(e) => e.stopPropagation()} className="text-slate-700 font-medium hover:underline">conditions</Link>
+              <Link href="/privacy" onClick={(e) => e.stopPropagation()} className="text-slate-200 font-medium hover:underline">conditions</Link>
             </>
           }
         />

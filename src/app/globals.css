@@ -565,6 +565,36 @@ html, body {
   opacity: 1 !important;
 }
 
+/* ============================================================================
+   Login/Signup are a fixed dark full-screen design, independent of the
+   logged-in dashboard's theme toggle — the same escape-hatch pattern as
+   .force-light-theme above, just forced dark instead of light. Without this,
+   .dark's own slate-ramp redefinitions (tuned for the dashboard) would bleed
+   into this page's dark-on-dark text and make labels/placeholders unreadable.
+   ============================================================================ */
+.force-dark-theme,
+.dark .force-dark-theme {
+  --color-slate-300: #cbd5e1 !important;
+  --color-slate-400: #94a3b8 !important;
+  --color-slate-500: #64748b !important;
+  --background: #0a0a0d !important;
+  --foreground: #ffffff !important;
+  background-color: #0a0a0d !important;
+  color: #ffffff !important;
+  color-scheme: dark;
+}
+
+.force-dark-theme input,
+.force-dark-theme select,
+.force-dark-theme textarea {
+  color: #ffffff !important;
+}
+.force-dark-theme input::placeholder,
+.force-dark-theme textarea::placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
+}
+
 /* In-app toast/dialog entrance animation */
 @keyframes lp-toast-in {
   from { opacity: 0; transform: translateY(-8px) scale(0.98); }
