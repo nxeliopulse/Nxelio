@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Logo } from "@/components/brand/logo";
+import { BrandVisualPanel } from "@/components/brand/brand-visual-panel";
 
 export default async function OnboardingLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -8,29 +8,24 @@ export default async function OnboardingLayout({ children }: { children: React.R
   if (!user) redirect("/login");
 
   return (
-    <div className="force-light-theme min-h-screen bg-slate-50 flex items-center justify-center py-8 sm:py-12">
-      <div className="mx-auto max-w-7xl w-full px-4">
-        <div className="flex gap-10 items-start">
-          <div className="flex-1 min-w-0">
-            {children}
-          </div>
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#0a0a0d] font-sans overflow-hidden">
 
-          {/* Decorative assistant panel — desktop only, stays in view alongside the (possibly tall) wizard steps.
-              Height is capped (not width-driven) so a wide panel can't stretch the whole page taller than the viewport. */}
-          <div className="hidden lg:block w-[460px] flex-shrink-0 sticky top-4 mt-6">
-            <div className="relative rounded-3xl overflow-hidden shadow-xl flex items-center justify-center p-8 h-[55vh] max-h-[460px]"
-              style={{ background: "linear-gradient(135deg,#18A7B8 0%,#5B3FA6 100%)" }}>
-              <div className="absolute -top-8 -left-8 h-28 w-28 rounded-full" style={{ background: "rgba(255,255,255,.12)" }} />
-              <div className="absolute -bottom-10 -right-6 h-32 w-32 rounded-full" style={{ background: "rgba(255,255,255,.1)" }} />
-              {/* eslint-disable-next-line @next/next/no-img-element -- fixed decorative illustration, not worth Next/Image's constraints here */}
-              <img src="/illustrations/onboarding-assistant-nobg.png" alt="" className="relative max-h-full w-auto max-w-full object-contain drop-shadow-2xl animate-float-gentle" />
-            </div>
-            <p className="mt-3 text-center text-sm text-slate-400 px-2">
-              A few quick steps and your AI co-pilot is ready to go.
-            </p>
-          </div>
+      {/* LEFT: dark surround holding the wizard's own light panel. The wizard
+          (multi-step form using the app-wide Card/Input/Select components)
+          stays untouched here rather than converted to a dark theme — those
+          components are shared with the rest of the app, and forcing them
+          dark would mean re-auditing every dashboard screen that uses them. */}
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-12 overflow-y-auto">
+        <div className="force-light-theme w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-5 sm:p-8 my-auto">
+          {children}
         </div>
       </div>
+
+      <BrandVisualPanel
+        statHeadline="Almost there."
+        statBody="A few quick steps and your AI co-pilot is ready to go."
+        cta={null}
+      />
     </div>
   );
 }
