@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { sendVerificationCode, verifyEmailCode } from "@/lib/queries/email-verification";
+import { createClient } from "@/lib/supabase/client";
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN = 30;
+// Must match the key signup/page.tsx writes to sessionStorage.
+const PENDING_PASSWORD_KEY = "nxelio_pending_signup_password";
 
 function VerifyEmailForm() {
   const router = useRouter();
@@ -53,12 +56,41 @@ function VerifyEmailForm() {
     if (code.length !== CODE_LENGTH) { setError("Enter the full 6-digit code"); return; }
     setError(null); setNotice(null); setVerifying(true);
     const result = await verifyEmailCode(email, code);
-    setVerifying(false);
-    if (!result.ok) { setError(result.error || "Verification failed"); return; }
+    if (!result.ok) {
+      setVerifying(false);
+      setError(result.error || "Verification failed");
+      return;
+    }
 
-    // Verified — never carry the password forward (e.g. via a URL param).
-    // Land on the public landing page, not straight to /login, so email
-    // signups get the same "never straight into the app" journey as OAuth.
+    // Sign the user straight into a real session using the password stashed
+    // in sessionStorage at signup (never a URL param — that would leak into
+    // browser history / referrer headers / server logs), then land them on
+    // onboarding instead of bouncing back to the marketing page. Always
+    // cleared right after reading, whether sign-in succeeds or not — it's
+    // one-time-use, not meant to sit in storage longer than this step.
+    let pendingPassword: string | null = null;
+    try {
+      pendingPassword = sessionStorage.getItem(PENDING_PASSWORD_KEY);
+      sessionStorage.removeItem(PENDING_PASSWORD_KEY);
+    } catch {}
+
+    if (pendingPassword) {
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: pendingPassword });
+      setVerifying(false);
+      if (!signInError) {
+        router.push("/onboarding");
+        return;
+      }
+      // Sign-in failed for some reason (password changed mid-flow, session
+      // quirk) — fall through to the manual-login landing page below rather
+      // than leaving the user stuck on a dead end.
+    } else {
+      setVerifying(false);
+    }
+
+    // No stashed password available (resumed this page in a fresh tab, or
+    // the auto sign-in above failed) — same safe fallback as before.
     router.push(`/?verified=1&email=${encodeURIComponent(email)}`);
   }
 
