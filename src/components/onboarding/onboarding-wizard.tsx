@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, ArrowRight, AlertCircle, Building2, Boxes, Users, Calendar, MapPin,
-  DollarSign, Target, Receipt, Clock, Package, Swords, Mail, Loader2,
-  Check, Sparkles, User, Briefcase, Camera,
+  ArrowLeft, ArrowRight, AlertCircle, Building2, Boxes, MapPin,
+  Target, Receipt, Clock, Package, Swords, Mail, Loader2,
+  Check, Sparkles, User, Briefcase, Camera, ChevronDown, Plus,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -18,9 +18,6 @@ import { updateProfile } from "@/lib/queries/profile";
 import { uploadAvatarImage } from "@/lib/storage/upload";
 import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid, type CountryCode } from "@/components/ui/phone-input";
 
-const GOALS = ["Generate leads", "Book more meetings", "Grow pipeline", "Close deals faster", "Automate outreach", "Track performance"];
-const SIZES = ["1–10", "11–50", "51–200", "201–500", "500+"];
-const REVENUE = ["< $100K", "$100K – $1M", "$1M – $5M", "$5M – $20M", "$20M+"];
 const DEAL_SIZES = ["< $1K", "$1K – $10K", "$10K – $50K", "$50K – $250K", "$250K+"];
 const CYCLES = ["< 1 week", "1–4 weeks", "1–3 months", "3–6 months", "6+ months"];
 const CUSTOMER_TYPES = ["B2B", "B2C", "Both"];
@@ -39,6 +36,43 @@ const emptyForm: OnboardingData = {
 
 const LIGHT_OUTLINE_STYLE: React.CSSProperties = { background: "white", borderColor: "#e2e8f0", color: "#334155" };
 
+function Stepper({ step, titles }: { step: number; titles: string[] }) {
+  return (
+    <div className="grid mb-6" style={{ gridTemplateColumns: `repeat(${titles.length}, 1fr)` }}>
+      {titles.map((title, i) => {
+        const idx = i + 1;
+        const done = idx < step;
+        const current = idx === step;
+        return (
+          <div key={title} className="relative flex flex-col items-center text-center px-1">
+            {i > 0 && (
+              <div
+                className="absolute top-4 right-1/2 w-full h-0.5 -translate-y-1/2"
+                style={{ background: idx <= step ? "linear-gradient(90deg,#18A7B8,#7E57C2)" : "#e2e8f0" }}
+              />
+            )}
+            <div
+              className="relative z-10 h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold border-2 flex-shrink-0"
+              style={
+                done
+                  ? { background: "linear-gradient(135deg,#18A7B8,#7E57C2)", borderColor: "transparent", color: "white" }
+                  : current
+                  ? { borderColor: "#18A7B8", color: "#18A7B8", background: "white" }
+                  : { borderColor: "#e2e8f0", color: "#94a3b8", background: "white" }
+              }
+            >
+              {done ? <Check className="h-4 w-4" /> : idx}
+            </div>
+            <span className={cn("relative z-10 mt-1.5 text-[11px] font-medium leading-tight bg-white px-1", (done || current) ? "text-slate-700" : "text-slate-400")}>
+              {title}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Field({ label, required, icon, children }: { label: string; required?: boolean; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
@@ -51,6 +85,139 @@ function Field({ label, required, icon, children }: { label: string; required?: 
           {children}
         </div>
       ) : children}
+    </div>
+  );
+}
+
+interface SelectCoords {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  maxListHeight: number;
+}
+
+/** Searchable, creatable dropdown (search a fixed list, or type your own
+ *  value if it isn't there) — used for Industry so a value not in our
+ *  picklist doesn't force the user into a generic "Other" bucket. Rendered
+ *  through a portal at the trigger's own screen coordinates rather than
+ *  absolutely inside the form column, so it isn't clipped by the column's
+ *  own scroll container (same fix as the phone country dropdown). */
+function SearchableSelect({
+  value, onChange, options, placeholder = "Select…", searchPlaceholder = "Search…", icon,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  icon?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [coords, setCoords] = useState<SelectCoords | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  function updateCoords() {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const margin = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const openUpward = spaceBelow < 180 && spaceAbove > spaceBelow;
+    setCoords({
+      left: rect.left,
+      width: rect.width,
+      ...(openUpward
+        ? { bottom: window.innerHeight - rect.top + 4, maxListHeight: Math.max(120, Math.min(240, spaceAbove - 56)) }
+        : { top: rect.bottom + 4, maxListHeight: Math.max(120, Math.min(240, spaceBelow - 56)) }),
+    });
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function onOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onReposition() { updateCoords(); }
+    document.addEventListener("mousedown", onOutside);
+    window.addEventListener("scroll", onReposition, true);
+    window.addEventListener("resize", onReposition);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      window.removeEventListener("scroll", onReposition, true);
+      window.removeEventListener("resize", onReposition);
+    };
+  }, [open]);
+
+  function toggleOpen() {
+    setOpen((v) => {
+      const next = !v;
+      if (next) { setQuery(""); updateCoords(); requestAnimationFrame(() => searchRef.current?.focus()); }
+      return next;
+    });
+  }
+
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(() => (q ? options.filter((o) => o.toLowerCase().includes(q)) : options), [options, q]);
+  const exactMatch = options.some((o) => o.toLowerCase() === q);
+
+  return (
+    <div ref={rootRef} className="relative w-full">
+      <button
+        type="button"
+        onClick={toggleOpen}
+        className="peer w-full h-10 rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-left transition hover:border-slate-350 focus:outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600 flex items-center justify-between"
+      >
+        <span className={cn("truncate", value ? "text-slate-900" : "text-slate-400")}>{value || placeholder}</span>
+        <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-2" />
+      </button>
+      {open && coords && typeof document !== "undefined" && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[100] rounded-lg border border-slate-200 bg-white shadow-lg overflow-hidden"
+          style={{ left: coords.left, width: coords.width, top: coords.top, bottom: coords.bottom }}
+        >
+          <div className="p-2 border-b border-slate-100">
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-indigo-600/35 focus:border-indigo-600"
+            />
+          </div>
+          <div className="overflow-y-auto" style={{ maxHeight: coords.maxListHeight }}>
+            {filtered.map((o) => (
+              <button
+                key={o}
+                type="button"
+                onClick={() => { onChange(o); setOpen(false); }}
+                className={cn("w-full flex items-center px-3 py-1.5 text-sm text-left hover:bg-slate-50", o === value && "bg-indigo-50 text-indigo-700")}
+              >
+                {o}
+              </button>
+            ))}
+            {query.trim() && !exactMatch && (
+              <button
+                type="button"
+                onClick={() => { onChange(query.trim()); setOpen(false); }}
+                className="w-full flex items-center gap-1.5 px-3 py-1.5 text-sm text-left text-indigo-600 hover:bg-indigo-50 border-t border-slate-100"
+              >
+                <Plus className="h-3.5 w-3.5" /> Use &quot;{query.trim()}&quot;
+              </button>
+            )}
+            {filtered.length === 0 && !query.trim() && (
+              <p className="px-3 py-4 text-sm text-slate-400 text-center">No options</p>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -80,15 +247,11 @@ export function OnboardingWizard({ status }: {
   function set<K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
-  function toggleGoal(g: string) {
-    setForm((f) => ({ ...f, goals: f.goals.includes(g) ? f.goals.filter((x) => x !== g) : [...f.goals, g] }));
-  }
   function setErr(msg: string) { setError(msg); return false; }
 
   function validateCompanyIdentity(): boolean {
     if (!form.company_name.trim()) return setErr("Company name is required.");
     if (!form.industry) return setErr("Please select your industry.");
-    if (form.goals.length === 0) return setErr("Pick at least one goal.");
     setError(null);
     return true;
   }
@@ -206,15 +369,7 @@ export function OnboardingWizard({ status }: {
       </div>
 
       {/* Progress */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex gap-1.5 flex-1">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="h-1.5 flex-1 rounded-full transition-colors bg-slate-200"
-              style={n <= step ? { background: "linear-gradient(135deg,#18A7B8,#7E57C2)" } : undefined} />
-          ))}
-        </div>
-        <span className="text-sm font-medium text-slate-400 whitespace-nowrap">Step {step} of 3</span>
-      </div>
+      <Stepper step={step} titles={STEP_TITLES.map((t) => t.title)} />
 
       {error && (
         <div className="flex items-start gap-2 rounded-lg p-3 text-sm mb-3"
@@ -225,7 +380,7 @@ export function OnboardingWizard({ status }: {
 
       {/* ── Step 1: Your profile ── */}
       {step === 1 && (
-        <Card className="p-5">
+        <div>
           <div className="flex items-center gap-2 mb-4">
             <User className="h-5 w-5 text-slate-700" />
             <h2 className="font-semibold text-slate-900">Your profile</h2>
@@ -283,12 +438,12 @@ export function OnboardingWizard({ status }: {
               </Field>
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* ── Step 2: Company identity ── */}
       {step === 2 && (
-          <Card className="p-5">
+          <div>
             <div className="flex items-center gap-2 mb-4">
               <Building2 className="h-5 w-5 text-slate-700" />
               <h2 className="font-semibold text-slate-900">Company identity</h2>
@@ -298,67 +453,30 @@ export function OnboardingWizard({ status }: {
                 <Input leftIcon={<Building2 className="h-4 w-4" />} placeholder="e.g. Acme Corp" value={form.company_name} onChange={(e) => set("company_name", e.target.value)} />
               </Field>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Industry / vertical" required icon={<Boxes className="h-4 w-4" />}>
-                  <Select className="pl-10" value={form.industry} onChange={(e) => set("industry", e.target.value)}>
-                    <option value="">Select industry</option>
-                    {industries.map((i) => <option key={i} value={i}>{i}</option>)}
-                  </Select>
-                </Field>
-                <Field label="Company size" icon={<Users className="h-4 w-4" />}>
-                  <Select className="pl-10" value={form.company_size} onChange={(e) => set("company_size", e.target.value)}>
-                    <option value="">Employees</option>
-                    {SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </Select>
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Founded year">
-                  <Input leftIcon={<Calendar className="h-4 w-4" />} placeholder="e.g. 2018" value={form.founded_year} onChange={(e) => set("founded_year", e.target.value)} />
-                </Field>
-                <Field label="HQ location / country">
-                  <Input leftIcon={<MapPin className="h-4 w-4" />} placeholder="e.g. Austin, TX, USA" value={form.hq_location} onChange={(e) => set("hq_location", e.target.value)} />
-                </Field>
-              </div>
-
-              <Field label="Annual revenue range" icon={<DollarSign className="h-4 w-4" />}>
-                <Select className="pl-10" value={form.annual_revenue} onChange={(e) => set("annual_revenue", e.target.value)}>
-                  <option value="">Select revenue range</option>
-                  {REVENUE.map((r) => <option key={r} value={r}>{r}</option>)}
-                </Select>
+              <Field label="Industry / vertical" required icon={<Boxes className="h-4 w-4" />}>
+                <SearchableSelect
+                  value={form.industry}
+                  onChange={(v) => set("industry", v)}
+                  options={industries}
+                  placeholder="Select industry"
+                  searchPlaceholder="Search your industry…"
+                />
               </Field>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Goals <span className="text-red-500">*</span></label>
-                <div className="flex flex-wrap gap-2">
-                  {GOALS.map((g) => {
-                    const on = form.goals.includes(g);
-                    return (
-                      <button key={g} type="button" onClick={() => toggleGoal(g)}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors",
-                          !on && "border border-slate-200 text-slate-600 hover:bg-slate-50"
-                        )}
-                        style={on ? { background: "linear-gradient(135deg,#18A7B8,#7E57C2)", color: "white" } : undefined}>
-                        {on && <Check className="h-3.5 w-3.5" />}{g}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-slate-400 mt-1.5">Select all that apply</p>
-              </div>
+              <Field label="HQ location / country">
+                <Input leftIcon={<MapPin className="h-4 w-4" />} placeholder="e.g. Austin, TX, USA" value={form.hq_location} onChange={(e) => set("hq_location", e.target.value)} />
+              </Field>
 
               <Field label="Company description">
                 <Textarea rows={3} placeholder="Briefly describe what your company does, who you serve, and what makes you different…" value={form.company_description} onChange={(e) => set("company_description", e.target.value)} />
               </Field>
             </div>
-          </Card>
+          </div>
       )}
 
       {/* ── Step 3: Sales context ── */}
       {step === 3 && (
-          <Card className="p-5">
+          <div>
             <div className="flex items-center gap-2 mb-4">
               <Target className="h-5 w-5 text-slate-700" />
               <h2 className="font-semibold text-slate-900">Sales context</h2>
@@ -407,7 +525,7 @@ export function OnboardingWizard({ status }: {
                 <p className="text-xs text-slate-400 mt-1.5">Separate multiple competitors with a comma. Nxelio Nurture uses this to surface high-intent leads.</p>
               </Field>
             </div>
-          </Card>
+          </div>
       )}
 
 
