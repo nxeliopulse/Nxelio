@@ -9,7 +9,7 @@ import { exchangeCode, fetchAccountEmail, type CalProvider } from "@/lib/calenda
 import { logAudit } from "@/lib/queries/audit-log";
 
 function isProvider(p: string): p is CalProvider {
-  return p === "google" || p === "microsoft";
+  return p === "google" || p === "microsoft" || p === "zoho";
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {

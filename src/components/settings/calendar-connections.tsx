@@ -10,7 +10,7 @@ import {
 } from "@/lib/queries/calendar-accounts";
 import { disconnectZoom, type ZoomAccountRow } from "@/lib/queries/zoom-accounts";
 
-const PROVIDER_LABEL: Record<string, string> = { google: "Google Calendar", microsoft: "Microsoft / Outlook" };
+const PROVIDER_LABEL: Record<string, string> = { google: "Google Calendar", microsoft: "Microsoft / Outlook", zoho: "Zoho Calendar" };
 
 function withNext(href: string, redirectTo: string | undefined): string {
   return redirectTo ? `${href}?next=${encodeURIComponent(redirectTo)}` : href;
@@ -25,7 +25,7 @@ export function CalendarConnections({
   redirectTo,
 }: {
   accounts: CalendarAccountRow[];
-  providerStatus: { google: boolean; microsoft: boolean };
+  providerStatus: { google: boolean; microsoft: boolean; zoho: boolean };
   zoomAccounts: ZoomAccountRow[];
   zoomConfigured: boolean;
   bookingSlug?: string | null;
@@ -91,7 +91,7 @@ export function CalendarConnections({
     }
   }
 
-  const anyConfigured = providerStatus.google || providerStatus.microsoft || zoomConfigured;
+  const anyConfigured = providerStatus.google || providerStatus.microsoft || providerStatus.zoho || zoomConfigured;
 
   return (
     <div className="space-y-4">
@@ -118,6 +118,9 @@ export function CalendarConnections({
         <a href={withNext("/api/calendar/microsoft/connect", redirectTo)} aria-disabled={!providerStatus.microsoft} className={!providerStatus.microsoft ? "pointer-events-none opacity-50" : ""}>
           <Button variant="outline"><Plus className="h-4 w-4" /> Connect Outlook Calendar</Button>
         </a>
+        <a href={withNext("/api/calendar/zoho/connect", redirectTo)} aria-disabled={!providerStatus.zoho} className={!providerStatus.zoho ? "pointer-events-none opacity-50" : ""}>
+          <Button variant="outline"><Plus className="h-4 w-4" /> Connect Zoho Calendar</Button>
+        </a>
         <a href={withNext("/api/zoom/connect", redirectTo)} aria-disabled={!zoomConfigured} className={!zoomConfigured ? "pointer-events-none opacity-50" : ""}>
           <Button variant="outline"><Plus className="h-4 w-4" /> Connect Zoom</Button>
         </a>
@@ -125,7 +128,7 @@ export function CalendarConnections({
 
       {!anyConfigured && (
         <p className="text-xs text-slate-400">
-          Calendar OAuth isn&apos;t configured yet. Add the Google / Microsoft / Zoom client credentials to your environment to enable these buttons.
+          Calendar OAuth isn&apos;t configured yet. Add the Google / Microsoft / Zoho / Zoom client credentials to your environment to enable these buttons.
         </p>
       )}
 

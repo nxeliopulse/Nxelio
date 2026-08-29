@@ -9,7 +9,7 @@ import { buildAuthUrl, type CalProvider } from "@/lib/calendar/providers";
 import { calendarConfigured } from "@/lib/calendar/config";
 
 function isProvider(p: string): p is CalProvider {
-  return p === "google" || p === "microsoft";
+  return p === "google" || p === "microsoft" || p === "zoho";
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {

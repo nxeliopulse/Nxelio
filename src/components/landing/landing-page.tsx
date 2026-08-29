@@ -76,6 +76,13 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
 
               {/* Right: Golden 2-Line Action Button */}
               <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={onBookDemo}
+                  className="hidden sm:inline-flex h-9 sm:h-10 px-4 items-center justify-center rounded-full border border-white/60 text-white text-xs sm:text-sm font-semibold hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  Book a Demo
+                </button>
                 <Link
                   href="/signup"
                   className="inline-flex flex-col items-center justify-center bg-[#fdb813] hover:bg-[#e5a60f] active:scale-95 text-slate-950 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full shadow-lg transition-all text-center leading-tight hover:shadow-amber-500/30 cursor-pointer"
@@ -116,6 +123,13 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
 
               {/* Right: Actions */}
               <div className="flex items-center gap-3 sm:gap-3.5">
+                <button
+                  type="button"
+                  onClick={onBookDemo}
+                  className="hidden sm:inline-flex h-10 px-4 items-center justify-center rounded-full border border-blue-200 bg-white text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm cursor-pointer"
+                >
+                  Book a Demo
+                </button>
                 <Link
                   href="/login"
                   className="hidden sm:inline-flex h-10 px-4 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm"
@@ -286,18 +300,29 @@ function Hero({ onBookDemo }: { onBookDemo: () => void }) {
 
         {/* Big 7-Day Free Trial CTA Button */}
         <div className="mt-8 sm:mt-10 flex flex-col items-center justify-center gap-3">
-          <Link
-            href="/signup"
-            className="group inline-flex items-center gap-3.5 sm:gap-4 rounded-full bg-white hover:bg-slate-50 text-[#1f2223] font-extrabold px-7 sm:px-9 py-4 sm:py-4.5 shadow-2xl shadow-blue-950/20 hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer text-base sm:text-xl border-2 border-white/80"
-          >
-            <span className="flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md group-hover:scale-110 transition-transform">
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-300 text-amber-300 animate-star-twinkle" />
-            </span>
-            <span className="tracking-tight">
-              Start Your 7-Day Free Trial
-            </span>
-            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 group-hover:translate-x-1 transition-transform" />
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+            <Link
+              href="/signup"
+              className="group inline-flex items-center gap-3.5 sm:gap-4 rounded-full bg-white hover:bg-slate-50 text-[#1f2223] font-extrabold px-7 sm:px-9 py-4 sm:py-4.5 shadow-2xl shadow-blue-950/20 hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer text-base sm:text-xl border-2 border-white/80"
+            >
+              <span className="flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md group-hover:scale-110 transition-transform">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-300 text-amber-300 animate-star-twinkle" />
+              </span>
+              <span className="tracking-tight">
+                Start Your 7-Day Free Trial
+              </span>
+              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 group-hover:translate-x-1 transition-transform" />
+            </Link>
+
+            <button
+              type="button"
+              onClick={onBookDemo}
+              className="group inline-flex items-center gap-2.5 rounded-full border-2 border-white/70 hover:border-white text-white font-bold px-6 sm:px-8 py-4 sm:py-4.5 hover:bg-white/10 active:scale-95 transition-all cursor-pointer text-base sm:text-xl"
+            >
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="tracking-tight">Book a Demo</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-1.5 text-xs sm:text-sm text-blue-100 font-medium">
             <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />

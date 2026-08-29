@@ -90,7 +90,7 @@ export function AdminDashboard({
   demoCallSlots: DemoCallSlot[];
   cancellationRequests: CancellationRequest[];
   calendarAccounts: CalendarAccountRow[];
-  calendarProviderStatus: { google: boolean; microsoft: boolean };
+  calendarProviderStatus: { google: boolean; microsoft: boolean; zoho: boolean };
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");

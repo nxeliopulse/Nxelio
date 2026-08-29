@@ -5736,3 +5736,21 @@ FROM leads l
 WHERE a.original_lead_id = l.id
   AND a.job_title IS NULL
   AND l.job_title IS NOT NULL;
+
+-- >>> FILE: 0147_demo_booking_calendar_and_defaults.sql
+-- Zoho as a third calendar provider; a "default" flag on the demo-call
+-- roster; company name + calendar-event tracking on demo_requests; a
+-- uniqueness guard against double-submitted bookings.
+ALTER TABLE calendar_accounts DROP CONSTRAINT IF EXISTS calendar_accounts_provider_check;
+ALTER TABLE calendar_accounts ADD CONSTRAINT calendar_accounts_provider_check
+  CHECK (provider IN ('google', 'microsoft', 'zoho'));
+
+ALTER TABLE demo_call_people ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE demo_requests ADD COLUMN IF NOT EXISTS company_name TEXT;
+ALTER TABLE demo_requests ADD COLUMN IF NOT EXISTS calendar_event_id TEXT;
+ALTER TABLE demo_requests ADD COLUMN IF NOT EXISTS calendar_provider TEXT;
+
+ALTER TABLE demo_requests DROP CONSTRAINT IF EXISTS demo_requests_email_start_unique;
+ALTER TABLE demo_requests ADD CONSTRAINT demo_requests_email_start_unique
+  UNIQUE (business_email, meeting_start_at);

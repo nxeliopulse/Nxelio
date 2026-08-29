@@ -316,7 +316,7 @@ function Field({ label, value }: { label: string; value: string }) {
 interface CancellationsTabProps {
   initialRequests: CancellationRequest[];
   calendarAccounts: CalendarAccountRow[];
-  calendarProviderStatus: { google: boolean; microsoft: boolean };
+  calendarProviderStatus: { google: boolean; microsoft: boolean; zoho: boolean };
 }
 
 export function CancellationsTab({ initialRequests, calendarAccounts, calendarProviderStatus }: CancellationsTabProps) {

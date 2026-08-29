@@ -53,7 +53,7 @@ interface Props {
   emailDomain: { verified: boolean; from: string; provider?: "brevo" | "none" };
   blocklist: BlocklistEntry[];
   calendarAccounts: CalendarAccountRow[];
-  calendarProviderStatus: { google: boolean; microsoft: boolean };
+  calendarProviderStatus: { google: boolean; microsoft: boolean; zoho: boolean };
   zoomAccounts: ZoomAccountRow[];
   zoomConfigured: boolean;
   mailboxAccounts: OutreachAccountRow[];

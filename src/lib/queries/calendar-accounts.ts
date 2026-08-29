@@ -15,8 +15,8 @@ export interface CalendarAccountRow {
 }
 
 /** Which providers are configured (have OAuth credentials) — drives the connect UI. */
-export async function getCalendarProviderStatus(): Promise<{ google: boolean; microsoft: boolean }> {
-  return { google: calendarConfigured("google"), microsoft: calendarConfigured("microsoft") };
+export async function getCalendarProviderStatus(): Promise<{ google: boolean; microsoft: boolean; zoho: boolean }> {
+  return { google: calendarConfigured("google"), microsoft: calendarConfigured("microsoft"), zoho: calendarConfigured("zoho") };
 }
 
 /** Connected calendar accounts for the current workspace (no tokens exposed). */
@@ -162,7 +162,9 @@ export interface CreateMeetLinkInput {
   attendeeEmails?: string[];
 }
 
-export type CreateMeetLinkResult = { ok: true; joinUrl: string } | { ok: false; error: string };
+export type CreateMeetLinkResult =
+  | { ok: true; joinUrl: string; provider: CalProvider; eventId: string }
+  | { ok: false; error: string };
 
 const NOT_CONNECTED_ERROR = "Connect Google Calendar in Settings → Calendar to generate a real Google Meet link.";
 
@@ -178,17 +180,52 @@ export async function createGoogleMeetLink(input: CreateMeetLinkInput): Promise<
     .maybeSingle();
   if (!acc) return { ok: false, error: NOT_CONNECTED_ERROR };
   try {
-    const token = await ensureToken(acc as AccountWithTokens);
-    const evt = await createMeetEvent(token, {
+    const typedAcc = acc as AccountWithTokens;
+    const token = await ensureToken(typedAcc);
+    const evt = await createMeetEvent(typedAcc.provider, token, {
       summary: input.title,
       description: input.description,
       startIso: input.startIso,
       endIso: input.endIso,
       attendeeEmails: input.attendeeEmails,
     });
-    return { ok: true, joinUrl: evt.joinUrl };
+    return { ok: true, joinUrl: evt.joinUrl, provider: typedAcc.provider, eventId: evt.eventId };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to create Google Meet event" };
+  }
+}
+
+const NOT_CONNECTED_ERROR_ANY_PROVIDER = "No calendar is connected for this email — connect one in Settings → Calendar to auto-create events for future bookings.";
+
+/** Same as createGoogleMeetLink but looked up by the connected account's own
+ *  email instead of a workspace — for flows with no workspace at all (e.g.
+ *  the public demo-booking page), where the target is "whoever's inbox this
+ *  notification is going to", not a customer's workspace. Provider-agnostic:
+ *  matches whichever calendar (Google, Microsoft, or Zoho) that email has
+ *  actually connected, rather than assuming Google. */
+export async function createMeetLinkForAccountEmail(email: string, input: CreateMeetLinkInput): Promise<CreateMeetLinkResult> {
+  const admin = createAdminClient();
+  const { data: acc } = await admin
+    .from("calendar_accounts")
+    .select("id, provider, email, access_token, refresh_token, token_expires_at")
+    .eq("email", email)
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+  if (!acc) return { ok: false, error: NOT_CONNECTED_ERROR_ANY_PROVIDER };
+  try {
+    const typedAcc = acc as AccountWithTokens;
+    const token = await ensureToken(typedAcc);
+    const evt = await createMeetEvent(typedAcc.provider, token, {
+      summary: input.title,
+      description: input.description,
+      startIso: input.startIso,
+      endIso: input.endIso,
+      attendeeEmails: input.attendeeEmails,
+    });
+    return { ok: true, joinUrl: evt.joinUrl, provider: typedAcc.provider, eventId: evt.eventId };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to create calendar event" };
   }
 }
 
@@ -205,15 +242,16 @@ export async function createGoogleMeetLinkForWorkspace(workspaceId: string, inpu
     .maybeSingle();
   if (!acc) return { ok: false, error: NOT_CONNECTED_ERROR };
   try {
-    const token = await ensureToken(acc as AccountWithTokens);
-    const evt = await createMeetEvent(token, {
+    const typedAcc = acc as AccountWithTokens;
+    const token = await ensureToken(typedAcc);
+    const evt = await createMeetEvent(typedAcc.provider, token, {
       summary: input.title,
       description: input.description,
       startIso: input.startIso,
       endIso: input.endIso,
       attendeeEmails: input.attendeeEmails,
     });
-    return { ok: true, joinUrl: evt.joinUrl };
+    return { ok: true, joinUrl: evt.joinUrl, provider: typedAcc.provider, eventId: evt.eventId };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to create Google Meet event" };
   }
