@@ -48,7 +48,7 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
         className={`w-full max-w-[1380px] pointer-events-auto rounded-full transition-all duration-300 ${
           scrolled
             ? "bg-[#007bfb] border border-blue-400/50 py-3 sm:py-3.5 px-5 sm:px-8 shadow-2xl shadow-blue-950/30 text-white"
-            : "bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white/85 dark:border-white/10 py-3.5 sm:py-4 px-6 sm:px-8 shadow-xl shadow-black/5 text-[#1f2223]"
+            : "bg-white/90 backdrop-blur-xl border border-white/85 py-3.5 sm:py-4 px-6 sm:px-8 shadow-xl shadow-black/5 text-[#1f2223]"
         }`}
       >
         <div className="flex justify-between items-center gap-4 sm:gap-6">
@@ -770,15 +770,15 @@ function CapabilitiesSection() {
         </div>
 
         <div className="max-w-4xl mx-auto mb-12 px-2">
-          <div className="flex flex-wrap items-center justify-center gap-2 p-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl sm:rounded-full border border-white/80 dark:border-slate-700/60 shadow-lg">
+          <div className="flex flex-wrap items-center justify-center gap-2 p-2 bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-full border border-white/80 shadow-lg">
             {capabilities.map((cap, i) => (
               <button
                 key={cap.id}
                 onClick={() => setActiveTab(i)}
                 className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === i
-                    ? "bg-[#1f2223] text-white dark:bg-blue-600 shadow-md scale-102"
-                    : "text-slate-700 dark:text-slate-300 hover:text-black dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-800"
+                    ? "bg-[#1f2223] text-white shadow-md scale-102"
+                    : "text-slate-700 hover:text-black hover:bg-white/70"
                 }`}
               >
                 {cap.tabTitle}
