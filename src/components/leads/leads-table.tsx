@@ -329,6 +329,38 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     setDatesPos({ top: r.bottom + 6, left: r.left });
     setDatesOpen(true);
   }
+
+  // "Sort By" toolbar dropdown — a custom popover instead of a native
+  // <select>, matching Filter/Added-between above. A native <select>'s open
+  // options list is rendered by the OS/browser chrome, not by our CSS, so it
+  // showed up unstyled (plain white, wrong font) no matter what classes were
+  // on the <select> itself.
+  const SORT_OPTIONS: { value: "none" | "name" | "score" | "newest"; label: string }[] = [
+    { value: "none", label: "Default" },
+    { value: "name", label: "Name A–Z" },
+    { value: "score", label: "Score High→Low" },
+    { value: "newest", label: "Newest" },
+  ];
+  const currentSortValue: "none" | "name" | "score" | "newest" =
+    !sortKey ? "none"
+    : sortKey === "name" && sortDir === "asc" ? "name"
+    : sortKey === "score" && sortDir === "desc" ? "score"
+    : sortKey === "created_at" && sortDir === "desc" ? "newest"
+    : "none";
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [sortMenuPos, setSortMenuPos] = useState<{ top: number; left: number } | null>(null);
+  function openSortMenu(e: React.MouseEvent<HTMLButtonElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    setSortMenuPos({ top: r.bottom + 6, left: r.left });
+    setSortMenuOpen(true);
+  }
+  function applySort(v: "none" | "name" | "score" | "newest") {
+    if (v === "none") { setSortKey(null); setSortDir("asc"); }
+    else if (v === "name") { setSortKey("name"); setSortDir("asc"); }
+    else if (v === "score") { setSortKey("score"); setSortDir("desc"); }
+    else if (v === "newest") { setSortKey("created_at"); setSortDir("desc"); }
+    setSortMenuOpen(false);
+  }
   function dateRangeLabel(): string {
     // Append a local-midnight time so formatDate's `new Date(...)` parses this
     // as local time, not UTC — a bare "YYYY-MM-DD" parses as UTC midnight and
@@ -1224,33 +1256,17 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           </Button>
 
           {/* Sort Dropdown */}
-          <div className="relative inline-flex items-center gap-1 flex-shrink-0 w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 pl-2.5 pr-1.5 shadow-sm">
-            <ArrowUpDown className="h-3 w-3 text-slate-400 flex-shrink-0" />
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">Sort By</span>
-            <select
-              value={
-                !sortKey ? "none"
-                : sortKey === "name" && sortDir === "asc" ? "name"
-                : sortKey === "score" && sortDir === "desc" ? "score"
-                : sortKey === "created_at" && sortDir === "desc" ? "newest"
-                : "none"
-              }
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "none") { setSortKey(null); setSortDir("asc"); }
-                else if (v === "name") { setSortKey("name"); setSortDir("asc"); }
-                else if (v === "score") { setSortKey("score"); setSortDir("desc"); }
-                else if (v === "newest") { setSortKey("created_at"); setSortDir("desc"); }
-              }}
-              className="appearance-none bg-transparent border-0 pl-1 pr-4 py-1 text-xs font-semibold text-slate-700 dark:text-slate-600 focus:outline-none cursor-pointer truncate"
-            >
-              <option value="none">Default</option>
-              <option value="name">Name A–Z</option>
-              <option value="score">Score High→Low</option>
-              <option value="newest">Newest</option>
-            </select>
-            <ChevronDown className="h-3 w-3 text-slate-400 absolute right-1.5 pointer-events-none" />
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openSortMenu}
+            className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0"
+            title="Sort prospects"
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            <span>Sort By: {SORT_OPTIONS.find((o) => o.value === currentSortValue)?.label}</span>
+            <ChevronDown className="h-3 w-3" />
+          </Button>
         </div>
 
         {/* Table Container */}
@@ -1864,6 +1880,30 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                 Clear dates
               </button>
             )}
+          </div>
+        </>
+      )}
+
+      {sortMenuOpen && sortMenuPos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setSortMenuOpen(false)} />
+          <div
+            className="fixed z-50 w-48 rounded-xl border border-slate-200 bg-white shadow-xl py-1"
+            style={{ top: sortMenuPos.top, left: sortMenuPos.left }}
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => applySort(opt.value)}
+                className={cn(
+                  "w-full flex items-center justify-between px-3 py-2 text-left text-xs font-medium hover:bg-slate-50",
+                  currentSortValue === opt.value ? "text-blue-600 bg-blue-50/60" : "text-slate-700"
+                )}
+              >
+                {opt.label}
+                {currentSortValue === opt.value && <Check className="h-3.5 w-3.5" />}
+              </button>
+            ))}
           </div>
         </>
       )}

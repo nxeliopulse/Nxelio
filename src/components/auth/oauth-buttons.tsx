@@ -43,12 +43,19 @@ export function OAuthButtons({ label = "or" }: OAuthButtonsProps) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
+      {/* Divider */}
+      <div className="flex items-center gap-3 mt-2">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">{label}</span>
+        <div className="flex-1 h-px bg-slate-200" />
+      </div>
+
       <button
         type="button"
         disabled={!!loadingProvider}
         onClick={() => signInWith("google")}
-        className="w-full flex items-center justify-center gap-2.5 h-10 rounded-lg text-xs sm:text-sm font-semibold text-slate-700 transition-all bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-xs disabled:opacity-50 cursor-pointer"
+        className="w-full flex items-center justify-center gap-2.5 h-11 rounded-full text-sm font-semibold text-slate-900 transition-all bg-transparent border border-slate-200 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 cursor-pointer"
       >
         {loadingProvider === "google"
           ? <span className="h-4 w-4 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
@@ -57,17 +64,10 @@ export function OAuthButtons({ label = "or" }: OAuthButtonsProps) {
       </button>
 
       {error && (
-        <p className="text-center text-xs rounded-lg px-3 py-1.5 bg-red-50 text-red-600 border border-red-200">
+        <p className="text-center text-xs rounded-xl px-3 py-2 bg-red-50 text-red-600 border border-red-100 mt-2">
           {error}
         </p>
       )}
-
-      {/* Divider */}
-      <div className="flex items-center gap-3 my-1.5">
-        <div className="flex-1 h-px bg-white/15" />
-        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">{label}</span>
-        <div className="flex-1 h-px bg-white/15" />
-      </div>
     </div>
   );
 }

@@ -29,15 +29,15 @@ function ForgotPasswordForm() {
   return (
     <div>
       <div className="mb-6">
-        <div className="h-12 w-12 rounded-2xl bg-blue-500/15 border border-blue-400/25 flex items-center justify-center mb-4 text-blue-300">
+        <div className="h-12 w-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4 text-blue-600">
           <KeyRound className="h-6 w-6" />
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
           Reset password
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 font-medium mt-1">
+        <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
           {sent
-            ? <>We&apos;ve sent a reset link to <span className="font-semibold text-slate-200">{email}</span>.</>
+            ? <>We&apos;ve sent a reset link to <span className="font-semibold text-slate-900">{email}</span>.</>
             : "Enter the email associated with your account to receive a reset link."}
         </p>
       </div>
@@ -51,7 +51,7 @@ function ForgotPasswordForm() {
           <button
             type="button"
             onClick={() => setSent(false)}
-            className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-slate-200 bg-white/10 hover:bg-white/15 border border-white/10 transition-all cursor-pointer"
+            className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer"
           >
             Use a different email
           </button>
@@ -66,7 +66,7 @@ function ForgotPasswordForm() {
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">Email</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Email</label>
             <div className="relative">
               <input
                 type="email"
@@ -74,7 +74,7 @@ function ForgotPasswordForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoFocus
-                className="w-full px-4 py-3 rounded-xl border border-white/15 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/15 text-sm text-white placeholder:text-slate-500 bg-white/[0.06] backdrop-blur-sm transition-all outline-none pr-10"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 text-sm text-slate-900 placeholder:text-slate-400 bg-white backdrop-blur-md transition-all outline-none pr-10"
               />
               <Mail className="h-4 w-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
@@ -83,7 +83,7 @@ function ForgotPasswordForm() {
           <button
             type="submit"
             disabled={sending || !email.includes("@")}
-            className="w-full py-3.5 px-6 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:scale-[0.99] transition-all shadow-md shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3.5 px-6 rounded-full text-sm font-bold text-white bg-blue-500 hover:bg-blue-400 active:scale-[0.99] transition-all shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {sending ? "Sending reset link…" : "Send reset link"}
@@ -91,9 +91,9 @@ function ForgotPasswordForm() {
         </form>
       )}
 
-      <p className="text-center text-xs text-slate-400 font-medium pt-5">
+      <p className="text-center text-xs text-slate-500 font-medium pt-5">
         Remembered your password?{" "}
-        <Link href="/login" className="font-bold text-blue-400 hover:text-blue-300 hover:underline">
+        <Link href="/login" className="font-bold text-blue-600 hover:text-blue-500 hover:underline">
           Back to sign in
         </Link>
       </p>

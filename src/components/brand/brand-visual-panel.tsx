@@ -30,72 +30,72 @@ export function BrandVisualPanel({
 }) {
   const straight = variant === "straight";
   const panelClassName = straight
-    ? "hidden lg:flex h-full relative items-center justify-center overflow-hidden shrink-0 lg:w-[42%] rounded-2xl bg-gradient-to-br from-[#1447e6] via-[#2563eb] to-[#1e2fc4]"
-    : "hidden lg:flex h-full relative items-center justify-center overflow-hidden shrink-0 lg:w-[46%] bg-gradient-to-br from-[#1447e6] via-[#2563eb] to-[#1e2fc4]";
+    ? "hidden lg:flex h-full relative items-center justify-center overflow-hidden shrink-0 lg:w-1/2 bg-gradient-to-b from-[#0b63f6] via-[#0243cf] to-[#041a68]"
+    : "hidden lg:flex h-full relative items-center justify-center overflow-hidden shrink-0 lg:w-[46%] bg-gradient-to-b from-[#0b63f6] via-[#0243cf] to-[#041a68]";
   return (
     <div
       className={panelClassName}
-      style={straight ? undefined : { clipPath: "polygon(22% 0%, 100% 0%, 100% 100%, 0% 100%)" }}
+      style={straight ? undefined : { clipPath: "polygon(18% 0%, 100% 0%, 100% 100%, 0% 100%)" }}
     >
-      {/* Radiant ambient glow sources */}
-      <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-white/20 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+      {/* Dynamic glowing light streaks behind glass card for real backdrop blur */}
+      <div className="absolute top-8 right-8 w-96 h-96 bg-gradient-to-br from-cyan-300 via-sky-400 to-blue-500 rounded-full blur-3xl opacity-70 pointer-events-none" />
+      <div className="absolute -bottom-20 -left-20 w-[500px] h-[500px] bg-gradient-to-tr from-blue-700 via-cyan-400 to-sky-200 rounded-full blur-3xl opacity-40 pointer-events-none" />
 
-      <div className="relative z-10 flex flex-col items-center px-8 py-6 my-auto">
+      <div className="relative z-10 flex flex-col items-center px-8 py-8 my-auto">
 
-        {/* Floating product preview card — a UI mockup, not a customer review */}
+        {/* Floating product preview card — Sleek Frosted Glass Effect */}
         {mockup && (
-          <div className="w-[280px] bg-white rounded-xl shadow-[0_20px_50px_rgba(10,20,60,0.35)] p-4 mb-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-red-300" />
-                <span className="w-2 h-2 rounded-full bg-amber-300" />
-                <span className="w-2 h-2 rounded-full bg-emerald-300" />
+          <div className="w-[340px] bg-white/20 backdrop-blur-3xl border border-white/35 rounded-3xl shadow-[0_30px_70px_rgba(0,10,40,0.35)] p-6 mb-8 text-white relative z-10">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56] shadow-xs" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] shadow-xs" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f] shadow-xs" />
               </div>
-              <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+              <span className="text-xs font-bold text-[#0052ff] bg-white px-3.5 py-1 rounded-full shadow-md">
                 Live Preview
               </span>
             </div>
 
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            <div className="flex items-center gap-3.5 mb-5">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 border border-white/40 flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-lg">
                 AR
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-[#1f2223] truncate">Alex Rivera</div>
-                <div className="text-[11px] text-slate-500 truncate">VP Sales · Synthetix AI</div>
+                <div className="text-base font-bold text-white truncate drop-shadow-xs">Nxlio Nurture</div>
+                <div className="text-xs text-white/80 font-medium truncate">VP Basic · Synthetix AI</div>
               </div>
             </div>
 
-            <div className="space-y-1.5 mb-3">
-              <div className="flex items-center gap-2 text-xs text-slate-600">
-                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="truncate text-[11px]">alex.r@synthetix.ai</span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 ml-auto" />
+            <div className="space-y-2.5 mb-5">
+              <div className="flex items-center gap-2.5 text-xs text-white font-medium">
+                <Mail className="w-4 h-4 text-white/80 shrink-0" />
+                <span className="truncate">alexx@symthotiv.ai</span>
+                <span className="ml-auto w-4.5 h-4.5 rounded-full border border-emerald-300/80 flex items-center justify-center bg-emerald-400/30 text-white text-[11px] font-bold shrink-0 shadow-xs">✓</span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-600">
-                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="text-[11px]">+1 (415) 890-3211</span>
+              <div className="flex items-center gap-2.5 text-xs text-white font-medium">
+                <Phone className="w-4 h-4 text-white/80 shrink-0" />
+                <span>+1 (415) 890-3211</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-100">
-              <button className="flex items-center justify-center gap-1 text-[10px] font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg py-1.5 transition-colors">
-                <ListPlus className="w-3 h-3" /> Add to Sequence
+            <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/25">
+              <button className="flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl py-2.5 backdrop-blur-md transition-all shadow-sm">
+                <ListPlus className="w-3.5 h-3.5" /> Add to Sequence
               </button>
-              <button className="flex items-center justify-center gap-1 text-[10px] font-semibold text-white bg-[#1f2223] hover:bg-black rounded-lg py-1.5 transition-colors">
-                <Send className="w-3 h-3" /> Send Email
+              <button className="flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-[#0f1117]/90 hover:bg-black border border-white/10 rounded-xl py-2.5 transition-all shadow-md">
+                <Send className="w-3.5 h-3.5" /> Send Email
               </button>
             </div>
           </div>
         )}
 
-        {/* Stat callout */}
+        {/* Stat callout — 100% Real. */}
         <div className="text-center">
-          <div className={`font-extrabold text-white tracking-tight ${straight ? "text-4xl sm:text-5xl" : "text-3xl sm:text-4xl"}`}>
+          <div className={`font-black text-white tracking-tight drop-shadow-md ${straight ? "text-5xl sm:text-6xl" : "text-4xl sm:text-5xl"}`}>
             {statHeadline}
           </div>
-          <p className={`mt-3 max-w-xs leading-relaxed ${straight ? "text-sm sm:text-base text-white/85" : "text-xs sm:text-sm text-blue-100"}`}>
+          <p className={`mt-3 max-w-sm leading-relaxed ${straight ? "text-sm sm:text-base text-blue-100 font-medium" : "text-xs sm:text-sm text-blue-100 font-medium"}`}>
             {statBody}
           </p>
         </div>
@@ -103,7 +103,7 @@ export function BrandVisualPanel({
         {cta && (
           <Link
             href={cta.href}
-            className="mt-5 inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-[#0a0a0d] hover:bg-black text-white text-xs sm:text-sm font-bold shadow-lg transition-all hover:scale-[1.02]"
+            className="mt-7 inline-flex items-center justify-center px-8 py-3.5 rounded-xl bg-black hover:bg-slate-900 text-white text-sm font-extrabold shadow-2xl transition-all border border-white/10 hover:scale-[1.02]"
           >
             {cta.label}
           </Link>

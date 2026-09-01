@@ -22,6 +22,9 @@ export interface DashboardStats {
   };
   /** Real lead.source breakdown — top 4 + an "Other" bucket for the rest. */
   trafficSources: { name: string; value: number; count: number }[];
+  /** Real lead.country breakdown, top 5 — leads with no country recorded
+   *  are excluded rather than guessed at. */
+  leadsByCountry: { country: string; count: number }[];
   /** Stage-grouped open pipeline (Lead/Proposal/Sales), plus Won closed this calendar month. */
   pipelineBuckets: { label: string; value: number; count: number }[];
   /** All-time, mutually-exclusive deal outcome buckets. */
@@ -51,6 +54,39 @@ export interface DashboardStats {
   /** All-time deal count + won revenue per owner_id — names are resolved by the caller
    *  (page.tsx already fetches the real user list; join here would duplicate that lookup). */
   teamPerformance: { ownerId: string; dealsCount: number; wonValue: number }[];
+  /** Average calendar days between created_at and closed_at, over all-time
+   *  won deals. Null when there are no won deals with both timestamps yet. */
+  avgDaysToClose: number | null;
+  /** Average calendar days a deal has been open (created_at → now), over
+   *  all currently-open deals. Null when there are no open deals. */
+  avgOpenDealAge: number | null;
+  /** Sum of each open deal's value times a stage-conversion-likelihood
+   *  weight (new 10%, qualified 25%, meeting_scheduled 40%, proposal_sent
+   *  60%, negotiation 80%) — the standard CRM "weighted pipeline" estimate,
+   *  not a separately-tracked real number, but built entirely from real
+   *  deal values and real stages rather than invented. */
+  weightedPipelineValue: number;
+  /** Won deals grouped by closed_at, oldest first, as three real period
+   *  aggregates (last 12 weeks / 12 months / 5 years) so the dashboard's
+   *  period toggle can switch client-side with no re-fetch. */
+  wonDealsTrend: {
+    weekly: { month: string; value: number; count: number }[];
+    monthly: { month: string; value: number; count: number }[];
+    yearly: { month: string; value: number; count: number }[];
+  };
+  /** Currently-open deals grouped by expected_close_date, oldest first, as
+   *  three real period aggregates (next 12 weeks / 12 months / up to 5
+   *  years). Deals without an expected_close_date are excluded rather than
+   *  guessed at. */
+  dealsProjection: {
+    weekly: { month: string; value: number; count: number }[];
+    monthly: { month: string; value: number; count: number }[];
+    yearly: { month: string; value: number; count: number }[];
+  };
+  /** Exact-stage breakdown of the live funnel (every non-won stage, plus
+   *  lost) — distinct from `pipelineBuckets`, which groups stages into 3
+   *  coarse buckets for the simpler bar-adjacent donut elsewhere. */
+  stageFunnel: { label: string; value: number; count: number }[];
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -67,15 +103,36 @@ function pctChange(current: number, previous: number): number | null {
   return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
-export async function getDashboardStats(): Promise<DashboardStats> {
+/** Optional deal-level filters for the dashboard's "Report date / Deal
+ *  Owner / Deal Stage" sidebar controls. Scoped to the opportunities-derived
+ *  figures only (pipeline value, the two 12-month trends, the stage funnel,
+ *  deal outcomes) — lead/campaign metrics elsewhere on the dashboard aren't
+ *  deal-scoped concepts, so they intentionally stay unfiltered rather than
+ *  being forced through filters that don't apply to them. */
+export interface DashboardFilters {
+  /** Filters opportunities by created_at >= this date (YYYY-MM-DD). */
+  dateFrom?: string;
+  /** Filters opportunities by created_at <= this date (YYYY-MM-DD). */
+  dateTo?: string;
+  ownerId?: string;
+  stage?: string;
+}
+
+export async function getDashboardStats(filters: DashboardFilters = {}): Promise<DashboardStats> {
   const supabase = await createClient();
+
+  let oppsQuery = supabase.from("opportunities").select("deal_value, stage, created_at, closed_at, owner_id, expected_close_date");
+  if (filters.dateFrom) oppsQuery = oppsQuery.gte("created_at", filters.dateFrom);
+  if (filters.dateTo) oppsQuery = oppsQuery.lte("created_at", filters.dateTo + "T23:59:59");
+  if (filters.ownerId) oppsQuery = oppsQuery.eq("owner_id", filters.ownerId);
+  if (filters.stage) oppsQuery = oppsQuery.eq("stage", filters.stage);
 
   const [
     { data: leads }, { data: campaigns }, { data: activities }, { data: allCampaigns },
     { count: replyCount }, { data: opps },
     { count: campaignCount }, { count: newsletterCount }, { count: segmentCount }, { count: workflowCount },
   ] = await Promise.all([
-    supabase.from("leads").select("id, full_name, company_name, lead_score, status, source, created_at"),
+    supabase.from("leads").select("id, full_name, company_name, lead_score, status, source, country, created_at"),
     supabase.from("campaigns").select("campaign_name, sent_count, open_rate, reply_rate").order("sent_count", { ascending: false }).limit(5),
     supabase.from("lead_activities")
       .select("id, activity_type, created_at, leads(full_name, company_name)")
@@ -83,14 +140,14 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .limit(8),
     supabase.from("campaigns").select("sent_count"),
     supabase.from("inbox_messages").select("id", { count: "exact", head: true }).eq("direction", "inbound"),
-    supabase.from("opportunities").select("deal_value, stage, created_at, closed_at, owner_id"),
+    oppsQuery,
     supabase.from("campaigns").select("id", { count: "exact", head: true }),
     supabase.from("newsletters").select("id", { count: "exact", head: true }),
     supabase.from("segments").select("id", { count: "exact", head: true }),
     supabase.from("workflows").select("id", { count: "exact", head: true }),
   ]);
 
-  const oppRows = (opps as { deal_value: number; stage: string; created_at: string; closed_at: string | null; owner_id: string | null }[]) || [];
+  const oppRows = (opps as { deal_value: number; stage: string; created_at: string; closed_at: string | null; owner_id: string | null; expected_close_date: string | null }[]) || [];
   const openOpps = oppRows.filter((o) => o.stage !== "won" && o.stage !== "lost");
   const wonOpps = oppRows.filter((o) => o.stage === "won");
   const lostOpps = oppRows.filter((o) => o.stage === "lost");
@@ -235,6 +292,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     value: Math.round((count / sourceTotal) * 1000) / 10,
   }));
 
+  // ── Leads by country — real lead.country breakdown, top 5 (leads with no
+  // country recorded are excluded rather than guessed at). ──
+  const countryCounts = new Map<string, number>();
+  for (const l of (leads || []) as { country: string | null }[]) {
+    if (!l.country?.trim()) continue;
+    countryCounts.set(l.country.trim(), (countryCounts.get(l.country.trim()) || 0) + 1);
+  }
+  const leadsByCountry = [...countryCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([country, count]) => ({ country, count }));
+
   // ── Pipeline Statistics — real stage-grouped buckets, Won scoped to this calendar month ──
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const bucketDefs: { label: string; stages: string[] }[] = [
@@ -270,6 +339,122 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     }).length);
   }
 
+  // ── Cycle-time stats — real, all-time (not scoped to the 5-month window
+  // used for the trend badges above) ──
+  const dayLenMs = 24 * 60 * 60 * 1000;
+  const wonWithBothDates = wonOpps.filter((o) => o.closed_at);
+  const avgDaysToClose = wonWithBothDates.length
+    ? Math.round(
+        wonWithBothDates.reduce((s, o) => s + (new Date(o.closed_at!).getTime() - new Date(o.created_at).getTime()) / dayLenMs, 0)
+        / wonWithBothDates.length
+      )
+    : null;
+  const avgOpenDealAge = openOpps.length
+    ? Math.round(
+        openOpps.reduce((s, o) => s + (now.getTime() - new Date(o.created_at).getTime()) / dayLenMs, 0)
+        / openOpps.length
+      )
+    : null;
+
+  // ── Weighted pipeline value — standard stage-likelihood estimate, built
+  // from real deal values/stages (see DashboardStats.weightedPipelineValue
+  // doc comment for the weighting rationale) ──
+  const STAGE_WEIGHT: Record<string, number> = {
+    new: 0.1, qualified: 0.25, meeting_scheduled: 0.4, proposal_sent: 0.6, negotiation: 0.8,
+  };
+  const weightedPipelineValue = Math.round(
+    openOpps.reduce((s, o) => s + Number(o.deal_value || 0) * (STAGE_WEIGHT[o.stage] ?? 0.2), 0)
+  );
+
+  // ── Won-deals trend + deals projection, each as weekly/monthly/yearly
+  // real aggregates (same weekly/monthly/yearly shape as revenueSeries
+  // above) so the dashboard cards can offer a period toggle without a
+  // server round-trip. ──
+  function monthLabel(d: Date): string {
+    return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  function weekLabel(d: Date): string {
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  const wonDealsTrendWeekly: { month: string; value: number; count: number }[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const end = new Date(now.getTime() - i * 7 * dayLenMs);
+    const start = new Date(end.getTime() - 7 * dayLenMs);
+    const rows = wonOpps.filter((o) => o.closed_at && new Date(o.closed_at).getTime() >= start.getTime() && new Date(o.closed_at).getTime() < end.getTime());
+    wonDealsTrendWeekly.push({ month: weekLabel(start), value: rows.reduce((s, o) => s + Number(o.deal_value || 0), 0), count: rows.length });
+  }
+  const wonDealsTrendMonthly: { month: string; value: number; count: number }[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    const rows = wonOpps.filter((o) => o.closed_at && new Date(o.closed_at).getTime() >= start.getTime() && new Date(o.closed_at).getTime() < end.getTime());
+    wonDealsTrendMonthly.push({ month: monthLabel(start), value: rows.reduce((s, o) => s + Number(o.deal_value || 0), 0), count: rows.length });
+  }
+  const wonYears = new Set<number>();
+  for (const o of wonWithBothDates) wonYears.add(new Date(o.closed_at!).getFullYear());
+  wonYears.add(now.getFullYear());
+  wonYears.add(now.getFullYear() - 1);
+  const wonDealsTrendYearly = [...wonYears].sort().slice(-5).map((y) => {
+    const start = new Date(y, 0, 1);
+    const end = new Date(y + 1, 0, 1);
+    const rows = wonOpps.filter((o) => o.closed_at && new Date(o.closed_at).getTime() >= start.getTime() && new Date(o.closed_at).getTime() < end.getTime());
+    return { month: String(y), value: rows.reduce((s, o) => s + Number(o.deal_value || 0), 0), count: rows.length };
+  });
+  const wonDealsTrend = { weekly: wonDealsTrendWeekly, monthly: wonDealsTrendMonthly, yearly: wonDealsTrendYearly };
+
+  const dealsProjectionWeekly: { month: string; value: number; count: number }[] = [];
+  for (let i = 0; i <= 11; i++) {
+    const start = new Date(now.getTime() + i * 7 * dayLenMs);
+    const end = new Date(start.getTime() + 7 * dayLenMs);
+    const rows = openOpps.filter((o) => {
+      if (!o.expected_close_date) return false;
+      const t = new Date(o.expected_close_date).getTime();
+      return t >= start.getTime() && t < end.getTime();
+    });
+    dealsProjectionWeekly.push({ month: weekLabel(start), value: rows.reduce((s, o) => s + Number(o.deal_value || 0), 0), count: rows.length });
+  }
+  const dealsProjectionMonthly: { month: string; value: number; count: number }[] = [];
+  for (let i = 0; i <= 11; i++) {
+    const start = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + i + 1, 1);
+    const rows = openOpps.filter((o) => {
+      if (!o.expected_close_date) return false;
+      const t = new Date(o.expected_close_date).getTime();
+      return t >= start.getTime() && t < end.getTime();
+    });
+    dealsProjectionMonthly.push({ month: monthLabel(start), value: rows.reduce((s, o) => s + Number(o.deal_value || 0), 0), count: rows.length });
+  }
+  const projectionYears = new Set<number>();
+  for (const o of openOpps) {
+    if (o.expected_close_date) projectionYears.add(new Date(o.expected_close_date).getFullYear());
+  }
+  projectionYears.add(now.getFullYear());
+  const dealsProjectionYearly = [...projectionYears].sort().slice(0, 5).map((y) => {
+    const start = new Date(y, 0, 1);
+    const end = new Date(y + 1, 0, 1);
+    const rows = openOpps.filter((o) => {
+      if (!o.expected_close_date) return false;
+      const t = new Date(o.expected_close_date).getTime();
+      return t >= start.getTime() && t < end.getTime();
+    });
+    return { month: String(y), value: rows.reduce((s, o) => s + Number(o.deal_value || 0), 0), count: rows.length };
+  });
+  const dealsProjection = { weekly: dealsProjectionWeekly, monthly: dealsProjectionMonthly, yearly: dealsProjectionYearly };
+
+  // ── Exact-stage funnel (every non-won stage, plus lost) — real counts/value ──
+  const FUNNEL_STAGES: { key: string; label: string }[] = [
+    { key: "new", label: "Lead In" },
+    { key: "qualified", label: "Contact Made" },
+    { key: "meeting_scheduled", label: "Interview" },
+    { key: "proposal_sent", label: "Proposal" },
+    { key: "negotiation", label: "Negotiation" },
+    { key: "lost", label: "Closed Lost" },
+  ];
+  const stageFunnel = FUNNEL_STAGES.map(({ key, label }) => {
+    const rows = oppRows.filter((o) => o.stage === key);
+    return { label, value: rows.reduce((s, o) => s + Number(o.deal_value || 0), 0), count: rows.length };
+  }).filter((s) => s.count > 0);
+
   // ── Team Performance — real per-owner deal counts + won revenue, top 4 by revenue ──
   const byOwner = new Map<string, { dealsCount: number; wonValue: number }>();
   for (const o of oppRows) {
@@ -294,6 +479,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     },
     revenueSeries: { weekly, monthly, yearly },
     trafficSources,
+    leadsByCountry,
     pipelineBuckets,
     dealsOverview,
     contactsSparkline,
@@ -304,6 +490,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     dealsCreatedTrendPct,
     pipelineValueTrendPct,
     teamPerformance,
+    avgDaysToClose,
+    avgOpenDealAge,
+    weightedPipelineValue,
+    wonDealsTrend,
+    dealsProjection,
+    stageFunnel,
   };
 }
 

@@ -116,24 +116,22 @@ function VerifyEmailForm() {
         </div>
       </div>
 
-      <h1 className="text-2xl font-black text-white mb-2 text-center">Confirm your email address</h1>
-      <p className="text-sm mb-8 text-center text-slate-400">
+      <h1 className="text-2xl font-black text-slate-900 mb-2 text-center">Confirm your email address</h1>
+      <p className="text-sm mb-8 text-center text-slate-500">
         For security, we&apos;ve sent a code to{" "}
-        <span className="font-semibold text-slate-200">{email || "your email"}</span>.
+        <span className="font-semibold text-slate-900">{email || "your email"}</span>.
         Enter it below to finish setting up your account.
       </p>
 
       <form onSubmit={handleVerify} className="space-y-5">
         {error && (
-          <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
-            style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
+          <div className="flex items-start gap-2 rounded-xl p-3 text-sm bg-red-50 border border-red-100 text-red-600">
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
         {notice && (
-          <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
-            style={{ background: "rgba(24,167,184,.08)", border: "1.5px solid rgba(24,167,184,.25)", color: "#0d7d8c" }}>
+          <div className="flex items-start gap-2 rounded-xl p-3 text-sm bg-blue-50 border border-blue-100 text-blue-600">
             <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{notice}</span>
           </div>
@@ -151,7 +149,7 @@ function VerifyEmailForm() {
               onChange={(e) => handleDigitChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onPaste={handlePaste}
-              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold text-white rounded-xl border border-white/15 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/15 bg-white/[0.06] backdrop-blur-sm outline-none transition-all"
+              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold text-slate-900 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 bg-white outline-none transition-all"
             />
           ))}
         </div>
@@ -165,21 +163,21 @@ function VerifyEmailForm() {
           {verifying ? "Verifying…" : "Verify email"}
         </button>
 
-        <div className="text-center text-xs text-slate-400 font-medium">
+        <div className="text-center text-xs text-slate-500 font-medium">
           Haven&apos;t received the code?{" "}
           <button
             type="button"
             onClick={handleResend}
             disabled={resending || cooldown > 0}
-            className="font-bold text-blue-400 hover:text-blue-300 hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer"
+            className="font-bold text-blue-600 hover:text-blue-500 hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer"
           >
             {resending ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
           </button>
         </div>
 
-        <p className="text-center text-xs pt-2 text-slate-400 font-medium">
+        <p className="text-center text-xs pt-2 text-slate-500 font-medium">
           Wrong email?{" "}
-          <Link href="/signup" className="font-bold text-blue-400 hover:text-blue-300 hover:underline">
+          <Link href="/signup" className="font-bold text-blue-600 hover:text-blue-500 hover:underline">
             Sign up again
           </Link>
         </p>

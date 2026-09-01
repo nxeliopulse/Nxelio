@@ -14,14 +14,8 @@ export function AuthSplitCard({
   children,
 }: {
   pageLabel?: string;
-  // Optional — pages that render their own heading as part of `children`
-  // (forgot-password, reset-password, check-email, verify-email) omit these
-  // and the shell just skips the header block instead of doubling it up.
   heading?: [string, string] | string;
   subheading?: string;
-  // Only Login/Signup pass this — it's what shows the Log In / Sign Up
-  // toggle pills. The password-reset/verification flows don't have a
-  // "sign up instead" equivalent, so they simply omit it.
   activeAuthTab?: "login" | "signup";
   leftEyebrow?: string;
   leftTitle?: string;
@@ -29,34 +23,34 @@ export function AuthSplitCard({
   children: ReactNode;
 }) {
   return (
-    <div className="force-dark-theme h-screen w-full flex flex-col lg:flex-row bg-[#0a0a0d] font-sans overflow-y-auto lg:overflow-hidden">
+    <div className="h-screen w-full flex flex-col lg:flex-row bg-white font-sans overflow-y-auto lg:overflow-hidden">
 
-      {/* LEFT: form panel — full height, compact padding to eliminate scrolling */}
-      <div className="flex-1 flex flex-col justify-between px-6 sm:px-10 lg:px-14 xl:px-20 py-5 lg:py-6 relative z-10">
-        <Link href="/" className="inline-flex items-center gap-2 mb-3 lg:mb-4 w-fit shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20">
-            <Zap className="w-3.5 h-3.5 text-white fill-white" />
+      {/* LEFT: form panel — 50% width */}
+      <div className="flex-1 flex flex-col justify-between px-6 sm:px-10 lg:px-16 xl:px-24 py-8 relative z-10 lg:w-1/2 shrink-0">
+        <Link href="/" className="inline-flex items-center gap-2 mb-4 w-fit shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20">
+            <Zap className="w-4 h-4 text-white fill-white" />
           </div>
-          <span className="text-base font-bold tracking-tight text-white">
-            Nx<span className="text-blue-400">elio</span> <span className="text-slate-400 font-medium">Nurture</span>
+          <span className="text-lg font-bold tracking-tight text-slate-900">
+            Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-normal">Nurture</span>
           </span>
         </Link>
 
-        <div className="flex-1 flex flex-col justify-center max-w-[420px] w-full mx-auto lg:mx-0 my-auto">
+        <div className="flex-1 flex flex-col justify-center max-w-[400px] w-full mx-auto lg:mx-0 my-auto py-4">
           {activeAuthTab && (
-            <div className="flex gap-2 mb-4 w-full">
+            <div className="flex gap-2 mb-6 w-full p-1 bg-slate-100 rounded-2xl border border-slate-200">
               <Link
                 href="/login"
-                className={`flex-1 text-center py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
-                  activeAuthTab === "login" ? "bg-white text-[#0a0a0d]" : "text-slate-400 hover:text-white border border-white/15"
+                className={`flex-1 text-center py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeAuthTab === "login" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 Log In
               </Link>
               <Link
                 href="/signup"
-                className={`flex-1 text-center py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
-                  activeAuthTab === "signup" ? "bg-white text-[#0a0a0d]" : "text-slate-400 hover:text-white border border-white/15"
+                className={`flex-1 text-center py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeAuthTab === "signup" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 Sign Up
@@ -65,12 +59,12 @@ export function AuthSplitCard({
           )}
 
           {heading && (
-            <div className="mb-3.5">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight leading-tight">
+            <div className="mb-6">
+              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 {Array.isArray(heading) ? heading[0] : heading}
               </h1>
               {subheading && (
-                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                <p className="text-sm text-slate-500 font-normal mt-1.5">
                   {subheading}
                 </p>
               )}
@@ -80,23 +74,23 @@ export function AuthSplitCard({
           {children}
         </div>
 
-        <p className="text-center text-[11px] text-slate-500 font-medium pt-3 shrink-0">
+        <p className="text-center text-xs text-slate-500 font-medium pt-4 pb-2 shrink-0">
           &copy; {new Date().getFullYear()} Nxelio Inc. All rights reserved.{" "}
-          <Link href="/privacy" className="hover:text-slate-300 hover:underline">Privacy</Link>
+          <Link href="/privacy" className="text-slate-600 hover:text-slate-900 hover:underline transition-colors">Privacy</Link>
           {" "}and{" "}
-          <Link href="/terms" className="hover:text-slate-300 hover:underline">Terms</Link>.
+          <Link href="/terms" className="text-slate-600 hover:text-slate-900 hover:underline transition-colors">Terms</Link>.
         </p>
       </div>
 
-      <BrandVisualPanel cta={{ label: "Start Your 7-Day Free Trial", href: "/signup" }} />
+      <BrandVisualPanel cta={{ label: "Start Your 7-Day Free Trial", href: "/signup" }} variant="straight" />
 
     </div>
   );
 }
 
-export const FIELD_LABEL = "block text-xs font-bold text-slate-300 mb-1 tracking-normal";
+export const FIELD_LABEL = "block text-sm font-medium text-slate-700 mb-2";
 
-export const UNDERLINE_INPUT = "w-full px-3.5 py-2.5 rounded-lg text-xs sm:text-sm text-white placeholder:text-slate-500 outline-none transition-all border border-white/15 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/15 bg-white/[0.06] backdrop-blur-sm";
+export const UNDERLINE_INPUT = "w-full px-4 py-3 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white";
 export const UNDERLINE_INPUT_STYLE: CSSProperties = {};
 
 export function authInputFocus(e: FocusEvent<HTMLInputElement>) {}
@@ -110,9 +104,9 @@ export function RadioToggle({ checked, onChange, label }: { checked: boolean; on
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-3.5 w-3.5 rounded border-white/25 bg-white/10 text-blue-500 focus:ring-blue-400 cursor-pointer"
+        className="h-3.5 w-3.5 rounded border-slate-300 bg-white text-blue-600 focus:ring-blue-500 cursor-pointer"
       />
-      <span className="text-xs text-slate-400 font-medium">{label}</span>
+      <span className="text-sm text-slate-600 font-medium">{label}</span>
     </label>
   );
 }
@@ -125,6 +119,7 @@ export function AuthButtonRow({
   switchLabel,
   switchLoading,
   onSwitchClick,
+  children,
 }: {
   submitLabel: string;
   submitDisabled: boolean;
@@ -132,24 +127,27 @@ export function AuthButtonRow({
   switchLabel: string;
   switchLoading?: boolean;
   onSwitchClick?: () => void;
+  children?: ReactNode;
 }) {
   const isLoginPage = switchHref === "/signup";
   return (
-    <div className="space-y-2">
+    <div className="space-y-4 pt-2">
       <button
         type="submit"
         disabled={submitDisabled}
-        className="w-full py-2.5 sm:py-3 px-5 rounded-lg text-xs sm:text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:scale-[0.99] transition-all shadow-md shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        className="w-full py-3.5 px-5 rounded-full text-sm font-bold text-white bg-blue-500 hover:bg-blue-400 active:scale-[0.99] transition-all shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
       >
         {submitLabel}
       </button>
 
-      <p className="text-center text-xs text-slate-400 font-medium">
+      {children}
+
+      <p className="text-center text-sm text-slate-500 font-medium">
         {isLoginPage ? "Don't have an account? " : "Have an account? "}
         <Link
           href={switchHref}
           onClick={onSwitchClick}
-          className="font-bold text-blue-400 hover:text-blue-300 hover:underline"
+          className="font-bold text-blue-600 hover:text-blue-500 hover:underline"
         >
           {isLoginPage ? "Sign up" : "Log in"}
         </Link>

@@ -188,7 +188,7 @@ export function SupportWidget({ assistantOpen = false, assistantExpanded = false
         aria-label={open ? "Close support" : "Open support"}
         title="Help & Support"
         suppressHydrationWarning
-        className={`fixed bottom-6 z-40 h-14 w-14 rounded-full bg-[var(--primary)] text-white shadow-xl shadow-black/20 flex items-center justify-center hover:scale-105 active:scale-95 transition-[right,transform] duration-300 ease-in-out ${assistantExpanded ? "hidden" : assistantOpen ? "right-6 sm:right-[424px]" : "right-6"}`}
+        className={`fixed bottom-6 z-40 h-14 w-14 rounded-full bg-[var(--primary)] text-white shadow-xl shadow-black/20 flex items-center justify-center hover:scale-105 active:scale-95 transition-[right,transform] duration-300 ease-in-out will-change-[right,transform] ${assistantExpanded ? "hidden" : assistantOpen ? "right-6 sm:right-[424px]" : "right-6"}`}
       >
         {open ? <X className="h-6 w-6" /> : <span className="text-[26px] font-bold leading-none" aria-hidden="true">?</span>}
       </button>

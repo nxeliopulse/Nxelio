@@ -4,14 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, Loader2, KeyRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
-const INPUT = {
-  className: "w-full px-4 py-3 rounded-xl text-sm text-slate-800 placeholder-slate-400 outline-none transition-all",
-  style: {
-    background: "#F3F4F8",
-    border: "1.5px solid transparent",
-  } as React.CSSProperties,
-};
+import { UNDERLINE_INPUT, UNDERLINE_INPUT_STYLE } from "@/components/auth/auth-split-card";
 
 /**
  * The reset link points HERE with ?token_hash=...&type=recovery (not straight
@@ -71,13 +64,13 @@ function ResetPasswordForm() {
   return (
     <div>
       <div className="mb-6">
-        <div className="h-12 w-12 rounded-2xl bg-blue-500/15 border border-blue-400/25 flex items-center justify-center mb-4 text-blue-300">
+        <div className="h-12 w-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4 text-blue-600">
           <KeyRound className="h-6 w-6" />
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
           Choose a new password
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 font-medium mt-1">
+        <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
           Enter a new password for your account below.
         </p>
       </div>
@@ -91,7 +84,7 @@ function ResetPasswordForm() {
         )}
 
         <div>
-          <label className="block text-xs font-bold text-slate-300 mb-1.5">New password</label>
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">New password</label>
           <div className="relative">
             <input
               type={showPass ? "text" : "password"}
@@ -99,12 +92,13 @@ function ResetPasswordForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoFocus
-              className="w-full px-4 py-3 rounded-xl border border-white/15 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/15 text-sm text-white placeholder:text-slate-500 bg-white/[0.06] backdrop-blur-sm transition-all outline-none pr-10"
+              className={UNDERLINE_INPUT}
+              style={UNDERLINE_INPUT_STYLE}
             />
             <button
               type="button"
               onClick={() => setShowPass(!showPass)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors text-slate-400 hover:text-slate-200 cursor-pointer"
+              className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
             >
               {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -112,29 +106,30 @@ function ResetPasswordForm() {
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-300 mb-1.5">Confirm new password</label>
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">Confirm new password</label>
           <input
             type={showPass ? "text" : "password"}
             placeholder="Confirm new password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-white/15 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/15 text-sm text-white placeholder:text-slate-500 bg-white/[0.06] backdrop-blur-sm transition-all outline-none"
+            className={UNDERLINE_INPUT}
+            style={UNDERLINE_INPUT_STYLE}
           />
         </div>
 
         <button
           type="submit"
           disabled={!valid || submitting}
-          className="w-full py-3.5 px-6 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:scale-[0.99] transition-all shadow-md shadow-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-3.5 px-6 rounded-full text-sm font-bold text-white bg-blue-500 hover:bg-blue-400 active:scale-[0.99] transition-all shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer mt-2"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {submitting ? "Updating…" : "Reset password"}
         </button>
       </form>
 
-      <p className="text-center text-xs text-slate-400 font-medium pt-5">
+      <p className="text-center text-xs text-slate-500 font-medium pt-5">
         Link expired or not working?{" "}
-        <Link href="/forgot-password" className="font-bold text-blue-400 hover:text-blue-300 hover:underline">
+        <Link href="/forgot-password" className="font-bold text-blue-600 hover:text-blue-500 hover:underline">
           Request a new one
         </Link>
       </p>

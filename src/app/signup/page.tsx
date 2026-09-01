@@ -43,18 +43,14 @@ export default function SignupPage() {
       subheading="Please enter your details to create your account."
       activeAuthTab="signup"
       leftEyebrow="You can easily"
-      leftTitle="Speed up your work with our Web App"
     >
       <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
-          <div className="flex items-start gap-2 rounded-lg p-2.5 text-xs sm:text-sm"
-            style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
+          <div className="flex items-start gap-2.5 rounded-xl p-3.5 text-sm bg-red-50 border border-red-100 text-red-600">
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
-
-        <OAuthButtons label="or" />
 
         <div>
           <label className={FIELD_LABEL}>Full name</label>
@@ -69,7 +65,7 @@ export default function SignupPage() {
               onFocus={authInputFocus}
               onBlur={authInputBlur}
             />
-            <User className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+            <User className="h-4 w-4 absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
         </div>
 
@@ -86,7 +82,7 @@ export default function SignupPage() {
               onFocus={authInputFocus}
               onBlur={authInputBlur}
             />
-            <Mail className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+            <Mail className="h-4 w-4 absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
         </div>
 
@@ -104,11 +100,11 @@ export default function SignupPage() {
               onBlur={authInputBlur}
             />
             <button type="button" onClick={() => setShowPass(!showPass)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
               {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Minimum 8 characters</p>
+          <p className="text-[10px] text-slate-500 mt-1 font-medium">Minimum 8 characters</p>
         </div>
 
         <RadioToggle
@@ -117,20 +113,22 @@ export default function SignupPage() {
           label={
             <>
               I agree with{" "}
-              <Link href="/terms" onClick={(e) => e.stopPropagation()} className="text-slate-200 font-medium hover:underline">terms</Link>
+              <Link href="/terms" onClick={(e) => e.stopPropagation()} className="text-slate-900 font-medium hover:underline">terms</Link>
               {" "}&{" "}
-              <Link href="/privacy" onClick={(e) => e.stopPropagation()} className="text-slate-200 font-medium hover:underline">conditions</Link>
+              <Link href="/privacy" onClick={(e) => e.stopPropagation()} className="text-slate-900 font-medium hover:underline">conditions</Link>
             </>
           }
         />
 
-        <div className="pt-1">
+        <div className="pt-2">
           <AuthButtonRow
             submitLabel={loading ? "Creating account…" : "Sign Up"}
             submitDisabled={!valid || loading}
             switchHref="/login"
             switchLabel="Sign In"
-          />
+          >
+            <OAuthButtons label="OR" />
+          </AuthButtonRow>
         </div>
       </form>
     </AuthSplitCard>
