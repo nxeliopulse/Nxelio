@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  CheckCircle2, X, ArrowUpRight, ChevronDown,
+  CheckCircle2, Check, X, ArrowUpRight, ChevronDown,
   Pencil, GripVertical, Plus, Save, LayoutGrid, Star, Trash2, Flame, Mail, FileDown, Video, CalendarClock, MousePointerClick, Gauge, FileText, Maximize2,
   TrendingUp, TrendingDown, Globe2, Zap, BarChart3, Lightbulb, Sparkles, AlertTriangle, Target, Users, Layers,
 } from "lucide-react";
@@ -28,6 +28,7 @@ import {
   WIDGET_CATALOG, WIDGET_CATEGORIES, WIDGET_SIZES, DEFAULT_LAYOUT, clampWidgetSize,
   type WidgetKey, type WidgetSize, type LayoutWidget,
 } from "@/lib/dashboard-widgets";
+import { completeSetupTask, dismissSetupTask } from "@/lib/queries/setup-tasks";
 import type { DashboardLayout } from "@/lib/queries/dashboard-layouts";
 import {
   createDashboardLayout, updateDashboardLayout, deleteDashboardLayout, setActiveDashboardLayout,
@@ -794,9 +795,36 @@ function buildSetupTasks(
  *  remain — unlike dashboard widgets, this isn't part of the customizable
  *  "Edit layout" system, since it's account setup rather than a business
  *  metric someone would want to arrange or resize. Once every task is
- *  actually complete the whole card disappears. */
-function SetupChecklistCard({ tasks }: { tasks: SetupTask[] }) {
-  if (tasks.length === 0) return null;
+ *  actually complete the whole card disappears.
+ *
+ *  Each row can also be cleared by hand: ✓ marks it done (the person handled
+ *  it, possibly outside Nxelio), ✕ dismisses the suggestion. Both persist per
+ *  workspace via setup-tasks.ts, and both hide the row optimistically so the
+ *  click feels instant — reverting only if the write actually fails. */
+function SetupChecklistCard({ tasks, initialStates }: { tasks: SetupTask[]; initialStates: Record<string, "accepted" | "dismissed"> }) {
+  const { toast } = useFeedback();
+  // Rows cleared during this render pass, before the server round-trip and
+  // revalidation catch up. Seeded from the server so a reload keeps them gone.
+  const [clearedIds, setClearedIds] = useState<string[]>(() => Object.keys(initialStates));
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  const visible = tasks.filter((t) => !clearedIds.includes(t.id));
+  if (visible.length === 0) return null;
+
+  async function clearTask(taskId: string, action: "complete" | "dismiss") {
+    setPendingId(taskId);
+    setClearedIds((ids) => [...ids, taskId]);
+    const ok = action === "complete" ? await completeSetupTask(taskId) : await dismissSetupTask(taskId);
+    setPendingId(null);
+    if (!ok) {
+      // Put the row back rather than leaving it hidden on a state the server
+      // never actually recorded.
+      setClearedIds((ids) => ids.filter((id) => id !== taskId));
+      toast("Couldn't update that setup step — please try again.", "error");
+      return;
+    }
+    toast(action === "complete" ? "Marked as completed." : "Recommendation dismissed.", "success");
+  }
 
   return (
     <Card className="bg-white dark:bg-[#1b212e] border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs p-5">
@@ -806,12 +834,12 @@ function SetupChecklistCard({ tasks }: { tasks: SetupTask[] }) {
           <h5 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Finish setting up your workspace</h5>
         </div>
         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
-          {tasks.length} step{tasks.length === 1 ? "" : "s"} left
+          {visible.length} step{visible.length === 1 ? "" : "s"} left
         </span>
       </div>
 
       <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-xs min-w-[480px]">
+        <table className="w-full text-xs min-w-[560px]">
           <thead>
             <tr className="text-left text-slate-400 dark:text-slate-500 uppercase text-[10px] tracking-wide">
               <th className="px-3 py-2 font-semibold">Task</th>
@@ -820,17 +848,37 @@ function SetupChecklistCard({ tasks }: { tasks: SetupTask[] }) {
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task) => (
+            {visible.map((task) => (
               <tr key={task.id} className="border-t border-slate-100 dark:border-slate-800">
                 <td className="px-3 py-3 font-semibold text-slate-800 dark:text-slate-100 whitespace-nowrap">{task.title}</td>
                 <td className="px-3 py-3 text-slate-500 dark:text-slate-400 hidden md:table-cell max-w-xs">{task.description}</td>
-                <td className="px-3 py-3 text-right">
-                  <button
-                    onClick={task.onAction}
-                    className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    {task.actionLabel}
-                  </button>
+                <td className="px-3 py-3">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      onClick={task.onAction}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      {task.actionLabel}
+                    </button>
+                    <button
+                      onClick={() => clearTask(task.id, "complete")}
+                      disabled={pendingId === task.id}
+                      title="Mark as completed"
+                      aria-label={`Mark "${task.title}" as completed`}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 dark:hover:border-emerald-800 transition-colors disabled:opacity-50"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => clearTask(task.id, "dismiss")}
+                      disabled={pendingId === task.id}
+                      title="Dismiss"
+                      aria-label={`Dismiss "${task.title}"`}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:hover:border-rose-800 transition-colors disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -1112,6 +1160,7 @@ export function DashboardView({
   usageHistory = [],
   teamPerformance = [],
   recentDeals = [],
+  setupTaskStates = {},
   savedLayouts = [],
   activeLayoutId = null,
   activeLayoutWidgets = null,
@@ -1124,6 +1173,7 @@ export function DashboardView({
   usageHistory?: UsageHistoryEntry[];
   teamPerformance?: { name: string; dealsCount: number; wonValue: number }[];
   recentDeals?: RecentDealRow[];
+  setupTaskStates?: Record<string, "accepted" | "dismissed">;
   savedLayouts?: DashboardLayout[];
   activeLayoutId?: string | null;
   activeLayoutWidgets?: LayoutWidget[] | null;
@@ -1457,7 +1507,7 @@ export function DashboardView({
 
       {/* Setup checklist — fixed, not part of the customizable layout; only
           renders while real setup tasks remain (see SetupChecklistCard) */}
-      <SetupChecklistCard tasks={setupTasks} />
+      <SetupChecklistCard tasks={setupTasks} initialStates={setupTaskStates} />
 
       {/* Layout controls — hidden while editing, since Save/Cancel below take over */}
       {!editing && (
