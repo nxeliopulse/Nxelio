@@ -745,7 +745,7 @@ function buildSetupTasks(
   totalLeads: number,
   collaboratorCount: number,
   emailsSent: number,
-  nav: { settings: () => void; leads: () => void; campaigns: () => void }
+  go: (href: string) => void
 ): SetupTask[] {
   return [
     {
@@ -753,7 +753,10 @@ function buildSetupTasks(
       title: "Connect your email",
       description: "Connect Gmail or Outlook to send and track outreach directly from Nxelio.",
       actionLabel: "Connect",
-      onAction: nav.settings,
+      // Settings reads ?section= on mount (settings-view.tsx) and opens that
+      // panel directly, so these land on the exact connector rather than
+      // dropping someone on the Profile tab to go hunting.
+      onAction: () => go("/settings?section=email"),
       done: Boolean(onboardingStatus?.inboxConnected),
     },
     {
@@ -761,7 +764,7 @@ function buildSetupTasks(
       title: "Connect your calendar",
       description: "Sync your calendar so meetings booked with leads show up automatically.",
       actionLabel: "Connect",
-      onAction: nav.settings,
+      onAction: () => go("/settings?section=calendar"),
       done: Boolean(onboardingStatus?.calendarConnected),
     },
     {
@@ -769,7 +772,7 @@ function buildSetupTasks(
       title: "Import your leads",
       description: "Add or import your first leads to start building your pipeline.",
       actionLabel: "Import",
-      onAction: nav.leads,
+      onAction: () => go("/leads"),
       done: totalLeads > 0,
     },
     {
@@ -777,7 +780,9 @@ function buildSetupTasks(
       title: "Invite your team",
       description: "Add teammates so you can share leads and win deals together.",
       actionLabel: "Invite",
-      onAction: nav.settings,
+      // Teammates live on /users, not in Settings — this previously sent
+      // people to the Settings page, which has no invite anywhere on it.
+      onAction: () => go("/users"),
       done: collaboratorCount > 1,
     },
     {
@@ -785,7 +790,9 @@ function buildSetupTasks(
       title: "Send your first campaign",
       description: "Launch an email campaign to start nurturing leads automatically.",
       actionLabel: "Create",
-      onAction: nav.campaigns,
+      // Straight into the builder — the same place the Campaigns page's own
+      // "New Campaign" button goes.
+      onAction: () => go("/campaigns/builder"),
       done: emailsSent > 0,
     },
   ].filter((task) => !task.done);
@@ -1475,11 +1482,7 @@ export function DashboardView({
     stats.totalLeads,
     collaborators.length,
     stats.snapshot.emailsSent,
-    {
-      settings: () => router.push("/settings"),
-      leads: () => router.push("/leads"),
-      campaigns: () => router.push("/campaigns"),
-    }
+    (href) => router.push(href)
   );
 
   return (

@@ -151,9 +151,31 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
   async function handleLogout() {
     setLoggingOut(true);
     const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+
+    // Revoking the refresh token server-side (signOut's default global scope)
+    // is worth one network call — it stops the session being resumed from
+    // anywhere else. What isn't worth it is making the person watch a
+    // "Logging out…" spinner when the auth server is slow or unreachable, so
+    // we stop waiting after 2s and tear the session down locally instead.
+    // The local pass is storage-only (no network), so it always completes.
+    try {
+      const timedOut = await Promise.race([
+        supabase.auth.signOut().then(() => false),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 2000)),
+      ]);
+      if (timedOut) await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      // Never block the redirect on a failed sign-out; clear what we can.
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    }
+
+    // A full-page replace rather than router.push + router.refresh. Those were
+    // two more sequential server round-trips (proxy.ts re-validates the
+    // session on each), and refresh() is redundant once we've left the route
+    // entirely. A hard navigation also guarantees every cached RSC payload and
+    // piece of logged-in React state is dropped — which is what you want on
+    // logout — and replace() keeps the app out of the back-button history.
+    window.location.replace("/login");
   }
 
   return (

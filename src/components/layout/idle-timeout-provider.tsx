@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,6 @@ export function IdleTimeoutProvider({
   warningLeadMinutes: number;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   // eslint-disable-next-line react-hooks/purity -- needs the real mount time to start the idle clock; deferring this to an effect risks the idle-check interval below racing ahead of it and firing an immediate false logout
   const lastActivityRef = useRef(Date.now());
   const lastHeartbeatRef = useRef(0);
@@ -39,15 +37,25 @@ export function IdleTimeoutProvider({
   const forceLogout = useCallback(async () => {
     if (loggingOutRef.current) return;
     loggingOutRef.current = true;
+    const supabase = createClient();
+    // Same shape as the manual logout in topbar.tsx: revoke server-side when
+    // we can, but cap the wait so an unreachable auth server can't strand
+    // someone on an idle-expired page. The local pass is storage-only.
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      const timedOut = await Promise.race([
+        supabase.auth.signOut().then(() => false),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 2000)),
+      ]);
+      if (timedOut) await supabase.auth.signOut({ scope: "local" });
     } catch {
       // proceed to redirect regardless — the server-side idle check in
       // proxy.ts will reject stale requests either way
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     }
-    router.push("/login?reason=idle");
-  }, [router]);
+    // Hard replace rather than router.push: avoids a second RSC round-trip
+    // through proxy.ts and drops all logged-in client state.
+    window.location.replace("/login?reason=idle");
+  }, []);
 
   const handleActivity = useCallback(() => {
     lastActivityRef.current = Date.now();

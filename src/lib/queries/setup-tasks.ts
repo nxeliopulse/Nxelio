@@ -28,11 +28,11 @@ export type SetupTaskState = "accepted" | "dismissed";
  *  only ever sends a task id — never arbitrary strings to be written to the
  *  database. Ids must match those built in dashboard-view.tsx. */
 const SETUP_TASK_META: Record<string, { title: string; ctaLabel: string; ctaHref: string }> = {
-  "connect-email": { title: "Connect your email", ctaLabel: "Connect", ctaHref: "/settings" },
-  "connect-calendar": { title: "Connect your calendar", ctaLabel: "Connect", ctaHref: "/settings" },
+  "connect-email": { title: "Connect your email", ctaLabel: "Connect", ctaHref: "/settings?section=email" },
+  "connect-calendar": { title: "Connect your calendar", ctaLabel: "Connect", ctaHref: "/settings?section=calendar" },
   "import-leads": { title: "Import your leads", ctaLabel: "Import", ctaHref: "/leads" },
-  "invite-team": { title: "Invite your team", ctaLabel: "Invite", ctaHref: "/settings" },
-  "first-campaign": { title: "Send your first campaign", ctaLabel: "Create", ctaHref: "/campaigns" },
+  "invite-team": { title: "Invite your team", ctaLabel: "Invite", ctaHref: "/users" },
+  "first-campaign": { title: "Send your first campaign", ctaLabel: "Create", ctaHref: "/campaigns/builder" },
 };
 
 async function resolveContext(): Promise<{ workspaceId: string; userId: string } | null> {
