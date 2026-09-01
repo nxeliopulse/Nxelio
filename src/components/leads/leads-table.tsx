@@ -102,8 +102,15 @@ function StatusPill({ status }: { status: string }) {
     Hot: "bg-rose-500 dark:bg-rose-600",
     Scored: "bg-violet-500 dark:bg-violet-600",
   };
+  // Neutral chip + colored dot rather than a solid saturated fill: with a dozen
+  // statuses on screen at once the solid pills fought the row content for
+  // attention. The status colors above are kept — they just move to the dot.
+  // bg-white / border-slate-* / text-slate-* are deliberate: globals.css remaps
+  // those (`.dark .bg-white`, the inverted slate ramp) so the chip themes
+  // itself, which a hardcoded hex here would not.
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white whitespace-nowrap", styles[status] || "bg-slate-400 dark:bg-slate-600")}>
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+      <span className={cn("h-1.5 w-1.5 rounded-full flex-shrink-0", styles[status] || "bg-slate-400 dark:bg-slate-600")} />
       {status}
     </span>
   );
@@ -868,13 +875,29 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); openLead(l.id); }}
-              className="flex items-center gap-2 max-w-[220px] text-left group"
+              className="flex items-center gap-2.5 max-w-[220px] text-left group"
             >
-              <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(name))}>
+              <span className={cn("h-8 w-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(name))}>
                 {initials(name)}
               </span>
-              <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
-                {name}
+              {/* Name over a secondary identifier, so a row is recognisable
+                  without switching extra columns on in Manage Columns. Email is
+                  preferred but only ~37% of leads have one, so it falls back to
+                  job title (~60%) before giving up — company deliberately isn't
+                  in the chain since it already has its own column. Renders
+                  nothing rather than a placeholder when both are missing. */}
+              <span className="min-w-0 flex flex-col leading-tight">
+                <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
+                  {name}
+                </span>
+                {(l.email || l.job_title) && (
+                  <span
+                    className="text-xs text-slate-500 dark:text-slate-500 truncate whitespace-nowrap"
+                    title={l.email || l.job_title || undefined}
+                  >
+                    {l.email || l.job_title}
+                  </span>
+                )}
               </span>
             </button>
           </div>
@@ -1280,7 +1303,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-500">
                   <th
-                    className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-2.5"
+                    className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-3"
                     style={{ width: 40, minWidth: 40, maxWidth: 40 }}
                   >
                     <input
@@ -1299,7 +1322,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       <th
                         key={c.key}
                         className={cn(
-                          "px-3 py-2.5 font-bold whitespace-nowrap",
+                          "px-3 py-3 font-semibold whitespace-nowrap",
                           c.key === "index" && "sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
                           c.key === "name" && "sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
                         )}
@@ -1378,7 +1401,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                     const running = runProgress?.columnId === col.id;
                     const pct = running && runProgress.total > 0 ? Math.round((runProgress.done / runProgress.total) * 100) : 0;
                     return (
-                      <th key={col.id} className="px-3 py-2.5 font-bold w-[200px] max-w-[200px] whitespace-nowrap">
+                      <th key={col.id} className="px-3 py-3 font-semibold w-[200px] max-w-[200px] whitespace-nowrap">
                         <span className="flex items-center gap-1.5 min-w-0">
                           <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                           <span className="truncate" title={col.name}>{col.name}</span>
@@ -1401,10 +1424,10 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       </th>
                     );
                   })}
-                  <th className="px-3 py-2.5 w-16 text-right font-bold whitespace-nowrap">Action</th>
+                  <th className="px-3 py-3 w-16 text-right font-semibold whitespace-nowrap">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
                 {paged.length === 0 && (
                   <tr>
                     <td colSpan={visibleCols.length + aiColumns.length + 2} className="px-4 py-16 text-center text-slate-500">
@@ -1419,7 +1442,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                     className="group hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <td
-                      className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-2"
+                      className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-3"
                       style={{ width: 40, minWidth: 40, maxWidth: 40 }}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -1434,7 +1457,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       <td
                         key={c.key}
                         className={cn(
-                          "px-3 py-2",
+                          "px-3 py-3",
                           c.key === "index" && "sticky left-10 z-10 bg-white group-hover:bg-slate-50 transition-colors",
                           c.key === "name" && "sticky left-[88px] z-10 bg-white group-hover:bg-slate-50 transition-colors"
                         )}
@@ -1449,7 +1472,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       const computed = l.custom_fields?.[col.id];
                       const running = runningCellKey === cellKey || runningColumnId === col.id;
                       return (
-                        <td key={col.id} className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <td key={col.id} className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           {running ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
                           ) : computed ? (
@@ -1465,7 +1488,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         </td>
                       );
                     })}
-                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setRowMenu({ id: l.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) }); }}
                         title="Row actions"
