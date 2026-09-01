@@ -6,10 +6,10 @@ First, run the development server:
 
 ```bash
 npm run dev
-# or gg
+# or
 yarn dev
 # or
-pnpm devk
+pnpm dev
 # or
 bun dev
 ```
