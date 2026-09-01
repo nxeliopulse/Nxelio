@@ -45,20 +45,20 @@ export function BrandVisualPanel({
 
         {/* Floating product preview card — Sleek Frosted Glass Effect */}
         {mockup && (
-          <div className="w-[340px] bg-white/20 backdrop-blur-3xl border border-white/35 rounded-3xl shadow-[0_30px_70px_rgba(0,10,40,0.35)] p-6 mb-8 text-white relative z-10">
+          <div className="w-[340px] bg-white/10 backdrop-blur-2xl border border-white/20 rounded-3xl shadow-[0_30px_70px_rgba(0,10,40,0.25)] p-6 mb-8 text-white relative z-10">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56] shadow-xs" />
                 <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] shadow-xs" />
                 <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f] shadow-xs" />
               </div>
-              <span className="text-xs font-bold text-[#0052ff] bg-white px-3.5 py-1 rounded-full shadow-md">
+              <span className="text-xs font-bold text-white bg-white/20 border border-white/10 backdrop-blur-md px-3.5 py-1 rounded-full shadow-sm">
                 Live Preview
               </span>
             </div>
 
             <div className="flex items-center gap-3.5 mb-5">
-              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 border border-white/40 flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-lg">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 border border-white/20 flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-lg">
                 AR
               </div>
               <div className="min-w-0">
@@ -79,11 +79,11 @@ export function BrandVisualPanel({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/25">
-              <button className="flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-white/20 hover:bg-white/30 border border-white/30 rounded-xl py-2.5 backdrop-blur-md transition-all shadow-sm">
+            <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/10">
+              <button className="flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl py-2.5 backdrop-blur-md transition-all shadow-sm">
                 <ListPlus className="w-3.5 h-3.5" /> Add to Sequence
               </button>
-              <button className="flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-[#0f1117]/90 hover:bg-black border border-white/10 rounded-xl py-2.5 transition-all shadow-md">
+              <button className="flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-black/40 hover:bg-black/60 border border-white/5 rounded-xl py-2.5 backdrop-blur-md transition-all shadow-md">
                 <Send className="w-3.5 h-3.5" /> Send Email
               </button>
             </div>
@@ -103,7 +103,7 @@ export function BrandVisualPanel({
         {cta && (
           <Link
             href={cta.href}
-            className="mt-7 inline-flex items-center justify-center px-8 py-3.5 rounded-xl bg-black hover:bg-slate-900 text-white text-sm font-extrabold shadow-2xl transition-all border border-white/10 hover:scale-[1.02]"
+            className="mt-7 inline-flex items-center justify-center px-8 py-3.5 rounded-xl bg-white text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-sm font-extrabold shadow-2xl transition-all hover:scale-[1.02]"
           >
             {cta.label}
           </Link>

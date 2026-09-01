@@ -1166,6 +1166,19 @@ export function DashboardView({
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [renamingName, setRenamingName] = useState("");
+  const switcherRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (switcherRef.current && !switcherRef.current.contains(event.target as Node)) {
+        setSwitcherOpen(false);
+      }
+    }
+    if (switcherOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [switcherOpen]);
 
   function beginEdit() {
     setDraftLayout(layout);
@@ -1455,7 +1468,7 @@ export function DashboardView({
           >
             <Pencil className="h-3.5 w-3.5" /> Edit layout
           </button>
-          <div className="relative">
+          <div className="relative" ref={switcherRef}>
             <button
               onClick={() => setSwitcherOpen((v) => !v)}
               className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1b212e] text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5"
