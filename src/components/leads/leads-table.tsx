@@ -102,8 +102,15 @@ function StatusPill({ status }: { status: string }) {
     Hot: "bg-rose-500 dark:bg-rose-600",
     Scored: "bg-violet-500 dark:bg-violet-600",
   };
+  // Neutral chip + colored dot rather than a solid saturated fill: with a dozen
+  // statuses on screen at once the solid pills fought the row content for
+  // attention. The status colors above are kept — they just move to the dot.
+  // bg-white / border-slate-* / text-slate-* are deliberate: globals.css remaps
+  // those (`.dark .bg-white`, the inverted slate ramp) so the chip themes
+  // itself, which a hardcoded hex here would not.
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white whitespace-nowrap", styles[status] || "bg-slate-400 dark:bg-slate-600")}>
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+      <span className={cn("h-1.5 w-1.5 rounded-full flex-shrink-0", styles[status] || "bg-slate-400 dark:bg-slate-600")} />
       {status}
     </span>
   );
@@ -328,6 +335,38 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     const r = e.currentTarget.getBoundingClientRect();
     setDatesPos({ top: r.bottom + 6, left: r.left });
     setDatesOpen(true);
+  }
+
+  // "Sort By" toolbar dropdown — a custom popover instead of a native
+  // <select>, matching Filter/Added-between above. A native <select>'s open
+  // options list is rendered by the OS/browser chrome, not by our CSS, so it
+  // showed up unstyled (plain white, wrong font) no matter what classes were
+  // on the <select> itself.
+  const SORT_OPTIONS: { value: "none" | "name" | "score" | "newest"; label: string }[] = [
+    { value: "none", label: "Default" },
+    { value: "name", label: "Name A–Z" },
+    { value: "score", label: "Score High→Low" },
+    { value: "newest", label: "Newest" },
+  ];
+  const currentSortValue: "none" | "name" | "score" | "newest" =
+    !sortKey ? "none"
+    : sortKey === "name" && sortDir === "asc" ? "name"
+    : sortKey === "score" && sortDir === "desc" ? "score"
+    : sortKey === "created_at" && sortDir === "desc" ? "newest"
+    : "none";
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [sortMenuPos, setSortMenuPos] = useState<{ top: number; left: number } | null>(null);
+  function openSortMenu(e: React.MouseEvent<HTMLButtonElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    setSortMenuPos({ top: r.bottom + 6, left: r.left });
+    setSortMenuOpen(true);
+  }
+  function applySort(v: "none" | "name" | "score" | "newest") {
+    if (v === "none") { setSortKey(null); setSortDir("asc"); }
+    else if (v === "name") { setSortKey("name"); setSortDir("asc"); }
+    else if (v === "score") { setSortKey("score"); setSortDir("desc"); }
+    else if (v === "newest") { setSortKey("created_at"); setSortDir("desc"); }
+    setSortMenuOpen(false);
   }
   function dateRangeLabel(): string {
     // Append a local-midnight time so formatDate's `new Date(...)` parses this
@@ -836,13 +875,29 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); openLead(l.id); }}
-              className="flex items-center gap-2 max-w-[220px] text-left group"
+              className="flex items-center gap-2.5 max-w-[220px] text-left group"
             >
-              <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(name))}>
+              <span className={cn("h-8 w-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(name))}>
                 {initials(name)}
               </span>
-              <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
-                {name}
+              {/* Name over a secondary identifier, so a row is recognisable
+                  without switching extra columns on in Manage Columns. Email is
+                  preferred but only ~37% of leads have one, so it falls back to
+                  job title (~60%) before giving up — company deliberately isn't
+                  in the chain since it already has its own column. Renders
+                  nothing rather than a placeholder when both are missing. */}
+              <span className="min-w-0 flex flex-col leading-tight">
+                <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate whitespace-nowrap">
+                  {name}
+                </span>
+                {(l.email || l.job_title) && (
+                  <span
+                    className="text-xs text-slate-500 dark:text-slate-500 truncate whitespace-nowrap"
+                    title={l.email || l.job_title || undefined}
+                  >
+                    {l.email || l.job_title}
+                  </span>
+                )}
               </span>
             </button>
           </div>
@@ -1224,33 +1279,17 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           </Button>
 
           {/* Sort Dropdown */}
-          <div className="relative inline-flex items-center gap-1 flex-shrink-0 w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-8 pl-2.5 pr-1.5 shadow-sm">
-            <ArrowUpDown className="h-3 w-3 text-slate-400 flex-shrink-0" />
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-600 flex-shrink-0 whitespace-nowrap">Sort By</span>
-            <select
-              value={
-                !sortKey ? "none"
-                : sortKey === "name" && sortDir === "asc" ? "name"
-                : sortKey === "score" && sortDir === "desc" ? "score"
-                : sortKey === "created_at" && sortDir === "desc" ? "newest"
-                : "none"
-              }
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "none") { setSortKey(null); setSortDir("asc"); }
-                else if (v === "name") { setSortKey("name"); setSortDir("asc"); }
-                else if (v === "score") { setSortKey("score"); setSortDir("desc"); }
-                else if (v === "newest") { setSortKey("created_at"); setSortDir("desc"); }
-              }}
-              className="appearance-none bg-transparent border-0 pl-1 pr-4 py-1 text-xs font-semibold text-slate-700 dark:text-slate-600 focus:outline-none cursor-pointer truncate"
-            >
-              <option value="none">Default</option>
-              <option value="name">Name A–Z</option>
-              <option value="score">Score High→Low</option>
-              <option value="newest">Newest</option>
-            </select>
-            <ChevronDown className="h-3 w-3 text-slate-400 absolute right-1.5 pointer-events-none" />
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openSortMenu}
+            className="rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0"
+            title="Sort prospects"
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            <span>Sort By: {SORT_OPTIONS.find((o) => o.value === currentSortValue)?.label}</span>
+            <ChevronDown className="h-3 w-3" />
+          </Button>
         </div>
 
         {/* Table Container */}
@@ -1264,7 +1303,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-500">
                   <th
-                    className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-2.5"
+                    className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-3"
                     style={{ width: 40, minWidth: 40, maxWidth: 40 }}
                   >
                     <input
@@ -1283,7 +1322,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       <th
                         key={c.key}
                         className={cn(
-                          "px-3 py-2.5 font-bold whitespace-nowrap",
+                          "px-3 py-3 font-semibold whitespace-nowrap",
                           c.key === "index" && "sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
                           c.key === "name" && "sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
                         )}
@@ -1362,7 +1401,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                     const running = runProgress?.columnId === col.id;
                     const pct = running && runProgress.total > 0 ? Math.round((runProgress.done / runProgress.total) * 100) : 0;
                     return (
-                      <th key={col.id} className="px-3 py-2.5 font-bold w-[200px] max-w-[200px] whitespace-nowrap">
+                      <th key={col.id} className="px-3 py-3 font-semibold w-[200px] max-w-[200px] whitespace-nowrap">
                         <span className="flex items-center gap-1.5 min-w-0">
                           <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                           <span className="truncate" title={col.name}>{col.name}</span>
@@ -1385,10 +1424,10 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       </th>
                     );
                   })}
-                  <th className="px-3 py-2.5 w-16 text-right font-bold whitespace-nowrap">Action</th>
+                  <th className="px-3 py-3 w-16 text-right font-semibold whitespace-nowrap">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
                 {paged.length === 0 && (
                   <tr>
                     <td colSpan={visibleCols.length + aiColumns.length + 2} className="px-4 py-16 text-center text-slate-500">
@@ -1403,7 +1442,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                     className="group hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <td
-                      className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-2"
+                      className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-3"
                       style={{ width: 40, minWidth: 40, maxWidth: 40 }}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -1418,7 +1457,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       <td
                         key={c.key}
                         className={cn(
-                          "px-3 py-2",
+                          "px-3 py-3",
                           c.key === "index" && "sticky left-10 z-10 bg-white group-hover:bg-slate-50 transition-colors",
                           c.key === "name" && "sticky left-[88px] z-10 bg-white group-hover:bg-slate-50 transition-colors"
                         )}
@@ -1433,7 +1472,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       const computed = l.custom_fields?.[col.id];
                       const running = runningCellKey === cellKey || runningColumnId === col.id;
                       return (
-                        <td key={col.id} className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <td key={col.id} className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           {running ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
                           ) : computed ? (
@@ -1449,7 +1488,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         </td>
                       );
                     })}
-                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setRowMenu({ id: l.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) }); }}
                         title="Row actions"
@@ -1864,6 +1903,30 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                 Clear dates
               </button>
             )}
+          </div>
+        </>
+      )}
+
+      {sortMenuOpen && sortMenuPos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setSortMenuOpen(false)} />
+          <div
+            className="fixed z-50 w-48 rounded-xl border border-slate-200 bg-white shadow-xl py-1"
+            style={{ top: sortMenuPos.top, left: sortMenuPos.left }}
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => applySort(opt.value)}
+                className={cn(
+                  "w-full flex items-center justify-between px-3 py-2 text-left text-xs font-medium hover:bg-slate-50",
+                  currentSortValue === opt.value ? "text-blue-600 bg-blue-50/60" : "text-slate-700"
+                )}
+              >
+                {opt.label}
+                {currentSortValue === opt.value && <Check className="h-3.5 w-3.5" />}
+              </button>
+            ))}
           </div>
         </>
       )}

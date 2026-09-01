@@ -1,103 +1,117 @@
 import type { ReactNode, CSSProperties, FocusEvent } from "react";
 import Link from "next/link";
+import { Zap } from "lucide-react";
+import { BrandVisualPanel } from "@/components/brand/brand-visual-panel";
 
-/** Shared shell for the redesigned Login/Signup screens — a bordered card
- *  split into a white form panel and a solid-color illustration panel,
- *  matching the reference layout. Each page supplies its own heading,
- *  subheading and illustration since those differ per screen. */
+/** Full-bleed split-screen shell for Login/Signup — no floating card. Left is
+ *  a plain dark panel holding the form; right is a diagonally-clipped color
+ *  panel with a product preview, matching the Apollo/Clay reference layout
+ *  the user asked for (full screen, no card). */
 export function AuthSplitCard({
-  pageLabel,
   heading,
   subheading,
-  illustration,
+  activeAuthTab,
   children,
 }: {
-  pageLabel: string;
-  heading: [string, string];
-  subheading: string;
-  illustration: ReactNode;
+  pageLabel?: string;
+  heading?: [string, string] | string;
+  subheading?: string;
+  activeAuthTab?: "login" | "signup";
+  leftEyebrow?: string;
+  leftTitle?: string;
+  illustration?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="force-light-theme h-screen overflow-hidden bg-slate-100 flex flex-col items-center justify-center p-3 sm:p-6">
-      <div className="w-full max-w-6xl max-h-full flex flex-col">
-        <div className="flex items-center gap-1.5 mb-2 px-1 flex-shrink-0">
-          <span className="h-2.5 w-2.5 rotate-45 bg-indigo-600 rounded-[2px] flex-shrink-0" />
-          <span className="text-sm font-semibold text-indigo-600">{pageLabel}</span>
-        </div>
+    <div className="h-screen w-full flex flex-col lg:flex-row bg-white font-sans overflow-y-auto lg:overflow-hidden">
 
-        <div className="rounded-2xl border-2 border-indigo-300 bg-white overflow-hidden flex flex-col lg:flex-row shadow-sm min-h-0">
-          <div className="flex-1 min-w-0 p-5 sm:p-8 overflow-y-auto">
-            <div className="max-w-md">
-              <h1 className="text-2xl font-bold text-slate-900 leading-snug mb-1">
-                <span className="block">{heading[0]}</span>
-                <span className="block">{heading[1]}</span>
-              </h1>
-              <p className="text-sm text-slate-400 mb-5">{subheading}</p>
-              {children}
+      {/* LEFT: form panel — 50% width */}
+      <div className="flex-1 flex flex-col justify-between px-6 sm:px-10 lg:px-16 xl:px-24 py-8 relative z-10 lg:w-1/2 shrink-0">
+        <Link href="/" className="inline-flex items-center gap-2 mb-4 w-fit shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20">
+            <Zap className="w-4 h-4 text-white fill-white" />
+          </div>
+          <span className="text-lg font-bold tracking-tight text-slate-900">
+            Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-normal">Nurture</span>
+          </span>
+        </Link>
+
+        <div className="flex-1 flex flex-col justify-center max-w-[400px] w-full mx-auto lg:mx-0 my-auto py-4">
+          {activeAuthTab && (
+            <div className="flex gap-2 mb-6 w-full p-1 bg-slate-100 rounded-2xl border border-slate-200">
+              <Link
+                href="/login"
+                className={`flex-1 text-center py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeAuthTab === "login" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                Log In
+              </Link>
+              <Link
+                href="/signup"
+                className={`flex-1 text-center py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeAuthTab === "signup" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                Sign Up
+              </Link>
             </div>
-          </div>
+          )}
 
-          <div
-            className="hidden lg:flex lg:w-[46%] relative items-center justify-center p-6 overflow-hidden flex-shrink-0"
-            style={{ background: "linear-gradient(160deg, #4F5FEF 0%, #3D4FEA 100%)" }}
-          >
-            <div
-              className="absolute inset-0"
-              style={{ background: "radial-gradient(circle at 30% 25%, rgba(255,255,255,.10), transparent 55%), radial-gradient(circle at 75% 80%, rgba(255,255,255,.08), transparent 50%)" }}
-            />
-            <div className="relative z-10 w-full max-w-[380px]">{illustration}</div>
-          </div>
+          {heading && (
+            <div className="mb-6">
+              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                {Array.isArray(heading) ? heading[0] : heading}
+              </h1>
+              {subheading && (
+                <p className="text-sm text-slate-500 font-normal mt-1.5">
+                  {subheading}
+                </p>
+              )}
+            </div>
+          )}
+
+          {children}
         </div>
+
+        <p className="text-center text-xs text-slate-500 font-medium pt-4 pb-2 shrink-0">
+          &copy; {new Date().getFullYear()} Nxelio Inc. All rights reserved.{" "}
+          <Link href="/privacy" className="text-slate-600 hover:text-slate-900 hover:underline transition-colors">Privacy</Link>
+          {" "}and{" "}
+          <Link href="/terms" className="text-slate-600 hover:text-slate-900 hover:underline transition-colors">Terms</Link>.
+        </p>
       </div>
+
+      <BrandVisualPanel cta={{ label: "Start Your 7-Day Free Trial", href: "/signup" }} variant="straight" />
+
     </div>
   );
 }
 
-export const FIELD_LABEL = "block text-xs font-semibold text-indigo-300 mb-1.5 tracking-wide";
+export const FIELD_LABEL = "block text-sm font-medium text-slate-700 mb-2";
 
-/** Rounded box input style. globals.css has an app-wide
- *  `input:focus, ... { border-color/outline/box-shadow: ... !important }`
- *  rule (added earlier to fix this exact sharp-focus-rectangle problem
- *  everywhere), which no per-component color/shadow style can beat — so
- *  this input doesn't try to. Giving it a real `rounded-lg` is what
- *  actually matters: box-shadow always follows the element's own
- *  border-radius, so that global ring now renders with a curved edge
- *  instead of a hard rectangle. onFocus/onBlur here only swap the
- *  background (untouched by the global rule) for a subtle "lit up" cue. */
-export const UNDERLINE_INPUT = "w-full px-3.5 py-2.5 pr-10 rounded-lg text-[15px] text-slate-800 placeholder-slate-300 outline-none transition-all";
-export const UNDERLINE_INPUT_STYLE: CSSProperties = { background: "#F8FAFC", border: "1.5px solid #E2E8F0", outline: "none" };
+export const UNDERLINE_INPUT = "w-full px-4 py-3 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white";
+export const UNDERLINE_INPUT_STYLE: CSSProperties = {};
 
-export function authInputFocus(e: FocusEvent<HTMLInputElement>) {
-  e.currentTarget.style.background = "#FFFFFF";
-}
-export function authInputBlur(e: FocusEvent<HTMLInputElement>) {
-  e.currentTarget.style.background = "#F8FAFC";
-}
+export function authInputFocus(e: FocusEvent<HTMLInputElement>) {}
+export function authInputBlur(e: FocusEvent<HTMLInputElement>) {}
 
-/** Circular radio-style toggle used for "Remember me" / "I agree…" rows,
- *  matching the reference's ring-and-dot control instead of a checkbox. */
+/** Checkbox toggle used for "Remember me" / "I agree…" rows */
 export function RadioToggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer select-none">
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className="h-4 w-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors"
-        style={{ borderColor: checked ? "#4F5FEF" : "#CBD5E1" }}
-      >
-        {checked && <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />}
-      </button>
-      <span className="text-xs text-slate-500">{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-3.5 w-3.5 rounded border-slate-300 bg-white text-blue-600 focus:ring-blue-500 cursor-pointer"
+      />
+      <span className="text-sm text-slate-600 font-medium">{label}</span>
     </label>
   );
 }
 
-/** The primary/secondary button pair shared by Sign In and Sign Up — the
- *  reference styles the "switch to the other flow" action as a real button,
- *  not a text link. */
+/** The primary action button and switch-flow link pair */
 export function AuthButtonRow({
   submitLabel,
   submitDisabled,
@@ -105,6 +119,7 @@ export function AuthButtonRow({
   switchLabel,
   switchLoading,
   onSwitchClick,
+  children,
 }: {
   submitLabel: string;
   submitDisabled: boolean;
@@ -112,24 +127,31 @@ export function AuthButtonRow({
   switchLabel: string;
   switchLoading?: boolean;
   onSwitchClick?: () => void;
+  children?: ReactNode;
 }) {
+  const isLoginPage = switchHref === "/signup";
   return (
-    <div className="flex items-center gap-3">
+    <div className="space-y-4 pt-2">
       <button
         type="submit"
         disabled={submitDisabled}
-        className="flex-1 py-2.5 rounded-lg text-[15px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full py-3.5 px-5 rounded-full text-sm font-bold text-white bg-blue-500 hover:bg-blue-400 active:scale-[0.99] transition-all shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
       >
         {submitLabel}
       </button>
-      <Link
-        href={switchHref}
-        onClick={onSwitchClick}
-        aria-disabled={switchLoading}
-        className="flex-1 py-2.5 rounded-lg text-[15px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 text-center transition-colors aria-disabled:opacity-60 aria-disabled:pointer-events-none"
-      >
-        {switchLoading ? "Loading…" : switchLabel}
-      </Link>
+
+      {children}
+
+      <p className="text-center text-sm text-slate-500 font-medium">
+        {isLoginPage ? "Don't have an account? " : "Have an account? "}
+        <Link
+          href={switchHref}
+          onClick={onSwitchClick}
+          className="font-bold text-blue-600 hover:text-blue-500 hover:underline"
+        >
+          {isLoginPage ? "Sign up" : "Log in"}
+        </Link>
+      </p>
     </div>
   );
 }

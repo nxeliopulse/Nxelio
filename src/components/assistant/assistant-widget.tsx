@@ -203,7 +203,7 @@ export function AssistantWidget({
       const p = getComputedStyle(root).getPropertyValue("--primary").trim() || "#2563eb";
       const b600 = getComputedStyle(root).getPropertyValue("--color-blue-600").trim() || p;
       const b700 = getComputedStyle(root).getPropertyValue("--color-blue-700").trim() || p;
-      setAccentColors({ primary: b600, purple: b700 });
+      setAccentColors((prev) => (prev.primary === b600 && prev.purple === b700 ? prev : { primary: b600, purple: b700 }));
     };
     check();
     const observer = new MutationObserver(check);
@@ -503,11 +503,12 @@ export function AssistantWidget({
     <aside
       className={cn(
         "flex overflow-hidden",
-        "transition-[width,transform] duration-300 ease-in-out",
+        "transition-[width,transform] duration-300 ease-in-out will-change-[width,transform]",
         "max-sm:fixed max-sm:inset-y-0 max-sm:right-0 max-sm:z-50",
         open ? "max-sm:translate-x-0" : "max-sm:translate-x-full",
         "sm:sticky sm:top-0 sm:h-screen sm:translate-x-0",
-        open ? panelWidth : "sm:w-0"
+        open ? panelWidth : "sm:w-0",
+        !open && "pointer-events-none"
       )}
       role="complementary"
       aria-label="Nxelio Nurture AI assistant"
@@ -518,8 +519,8 @@ export function AssistantWidget({
       <div
         className={cn(
           "flex flex-col mt-2.5 mb-2.5 rounded-2xl overflow-hidden h-[calc(100vh-20px)]",
-          expanded ? "ml-2.5 mr-2.5 flex-1" : "ml-2.5 mr-2.5 flex-shrink-0 w-[396px]",
-          "transition-[width,margin,flex] duration-300 ease-in-out",
+          expanded ? "ml-2.5 mr-2.5 flex-1" : "ml-2.5 mr-2.5 flex-shrink-0 w-[396px] min-w-[396px]",
+          "transition-[width,margin,flex] duration-300 ease-in-out will-change-[width,margin,flex]",
           "max-sm:w-[calc(100vw-20px)] max-sm:h-[calc(100%-20px)]"
         )}
         style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, ${PURPLE} 100%)`, padding: expanded ? "4px" : "3px" }}

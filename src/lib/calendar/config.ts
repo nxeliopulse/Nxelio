@@ -1,6 +1,6 @@
 import "server-only";
 
-export type CalProvider = "google" | "microsoft";
+export type CalProvider = "google" | "microsoft" | "zoho";
 
 export function appUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
@@ -14,6 +14,10 @@ export const calendarConfig = {
   microsoft: {
     clientId: process.env.MS_CALENDAR_CLIENT_ID || "",
     clientSecret: process.env.MS_CALENDAR_CLIENT_SECRET || "",
+  },
+  zoho: {
+    clientId: process.env.ZOHO_CALENDAR_CLIENT_ID || "",
+    clientSecret: process.env.ZOHO_CALENDAR_CLIENT_SECRET || "",
   },
 } as const;
 

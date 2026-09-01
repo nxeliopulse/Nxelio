@@ -25,10 +25,17 @@
     "test:auth-errors": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs",
     "test:subscription-types": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-subscription-types.mjs",
     "test:cancellation-types": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-cancellation-types.mjs",
-    "test:unit": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs scripts/test-subscription-types.mjs scripts/test-cancellation-types.mjs scripts/test-idle-timeout.mjs"
+    "test:stripe-price-mode": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-stripe-price-mode.mjs",
+    "test:unit": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs scripts/test-subscription-types.mjs scripts/test-cancellation-types.mjs scripts/test-idle-timeout.mjs scripts/test-stripe-price-mode.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^9.4.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "@tiptap/extension-font-family": "^3.27.1",

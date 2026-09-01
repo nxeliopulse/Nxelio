@@ -7,6 +7,7 @@ export interface DemoCallPerson {
   name: string;
   emails: string[];
   designation: string | null;
+  is_default: boolean;
   created_at: string;
 }
 
@@ -41,9 +42,21 @@ export async function getDemoCallPeople(): Promise<DemoCallPerson[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("demo_call_people")
-    .select("id, name, emails, designation, created_at")
+    .select("id, name, emails, designation, is_default, created_at")
     .order("created_at", { ascending: true });
   return (data as DemoCallPerson[] | null) ?? [];
+}
+
+/** Toggles whether a person is a default notify recipient. Unlike per-slot
+ *  "live" status, being "default" is not mutually exclusive — several people
+ *  can be marked default at once, and all of them get notified when nobody's
+ *  live for a booked slot. */
+export async function setPersonDefault(id: string, isDefault: boolean): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isPlatformAdmin())) return { ok: false, error: "Forbidden" };
+  const admin = createAdminClient();
+  const { error } = await admin.from("demo_call_people").update({ is_default: isDefault }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function addDemoCallPerson(input: { name: string; emails: string[]; designation?: string }): Promise<{ ok: boolean; error?: string }> {
@@ -202,4 +215,17 @@ export async function getLiveRepForSlot(dateStr: string, timeHHMMSS: string): Pr
     .maybeSingle();
   const person = (assignment as { demo_call_people: unknown } | null)?.demo_call_people as { name: string; emails: string[] | null } | null;
   return person ? { name: person.name, emails: person.emails ?? [] } : null;
+}
+
+/** Everyone marked as a default notify recipient — used to route a newly-
+ *  booked demo's notification when no one is live for the covering slot.
+ *  Not admin-gated: called internally from the public booking flow, never
+ *  exposed to a client directly. */
+export async function getDefaultNotifyRecipients(): Promise<{ name: string; emails: string[] }[]> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("demo_call_people")
+    .select("name, emails")
+    .eq("is_default", true);
+  return ((data as { name: string; emails: string[] | null }[] | null) ?? []).map((p) => ({ name: p.name, emails: p.emails ?? [] }));
 }

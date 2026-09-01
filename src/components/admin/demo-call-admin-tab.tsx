@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import { UserPlus, UserMinus, CalendarPlus, PhoneCall, Loader2, Trash2, Plus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
-  addDemoCallPerson, removeDemoCallPerson, addDemoCallSlot,
+  addDemoCallPerson, removeDemoCallPerson, setPersonDefault, addDemoCallSlot,
   setSlotAssignmentLive, clearSlotAssignmentLive, deleteSlotAssignment,
   getDemoCallPeople, getDemoCallSlots,
   type DemoCallPerson, type DemoCallSlot,
@@ -88,6 +88,13 @@ export function DemoCallAdminTab({ initialPeople, initialSlots }: { initialPeopl
   function handleRemovePerson(id: string) {
     startTransition(async () => {
       const res = await removeDemoCallPerson(id);
+      if (res.ok) await refreshAll();
+    });
+  }
+
+  function handleToggleDefault(id: string, isDefault: boolean) {
+    startTransition(async () => {
+      const res = await setPersonDefault(id, isDefault);
       if (res.ok) await refreshAll();
     });
   }
@@ -184,6 +191,9 @@ export function DemoCallAdminTab({ initialPeople, initialSlots }: { initialPeopl
 
           <div className="px-5 pb-2">
             <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">People ({people.length})</p>
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
+              Default recipients get notified when nobody&apos;s marked live for a booked time slot.
+            </p>
           </div>
           {people.length === 0 ? (
             <p className="px-5 pb-5 text-sm text-slate-400 text-center">No one on the roster yet.</p>
@@ -197,9 +207,21 @@ export function DemoCallAdminTab({ initialPeople, initialSlots }: { initialPeopl
                       {p.emails.join(", ")}{p.designation && ` · ${p.designation}`}
                     </p>
                   </div>
-                  <button onClick={() => handleRemovePerson(p.id)} disabled={pending} className={destructiveButtonClass}>
-                    <UserMinus className="h-3.5 w-3.5" /> Remove
-                  </button>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-500">Default</span>
+                      <Switch
+                        checked={p.is_default}
+                        onChange={(v) => handleToggleDefault(p.id, v)}
+                        disabled={pending}
+                        className={p.is_default ? "bg-[#18A7B8]" : ""}
+                        aria-label={`Mark ${p.name} as a default notify recipient`}
+                      />
+                    </div>
+                    <button onClick={() => handleRemovePerson(p.id)} disabled={pending} className={destructiveButtonClass}>
+                      <UserMinus className="h-3.5 w-3.5" /> Remove
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

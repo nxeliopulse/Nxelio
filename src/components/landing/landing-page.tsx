@@ -48,7 +48,7 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
         className={`w-full max-w-[1380px] pointer-events-auto rounded-full transition-all duration-300 ${
           scrolled
             ? "bg-[#007bfb] border border-blue-400/50 py-3 sm:py-3.5 px-5 sm:px-8 shadow-2xl shadow-blue-950/30 text-white"
-            : "bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white/85 dark:border-white/10 py-3.5 sm:py-4 px-6 sm:px-8 shadow-xl shadow-black/5 text-[#1f2223]"
+            : "bg-white/90 backdrop-blur-xl border border-white/85 py-3.5 sm:py-4 px-6 sm:px-8 shadow-xl shadow-black/5 text-[#1f2223]"
         }`}
       >
         <div className="flex justify-between items-center gap-4 sm:gap-6">
@@ -76,6 +76,13 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
 
               {/* Right: Golden 2-Line Action Button */}
               <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={onBookDemo}
+                  className="hidden sm:inline-flex h-9 sm:h-10 px-4 items-center justify-center rounded-full border border-white/60 text-white text-xs sm:text-sm font-semibold hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  Book a Demo
+                </button>
                 <Link
                   href="/signup"
                   className="inline-flex flex-col items-center justify-center bg-[#fdb813] hover:bg-[#e5a60f] active:scale-95 text-slate-950 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full shadow-lg transition-all text-center leading-tight hover:shadow-amber-500/30 cursor-pointer"
@@ -116,15 +123,22 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
 
               {/* Right: Actions */}
               <div className="flex items-center gap-3 sm:gap-3.5">
+                <button
+                  type="button"
+                  onClick={onBookDemo}
+                  className="hidden sm:inline-flex h-10 px-4 items-center justify-center rounded-full border border-blue-200 bg-white text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  Book a Demo
+                </button>
                 <Link
                   href="/login"
-                  className="hidden sm:inline-flex h-10 px-4 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm"
+                  className="hidden sm:inline-flex h-10 px-4 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap shrink-0"
                 >
                   Log In
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex h-10 sm:h-11 px-5 sm:px-6 items-center justify-center gap-2 rounded-full bg-[#1f2223] text-white text-sm sm:text-[15px] font-semibold hover:bg-black transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-95 cursor-pointer"
+                  className="inline-flex h-10 sm:h-11 px-5 sm:px-6 items-center justify-center gap-2 rounded-full bg-[#1f2223] text-white text-sm sm:text-[15px] font-semibold hover:bg-black transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
                 >
                   <span>Start Free Trial</span>
                   <ArrowRight className="w-4 h-4" />
@@ -286,18 +300,29 @@ function Hero({ onBookDemo }: { onBookDemo: () => void }) {
 
         {/* Big 7-Day Free Trial CTA Button */}
         <div className="mt-8 sm:mt-10 flex flex-col items-center justify-center gap-3">
-          <Link
-            href="/signup"
-            className="group inline-flex items-center gap-3.5 sm:gap-4 rounded-full bg-white hover:bg-slate-50 text-[#1f2223] font-extrabold px-7 sm:px-9 py-4 sm:py-4.5 shadow-2xl shadow-blue-950/20 hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer text-base sm:text-xl border-2 border-white/80"
-          >
-            <span className="flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md group-hover:scale-110 transition-transform">
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-300 text-amber-300 animate-star-twinkle" />
-            </span>
-            <span className="tracking-tight">
-              Start Your 7-Day Free Trial
-            </span>
-            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 group-hover:translate-x-1 transition-transform" />
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+            <Link
+              href="/signup"
+              className="group inline-flex items-center gap-3.5 sm:gap-4 rounded-full bg-white hover:bg-slate-50 text-[#1f2223] font-extrabold px-7 sm:px-9 py-4 sm:py-4.5 shadow-2xl shadow-blue-950/20 hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer text-base sm:text-xl border-2 border-white/80"
+            >
+              <span className="flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md group-hover:scale-110 transition-transform">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-300 text-amber-300 animate-star-twinkle" />
+              </span>
+              <span className="tracking-tight">
+                Start Your 7-Day Free Trial
+              </span>
+              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700 group-hover:translate-x-1 transition-transform" />
+            </Link>
+
+            <button
+              type="button"
+              onClick={onBookDemo}
+              className="group inline-flex items-center gap-2.5 rounded-full border-2 border-white/70 hover:border-white text-white font-bold px-6 sm:px-8 py-4 sm:py-4.5 hover:bg-white/10 active:scale-95 transition-all cursor-pointer text-base sm:text-xl"
+            >
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="tracking-tight">Book a Demo</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-1.5 text-xs sm:text-sm text-blue-100 font-medium">
             <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
@@ -745,15 +770,15 @@ function CapabilitiesSection() {
         </div>
 
         <div className="max-w-4xl mx-auto mb-12 px-2">
-          <div className="flex flex-wrap items-center justify-center gap-2 p-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl sm:rounded-full border border-white/80 dark:border-slate-700/60 shadow-lg">
+          <div className="flex flex-wrap items-center justify-center gap-2 p-2 bg-white/80 backdrop-blur-xl rounded-2xl sm:rounded-full border border-white/80 shadow-lg">
             {capabilities.map((cap, i) => (
               <button
                 key={cap.id}
                 onClick={() => setActiveTab(i)}
                 className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === i
-                    ? "bg-[#1f2223] text-white dark:bg-blue-600 shadow-md scale-102"
-                    : "text-slate-700 dark:text-slate-300 hover:text-black dark:hover:text-white hover:bg-white/70 dark:hover:bg-slate-800"
+                    ? "bg-[#1f2223] text-white shadow-md scale-102"
+                    : "text-slate-700 hover:text-black hover:bg-white/70"
                 }`}
               >
                 {cap.tabTitle}
@@ -1124,132 +1149,27 @@ function PricingSection() {
   );
 }
 
-function TrustSection() {
-  // Styled like customer-quote cards (big quote mark, avatar row, dot
-  // navigation, auto-rotating carousel) on purpose — but the "avatar" is an
-  // icon and the "name" is a category, never a fake person. We have no real
-  // customers to quote yet; faking one would be a false, deceptive statement
-  // placed on a real site visitors act on.
-  const points = [
-    {
-      Icon: Cpu,
-      quote: "Prospecting, enrichment, and outreach copy are powered by OpenAI and Groq — not a scripted demo.",
-      label: "Real AI",
-      sub: "Not hype",
-    },
-    {
-      Icon: ShieldCheck,
-      quote: "Payments are processed by Stripe, the same infrastructure trusted by millions of businesses worldwide.",
-      label: "Secure Billing",
-      sub: "Powered by Stripe",
-    },
-    {
-      Icon: Database,
-      quote: "Authentication, storage, and database security are built on Supabase — audited, encrypted, industry-standard.",
-      label: "Your Data",
-      sub: "Protected by design",
-    },
-    {
-      Icon: RefreshCw,
-      quote: "Start with a 7-day free trial. A credit card is required to begin, but you can cancel, downgrade, or upgrade any time.",
-      label: "No Lock-In",
-      sub: "Cancel anytime",
-    },
-  ];
-
-  const [current, setCurrent] = useState(0);
-  const [paused, setPaused] = useState(false);
-
-  useEffect(() => {
-    if (paused) return;
-    const timer = setInterval(() => setCurrent((c) => (c + 1) % points.length), 5000);
-    return () => clearInterval(timer);
-  }, [paused, points.length]);
-
-  // 3-wide sliding window (matches a real multi-card carousel) that wraps
-  // around, so it always shows `points.length` cards no matter which is active.
-  const visible = [0, 1, 2].map((offset) => points[(current + offset) % points.length]);
-
-  return (
-    <section className="py-24 sm:py-28 bg-transparent">
-      <div className="max-w-[1280px] mx-auto px-5 sm:px-8">
-        <div className="max-w-2xl mx-auto text-center mb-14">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-100 mb-3 bg-white/20 backdrop-blur-sm inline-block px-3 py-1 rounded-full border border-white/25">
-            Built To Be Trusted
-          </p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight">
-            Why teams trust Nxelio Nurture.
-          </h2>
-          <p className="text-base sm:text-lg text-blue-50 mt-4 leading-relaxed">
-            We&apos;re an early-stage product without customer reviews yet — so here&apos;s what&apos;s actually true instead.
-          </p>
-        </div>
-
-        <div
-          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-4xl mx-auto"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-        >
-          {visible.map((p) => (
-            <div
-              key={p.label}
-              className="relative landing-glass-card rounded-2xl p-6 pt-8 flex flex-col shadow-lg transition-opacity duration-500 hover-lift-card"
-            >
-              <span className="absolute -top-4 left-6 w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-lg font-serif shadow-lg shadow-blue-600/30">
-                &ldquo;
-              </span>
-              <p className="text-sm text-slate-700 leading-relaxed mb-6 flex-1">{p.quote}</p>
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                  <p.Icon className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-[#1f2223]">{p.label}</div>
-                  <div className="text-xs text-slate-500">{p.sub}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex justify-center gap-2 mt-10">
-          {points.map((p, i) => (
-            <button
-              key={p.label}
-              onClick={() => setCurrent(i)}
-              className={`w-2.5 h-2.5 rounded-full transition-colors cursor-pointer ${
-                i === current ? "bg-blue-600" : "bg-slate-200 hover:bg-slate-300"
-              }`}
-              aria-label={`Show ${p.label}`}
-            />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function FAQSection() {
   const faqs = [
     {
-      q: "What is Nxelio?",
-      a: "Nxelio is an all-in-one AI Sales and GTM platform. It combines prospect discovery, 15+ provider waterfall contact enrichment, cold email sequence campaigns, visual deal pipeline CRM, calendar meeting scheduling, and newsletter broadcasting into a single unified workspace."
+      q: "What is Nxelio Nurture?",
+      a: "Nxelio Nurture is an all-in-one AI sales platform. It combines prospect discovery, verified contact enrichment, cold email sequence campaigns, a visual deal pipeline, and calendar meeting scheduling into a single unified workspace."
     },
     {
       q: "How does contact enrichment work?",
-      a: "Nxelio queries a waterfall of over 15 verified data providers to find deliverable business emails, direct phone numbers, and company firmographics. This multi-layer lookup ensures high accuracy and prevents emails from bouncing."
+      a: "Nxelio Nurture looks up verified business emails and phone numbers through trusted contact data providers, so you're not guessing or pattern-matching addresses by hand."
     },
     {
       q: "Can I bring my own contact list?",
-      a: "Yes. You can import any CSV file with leads or accounts. Nxelio automatically maps your columns, enriches missing phone numbers or emails, and allows you to instantly enroll them into campaigns or segments."
+      a: "Yes. You can import any CSV file with leads or accounts. Nxelio Nurture automatically maps your columns, enriches missing phone numbers or emails, and allows you to instantly enroll them into campaigns or segments."
     },
     {
       q: "How does the meeting booking feature work?",
-      a: "Nxelio includes a built-in calendar scheduler. You can create public booking pages (e.g. nxelio.com/book/your-name), connect Google Calendar or Microsoft 365 to check real-time availability, and automatically create Zoom video meeting links."
+      a: "Nxelio Nurture includes a built-in calendar scheduler. You can create public booking pages (e.g. nxelio.com/book/your-name), connect Google Calendar or Microsoft/Outlook Calendar to check real-time availability, and automatically create Zoom video meeting links."
     },
     {
       q: "How does the 7-day free trial work?",
-      a: "You get full access to Nxelio for 7 days. You can discover prospects, run campaign sequences, test meeting bookings, and manage your pipeline risk-free. A credit card is required to start, and you can cancel anytime before you're charged."
+      a: "You get full access to Nxelio Nurture for 7 days. You can discover prospects, run campaign sequences, test meeting bookings, and manage your pipeline risk-free. A credit card is required to start, and you can cancel anytime before you're charged."
     }
   ];
 
@@ -1442,7 +1362,6 @@ export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = 
       <IntegrationsSection />
       <PricingSection />
       <TestimonialsBentoSection />
-      <TrustSection />
       <FAQSection />
       <DramaticBottomCTAAndFooter />
 

@@ -4,14 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, AlertCircle, Loader2, KeyRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
-const INPUT = {
-  className: "w-full px-4 py-3 rounded-xl text-sm text-slate-800 placeholder-slate-400 outline-none transition-all",
-  style: {
-    background: "#F3F4F8",
-    border: "1.5px solid transparent",
-  } as React.CSSProperties,
-};
+import { UNDERLINE_INPUT, UNDERLINE_INPUT_STYLE } from "@/components/auth/auth-split-card";
 
 /**
  * The reset link points HERE with ?token_hash=...&type=recovery (not straight
@@ -70,66 +63,73 @@ function ResetPasswordForm() {
 
   return (
     <div>
-      <div className="flex justify-center mb-6">
-        <div className="h-16 w-16 rounded-2xl flex items-center justify-center"
-          style={{ background: "linear-gradient(135deg,rgba(24,167,184,.18),rgba(126,87,194,.18))", border: "1.5px solid rgba(24,167,184,.3)" }}>
-          <KeyRound className="h-7 w-7" style={{ color: "#4dd6e5" }} />
+      <div className="mb-6">
+        <div className="h-12 w-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4 text-blue-600">
+          <KeyRound className="h-6 w-6" />
         </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
+          Choose a new password
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+          Enter a new password for your account below.
+        </p>
       </div>
-
-      <h1 className="text-2xl font-black text-slate-900 mb-2 text-center">Choose a new password</h1>
-      <p className="text-sm mb-8 text-center text-slate-500">
-        Enter a new password for your account below.
-      </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="flex items-start gap-2 rounded-xl p-3 text-sm"
-            style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
+          <div className="flex items-start gap-2 rounded-xl p-3 text-xs sm:text-sm bg-red-50 border border-red-200 text-red-700">
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="relative">
-          <input
-            type={showPass ? "text" : "password"}
-            placeholder="New password *"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoFocus
-            {...INPUT}
-            style={{ ...INPUT.style, paddingRight: "2.75rem" }}
-            onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.25)"; }}
-            onBlur={(e) => { e.currentTarget.style.boxShadow = "none"; }}
-          />
-          <button type="button" onClick={() => setShowPass(!showPass)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors text-slate-400 hover:text-slate-600">
-            {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">New password</label>
+          <div className="relative">
+            <input
+              type={showPass ? "text" : "password"}
+              placeholder="Enter new password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+              className={UNDERLINE_INPUT}
+              style={UNDERLINE_INPUT_STYLE}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass(!showPass)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
 
-        <input
-          type={showPass ? "text" : "password"}
-          placeholder="Confirm new password *"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          {...INPUT}
-          onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 3px rgba(24,167,184,.25)"; }}
-          onBlur={(e) => { e.currentTarget.style.boxShadow = "none"; }}
-        />
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">Confirm new password</label>
+          <input
+            type={showPass ? "text" : "password"}
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className={UNDERLINE_INPUT}
+            style={UNDERLINE_INPUT_STYLE}
+          />
+        </div>
 
-        <button type="submit" disabled={!valid || submitting}
-          className="w-full py-3.5 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          style={{ background: "linear-gradient(135deg,#18A7B8,#7E57C2)", boxShadow: "0 4px 20px rgba(24,167,184,.3)" }}>
+        <button
+          type="submit"
+          disabled={!valid || submitting}
+          className="w-full py-3.5 px-6 rounded-full text-sm font-bold text-white bg-blue-500 hover:bg-blue-400 active:scale-[0.99] transition-all shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer mt-2"
+        >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {submitting ? "Updating…" : "Reset password"}
         </button>
       </form>
 
-      <p className="text-center text-sm pt-6 text-slate-500">
+      <p className="text-center text-xs text-slate-500 font-medium pt-5">
         Link expired or not working?{" "}
-        <Link href="/forgot-password" className="font-bold hover:underline" style={{ color: "#18A7B8" }}>
+        <Link href="/forgot-password" className="font-bold text-blue-600 hover:text-blue-500 hover:underline">
           Request a new one
         </Link>
       </p>

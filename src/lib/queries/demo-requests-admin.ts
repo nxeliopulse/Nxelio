@@ -9,6 +9,7 @@ export interface DemoRequestRow {
   full_name: string;
   business_email: string;
   phone: string;
+  company_name: string | null;
   industry: string;
   employee_count: string;
   monthly_revenue: string;
@@ -18,6 +19,7 @@ export interface DemoRequestRow {
   requested_time: string;
   meeting_start_at: string;
   join_url: string | null;
+  calendar_provider: string | null;
   status: DemoRequestStatus;
   created_at: string;
 }
@@ -28,7 +30,7 @@ export async function getDemoRequests(): Promise<DemoRequestRow[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("demo_requests")
-    .select("id, full_name, business_email, phone, industry, employee_count, monthly_revenue, purpose, referral_source, requested_date, requested_time, meeting_start_at, join_url, status, created_at")
+    .select("id, full_name, business_email, phone, company_name, industry, employee_count, monthly_revenue, purpose, referral_source, requested_date, requested_time, meeting_start_at, join_url, calendar_provider, status, created_at")
     .order("created_at", { ascending: false });
   return (data as DemoRequestRow[] | null) ?? [];
 }

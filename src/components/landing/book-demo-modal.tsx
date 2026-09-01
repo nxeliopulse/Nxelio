@@ -22,7 +22,7 @@ const COMMON_TIMEZONES = [
 ];
 
 const EMPTY_DETAILS = {
-  fullName: "", businessEmail: "", phone: "", industry: "",
+  fullName: "", businessEmail: "", phone: "", companyName: "", industry: "",
   employeeCount: "", monthlyRevenue: "", purpose: "", referralSource: "",
 };
 
@@ -91,17 +91,17 @@ function zonedWallTimeToDate(y: number, m: number, d: number, hh: number, mm: nu
   return new Date(guess.getTime() - offsetMin * 60000);
 }
 
-/** Half-hour slots within business hours, computed in `tz` (not the visitor's
- *  own local time) so switching the timezone selector actually moves the
- *  bookable window instead of just relabeling the same local times. */
+/** Slots spaced MEETING_DURATION_MIN apart within business hours, computed in
+ *  `tz` (not the visitor's own local time) so switching the timezone selector
+ *  actually moves the bookable window instead of just relabeling the same
+ *  local times. */
 function timeSlotsFor(day: Date, tz: string): Date[] {
   const slots: Date[] = [];
   const y = day.getFullYear(), m = day.getMonth(), d = day.getDate();
-  for (let h = WORK_START_HOUR; h < WORK_END_HOUR; h++) {
-    for (const mins of [0, 30]) {
-      const s = zonedWallTimeToDate(y, m, d, h, mins, tz);
-      if (s.getTime() > Date.now()) slots.push(s);
-    }
+  const dayStart = zonedWallTimeToDate(y, m, d, WORK_START_HOUR, 0, tz);
+  const dayEnd = zonedWallTimeToDate(y, m, d, WORK_END_HOUR, 0, tz);
+  for (let t = dayStart.getTime(); t < dayEnd.getTime(); t += MEETING_DURATION_MIN * 60000) {
+    if (t > Date.now()) slots.push(new Date(t));
   }
   return slots;
 }
@@ -268,6 +268,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
         ...details,
         purpose: purposeWithGuests,
         phone: formatPhoneForStorage(details.phone, phoneCountry),
+        companyName: details.companyName.trim(),
         date: `${y}-${m}-${d}`,
         hour, minute, meridiem,
       });
@@ -372,6 +373,11 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
               <div className="max-w-xs">
                 <label className={labelClass}>Phone number</label>
                 <PhoneInput label="" country={phoneCountry} value={details.phone} onCountryChange={setPhoneCountry} onValueChange={(v) => setDetails({ ...details, phone: v })} inputClassName={inputClass} />
+              </div>
+
+              <div className="max-w-xs">
+                <label htmlFor="demo-company-name" className={labelClass}>Company name</label>
+                <input id="demo-company-name" value={details.companyName} onChange={(e) => setDetails({ ...details, companyName: e.target.value })} placeholder="Acme Inc." className={inputClass} />
               </div>
 
               {/* Add guests — a real Calendly option on its details step: invite

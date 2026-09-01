@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { CalendarClock, Video, Mail, Phone, ExternalLink } from "lucide-react";
+import { CalendarClock, Video, Mail, Phone, ExternalLink, Building2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { updateDemoRequestStatus, type DemoRequestRow, type DemoRequestStatus } from "@/lib/queries/demo-requests-admin";
 
 const STATUS_STYLE: Record<DemoRequestStatus, string> = {
@@ -85,12 +85,21 @@ export function DemoRequestsTab({ rows }: { rows: DemoRequestRow[] }) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-slate-900 dark:text-white">{r.full_name}</span>
+                    {r.company_name && (
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-500 flex items-center gap-1">
+                        <Building2 className="h-3 w-3" /> {r.company_name}
+                      </span>
+                    )}
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${STATUS_STYLE[r.status]}`}>{STATUS_LABEL[r.status]}</span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap">
                     <Mail className="h-3 w-3" /> {r.business_email}
-                    <span className="mx-1 text-slate-300 dark:text-slate-700">·</span>
-                    <Phone className="h-3 w-3" /> {r.phone}
+                    {r.phone && (
+                      <>
+                        <span className="mx-1 text-slate-300 dark:text-slate-700">·</span>
+                        <Phone className="h-3 w-3" /> {r.phone}
+                      </>
+                    )}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
                     {r.industry} · {r.employee_count} employees · {r.monthly_revenue}/mo
@@ -106,6 +115,15 @@ export function DemoRequestsTab({ rows }: { rows: DemoRequestRow[] }) {
                       </a>
                     )}
                   </p>
+                  {r.calendar_provider ? (
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Added to {r.calendar_provider} calendar
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> No calendar connected — connect one in Settings to auto-add future bookings
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-shrink-0">

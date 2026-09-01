@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
 import {
-  CreditCard, Check, Zap, Star, Shield,
+  Check, Zap, Star, Shield,
   Mail, BarChart2, Users, Calendar, Link,
-  ChevronRight, Loader2,
+  Loader2,
 } from "lucide-react";
 import { PlanTermsModal } from "@/components/billing/plan-terms-modal";
 
@@ -55,8 +55,6 @@ const PLANS: {
     features: [
       "Everything in Basic",
       "Automated lead discovery",
-      "1,000 AI-discovered leads / month",
-      "700 AI credits / month",
     ],
   },
   {
@@ -70,8 +68,6 @@ const PLANS: {
     icon: <Shield size={16} />,
     features: [
       "Everything in Starter",
-      "2,000 AI-discovered leads / month",
-      "1,500 AI credits / month",
       "Priority support",
     ],
   },
@@ -128,47 +124,63 @@ export function SubscriptionGate() {
   }
 
   const selectedPlan = PLANS.find(p => p.id === selected)!;
-  const price = interval === "annual" ? selectedPlan.annual : selectedPlan.monthly;
+
+  function chooseAndProceed(planId: PlanId) {
+    setSelected(planId);
+    setTermsOpen(true);
+  }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
-      style={{ background: "linear-gradient(135deg, #0a0f1e 0%, #0d1224 50%, #0a0f1e 100%)" }}>
+    <div className="relative h-screen overflow-y-auto flex flex-col items-center justify-center px-4 py-4"
+      style={{ background: "linear-gradient(180deg, #0a3fd1 0%, #0e5fdb 35%, #139be8 70%, #17c8f5 100%)" }}>
 
-      {/* Background glow */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-80 w-80 rounded-full opacity-20"
-          style={{ background: "radial-gradient(circle, #06B6D4, transparent)" }} />
-        <div className="absolute bottom-0 right-1/4 h-60 w-60 rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, #8B5CF6, transparent)" }} />
+      {/* Decorative giant background wordmark, like a faint watermark behind the heading */}
+      <div className="pointer-events-none fixed inset-x-0 top-2 flex justify-center overflow-hidden select-none" aria-hidden>
+        <span
+          className="font-black tracking-tight whitespace-nowrap"
+          style={{
+            fontSize: "clamp(70px, 16vw, 200px)",
+            lineHeight: 1,
+            background: "linear-gradient(135deg,#06B6D4,#8B5CF6)",
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+            color: "transparent",
+            opacity: 0.16,
+            filter: "blur(1px)",
+          }}
+        >
+          PRICING
+        </span>
       </div>
 
       {/* Logo */}
-      <div className="mb-8 flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl"
+      <div className="relative z-10 mb-3 flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl"
           style={{ background: "linear-gradient(135deg,#06B6D4,#8B5CF6)" }}>
-          <BarChart2 size={18} className="text-white" />
+          <BarChart2 size={16} className="text-white" />
         </div>
-        <span className="text-xl font-black text-white tracking-tight">Nxelio Nurture</span>
+        <span className="text-lg font-black text-white tracking-tight">Nxelio Nurture</span>
       </div>
 
       {/* Heading */}
-      <div className="mb-2 text-center">
-        <h1 className="text-3xl font-black text-white mb-3">Choose your plan</h1>
-        <p className="text-sm max-w-sm mx-auto" style={{ color: "rgba(255,255,255,.45)" }}>
+      <div className="relative z-10 mb-1 text-center">
+        <h1 className="text-2xl font-black text-white mb-1.5">Choose your plan</h1>
+        <p className="text-xs max-w-sm mx-auto" style={{ color: "rgba(255,255,255,.75)" }}>
           Add a payment method to activate your workspace. No charge during your trial.
         </p>
       </div>
 
       {/* Billing toggle */}
-      <div className="mt-6 mb-8 flex items-center gap-3">
-        <span className={`text-sm font-medium transition-colors ${interval === "monthly" ? "text-white" : "text-white/40"}`}>Monthly</span>
+      <div className="relative z-10 mt-3 mb-5 flex items-center gap-3">
+        <span className={`text-sm font-medium transition-colors ${interval === "monthly" ? "text-white" : "text-white/60"}`}>Monthly</span>
         <button
           onClick={() => setInterval(i => i === "monthly" ? "annual" : "monthly")}
           className="relative h-6 w-12 flex-shrink-0 rounded-full transition-colors"
-          style={{ background: interval === "annual" ? "linear-gradient(135deg,#06B6D4,#8B5CF6)" : "rgba(255,255,255,.12)" }}>
-          <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${interval === "annual" ? "translate-x-6" : "translate-x-0"}`} />
+          style={{ background: interval === "annual" ? "rgba(255,255,255,.9)" : "rgba(255,255,255,.12)" }}>
+          <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full shadow-sm transition-transform"
+            style={{ background: interval === "annual" ? "#05070d" : "#ffffff", transform: interval === "annual" ? "translateX(1.5rem)" : "translateX(0)" }} />
         </button>
-        <span className={`text-sm font-medium transition-colors ${interval === "annual" ? "text-white" : "text-white/40"}`}>Annual</span>
+        <span className={`text-sm font-medium transition-colors ${interval === "annual" ? "text-white" : "text-white/60"}`}>Annual</span>
         {interval === "annual" && (
           <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
             style={{ background: "rgba(6,182,212,.2)", border: "1px solid rgba(6,182,212,.4)" }}>
@@ -178,19 +190,20 @@ export function SubscriptionGate() {
       </div>
 
       {/* Plan cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 w-full max-w-3xl mb-8">
+      <div className="relative z-10 grid grid-cols-1 gap-5 sm:grid-cols-3 w-full max-w-5xl mb-4">
         {PLANS.map(plan => {
-          const isSelected = selected === plan.id;
+          const featured = Boolean(plan.badge);
           const displayPrice = interval === "annual" ? plan.annual : plan.monthly;
           return (
-            <button
+            <div
               key={plan.id}
-              onClick={() => setSelected(plan.id)}
-              className="relative rounded-2xl p-5 text-left transition-all"
+              className="relative rounded-3xl p-5 flex flex-col backdrop-blur-md"
               style={{
-                border: isSelected ? `1.5px solid ${plan.color}66` : "1.5px solid rgba(255,255,255,.08)",
-                background: isSelected ? `${plan.color}0e` : "rgba(255,255,255,.03)",
-                boxShadow: isSelected ? `0 0 24px ${plan.color}22` : "none",
+                border: featured ? `1.5px solid ${plan.color}88` : "1.5px solid rgba(255,255,255,.18)",
+                background: featured
+                  ? `linear-gradient(160deg, ${plan.color}40 0%, rgba(3,8,22,.72) 60%)`
+                  : "rgba(3,8,22,.6)",
+                boxShadow: featured ? `0 8px 32px ${plan.color}3d, 0 0 0 1px rgba(0,0,0,.2)` : "0 8px 24px rgba(0,0,0,.25)",
               }}>
 
               {plan.badge && (
@@ -200,52 +213,55 @@ export function SubscriptionGate() {
                 </div>
               )}
 
-              {/* Selection ring */}
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl"
-                  style={{ background: `${plan.color}22`, color: plan.color }}>
-                  {plan.icon}
-                </div>
-                <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all`}
-                  style={{
-                    borderColor: isSelected ? plan.color : "rgba(255,255,255,.2)",
-                    background: isSelected ? plan.color : "transparent",
-                  }}>
-                  {isSelected && <Check size={11} className="text-white" strokeWidth={3} />}
-                </div>
+              <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-xl"
+                style={{ background: `${plan.color}22`, color: plan.color }}>
+                {plan.icon}
               </div>
 
-              <p className="font-bold text-white mb-0.5">{plan.name}</p>
-              {plan.trial && interval === "monthly" && (
+              <p className="font-bold text-white mb-0.5 text-base">{plan.name}</p>
+              {plan.trial && interval === "monthly" ? (
                 <p className="text-[11px] mb-2" style={{ color: plan.color }}>{plan.trial}</p>
+              ) : (
+                <p className="text-[11px] mb-2" style={{ color: "rgba(255,255,255,.6)" }}>&nbsp;</p>
               )}
 
               <div className="mb-1">
                 <span className="text-2xl font-black text-white">${displayPrice.toFixed(displayPrice % 1 === 0 ? 0 : 2)}</span>
-                <span className="text-xs ml-1" style={{ color: "rgba(255,255,255,.35)" }}>/mo</span>
+                <span className="text-xs ml-1" style={{ color: "rgba(255,255,255,.55)" }}>/mo</span>
               </div>
-              <div className="mb-4 flex flex-col gap-0.5">
-                <span className="text-[11px]" style={{ color: "rgba(255,255,255,.4)" }}>{plan.credits.toLocaleString()} AI credits / mo</span>
+              <div className="mb-3 flex flex-col gap-0.5">
+                <span className="text-[11px]" style={{ color: "rgba(255,255,255,.65)" }}>{plan.credits.toLocaleString()} AI credits / mo</span>
                 {plan.leads > 0 && (
-                  <span className="text-[11px]" style={{ color: "rgba(255,255,255,.4)" }}>{plan.leads.toLocaleString()} AI-discovered leads / mo</span>
+                  <span className="text-[11px]" style={{ color: "rgba(255,255,255,.65)" }}>{plan.leads.toLocaleString()} AI-discovered leads / mo</span>
                 )}
               </div>
 
-              <ul className="space-y-1.5">
+              <ul className="space-y-1.5 mb-5">
                 {plan.features.map((f, i) => (
-                  <li key={i} className="flex items-start gap-1.5 text-[12px]" style={{ color: "rgba(255,255,255,.6)" }}>
-                    <Check size={11} className="mt-0.5 shrink-0" style={{ color: plan.color }} />
+                  <li key={i} className="flex items-center gap-2 text-[12px]" style={{ color: "rgba(255,255,255,.85)" }}>
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,.15)" }}>
+                      <Check size={10} style={{ color: plan.color }} strokeWidth={3} />
+                    </span>
                     {f}
                   </li>
                 ))}
               </ul>
-            </button>
+
+              <button
+                type="button"
+                onClick={() => chooseAndProceed(plan.id)}
+                disabled={pending}
+                className="mt-auto w-full py-2.5 rounded-full text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "#ffffff", color: "#05070d" }}>
+                {plan.trial && interval === "monthly" ? "Start free trial" : "Choose Plan"}
+              </button>
+            </div>
           );
         })}
       </div>
 
       {/* Promo code */}
-      <div className="w-full max-w-sm mb-4">
+      <div className="relative z-10 w-full max-w-sm mb-2">
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -253,51 +269,35 @@ export function SubscriptionGate() {
             onChange={e => { setPromoCode(e.target.value); setPromoResult(null); }}
             onKeyDown={e => e.key === "Enter" && applyPromo()}
             placeholder="Promo code (optional)"
-            className="flex-1 px-3.5 py-2.5 rounded-xl text-sm text-white placeholder-white/30 outline-none transition-all"
-            style={{ background: "rgba(255,255,255,.06)", border: "1.5px solid rgba(255,255,255,.1)" }}
+            className="flex-1 px-3.5 py-2 rounded-xl text-sm text-white placeholder-white/50 outline-none transition-all"
+            style={{ background: "rgba(3,8,22,.55)", border: "1.5px solid rgba(255,255,255,.22)" }}
           />
           <button
             onClick={applyPromo}
             disabled={promoChecking || !promoCode.trim()}
-            className="px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
-            style={{ background: "rgba(255,255,255,.08)", border: "1.5px solid rgba(255,255,255,.12)" }}>
+            className="px-4 py-2 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
+            style={{ background: "rgba(3,8,22,.55)", border: "1.5px solid rgba(255,255,255,.25)" }}>
             {promoChecking ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
           </button>
         </div>
         {promoResult && (
-          <p className="mt-2 text-xs px-3.5" style={{ color: promoResult.ok ? "#34D399" : "#f87171" }}>
+          <p className="mt-1.5 text-xs px-3.5" style={{ color: promoResult.ok ? "#34D399" : "#f87171" }}>
             {promoResult.ok ? (promoResult.description || "Code applied!") : promoResult.error}
           </p>
         )}
-      </div>
-
-      {/* CTA */}
-      <div className="w-full max-w-sm space-y-3">
-        <button
-          onClick={() => setTermsOpen(true)}
-          disabled={pending}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ background: `linear-gradient(135deg,${selectedPlan.color},${selectedPlan.color}99)`, boxShadow: `0 4px 20px ${selectedPlan.color}44` }}>
-          {pending
-            ? <><Loader2 size={16} className="animate-spin" /> Redirecting to checkout…</>
-            : <><CreditCard size={16} /> {selectedPlan.trial && interval === "monthly" ? `Start ${selectedPlan.trial}` : `Subscribe to ${selectedPlan.name}`} <ChevronRight size={15} /></>
-          }
-        </button>
-
         {error && (
-          <p className="text-center text-xs rounded-xl px-4 py-2.5"
+          <p className="mt-1.5 text-center text-xs rounded-xl px-4 py-2"
             style={{ background: "rgba(244,63,94,.1)", border: "1px solid rgba(244,63,94,.3)", color: "#f87171" }}>
             {error}
           </p>
         )}
-
-        <p className="text-center text-[11px]" style={{ color: "rgba(255,255,255,.25)" }}>
+        <p className="mt-2 text-center text-[11px]" style={{ color: "rgba(255,255,255,.6)" }}>
           Secured by Stripe · Cancel anytime{selectedPlan.trial && interval === "monthly" ? " · No charge during trial" : ""}
         </p>
       </div>
 
       {/* Trust badges */}
-      <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
+      <div className="relative z-10 mt-2 flex flex-wrap items-center justify-center gap-5">
         {[
           { icon: <Shield size={13} />, label: "SOC 2-ready" },
           { icon: <Users size={13} />, label: "GDPR compliant" },
@@ -305,8 +305,8 @@ export function SubscriptionGate() {
           { icon: <Link size={13} />, label: "LinkedIn + email" },
           { icon: <Calendar size={13} />, label: "Cancel anytime" },
         ].map((b, i) => (
-          <span key={i} className="flex items-center gap-1.5 text-[11px]" style={{ color: "rgba(255,255,255,.25)" }}>
-            <span style={{ color: "rgba(255,255,255,.35)" }}>{b.icon}</span>
+          <span key={i} className="flex items-center gap-1.5 text-[11px]" style={{ color: "rgba(255,255,255,.55)" }}>
+            <span style={{ color: "rgba(255,255,255,.65)" }}>{b.icon}</span>
             {b.label}
           </span>
         ))}

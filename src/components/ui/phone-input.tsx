@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { getCountries, getCountryCallingCode, getExampleNumber, isValidPhoneNumber, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
 import examples from "libphonenumber-js/examples.mobile.json";
@@ -68,26 +69,70 @@ function examplePlaceholder(country: CountryCode): string {
 /** Flag button + searchable country list, opened as a floating panel — the calling-code
  *  equivalent of a native <select> but with flags and search, since a plain <select>
  *  can't render a flag glyph next to each option. */
+interface DropdownCoords {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  maxListHeight: number;
+}
+
 function CountryDropdown({ country, onChange }: { country: CountryCode; onChange: (c: CountryCode) => void }) {
   const countries = useMemo(() => countryList(), []);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [coords, setCoords] = useState<DropdownCoords | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Positioned via a portal (fixed coords from the trigger's own bounding
+  // rect) rather than absolute-inside-rootRef — this field usually sits in a
+  // scrollable form column, and an absolutely positioned panel gets clipped
+  // by that ancestor's overflow, which is what made the list look cut off /
+  // overlapping instead of floating cleanly above the rest of the page.
+  function updateCoords() {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const margin = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const openUpward = spaceBelow < 180 && spaceAbove > spaceBelow;
+    setCoords({
+      left: rect.left,
+      width: Math.max(rect.width, 256),
+      ...(openUpward
+        ? { bottom: window.innerHeight - rect.top + 4, maxListHeight: Math.max(120, Math.min(256, spaceAbove - 56)) }
+        : { top: rect.bottom + 4, maxListHeight: Math.max(120, Math.min(256, spaceBelow - 56)) }),
+    });
+  }
 
   useEffect(() => {
     if (!open) return;
     function onOutside(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
     }
+    function onReposition() { updateCoords(); }
     document.addEventListener("mousedown", onOutside);
-    return () => document.removeEventListener("mousedown", onOutside);
+    window.addEventListener("scroll", onReposition, true);
+    window.addEventListener("resize", onReposition);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      window.removeEventListener("scroll", onReposition, true);
+      window.removeEventListener("resize", onReposition);
+    };
   }, [open]);
 
   function toggleOpen() {
     setOpen((v) => {
       const next = !v;
-      if (next) { setQuery(""); requestAnimationFrame(() => searchRef.current?.focus()); }
+      if (next) {
+        setQuery("");
+        updateCoords();
+        requestAnimationFrame(() => searchRef.current?.focus());
+      }
       return next;
     });
   }
@@ -110,8 +155,12 @@ function CountryDropdown({ country, onChange }: { country: CountryCode; onChange
         <CountryFlag code={current?.code} className="h-3.5 w-5" />
         <ChevronDown className="h-3 w-3 text-slate-400" />
       </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-64 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[var(--card)] shadow-lg overflow-hidden">
+      {open && coords && typeof document !== "undefined" && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[100] rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[var(--card)] shadow-lg overflow-hidden"
+          style={{ left: coords.left, width: coords.width, top: coords.top, bottom: coords.bottom }}
+        >
           <div className="p-2 border-b border-slate-100 dark:border-slate-800">
             <input
               ref={searchRef}
@@ -121,7 +170,7 @@ function CountryDropdown({ country, onChange }: { country: CountryCode; onChange
               className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[var(--muted)] dark:text-slate-900 px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-[var(--primary)]/35 focus:border-[var(--primary)]"
             />
           </div>
-          <div className="max-h-64 overflow-y-auto">
+          <div className="overflow-y-auto" style={{ maxHeight: coords.maxListHeight }}>
             {filtered.length === 0 ? (
               <p className="px-3 py-4 text-sm text-slate-400 text-center">No matches</p>
             ) : (
@@ -142,7 +191,8 @@ function CountryDropdown({ country, onChange }: { country: CountryCode; onChange
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

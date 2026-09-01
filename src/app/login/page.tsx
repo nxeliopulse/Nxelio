@@ -110,28 +110,21 @@ function LoginForm() {
 
   return (
     <AuthSplitCard
-      pageLabel="Sign In"
-      heading={["Welcome back to Nxelio Nurture.", "Sign in to see the latest updates."]}
-      subheading="Enter your details to proceed further"
-      illustration={
-        <img
-          src="/login-illustration.svg"
-          alt="Sign in illustration"
-          className="w-full h-auto"
-        />
-      }
+      heading="Welcome Back"
+      subheading="Please log in to your account to continue."
+      activeAuthTab="login"
+      leftEyebrow="You can easily"
+      leftTitle="Speed up your work with our Web App"
     >
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
-          <div role="alert" className="flex items-start gap-2 rounded-lg p-3 text-sm"
-            style={{ background: "rgba(244,81,30,.08)", border: "1.5px solid rgba(244,81,30,.25)", color: "#c2410c" }}>
+          <div role="alert" className="flex items-start gap-2.5 rounded-xl p-3.5 text-sm bg-red-50 border border-red-100 text-red-600">
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{error}{lockedUntil ? ` (${lockSecondsLeft}s)` : ""}</span>
           </div>
         )}
         {notice && (
-          <div className="flex items-start gap-2 rounded-lg p-3 text-sm"
-            style={{ background: "rgba(79,95,239,.08)", border: "1.5px solid rgba(79,95,239,.25)", color: "#3D4FEA" }}>
+          <div className="flex items-start gap-2.5 rounded-xl p-3.5 text-sm bg-blue-50 border border-blue-100 text-blue-600">
             <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{notice}</span>
           </div>
@@ -142,7 +135,7 @@ function LoginForm() {
           <div className="relative">
             <input
               type="email"
-              placeholder="john.doe@gmail.com"
+              placeholder="enter your email"
               value={form.email}
               maxLength={254}
               onChange={(e) => { setForm({ ...form, email: e.target.value }); setFieldErrors((f) => ({ ...f, email: undefined })); }}
@@ -152,7 +145,7 @@ function LoginForm() {
               onFocus={authInputFocus}
               aria-invalid={!!fieldErrors.email}
             />
-            <Mail className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+            <Mail className="h-4 w-4 absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
           {fieldErrors.email && <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
         </div>
@@ -174,18 +167,18 @@ function LoginForm() {
             />
             <button type="button" onClick={() => setShowPass(!showPass)}
               aria-label={showPass ? "Hide password" : "Show password"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
               {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
           {fieldErrors.password && <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>}
         </div>
 
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center justify-between pt-0.5">
           <RadioToggle checked={rememberMe} onChange={setRememberMe} label="Remember me" />
           <Link
             href={`/forgot-password${form.email.includes("@") ? `?email=${encodeURIComponent(form.email)}` : ""}`}
-            className="text-xs font-semibold text-indigo-600 hover:underline"
+            className="text-sm font-medium text-blue-600 hover:text-blue-500 hover:underline"
           >
             Recover password
           </Link>
@@ -199,11 +192,9 @@ function LoginForm() {
             switchLabel="Sign Up"
             switchLoading={signUpLoading}
             onSwitchClick={() => setSignUpLoading(true)}
-          />
-        </div>
-
-        <div className="pt-2">
-          <OAuthButtons label="sign in with" />
+          >
+            <OAuthButtons label="OR" />
+          </AuthButtonRow>
         </div>
       </form>
     </AuthSplitCard>

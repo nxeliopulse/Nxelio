@@ -43,11 +43,11 @@ export function OAuthButtons({ label = "or" }: OAuthButtonsProps) {
   }
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-4">
       {/* Divider */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 mt-2">
         <div className="flex-1 h-px bg-slate-200" />
-        <span className="text-xs font-medium text-slate-400">{label}</span>
+        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">{label}</span>
         <div className="flex-1 h-px bg-slate-200" />
       </div>
 
@@ -55,18 +55,16 @@ export function OAuthButtons({ label = "or" }: OAuthButtonsProps) {
         type="button"
         disabled={!!loadingProvider}
         onClick={() => signInWith("google")}
-        className="w-full flex items-center justify-center gap-2.5 h-10 rounded-lg text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-        style={{ background: "white", border: "1.5px solid #E2E8F0" }}
+        className="w-full flex items-center justify-center gap-2.5 h-11 rounded-full text-sm font-semibold text-slate-900 transition-all bg-transparent border border-slate-200 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 cursor-pointer"
       >
         {loadingProvider === "google"
           ? <span className="h-4 w-4 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
           : <GoogleIcon />}
-        Continue with Google
+        <span>Login with Google</span>
       </button>
 
       {error && (
-        <p className="text-center text-xs rounded-xl px-3 py-2"
-          style={{ background: "rgba(244,81,30,.1)", border: "1px solid rgba(244,81,30,.3)", color: "#ff8a65" }}>
+        <p className="text-center text-xs rounded-xl px-3 py-2 bg-red-50 text-red-600 border border-red-100 mt-2">
           {error}
         </p>
       )}
