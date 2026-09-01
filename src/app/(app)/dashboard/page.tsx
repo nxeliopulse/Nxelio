@@ -23,10 +23,28 @@ export default async function DashboardPage() {
     getSetupTaskStates(),
   ]);
 
-  const { count: outreachCount } = await supabase
-    .from("outreach_accounts")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "connected");
+  // Counted per channel, not across the whole table. A single unfiltered
+  // "any connected outreach account" count meant connecting LinkedIn also
+  // marked the mailbox as connected, so the dashboard's "Connect your email"
+  // setup task vanished without an inbox ever being linked.
+  //
+  // Both deliberately fail CLOSED: `count` is null on a query error, so `|| 0`
+  // leaves the task visible. The equivalent helpers in outreach-accounts.ts
+  // (hasConnectedMailbox) fail OPEN instead, which is right for the onboarding
+  // gate — never lock someone out — but wrong here, where failing open would
+  // tell a person setup was finished when it wasn't.
+  const [{ count: emailAccountCount }, { count: linkedinAccountCount }] = await Promise.all([
+    supabase
+      .from("outreach_accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("channel", "email")
+      .eq("status", "connected"),
+    supabase
+      .from("outreach_accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("channel", "linkedin")
+      .eq("status", "connected"),
+  ]);
 
   const { data: recentDeals } = await supabase
     .from("opportunities")
@@ -36,7 +54,8 @@ export default async function DashboardPage() {
 
   const onboardingStatus = {
     essentialsDone,
-    inboxConnected: (outreachCount || 0) > 0,
+    inboxConnected: (emailAccountCount || 0) > 0,
+    linkedinConnected: (linkedinAccountCount || 0) > 0,
     calendarConnected: calendarAccounts.some((a) => a.status === "connected"),
     goals: onboardingData?.goals ?? [],
     userName: onboardingData?.company_name ?? "",

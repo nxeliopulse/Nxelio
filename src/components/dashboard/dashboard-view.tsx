@@ -760,6 +760,14 @@ function buildSetupTasks(
       done: Boolean(onboardingStatus?.inboxConnected),
     },
     {
+      id: "connect-linkedin",
+      title: "Connect your LinkedIn",
+      description: "Link LinkedIn to send connection requests and messages alongside email.",
+      actionLabel: "Connect",
+      onAction: () => go("/settings?section=linkedin"),
+      done: Boolean(onboardingStatus?.linkedinConnected),
+    },
+    {
       id: "connect-calendar",
       title: "Connect your calendar",
       description: "Sync your calendar so meetings booked with leads show up automatically.",
@@ -1141,6 +1149,7 @@ function WelcomeBanner({ planId = "basic" }: { planId?: string }) {
 interface OnboardingStatus {
   essentialsDone: boolean;
   inboxConnected: boolean;
+  linkedinConnected: boolean;
   calendarConnected: boolean;
   goals: string[];
   userName: string;

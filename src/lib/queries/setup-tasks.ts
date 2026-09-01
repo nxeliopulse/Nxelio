@@ -29,6 +29,7 @@ export type SetupTaskState = "accepted" | "dismissed";
  *  database. Ids must match those built in dashboard-view.tsx. */
 const SETUP_TASK_META: Record<string, { title: string; ctaLabel: string; ctaHref: string }> = {
   "connect-email": { title: "Connect your email", ctaLabel: "Connect", ctaHref: "/settings?section=email" },
+  "connect-linkedin": { title: "Connect your LinkedIn", ctaLabel: "Connect", ctaHref: "/settings?section=linkedin" },
   "connect-calendar": { title: "Connect your calendar", ctaLabel: "Connect", ctaHref: "/settings?section=calendar" },
   "import-leads": { title: "Import your leads", ctaLabel: "Import", ctaHref: "/leads" },
   "invite-team": { title: "Invite your team", ctaLabel: "Invite", ctaHref: "/users" },
