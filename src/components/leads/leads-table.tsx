@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect, useOptimistic } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, Trash2, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, XCircle, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, Flame, MailCheck, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, Flame, MailCheck, type LucideIcon } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,8 +11,6 @@ import { useFeedback } from "@/components/ui/feedback";
 import { cn, formatDate, formatDateTime, toAbsoluteUrl } from "@/lib/utils";
 import { industries as FALLBACK_INDUSTRIES, interestAreas as FALLBACK_INTEREST_AREAS } from "@/lib/mock-data";
 import { getPicklistValues } from "@/lib/queries/picklists";
-import { AddLeadsWizard } from "@/components/leads/add-leads-wizard";
-import { AiColumnModal } from "@/components/leads/ai-column-modal";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { updateLead, type LeadRow } from "@/lib/queries/leads";
@@ -21,7 +19,6 @@ import { createStaticSegment } from "@/lib/queries/segments";
 import { getOutreachAccounts } from "@/lib/queries/outreach-accounts";
 import { usePageTour } from "@/components/tour/use-page-tour";
 import { LEADS_TOUR_STEPS } from "@/components/tour/tour-registry";
-import { runAiColumn, deleteAiColumn, getAiColumnProgress, type AiColumnDefinitionRow, type AiColumnSavedTemplateRow } from "@/lib/queries/ai-columns";
 
 // Customizable columns. Users toggle these via the gear menu in the header; the
 // choice persists in localStorage so it survives reloads. `index`, the checkbox,
@@ -75,10 +72,6 @@ interface Props {
   campaignFilter?: { id: string; name: string };
   /** Pre-populate the search box (from global search). */
   initialSearch?: string;
-  /** Saved Clay-style custom AI columns for this workspace, rendered after the built-in columns. */
-  aiColumns?: AiColumnDefinitionRow[];
-  /** Workspace's own saved AI column templates (user-created, distinct from the built-in library). */
-  aiColumnSavedTemplates?: AiColumnSavedTemplateRow[];
   /** Maps owner_id -> full name, for the Owner column. */
   owners?: Record<string, string>;
   /** True when a background Verified Leads search has finished and hasn't
@@ -134,7 +127,7 @@ function CompanyLogo({ name }: { name?: string | null }) {
   );
 }
 
-export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColumns = [], aiColumnSavedTemplates = [], owners = {}, hasReadyVerifiedLeads = false }: Props) {
+export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners = {}, hasReadyVerifiedLeads = false }: Props) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   usePageTour("leads", LEADS_TOUR_STEPS);
@@ -150,7 +143,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   const [interestFilter, setInterestFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [showWizard, setShowWizard] = useState(false);
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"list" | "grid">("list");
 
@@ -445,75 +437,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     ...colOrder.filter((k) => cols[k]).map((k) => columnByKey.get(k)!),
   ];
 
-  // Clay-style custom AI columns — creation/run/delete + per-row single-cell generation.
-  const [showAiColumnModal, setShowAiColumnModal] = useState(false);
-  const [aiColMenu, setAiColMenu] = useState<{ id: string; top: number; left: number } | null>(null);
-  const [runningColumnId, setRunningColumnId] = useState<string | null>(null);
-  const [runningCellKey, setRunningCellKey] = useState<string | null>(null);
-  // Live progress while a "Run on all leads" bulk job is in flight — polled from the
-  // server since runAiColumn itself is one long request with no incremental callback.
-  const [runProgress, setRunProgress] = useState<{ columnId: string; done: number; total: number } | null>(null);
-
-  function openAiColMenu(e: React.MouseEvent<HTMLButtonElement>, id: string) {
-    const r = e.currentTarget.getBoundingClientRect();
-    setAiColMenu({ id, top: r.bottom + 6, left: r.left });
-  }
-
-  async function runAiColumnOnAll(columnId: string) {
-    setAiColMenu(null);
-
-    // AnySite email lookups spend real, uncapped AnySite credits (50 per
-    // successful find) — unlike every other AI column type, which is just
-    // AI-text generation. Running this across every lead with no warning is
-    // how a routine click can silently burn through hundreds of credits.
-    const column = aiColumns.find((c) => c.id === columnId);
-    if (column?.action_type === "anysite_email") {
-      const withLinkedin = optimisticLeads.filter((l) => l.linkedin).length;
-      const ok = await confirm({
-        title: "Run AnySite email lookup on all leads?",
-        message: `This will attempt a real email lookup for ${withLinkedin} lead${withLinkedin === 1 ? "" : "s"} that ${withLinkedin === 1 ? "has" : "have"} a LinkedIn URL. Each successful find costs 50 AnySite credits — up to ${withLinkedin * 50} credits in the worst case, deducted from your AnySite balance, not your app credits.`,
-        confirmLabel: "Run anyway",
-        danger: true,
-      });
-      if (!ok) return;
-    }
-
-    setRunningColumnId(columnId);
-    setRunProgress({ columnId, done: 0, total: optimisticLeads.length });
-
-    const poll = setInterval(async () => {
-      const p = await getAiColumnProgress(columnId);
-      setRunProgress({ columnId, ...p });
-    }, 1200);
-
-    start(async () => {
-      await runAiColumn(columnId);
-      clearInterval(poll);
-      setRunningColumnId(null);
-      setRunProgress(null);
-      router.refresh();
-    });
-  }
-
-  async function handleDeleteAiColumn(columnId: string) {
-    setAiColMenu(null);
-    if (!(await confirm({ title: "Delete AI column?", message: "This removes the column and its generated values for every lead.", confirmLabel: "Delete", danger: true }))) return;
-    start(async () => {
-      await deleteAiColumn(columnId);
-      router.refresh();
-    });
-  }
-
-  function runAiColumnOnRow(columnId: string, leadId: string) {
-    const key = `${columnId}:${leadId}`;
-    setRunningCellKey(key);
-    start(async () => {
-      await runAiColumn(columnId, [leadId]);
-      setRunningCellKey(null);
-      router.refresh();
-    });
-  }
-
   const activeColumnFilterKeys = (Object.keys(columnFilters) as ColKey[]).filter((k) => columnFilters[k]);
 
   const baseFiltered = optimisticLeads.filter((l) => {
@@ -624,39 +547,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
     if (score >= 70) return { label: "Hot", textClass: "text-rose-600 dark:text-rose-400", dotClass: "bg-rose-500" };
     if (score >= 40) return { label: "Warm", textClass: "text-amber-600 dark:text-amber-400", dotClass: "bg-amber-500" };
     return { label: "Cold", textClass: "text-blue-600 dark:text-blue-400", dotClass: "bg-blue-500" };
-  }
-
-  /** Clay-style compact status badge for AI column results — booleans and AnySite email
-   *  lookups render as an icon + short label instead of raw text, which also reads
-   *  better in a narrow column when the table is squeezed (e.g. AI Assistant open). */
-  function renderAiColumnCellValue(col: AiColumnDefinitionRow, value: string) {
-    if (col.action_type === "anysite_email") {
-      const isEmail = /\S+@\S+\.\S+/.test(value);
-      return isEmail ? (
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5 max-w-full">
-          <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
-          <span className="truncate">{value}</span>
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2 py-0.5 max-w-full">
-          <XCircle className="h-3 w-3 flex-shrink-0" />
-          <span className="truncate">{value || "Not found"}</span>
-        </span>
-      );
-    }
-    if (col.output_type === "boolean") {
-      const isYes = /^\s*(yes|true)\b/i.test(value);
-      return isYes ? (
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
-          <CheckCircle2 className="h-3 w-3" /> Yes
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
-          <XCircle className="h-3 w-3" /> No
-        </span>
-      );
-    }
-    return <span className="block max-w-[260px] truncate text-slate-700" title={value}>{value || "—"}</span>;
   }
 
   /** Plain-text value of a column, for the header click-to-search filter. */
@@ -955,13 +845,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         return l.industry ? (
           <span className="block max-w-[160px] truncate text-slate-600 dark:text-slate-500 whitespace-nowrap" title={l.industry}>{l.industry}</span>
         ) : (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setShowAiColumnModal(true); }}
-            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/70 whitespace-nowrap"
-          >
-            <Sparkles className="h-3 w-3" /> Enrich with AI
-          </button>
+          <span className="text-slate-400 dark:text-slate-600 whitespace-nowrap">—</span>
         );
       case "score": {
         const level = scoreLevel(l.lead_score);
@@ -1043,8 +927,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
   }
 
   return (
-    <div className="flex items-start gap-4">
-    <div className={showAiColumnModal ? "flex-1 min-w-0" : "max-w-[1600px] mx-auto w-full"}>
+    <div className="max-w-[1600px] mx-auto w-full">
       {/* Page header — title + total count badge, breadcrumb, Export/Refresh/Import actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
@@ -1083,7 +966,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           }} title="Refresh" className="rounded-xl h-8 w-8">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setShowWizard(true)} title="Import prospects" className="rounded-xl h-8 w-8">
+          <Button variant="outline" size="icon" onClick={() => router.push("/leads/add")} title="Import prospects" className="rounded-xl h-8 w-8">
             <Upload className="h-3.5 w-3.5" />
           </Button>
           <Link
@@ -1187,18 +1070,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               <span>Manage Columns</span>
             </Button>
 
-            {/* Use AI Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAiColumnModal(true)}
-              className="rounded-xl gap-1 font-semibold h-8 text-xs px-2.5 border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex-shrink-0"
-              title="AI-powered column enrichment"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-              <span>AI Actions</span>
-            </Button>
-
             {/* List/Grid View Toggle */}
             <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0">
               <button type="button" onClick={() => setView("list")} className={cn("h-8 w-8 flex items-center justify-center transition-colors", view === "list" ? "bg-[var(--primary)] text-white" : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800")} title="List view"><LayoutList className="h-3.5 w-3.5" /></button>
@@ -1209,7 +1080,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
             <Button
               data-tour-id="leads-add-prospect"
               size="sm"
-              onClick={() => setShowWizard(true)}
+              onClick={() => router.push("/leads/add")}
               className="rounded-xl gap-1.5 font-bold h-8 px-3 text-xs flex-shrink-0 whitespace-nowrap"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -1397,40 +1268,13 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                       </th>
                     );
                   })}
-                  {aiColumns.map((col) => {
-                    const running = runProgress?.columnId === col.id;
-                    const pct = running && runProgress.total > 0 ? Math.round((runProgress.done / runProgress.total) * 100) : 0;
-                    return (
-                      <th key={col.id} className="px-3 py-3 font-semibold w-[200px] max-w-[200px] whitespace-nowrap">
-                        <span className="flex items-center gap-1.5 min-w-0">
-                          <Sparkles className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                          <span className="truncate" title={col.name}>{col.name}</span>
-                          <button
-                            onClick={(e) => openAiColMenu(e, col.id)}
-                            title="Column actions"
-                            className="p-0.5 rounded hover:bg-slate-200/70 dark:hover:bg-slate-800 flex-shrink-0 ml-auto"
-                          >
-                            <MoreVertical className="h-3 w-3 text-slate-400" />
-                          </button>
-                        </span>
-                        {running && (
-                          <div className="flex items-center gap-1.5 mt-1.5">
-                            <div className="flex-1 h-[3px] rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                              <div className="h-full bg-blue-500 transition-[width] duration-500 rounded-full" style={{ width: `${Math.max(pct, 4)}%` }} />
-                            </div>
-                            <span className="text-[10px] font-normal normal-case text-slate-400 tabular-nums flex-shrink-0">{pct}%</span>
-                          </div>
-                        )}
-                      </th>
-                    );
-                  })}
                   <th className="px-3 py-3 w-16 text-right font-semibold whitespace-nowrap">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={visibleCols.length + aiColumns.length + 2} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
                       No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.
                     </td>
                   </tr>
@@ -1467,27 +1311,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         {renderCell(c.key, l, safePage * pageSize + i + 1)}
                       </td>
                     ))}
-                    {aiColumns.map((col) => {
-                      const cellKey = `${col.id}:${l.id}`;
-                      const computed = l.custom_fields?.[col.id];
-                      const running = runningCellKey === cellKey || runningColumnId === col.id;
-                      return (
-                        <td key={col.id} className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                          {running ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
-                          ) : computed ? (
-                            renderAiColumnCellValue(col, computed.value)
-                          ) : (
-                            <button
-                              onClick={() => runAiColumnOnRow(col.id, l.id)}
-                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-                            >
-                              <Play className="h-3 w-3" /> Generate
-                            </button>
-                          )}
-                        </td>
-                      );
-                    })}
                     <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setRowMenu({ id: l.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) }); }}
@@ -1611,8 +1434,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         </div>
       </Card>
 
-      <AddLeadsWizard open={showWizard} onClose={() => setShowWizard(false)} />
-
       {editingLead && (
         <EditLeadModal open={Boolean(editingLead)} onClose={() => setEditingLead(null)} lead={editingLead} />
       )}
@@ -1723,29 +1544,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
         </div>
       </Modal>
 
-      {/* AI column header menu — run on all rows, or delete the column */}
-      {aiColMenu && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setAiColMenu(null)} />
-          <div
-            className="fixed z-50 w-48 rounded-xl border border-slate-200 bg-white shadow-xl p-1"
-            style={{ top: aiColMenu.top, left: aiColMenu.left }}
-          >
-            <button
-              onClick={() => runAiColumnOnAll(aiColMenu.id)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
-            >
-              <Play className="h-3.5 w-3.5" /> Run on all leads
-            </button>
-            <button
-              onClick={() => handleDeleteAiColumn(aiColMenu.id)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete column
-            </button>
-          </div>
-        </>
-      )}
 
       {/* Column picker — fixed-position so the table's horizontal scroll never clips it */}
       {showCols && colsPos && (
@@ -2035,18 +1833,6 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
           </div>
         </div>
       )}
-    </div>
-
-    {showAiColumnModal && (
-      <AiColumnModal
-        open={showAiColumnModal}
-        onClose={() => setShowAiColumnModal(false)}
-        onCreated={() => router.refresh()}
-        savedTemplates={aiColumnSavedTemplates}
-        leadCountWithLinkedin={optimisticLeads.filter((l) => l.linkedin).length}
-      />
-    )}
-
     </div>
   );
 }

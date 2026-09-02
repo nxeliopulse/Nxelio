@@ -194,9 +194,15 @@ export function AddLeadsWizard({
   open,
   onClose,
   initialSource,
+  asPage,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Renders as a normal page inside the app's own layout (sidebar/topbar
+   *  stay visible, the whole page scrolls) instead of a full-viewport
+   *  overlay. Used by the dedicated /leads/add route; the campaign
+   *  builder's in-context import dialog keeps the overlay behavior. */
+  asPage?: boolean;
   /** Jumps straight to that source's data-entry screen (step 2) instead of the source picker — used by toolbar quick-add shortcuts. */
   initialSource?: SourceId | null;
 }) {
@@ -645,7 +651,7 @@ export function AddLeadsWizard({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+    <div className={asPage ? "bg-white flex flex-col" : "fixed inset-0 z-[100] bg-white flex flex-col"}>
       {/* Header + progress */}
       <div className="px-6 sm:px-10 py-5 border-b border-slate-100 flex-shrink-0">
         <div className="max-w-6xl mx-auto flex items-start justify-between">
@@ -671,7 +677,7 @@ export function AddLeadsWizard({
       </div>
 
       {/* Body */}
-      <div className="overflow-auto flex-1 px-6 sm:px-10 py-8 flex flex-col">
+      <div className={cn("px-6 sm:px-10 py-8 flex flex-col", asPage ? "flex-1" : "overflow-auto flex-1")}>
         <div className={cn(
           "max-w-6xl mx-auto w-full flex-1 flex flex-col",
           (source === "linkedin-search" || source === "linkedin-post") && step === 2 && "justify-center"
@@ -709,7 +715,7 @@ export function AddLeadsWizard({
                     </div>
                     <p className="font-semibold text-slate-900 text-base">{s.label}</p>
                     <p className="text-sm text-slate-500 mt-1.5">
-                      {isComingSoon(s.id) ? "Not available yet — the admin hasn't turned this on." : sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}
+                      {isComingSoon(s.id) ? "This feature is coming soon." : sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}
                     </p>
                   </button>
                 );
