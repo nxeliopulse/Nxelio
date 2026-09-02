@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 /**
  * Multi-location picker for Buy Leads — chips for each picked location, backed
@@ -12,9 +13,11 @@ import { Input } from "@/components/ui/input";
 export function MultiLocationInput({
   value,
   onChange,
+  disabled,
 }: {
   value: string[];
   onChange: (v: string[]) => void;
+  disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -60,11 +63,11 @@ export function MultiLocationInput({
 
   return (
     <div ref={wrapRef} className="relative">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-400 bg-white px-3 py-2 min-h-12 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 shadow-sm">
+      <div className={cn("flex flex-wrap items-center gap-2 rounded-xl border border-slate-400 bg-white px-3 py-2 min-h-12 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 shadow-sm", disabled && "bg-slate-50 opacity-70")}>
         {value.map((loc) => (
           <span key={loc} className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 text-base font-medium pl-3 pr-1.5 py-1">
             {loc}
-            <button type="button" onClick={() => removeLocation(loc)} aria-label={`Remove ${loc}`} className="p-0.5 rounded-full hover:bg-blue-100 text-blue-500">
+            <button type="button" onClick={() => removeLocation(loc)} disabled={disabled} aria-label={`Remove ${loc}`} className="p-0.5 rounded-full hover:bg-blue-100 text-blue-500 disabled:cursor-not-allowed disabled:opacity-60">
               <X className="h-4 w-4" />
             </button>
           </span>
@@ -75,6 +78,7 @@ export function MultiLocationInput({
           onFocus={() => { if (suggestions.length) setOpen(true); }}
           placeholder={value.length ? "Add another location" : "e.g. United States, Austin TX"}
           autoComplete="off"
+          disabled={disabled}
           className="flex-1 min-w-[140px] border-0 shadow-none focus:ring-0 px-1 py-1 h-auto text-base"
         />
       </div>
