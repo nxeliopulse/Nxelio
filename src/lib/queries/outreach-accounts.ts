@@ -121,6 +121,11 @@ export async function connectOutreachAccount(channel: "email" | "linkedin", retu
   // forever, since nothing else ever re-checks it.
   await pruneDeadUnipileAccounts(supabase);
 
+  // Starting a fresh connect is explicit reconnect intent — forget any past
+  // disconnects for this channel so sync doesn't ignore the account that's
+  // about to come back (see outreach_disconnected_accounts, 0153).
+  await supabase.from("outreach_disconnected_accounts").delete().eq("channel", channel);
+
   // Cap: at most one connected account per channel (email, linkedin).
   const { count } = await supabase
     .from("outreach_accounts")
@@ -162,8 +167,17 @@ export async function syncOutreachAccounts(): Promise<{ ok: boolean; count: numb
   const supabase = await createClient();
   try {
     const accounts = await listUnipileAccounts();
+    // Accounts the user explicitly disconnected — Unipile may still list them
+    // (e.g. the DELETE call to Unipile failed because the workspace's Unipile
+    // subscription lapsed, so deleteOutreachAccount deleted the local row but
+    // couldn't remove it on Unipile's side). Never resurrect those; a fresh
+    // Connect click clears its own tombstone (see connectOutreachAccount).
+    const { data: tombstones } = await supabase.from("outreach_disconnected_accounts").select("account_id");
+    const disconnectedIds = new Set((tombstones ?? []).map((t) => t.account_id));
+
     let count = 0;
     for (const a of accounts) {
+      if (disconnectedIds.has(a.id)) continue;
       const channel: "email" | "linkedin" | "whatsapp" = a.type === "LINKEDIN" ? "linkedin" : a.type === "WHATSAPP" ? "whatsapp" : "email";
       const status = (a.status && a.status.toLowerCase().includes("ok")) || a.status === "CONNECTED" ? "connected" : (a.status || "connected");
 
@@ -286,16 +300,29 @@ export async function deleteOutreachAccount(id: string) {
   await requireSuperAdmin();
   const supabase = await createClient();
   // Look up the Unipile account_id (RLS guarantees it's one of THIS workspace's rows).
-  const { data: row } = await supabase.from("outreach_accounts").select("account_id").eq("id", id).maybeSingle();
+  const { data: row } = await supabase.from("outreach_accounts").select("account_id, channel").eq("id", id).maybeSingle();
 
   // Disconnect from Unipile too, so it's truly gone and a Recheck can't re-add it.
-  const accountId = (row as { account_id?: string } | null)?.account_id;
+  const accountId = (row as { account_id?: string; channel?: string } | null)?.account_id;
+  const channel = (row as { account_id?: string; channel?: string } | null)?.channel;
+  let unipileDeleteFailed = false;
   if (accountId && unipileConfigured) {
-    await unipileDeleteAccount(accountId).catch(() => { /* already gone / network — still remove locally */ });
+    await unipileDeleteAccount(accountId).catch(() => { unipileDeleteFailed = true; /* already gone / network — still remove locally */ });
   }
 
   const { error } = await supabase.from("outreach_accounts").delete().eq("id", id);
   if (error) throw error;
+
+  // The Unipile-side delete failed (e.g. a lapsed Unipile subscription) — the
+  // account is still alive on Unipile's side, so the next sync (window focus,
+  // reload) would otherwise silently re-add it. Remember it was explicitly
+  // disconnected so sync leaves it alone until the user reconnects (see 0153).
+  if (unipileDeleteFailed && accountId && channel) {
+    await supabase.from("outreach_disconnected_accounts").upsert(
+      { account_id: accountId, channel },
+      { onConflict: "workspace_id,account_id" }
+    );
+  }
   revalidatePath("/outreach");
   revalidatePath("/campaigns");
   await logAudit({ action: "connector.disconnected", entityType: "outreach_account", entityId: id });

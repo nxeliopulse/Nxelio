@@ -22,6 +22,11 @@ const FEATURES: { key: KillSwitchFeature; label: string; description: string }[]
     label: "Send Newsletter",
     description: "Sending a newsletter to its recipient list, including test sends.",
   },
+  {
+    key: "verified_emails_source",
+    label: "Verified Emails (Coming Soon)",
+    description: "The \"Verified Emails\" card in Add Prospects → Choose a source. Ships locked — turn on to release it to every workspace.",
+  },
 ];
 
 export function FeatureKillSwitchesTab({ initialSwitches }: { initialSwitches: Record<KillSwitchFeature, boolean> }) {

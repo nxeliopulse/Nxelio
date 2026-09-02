@@ -2,7 +2,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/queries/platform-admin";
 import { revalidatePath } from "next/cache";
-import { ALL_KILL_SWITCH_FEATURES, FEATURE_LABELS, resolveEffectiveEnabled, type KillSwitchFeature } from "@/lib/kill-switch-rules";
+import { ALL_KILL_SWITCH_FEATURES, DEFAULT_LOCKED_FEATURES, FEATURE_LABELS, resolveEffectiveEnabled, type KillSwitchFeature } from "@/lib/kill-switch-rules";
 
 /**
  * Raw flags straight from the DB via the service-role admin client — safe to
@@ -10,13 +10,18 @@ import { ALL_KILL_SWITCH_FEATURES, FEATURE_LABELS, resolveEffectiveEnabled, type
  * all). No admin-bypass logic here; that only makes sense where there's an
  * actual "current user" to bypass for (see isFeatureEnabledForCurrentUser).
  *
- * Fails OPEN (defaults every flag to enabled) if the table can't be read —
- * a transient DB hiccup should never silently take down all outbound
- * sending platform-wide; only an explicit `enabled = false` row blocks
- * anything. Mirrors ai-provider-settings.ts's same fail-open convention.
+ * Fails to each feature's own safe default if the table can't be read — the
+ * three original switches fail OPEN (a transient DB hiccup should never
+ * silently take down all outbound sending platform-wide; only an explicit
+ * `enabled = false` row blocks anything, mirroring ai-provider-settings.ts).
+ * Features in DEFAULT_LOCKED_FEATURES (not-yet-released previews) fail
+ * CLOSED instead — the safe default for something nobody should see yet is
+ * "still locked", not "accidentally unlocked by a DB read failure".
  */
 export async function getFeatureKillSwitches(): Promise<Record<KillSwitchFeature, boolean>> {
-  const result: Record<KillSwitchFeature, boolean> = { launch_campaign: true, send_email: true, send_newsletter: true };
+  const result = Object.fromEntries(
+    ALL_KILL_SWITCH_FEATURES.map((f) => [f, !DEFAULT_LOCKED_FEATURES.includes(f)])
+  ) as Record<KillSwitchFeature, boolean>;
   try {
     const admin = createAdminClient();
     const { data } = await admin.from("feature_kill_switches").select("feature_key, enabled");

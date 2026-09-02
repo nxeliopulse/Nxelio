@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { bulkInsertContacts } from "@/lib/queries/contacts-import";
 import type { ContactRow } from "@/lib/queries/contacts";
 import { formatPhoneForStorage, detectCountry } from "@/components/ui/phone-input";
+import { isValidLinkedIn } from "@/lib/validation";
 
 // CSV-specific parsing, adapted from add-leads-wizard.tsx (splitCsvLine /
 // parseCsv / CSV_HEADER_MAP / CsvRow pattern) for the Contacts field set.
@@ -87,8 +88,9 @@ function parseCsv(text: string): CsvRow[] {
     // Identity: needs a first or last name. Contact info: needs an email or phone.
     const hasIdentity = !!(row.first_name || row.last_name);
     const hasContact = !!(row.email || row.phone);
-    row._valid = hasIdentity && hasContact;
-    if (!row._valid) row._reason = !hasIdentity ? "Missing first/last name" : "Missing email/phone";
+    const linkedinOk = !row.linkedin || isValidLinkedIn(row.linkedin);
+    row._valid = hasIdentity && hasContact && linkedinOk;
+    if (!row._valid) row._reason = !hasIdentity ? "Missing first/last name" : !hasContact ? "Missing email/phone" : "LinkedIn isn't a real linkedin.com URL";
     rows.push(row);
   }
   return rows;

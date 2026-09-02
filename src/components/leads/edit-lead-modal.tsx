@@ -14,7 +14,7 @@ import { isSuperAdmin } from "@/lib/queries/auth-guards";
 import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
-import { isValidEmail, isValidWebsite, EMAIL_ERROR, WEBSITE_ERROR } from "@/lib/validation";
+import { isValidEmail, isValidWebsite, isValidLinkedIn, EMAIL_ERROR, WEBSITE_ERROR, LINKEDIN_ERROR } from "@/lib/validation";
 
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
@@ -88,6 +88,7 @@ export function EditLeadModal({ open, onClose, lead }: { open: boolean; onClose:
     }
     if (!isValidEmail(form.email)) { setError(EMAIL_ERROR); return; }
     if (!isValidWebsite(form.website_url)) { setError(WEBSITE_ERROR); return; }
+    if (!isValidLinkedIn(form.linkedin)) { setError(LINKEDIN_ERROR); return; }
     if (!isPhoneValid(form.phone, phoneCountry)) {
       setError("Phone number isn't valid for the selected country.");
       return;

@@ -24,10 +24,12 @@ import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options
 import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
+import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { cn, toAbsoluteUrl } from "@/lib/utils";
 import { PhoneInput, formatPhoneForStorage, isPhoneValid, detectCountry, type CountryCode } from "@/components/ui/phone-input";
+import { isValidLinkedIn } from "@/lib/validation";
 
 export type SourceId = "linkedin-search" | "linkedin-post" | "verified-emails" | "manual" | "buy" | "csv";
 
@@ -153,8 +155,9 @@ export function parseCsv(text: string): CsvRow[] {
     });
     const hasIdentity = !!(row.full_name || row.company_name);
     const hasContact = !!(row.email || row.website_url);
-    row._valid = hasIdentity && hasContact;
-    if (!row._valid) row._reason = !hasIdentity ? "Missing name/company" : "Missing email/website";
+    const linkedinOk = !row.linkedin || isValidLinkedIn(row.linkedin);
+    row._valid = hasIdentity && hasContact && linkedinOk;
+    if (!row._valid) row._reason = !hasIdentity ? "Missing name/company" : !hasContact ? "Missing email/website" : "LinkedIn isn't a real linkedin.com URL";
     rows.push(row);
   }
   return rows;
@@ -179,8 +182,8 @@ const newEntry = (): ManualEntry => ({
   phone: "", phoneCountry: "US", companySize: "", seniority: "", twitter: "", linkedin: "",
   streetAddress: "", city: "", state: "", country: "", postalCode: "",
 });
-// A manual entry imports if it has a name AND a LinkedIn profile — email is optional.
-const entryValid = (e: ManualEntry) => !!(e.name.trim() && e.linkedin.trim()) && isPhoneValid(e.phone, e.phoneCountry);
+// A manual entry imports if it has a name AND a real LinkedIn profile URL — email is optional.
+const entryValid = (e: ManualEntry) => !!(e.name.trim() && e.linkedin.trim()) && isValidLinkedIn(e.linkedin) && isPhoneValid(e.phone, e.phoneCountry);
 const entryStarted = (e: ManualEntry) =>
   !!(e.name.trim() || e.email.trim() || e.company.trim() || e.title.trim() || e.phone.trim() ||
      e.companySize.trim() || e.seniority.trim() || e.twitter.trim() || e.linkedin.trim() ||
@@ -250,10 +253,18 @@ export function AddLeadsWizard({
 
   // Plan-gated sources (Buy Leads) — checked once when the wizard opens.
   const [locked, setLocked] = useState<{ discovery: boolean }>({ discovery: false });
+  // Platform-admin release gate for "Verified Emails" — ships locked for
+  // everyone until turned on from Admin > Feature Access (see
+  // feature-kill-switches.ts). Separate from the plan-based `locked` above:
+  // this one is "not released yet", not "not on your plan".
+  const [verifiedEmailsReleased, setVerifiedEmailsReleased] = useState(false);
   useEffect(() => {
     if (!open) return;
     hasFeature("discovery")
       .then((discovery) => setLocked({ discovery: !discovery }))
+      .catch(() => {});
+    isFeatureEnabledForCurrentUser("verified_emails_source")
+      .then(setVerifiedEmailsReleased)
       .catch(() => {});
     getMaxBuyLeadsCount()
       .then((max) => {
@@ -390,7 +401,12 @@ export function AddLeadsWizard({
     onClose();
   }
 
+  function isComingSoon(id: SourceId): boolean {
+    return id === "verified-emails" && !verifiedEmailsReleased;
+  }
+
   function isLocked(id: SourceId): boolean {
+    if (isComingSoon(id)) return true;
     const flag = SOURCES.find((s) => s.id === id)?.featureFlag;
     return flag ? locked[flag] : false;
   }
@@ -681,7 +697,9 @@ export function AddLeadsWizard({
                         <Check className="h-3.5 w-3.5 text-white" />
                       </span>
                     )}
-                    {sourceLocked ? (
+                    {isComingSoon(s.id) ? (
+                      <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-slate-400 text-white rounded-full px-2 py-0.5">Coming Soon</span>
+                    ) : sourceLocked ? (
                       <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-slate-400 text-white rounded-full px-2 py-0.5">Upgrade</span>
                     ) : !active && s.badge && (
                       <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white rounded-full px-2 py-0.5">{s.badge}</span>
@@ -690,7 +708,9 @@ export function AddLeadsWizard({
                       <Icon className="h-6 w-6" />
                     </div>
                     <p className="font-semibold text-slate-900 text-base">{s.label}</p>
-                    <p className="text-sm text-slate-500 mt-1.5">{sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}</p>
+                    <p className="text-sm text-slate-500 mt-1.5">
+                      {isComingSoon(s.id) ? "Not available yet — the admin hasn't turned this on." : sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}
+                    </p>
                   </button>
                 );
 
