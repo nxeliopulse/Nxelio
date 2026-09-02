@@ -1397,16 +1397,17 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           />
         </div>
 
-        <label className={cn("flex items-center gap-3 text-base text-slate-800", (forceVerifiedEmail || backgroundLoading) ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
-          <input
-            type="checkbox"
-            checked={buy.requireVerifiedEmail}
-            disabled={forceVerifiedEmail || backgroundLoading}
-            onChange={(e) => setBuy({ ...buy, requireVerifiedEmail: e.target.checked })}
-            className={cn("rounded border-slate-400 h-5 w-5", (forceVerifiedEmail || backgroundLoading) ? "cursor-not-allowed" : "cursor-pointer")}
-          />
-          Require a verified work email{forceVerifiedEmail && " (always on for Verified Emails)"}
-        </label>
+        {/* Buy Leads and Verified Emails are two different services — Buy Leads
+            never includes an email (that's the whole point of the separate
+            Verified Emails service), so there's no toggle here at all. This
+            only ever renders as a fixed "always on" indicator when reached
+            via the Verified Emails card. */}
+        {forceVerifiedEmail && (
+          <label className="flex items-center gap-3 text-base text-slate-800 cursor-not-allowed opacity-70">
+            <input type="checkbox" checked disabled className="rounded border-slate-400 h-5 w-5 cursor-not-allowed" />
+            Verified work email included on every result
+          </label>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           {onRunInBackground ? (
@@ -1425,7 +1426,7 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
         </div>
         {onRunInBackground && (
           <p className="text-sm text-slate-500">
-            {buy.requireVerifiedEmail
+            {forceVerifiedEmail
               ? "Every lead here comes with a verified email — that takes real time to confirm, so this runs in the background, however long it needs."
               : "Getting exactly the number you asked for can take a little while, so this runs in the background."}
             {" "}We&apos;ll email you and notify you in the app the moment it&apos;s ready — feel free to leave this screen and keep working. Come back to Buy Leads to check progress any time.
@@ -1459,10 +1460,10 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           <ul className="space-y-3 text-base text-slate-600">
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Name, job title, company and LinkedIn URL from real public profiles.</li>
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> An estimated seniority label, shown alongside each result (not a search filter — just informational).</li>
-            {buy.requireVerifiedEmail ? (
+            {forceVerifiedEmail ? (
               <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> A confirmed work email for every result, guaranteed — never guessed, never skipped.</li>
             ) : (
-              <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> No email required — check &quot;Require a verified work email&quot; above if you need one on every result.</li>
+              <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> No email — Buy Leads never includes one. Use Verified Emails if you need a confirmed email on every result.</li>
             )}
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
           </ul>
