@@ -511,7 +511,7 @@ export function CampaignsView({
                   size="custom"
                   onClick={() => setColumnsOpen((v) => !v)}
                   className={cn(
-                    "h-9 px-3 text-xs rounded-xl font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-[var(--muted)] shadow-2xs flex items-center justify-center gap-1.5",
+                    "h-9 px-3 text-xs rounded-xl font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[var(--muted)] shadow-2xs flex items-center justify-center gap-1.5",
                     columnsOpen && "bg-slate-50 dark:bg-slate-800"
                   )}
                 >
@@ -529,7 +529,7 @@ export function CampaignsView({
                       ["owner", "Owner"],
                       ["lastModified", "Last modified"],
                     ] as const).map(([key, label]) => (
-                      <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer select-none">
+                      <label key={key} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={visibleCols[key]}

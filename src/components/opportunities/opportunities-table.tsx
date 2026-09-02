@@ -202,11 +202,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
     };
   }, [rows]);
 
-  async function drop(stage: OpportunityStage) {
-    const id = dragId;
-    setDragId(null);
-    setOverStage(null);
-    if (!id) return;
+  async function changeStage(id: string, stage: OpportunityStage) {
     const current = rows.find((r) => r.id === id);
     if (!current || current.stage === stage) return;
     const prev = rows;
@@ -217,6 +213,14 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
       setRows(prev);
       toast("Could not move the deal. Try again.", "error");
     }
+  }
+
+  async function drop(stage: OpportunityStage) {
+    const id = dragId;
+    setDragId(null);
+    setOverStage(null);
+    if (!id) return;
+    await changeStage(id, stage);
   }
 
   async function remove(row: OpportunityRow) {
@@ -573,10 +577,10 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                 <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${STAGE_ACCENT[stage]}`} />
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-700">{STAGE_LABELS[stage]}</span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{STAGE_LABELS[stage]}</span>
                     <span className="text-xs text-slate-400 dark:text-slate-500">{items.length}</span>
                   </div>
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-500">{money(colValue)}</span>
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{money(colValue)}</span>
                 </div>
                 <div className="p-2 space-y-2 min-h-[80px]">
                   {items.map((row) => (
@@ -593,7 +597,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{row.name}</p>
                           {row.company && (
-                            <p className="text-xs text-slate-500 dark:text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 truncate">
                               <Building2 className="h-3 w-3 flex-shrink-0" /> {row.company}
                             </p>
                           )}
@@ -607,6 +611,20 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
+                      </div>
+
+                      {/* Mobile stage switcher — allows moving cards on touch screens */}
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between md:hidden" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Move:</span>
+                        <select
+                          value={row.stage}
+                          onChange={(e) => changeStage(row.id, e.target.value as OpportunityStage)}
+                          className="text-xs font-semibold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-0.5 text-slate-700 dark:text-slate-200"
+                        >
+                          {OPPORTUNITY_STAGES.map((s) => (
+                            <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   ))}

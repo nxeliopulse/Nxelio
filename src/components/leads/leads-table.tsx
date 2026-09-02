@@ -1303,7 +1303,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
               <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-500">
                   <th
-                    className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-3"
+                    className="sm:sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-3"
                     style={{ width: 40, minWidth: 40, maxWidth: 40 }}
                   >
                     <input
@@ -1323,8 +1323,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         key={c.key}
                         className={cn(
                           "px-3 py-3 font-semibold whitespace-nowrap",
-                          c.key === "index" && "sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
-                          c.key === "name" && "sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
+                          c.key === "index" && "sm:sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
+                          c.key === "name" && "sm:sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
                         )}
                         // Sticky offsets below (left-10, left-[88px]) are hardcoded pixel
                         // sums of the checkbox + Row# column widths — fix both header AND
@@ -1442,7 +1442,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                     className="group hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <td
-                      className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-3"
+                      className="sm:sticky left-0 z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors px-3 py-3"
                       style={{ width: 40, minWidth: 40, maxWidth: 40 }}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -1458,8 +1458,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, aiColu
                         key={c.key}
                         className={cn(
                           "px-3 py-3",
-                          c.key === "index" && "sticky left-10 z-10 bg-white group-hover:bg-slate-50 transition-colors",
-                          c.key === "name" && "sticky left-[88px] z-10 bg-white group-hover:bg-slate-50 transition-colors"
+                          c.key === "index" && "sm:sticky left-10 z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors",
+                          c.key === "name" && "sm:sticky left-[88px] z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors"
                         )}
                         style={c.key === "index" ? { width: 48, minWidth: 48, maxWidth: 48 } : undefined}
                         onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}

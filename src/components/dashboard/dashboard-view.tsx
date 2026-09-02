@@ -982,21 +982,16 @@ function AiInsightsCard({ stats, onOpenProspects, onOpenDeals, onOpenCampaigns }
 }
 
 const SPAN_CLASS: Record<WidgetSize, string> = {
-  3: "lg:col-span-3", 4: "lg:col-span-4", 6: "lg:col-span-6", 8: "lg:col-span-8", 12: "lg:col-span-12",
+  3: "col-span-1 sm:col-span-1 md:col-span-3 lg:col-span-3",
+  4: "col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4",
+  6: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-6",
+  8: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-8",
+  12: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-12",
 };
 
 /** One widget's slot in the dashboard grid — a dnd-kit sortable item that
  *  becomes draggable (grip handle) and removable (X) only in edit mode, so
  *  the normal view stays exactly as plain as before this feature existed. */
-/** One widget's slot in the dashboard grid — a dnd-kit sortable item that
- *  becomes draggable (grip handle), removable (X), and resizable (corner
- *  handle) only in edit mode, so the normal view stays exactly as plain as
- *  before this feature existed. Resize is a raw pointer drag rather than a
- *  library (no free-form grid-resize engine already in this project — see
- *  the analytics_dashboard_widgets research this was built alongside): the
- *  handle tracks horizontal drag distance against the widget's own current
- *  pixel width to estimate one grid column's width, then snaps to the
- *  nearest allowed size on every pointermove for live feedback. */
 function SortableWidgetItem({
   id, size, editing, onRemove, onResize, children,
 }: {
@@ -1038,7 +1033,7 @@ function SortableWidgetItem({
   }
 
   return (
-    <div ref={setRefs} style={style} className={`col-span-1 ${SPAN_CLASS[size]} relative`}>
+    <div ref={setRefs} style={style} className={`${SPAN_CLASS[size]} relative`}>
       {editing && (
         <>
           <div className="absolute -top-2 -right-2 z-10 flex gap-1">
@@ -1617,7 +1612,7 @@ export function DashboardView({
       <div className={editing ? "grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 items-start" : ""}>
         <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={(editing ? draftLayout : layout).map((w) => w.key)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 auto-rows-min">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 lg:grid-cols-12 gap-4 sm:gap-5 auto-rows-min">
               {(editing ? draftLayout : layout).map((w) => (
                 <SortableWidgetItem
                   key={w.key} id={w.key} size={w.size} editing={editing}
@@ -1628,7 +1623,7 @@ export function DashboardView({
                 </SortableWidgetItem>
               ))}
               {editing && draftLayout.length === 0 && (
-                <div className="col-span-1 lg:col-span-12 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-sm text-slate-400">
+                <div className="col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-12 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-sm text-slate-400">
                   No widgets yet — add some from the library on the right.
                 </div>
               )}
