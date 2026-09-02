@@ -1202,13 +1202,24 @@ export function DashboardView({
   const TILE_BLUE = "#3E8EDE";
   const TILE_GREEN = "#2FB88A";
 
-  const getGreeting = () => {
+  // A time-of-day greeting genuinely needs the visitor's LOCAL hour, but
+  // reading it during the initial render risks a server/client hydration
+  // mismatch: Next.js server-renders this "use client" component too, and
+  // the server's clock (often a different timezone entirely) can land on a
+  // different greeting than the browser's for the same real moment. Render
+  // a neutral default on the first pass, then swap to the real local
+  // greeting once mounted on the client — matching what the server already
+  // sent, so hydration never disagrees with itself.
+  const [greeting, setGreeting] = useState("Welcome back");
+  // Same hydration hazard as the greeting above — the weekday/date badge
+  // also needs the visitor's real local date, not a server-computed one.
+  const [dateLabel, setDateLabel] = useState<string | null>(null);
+  useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
-  };
-  const greeting = getGreeting();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time swap from the neutral SSR default to the real local greeting/date once mounted, avoiding a server/client hydration mismatch
+    setGreeting(hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening");
+    setDateLabel(new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }));
+  }, []);
 
   // Recharts' ResponsiveContainer measures its parent's real pixel size via
   // ResizeObserver, which isn't available yet during SSR/first paint — that
@@ -1507,7 +1518,7 @@ export function DashboardView({
         <div>
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+              {dateLabel ?? " "}
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">

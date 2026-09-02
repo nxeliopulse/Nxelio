@@ -237,14 +237,17 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
       }
 
       const details = `File: ${event.filename || "Unknown"}\nLine: ${event.lineno || 0}:${event.colno || 0}\nMessage: ${event.message || "Unknown error"}`;
-      const appError = new AppError({
-        code: "UNKNOWN",
-        title: "Application Exception",
-        message: "A runtime error occurred in the application. We are looking into it.",
-        technicalDetails: details + (event.error?.stack ? `\nStack:\n${event.error.stack}` : ""),
-      });
-
-      pushToast(appError);
+      // Logged, not shown to the user: this bucket catches ANY uncaught
+      // window-level error, most of which are one-off, non-blocking hiccups
+      // (a third-party script, a stray timing issue) that don't stop the app
+      // from working — the rest of the page keeps rendering fine underneath
+      // it. A canned "Application Exception" toast with no actionable info
+      // was scarier than useful. Still logged here so it's visible in the
+      // browser console (and easy to wire to a real error tracker later).
+      console.error(
+        "[global-error]",
+        details + (event.error?.stack ? `\nStack:\n${event.error.stack}` : "")
+      );
     };
 
     const handlePromiseRejection = (event: PromiseRejectionEvent) => {
