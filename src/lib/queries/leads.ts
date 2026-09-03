@@ -9,6 +9,7 @@ import { mapWithConcurrency } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/queries/auth-guards";
 import { isManualStatusTransitionAllowed, statusTransitionError } from "@/lib/leads/status-flow";
 import { isValidPhoneNumber } from "libphonenumber-js";
+import { isValidLinkedIn, LINKEDIN_ERROR } from "@/lib/validation";
 
 /**
  * The client always sends phone pre-formatted to international form (e.g.
@@ -19,6 +20,14 @@ import { isValidPhoneNumber } from "libphonenumber-js";
 function assertValidLeadPhone(payload: Partial<LeadRow>) {
   if (payload.phone && !isValidPhoneNumber(payload.phone)) {
     throw new Error("Phone number isn't valid.");
+  }
+}
+
+/** Never trust the client alone — reject anything that isn't a real
+ *  linkedin.com URL, same enforcement point as the phone check above. */
+function assertValidLeadLinkedIn(payload: Partial<LeadRow>) {
+  if (payload.linkedin && !isValidLinkedIn(payload.linkedin)) {
+    throw new Error(LINKEDIN_ERROR);
   }
 }
 
@@ -190,6 +199,7 @@ export async function getDistinctLeadValues(
 
 export async function createLead(payload: Partial<LeadRow>) {
   assertValidLeadPhone(payload);
+  assertValidLeadLinkedIn(payload);
   const supabase = await createClient();
   await assertPhoneNotTaken(supabase, payload.phone);
   const { data, error } = await supabase.from("leads").insert(payload).select().single();
@@ -208,6 +218,7 @@ export async function createLead(payload: Partial<LeadRow>) {
  */
 export async function updateLead(id: string, payload: Partial<LeadRow>, opts?: { allowConvertedStatus?: boolean }) {
   assertValidLeadPhone(payload);
+  assertValidLeadLinkedIn(payload);
   const supabase = await createClient();
   if (Object.prototype.hasOwnProperty.call(payload, "phone")) {
     await assertPhoneNotTaken(supabase, payload.phone, id);

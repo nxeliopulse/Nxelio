@@ -27,5 +27,22 @@ export function isValidWebsite(value: string): boolean {
   }
 }
 
+/** Accepts a bare "linkedin.com/in/..." path or a full URL with protocol, on
+ *  linkedin.com itself (any subdomain/country prefix, e.g. "uk.linkedin.com")
+ *  — rejects any other domain, including lookalikes and other social sites.
+ *  Empty string is valid (optional field). */
+export function isValidLinkedIn(value: string): boolean {
+  const v = value.trim();
+  if (v === "") return true;
+  const withProtocol = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  try {
+    const { hostname } = new URL(withProtocol);
+    return /^([a-z0-9-]+\.)*linkedin\.com$/i.test(hostname);
+  } catch {
+    return false;
+  }
+}
+
 export const EMAIL_ERROR = "Enter a valid email address (e.g. name@company.com).";
 export const WEBSITE_ERROR = "Enter a valid website (e.g. company.com).";
+export const LINKEDIN_ERROR = "Enter a valid LinkedIn URL (e.g. linkedin.com/in/username).";

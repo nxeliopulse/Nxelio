@@ -24,10 +24,12 @@ import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options
 import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
+import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { cn, toAbsoluteUrl } from "@/lib/utils";
 import { PhoneInput, formatPhoneForStorage, isPhoneValid, detectCountry, type CountryCode } from "@/components/ui/phone-input";
+import { isValidLinkedIn } from "@/lib/validation";
 
 export type SourceId = "linkedin-search" | "linkedin-post" | "verified-emails" | "manual" | "buy" | "csv";
 
@@ -153,8 +155,9 @@ export function parseCsv(text: string): CsvRow[] {
     });
     const hasIdentity = !!(row.full_name || row.company_name);
     const hasContact = !!(row.email || row.website_url);
-    row._valid = hasIdentity && hasContact;
-    if (!row._valid) row._reason = !hasIdentity ? "Missing name/company" : "Missing email/website";
+    const linkedinOk = !row.linkedin || isValidLinkedIn(row.linkedin);
+    row._valid = hasIdentity && hasContact && linkedinOk;
+    if (!row._valid) row._reason = !hasIdentity ? "Missing name/company" : !hasContact ? "Missing email/website" : "LinkedIn isn't a real linkedin.com URL";
     rows.push(row);
   }
   return rows;
@@ -179,8 +182,8 @@ const newEntry = (): ManualEntry => ({
   phone: "", phoneCountry: "US", companySize: "", seniority: "", twitter: "", linkedin: "",
   streetAddress: "", city: "", state: "", country: "", postalCode: "",
 });
-// A manual entry imports if it has a name AND a LinkedIn profile — email is optional.
-const entryValid = (e: ManualEntry) => !!(e.name.trim() && e.linkedin.trim()) && isPhoneValid(e.phone, e.phoneCountry);
+// A manual entry imports if it has a name AND a real LinkedIn profile URL — email is optional.
+const entryValid = (e: ManualEntry) => !!(e.name.trim() && e.linkedin.trim()) && isValidLinkedIn(e.linkedin) && isPhoneValid(e.phone, e.phoneCountry);
 const entryStarted = (e: ManualEntry) =>
   !!(e.name.trim() || e.email.trim() || e.company.trim() || e.title.trim() || e.phone.trim() ||
      e.companySize.trim() || e.seniority.trim() || e.twitter.trim() || e.linkedin.trim() ||
@@ -191,9 +194,15 @@ export function AddLeadsWizard({
   open,
   onClose,
   initialSource,
+  asPage,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Renders as a normal page inside the app's own layout (sidebar/topbar
+   *  stay visible, the whole page scrolls) instead of a full-viewport
+   *  overlay. Used by the dedicated /leads/add route; the campaign
+   *  builder's in-context import dialog keeps the overlay behavior. */
+  asPage?: boolean;
   /** Jumps straight to that source's data-entry screen (step 2) instead of the source picker — used by toolbar quick-add shortcuts. */
   initialSource?: SourceId | null;
 }) {
@@ -250,10 +259,18 @@ export function AddLeadsWizard({
 
   // Plan-gated sources (Buy Leads) — checked once when the wizard opens.
   const [locked, setLocked] = useState<{ discovery: boolean }>({ discovery: false });
+  // Platform-admin release gate for "Verified Emails" — ships locked for
+  // everyone until turned on from Admin > Feature Access (see
+  // feature-kill-switches.ts). Separate from the plan-based `locked` above:
+  // this one is "not released yet", not "not on your plan".
+  const [verifiedEmailsReleased, setVerifiedEmailsReleased] = useState(false);
   useEffect(() => {
     if (!open) return;
     hasFeature("discovery")
       .then((discovery) => setLocked({ discovery: !discovery }))
+      .catch(() => {});
+    isFeatureEnabledForCurrentUser("verified_emails_source")
+      .then(setVerifiedEmailsReleased)
       .catch(() => {});
     getMaxBuyLeadsCount()
       .then((max) => {
@@ -390,7 +407,12 @@ export function AddLeadsWizard({
     onClose();
   }
 
+  function isComingSoon(id: SourceId): boolean {
+    return id === "verified-emails" && !verifiedEmailsReleased;
+  }
+
   function isLocked(id: SourceId): boolean {
+    if (isComingSoon(id)) return true;
     const flag = SOURCES.find((s) => s.id === id)?.featureFlag;
     return flag ? locked[flag] : false;
   }
@@ -438,7 +460,8 @@ export function AddLeadsWizard({
       .then((res) => {
         if (!res.ok) { setStep2Error(res.error || "Could not queue the search."); return; }
         const eta = res.timeEstimate ? ` Usually takes ${res.timeEstimate}, but we'll keep going as long as it takes to find all ${buy.count}.` : "";
-        toast(`We'll email you when your ${buy.count} verified leads are ready.${eta} Check Verified Leads under Prospects later.`, "success");
+        const leadWord = buy.requireVerifiedEmail ? "verified leads" : "leads";
+        toast(`We'll email you and notify you in the app when your ${buy.count} ${leadWord} are ready.${eta} Check Verified Leads under Prospects any time to see progress.`, "success");
         reset();
         onClose();
       })
@@ -629,7 +652,7 @@ export function AddLeadsWizard({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+    <div className={asPage ? "bg-white flex flex-col" : "fixed inset-0 z-[100] bg-white flex flex-col"}>
       {/* Header + progress */}
       <div className="px-6 sm:px-10 py-5 border-b border-slate-100 flex-shrink-0">
         <div className="max-w-6xl mx-auto flex items-start justify-between">
@@ -655,7 +678,7 @@ export function AddLeadsWizard({
       </div>
 
       {/* Body */}
-      <div className="overflow-auto flex-1 px-6 sm:px-10 py-8 flex flex-col">
+      <div className={cn("px-6 sm:px-10 py-8 flex flex-col", asPage ? "flex-1" : "overflow-auto flex-1")}>
         <div className={cn(
           "max-w-6xl mx-auto w-full flex-1 flex flex-col",
           (source === "linkedin-search" || source === "linkedin-post") && step === 2 && "justify-center"
@@ -681,7 +704,9 @@ export function AddLeadsWizard({
                         <Check className="h-3.5 w-3.5 text-white" />
                       </span>
                     )}
-                    {sourceLocked ? (
+                    {isComingSoon(s.id) ? (
+                      <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-slate-400 text-white rounded-full px-2 py-0.5">Coming Soon</span>
+                    ) : sourceLocked ? (
                       <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-slate-400 text-white rounded-full px-2 py-0.5">Upgrade</span>
                     ) : !active && s.badge && (
                       <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide bg-blue-600 text-white rounded-full px-2 py-0.5">{s.badge}</span>
@@ -690,7 +715,9 @@ export function AddLeadsWizard({
                       <Icon className="h-6 w-6" />
                     </div>
                     <p className="font-semibold text-slate-900 text-base">{s.label}</p>
-                    <p className="text-sm text-slate-500 mt-1.5">{sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}</p>
+                    <p className="text-sm text-slate-500 mt-1.5">
+                      {isComingSoon(s.id) ? "This feature is coming soon." : sourceLocked ? "Not included on your plan — upgrade to unlock." : s.desc}
+                    </p>
                   </button>
                 );
 
@@ -722,8 +749,11 @@ export function AddLeadsWizard({
                     onChange={(id) => { setBuyMode(id as "individual" | "company"); setStep2Error(null); }}
                   />
                 )}
-                {/* Verified Emails is Individual-only, background-search-only — see
-                    runInBackground() and BuyForm's onRunInBackground handling. */}
+                {/* Individual Leads (plain Buy Leads and Verified Emails alike) always
+                    run as a background search job now — see runInBackground() and
+                    BuyForm's onRunInBackground handling. Guaranteeing the exact count
+                    the user asked for needs patience an on-screen wait can't honestly
+                    promise, and it lets the user leave and keep working elsewhere. */}
                 {source === "verified-emails" || buyMode === "individual" ? (
                   <BuyForm
                     buy={buy}
@@ -735,8 +765,9 @@ export function AddLeadsWizard({
                     error={step2Error}
                     warning={step2Warning}
                     maxCount={maxBuyCount}
-                    onRunInBackground={source === "verified-emails" ? runInBackground : undefined}
+                    onRunInBackground={runInBackground}
                     backgroundLoading={bgQueueLoading}
+                    forceVerifiedEmail={source === "verified-emails"}
                   />
                 ) : (
                   <CompanyWiseLeadsFlow
@@ -1294,7 +1325,7 @@ export type BuyState = {
 // values load in — "Any" is a client-only sentinel for this filter UI, never stored.
 const FALLBACK_COMPANY_SIZE_BUCKETS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const FALLBACK_SENIORITY_LEVELS = ["C-Level", "VP", "Director", "Manager", "Individual Contributor"];
-export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, warning, maxCount, onRunInBackground, backgroundLoading }: {
+export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, error, warning, maxCount, onRunInBackground, backgroundLoading, forceVerifiedEmail }: {
   buy: BuyState;
   setBuy: (b: BuyState) => void;
   results: GeneratedProspect[] | null;
@@ -1310,6 +1341,9 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
    *  honestly promise, so that path doesn't exist here at all. */
   onRunInBackground?: () => void;
   backgroundLoading?: boolean;
+  /** Set when the wizard's "Verified Emails" card was chosen — locks the
+   *  filter on so it can't be turned off. */
+  forceVerifiedEmail?: boolean;
 }) {
   const isReal = source === "brightdata" || source === "anysite";
   // Initialized once from buy.count — BuyForm unmounts whenever the user leaves
@@ -1329,14 +1363,14 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-base font-semibold text-slate-800 mb-2">Industry</label>
-            <Select value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
+            <Select value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })} disabled={backgroundLoading} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
               <option value="">Any industry</option>
               {LINKEDIN_INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
             </Select>
           </div>
           <div>
             <label className="block text-base font-semibold text-slate-800 mb-2">Job title / role</label>
-            <Select value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm">
+            <Select value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })} disabled={backgroundLoading} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
               <option value="">Any role</option>
               {COMMON_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
             </Select>
@@ -1345,7 +1379,7 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
 
         <div>
           <label className="block text-base font-semibold text-slate-800 mb-2">Location</label>
-          <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} />
+          <MultiLocationInput value={buy.locations} onChange={(v) => setBuy({ ...buy, locations: v })} disabled={backgroundLoading} />
         </div>
 
         <div className="max-w-[220px]">
@@ -1358,9 +1392,22 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
             onChange={(e) => setCountDraft(e.target.value.replace(/[^0-9]/g, ""))}
             onBlur={commitCount}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitCount(); } }}
-            className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+            disabled={backgroundLoading}
+            className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
           />
         </div>
+
+        {/* Buy Leads and Verified Emails are two different services — Buy Leads
+            never includes an email (that's the whole point of the separate
+            Verified Emails service), so there's no toggle here at all. This
+            only ever renders as a fixed "always on" indicator when reached
+            via the Verified Emails card. */}
+        {forceVerifiedEmail && (
+          <label className="flex items-center gap-3 text-base text-slate-800 cursor-not-allowed opacity-70">
+            <input type="checkbox" checked disabled className="rounded border-slate-400 h-5 w-5 cursor-not-allowed" />
+            Verified work email included on every result
+          </label>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           {onRunInBackground ? (
@@ -1379,7 +1426,10 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
         </div>
         {onRunInBackground && (
           <p className="text-sm text-slate-500">
-            Every lead here comes with a verified email — that takes real time to confirm, so this runs in the background, however long it needs. We&apos;ll email you when it&apos;s ready; find it later under Prospects → Verified Leads.
+            {forceVerifiedEmail
+              ? "Every lead here comes with a verified email — that takes real time to confirm, so this runs in the background, however long it needs."
+              : "Getting exactly the number you asked for can take a little while, so this runs in the background."}
+            {" "}We&apos;ll email you and notify you in the app the moment it&apos;s ready — feel free to leave this screen and keep working. Come back to Buy Leads to check progress any time.
           </p>
         )}
 
@@ -1410,10 +1460,10 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
           <ul className="space-y-3 text-base text-slate-600">
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Name, job title, company and LinkedIn URL from real public profiles.</li>
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> An estimated seniority label, shown alongside each result (not a search filter — just informational).</li>
-            {onRunInBackground ? (
+            {forceVerifiedEmail ? (
               <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> A confirmed work email for every result, guaranteed — never guessed, never skipped.</li>
             ) : (
-              <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> No email — this is a fast, no-email lookup. Use Verified Emails if you need one.</li>
+              <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> No email — Buy Leads never includes one. Use Verified Emails if you need a confirmed email on every result.</li>
             )}
             <li className="flex gap-2"><CheckCircle2 className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" /> Up to {maxCount} prospects per search, based on your plan.</li>
           </ul>

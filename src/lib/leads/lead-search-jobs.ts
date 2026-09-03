@@ -1,7 +1,8 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email/resend";
-import { hasFeature, getMaxBuyLeadsCount, canAffordLeads } from "@/lib/queries/subscriptions";
+import { hasFeature, getMaxBuyLeadsCount, canAffordLeads, getSubscription, getDailyBuyLeadsLimit } from "@/lib/queries/subscriptions";
+import { notifyUser } from "@/lib/queries/notifications";
 import { getActiveLeadProvider } from "@/lib/leads/provider";
 import { anysiteConfigured, searchAnysiteUsers } from "@/lib/leads/anysite";
 import { brightDataConfigured, brightDataSearchPeople } from "@/lib/leads/bright-data";
@@ -76,6 +77,7 @@ export type LeadSearchJobStatus = "pending" | "running" | "done" | "failed";
 interface JobDbRow {
   id: string;
   workspace_id: string;
+  created_by: string;
   notify_email: string;
   criteria: BuyCriteria;
   requested_count: number;
@@ -161,19 +163,41 @@ export async function createLeadSearchJob(
   const email = (notifyEmail || user.email || "").trim();
   if (!email) return { ok: false, error: "No notification email available for this account." };
 
+  // Daily cap — separate from leads_remaining (the monthly balance). Checked
+  // read-only here, only incremented once the job is actually created below,
+  // so a rejected request never needs to be rolled back.
+  const sub = await getSubscription();
+  if (!sub) return { ok: false, error: "No active subscription found." };
+  const dailyLimit = await getDailyBuyLeadsLimit();
+  const { data: remainingToday, error: quotaError } = await supabase.rpc("lead_search_daily_remaining", {
+    p_workspace_id: sub.workspace_id,
+    p_daily_limit: dailyLimit,
+  });
+  if (quotaError) return { ok: false, error: quotaError.message };
+  const remaining = typeof remainingToday === "number" ? remainingToday : dailyLimit;
+  if (remaining <= 0) {
+    return { ok: false, error: `You've reached your plan's daily limit of ${dailyLimit} leads. This resets at midnight — try again tomorrow.` };
+  }
+  if (requestedCount > remaining) {
+    return { ok: false, error: `You can request at most ${remaining} more lead${remaining === 1 ? "" : "s"} today (daily limit: ${dailyLimit}). Lower the count, or come back tomorrow for the rest.` };
+  }
+
   const timeEstimate = estimateWaitLabel(requestedCount);
   const { data, error } = await supabase
     .from("lead_search_jobs")
     .insert({
       created_by: user.id,
       notify_email: email,
-      criteria: { ...criteria, count: requestedCount, requireVerifiedEmail: true },
+      criteria: { ...criteria, count: requestedCount },
       requested_count: requestedCount,
       time_estimate: timeEstimate,
     })
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
+
+  await supabase.rpc("increment_lead_search_daily_usage", { p_workspace_id: sub.workspace_id, p_amount: requestedCount });
+
   return { ok: true, id: data.id, timeEstimate };
 }
 
@@ -267,35 +291,46 @@ async function runSearchRound(
   return { ok: false, prospects: [], error: "Lead discovery requires the active provider to be configured." };
 }
 
-async function enrichBatch(prospects: GeneratedProspect[], provider: "anysite" | "bright_data") {
+async function enrichBatch(prospects: GeneratedProspect[], provider: "anysite" | "bright_data", requireVerifiedEmail: boolean) {
   return provider === "anysite"
-    ? enrichWithAnysiteEmails(prospects, true)
-    : enrichAndFilterProspects(prospects, true);
+    ? enrichWithAnysiteEmails(prospects, requireVerifiedEmail)
+    : enrichAndFilterProspects(prospects, requireVerifiedEmail);
 }
 
-function noteFor(found: number, requested: number): string | undefined {
+function noteFor(found: number, requested: number, requireVerifiedEmail: boolean): string | undefined {
   if (found >= requested) return undefined;
-  return `Found ${found} of the ${requested} requested — we checked every real match we could find for this criteria (right up to genuine exhaustion) and this is everyone available with a confirmed email right now. Try a broader location/role to get more.`;
+  const emailPart = requireVerifiedEmail ? " with a confirmed email" : "";
+  return `Found ${found} of the ${requested} requested — we checked every real match we could find for this criteria (right up to genuine exhaustion) and this is everyone available${emailPart} right now. Try a broader location/role to get more.`;
 }
 
 async function sendCompletionEmail(row: JobDbRow, note?: string) {
   const roleLabel = [row.criteria.role, row.criteria.industry].filter(Boolean).join(" ") || "your criteria";
+  const leadWord = row.criteria.requireVerifiedEmail ? "verified leads" : "leads";
+  const emailQualifier = row.criteria.requireVerifiedEmail ? "verified-email " : "";
   const subject = note
-    ? `Your verified leads search finished — ${row.found_count} of ${row.requested_count} found`
-    : `Your ${row.found_count} verified leads are ready`;
+    ? `Your ${leadWord} search finished — ${row.found_count} of ${row.requested_count} found`
+    : `Your ${row.found_count} ${leadWord} are ready`;
   const text = note
-    ? `We searched exhaustively for "${roleLabel}" and found ${row.found_count} of the ${row.requested_count} verified-email leads you asked for — that's genuinely everyone available right now. Open Verified Leads in the app to review and import them.`
-    : `We found all ${row.found_count} verified-email leads you asked for matching "${roleLabel}". Open Verified Leads in the app to review and import them.`;
+    ? `We searched exhaustively for "${roleLabel}" and found ${row.found_count} of the ${row.requested_count} ${emailQualifier}leads you asked for — that's genuinely everyone available right now. Open the app to review and import them.`
+    : `We found all ${row.found_count} ${emailQualifier}leads you asked for matching "${roleLabel}". Open the app to review and import them.`;
   await sendEmail({ to: row.notify_email, subject, text });
+  await notifyUser(row.created_by, {
+    type: "lead_search_job",
+    title: note ? `${row.found_count} of ${row.requested_count} leads found` : `${row.found_count} leads are ready`,
+    message: `Your search for "${roleLabel}" finished. Open Prospects to review and import them.`,
+    link: "/leads",
+  }).catch(() => {});
 }
 
 async function sendProgressEmail(row: JobDbRow) {
   const roleLabel = [row.criteria.role, row.criteria.industry].filter(Boolean).join(" ") || "your criteria";
+  const leadWord = row.criteria.requireVerifiedEmail ? "verified leads" : "leads";
+  const emailQualifier = row.criteria.requireVerifiedEmail ? "verified-email " : "";
   const elapsedMin = Math.round((Date.now() - new Date(row.created_at).getTime()) / 60000);
   await sendEmail({
     to: row.notify_email,
-    subject: `Still searching — ${row.found_count} of ${row.requested_count} verified leads found so far`,
-    text: `Your search for "${roleLabel}" is still running (${elapsedMin} minutes so far). We've confirmed ${row.found_count} of the ${row.requested_count} verified-email leads you asked for and are continuing to search for the rest — quality over speed, so this can take a while. We'll email you again the moment it's done.`,
+    subject: `Still searching — ${row.found_count} of ${row.requested_count} ${leadWord} found so far`,
+    text: `Your search for "${roleLabel}" is still running (${elapsedMin} minutes so far). We've found ${row.found_count} of the ${row.requested_count} ${emailQualifier}leads you asked for and are continuing to search for the rest — quality over speed, so this can take a while. We'll email you again the moment it's done.`,
   });
 }
 
@@ -322,16 +357,23 @@ export async function processDueLeadSearchJobs(jobLimit = 3, perJobBudgetMs = 15
     let lastError: string | undefined;
 
     if (attempts + 1 > MAX_ATTEMPTS) {
+      const emailQualifier = job.criteria.requireVerifiedEmail ? "verified-email " : "";
       await admin.from("lead_search_jobs").update({
         status: "failed",
-        last_error: "Gave up after an extremely long search — this criteria may be impossible to fill with verified emails.",
+        last_error: `Gave up after an extremely long search — this criteria may be impossible to fill with ${emailQualifier || ""}enough leads.`,
         updated_at: new Date().toISOString(),
       }).eq("id", job.id);
       await sendEmail({
         to: job.notify_email,
-        subject: `Your verified leads search couldn't be completed`,
-        text: `We searched extensively but couldn't find enough verified-email leads for your criteria. Found ${job.found_count} of ${job.requested_count} before giving up. Try broadening the location or job title.`,
+        subject: `Your lead search couldn't be completed`,
+        text: `We searched extensively but couldn't find enough ${emailQualifier}leads for your criteria. Found ${job.found_count} of ${job.requested_count} before giving up. Try broadening the location or job title.`,
       });
+      await notifyUser(job.created_by, {
+        type: "lead_search_job",
+        title: "Lead search couldn't be completed",
+        message: `Found ${job.found_count} of ${job.requested_count} before giving up. Try broadening your criteria.`,
+        link: "/leads",
+      }).catch(() => {});
       failed += 1;
       continue;
     }
@@ -366,7 +408,7 @@ export async function processDueLeadSearchJobs(jobLimit = 3, perJobBudgetMs = 15
 
       const batch = pool.slice(0, ENRICH_BATCH_SIZE);
       pool = pool.slice(ENRICH_BATCH_SIZE);
-      const enriched = await enrichBatch(batch, provider);
+      const enriched = await enrichBatch(batch, provider, job.criteria.requireVerifiedEmail ?? false);
       attempts += 1;
       if (enriched.ok) {
         results = [...results, ...enriched.prospects];
@@ -395,7 +437,7 @@ export async function processDueLeadSearchJobs(jobLimit = 3, perJobBudgetMs = 15
 
     if (done || stuck) {
       const trimmed = results.slice(0, job.requested_count);
-      const note = noteFor(trimmed.length, job.requested_count);
+      const note = noteFor(trimmed.length, job.requested_count, job.criteria.requireVerifiedEmail ?? false);
       const nowIso = new Date().toISOString();
       await admin.from("lead_search_jobs").update({
         status: "done",

@@ -57,12 +57,26 @@ export async function canAffordLeads(amount = 1): Promise<boolean> {
   return sub.leads_remaining >= amount;
 }
 
-/** Buy Leads' per-request cap: at most 100 in one go, further capped by
- *  whatever's actually left on the plan this cycle. */
+/** Daily cap on Buy Leads / background lead searches — separate from
+ *  leads_remaining (the monthly/billing-cycle balance). Basic has no
+ *  discovery access at all (see hasFeature("discovery")), so it never
+ *  reaches this. */
+const DAILY_LEAD_SEARCH_LIMIT: Record<PlanId, number> = { basic: 0, starter: 100, pro: 200 };
+
+/** This plan's daily lead-search limit — 0 if there's no active subscription. */
+export async function getDailyBuyLeadsLimit(): Promise<number> {
+  const sub = await getSubscription();
+  if (!sub) return 0;
+  return DAILY_LEAD_SEARCH_LIMIT[sub.plan.id] ?? 0;
+}
+
+/** Buy Leads' per-request cap: at most the plan's daily limit in one go,
+ *  further capped by whatever's actually left on the plan this cycle. */
 export async function getMaxBuyLeadsCount(): Promise<number> {
   const sub = await getSubscription();
   if (!sub) return 100;
-  return Math.max(1, Math.min(100, sub.leads_remaining));
+  const dailyLimit = DAILY_LEAD_SEARCH_LIMIT[sub.plan.id] ?? 100;
+  return Math.max(1, Math.min(dailyLimit, sub.leads_remaining));
 }
 
 export async function getCreditHistory(limit = 50, resourceType?: "credits" | "leads") {

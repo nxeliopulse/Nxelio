@@ -12,7 +12,7 @@ import type { OwnerOption } from "@/components/contacts/contacts-table";
 import { PhoneInput, detectCountry, formatPhoneForStorage, isPhoneValid } from "@/components/ui/phone-input";
 import type { CountryCode } from "libphonenumber-js";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
-import { isValidEmail, EMAIL_ERROR } from "@/lib/validation";
+import { isValidEmail, isValidLinkedIn, EMAIL_ERROR, LINKEDIN_ERROR } from "@/lib/validation";
 
 const SALUTATIONS = ["Mr.", "Ms.", "Mrs.", "Dr.", "Prof."];
 const INDUSTRIES = ["Technology", "Finance", "Healthcare", "Manufacturing", "Retail", "Education", "Consulting", "Other"];
@@ -264,6 +264,11 @@ export function EditContactModal({
     }
     if (!isPhoneValid(form.whatsapp, whatsappCountry)) {
       setError("WhatsApp number isn't valid for the selected country.");
+      setOpenSections((s) => ({ ...s, social: true }));
+      return;
+    }
+    if (!isValidLinkedIn(form.linkedin)) {
+      setError(LINKEDIN_ERROR);
       setOpenSections((s) => ({ ...s, social: true }));
       return;
     }

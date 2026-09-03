@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import { isValidPhoneNumber } from "libphonenumber-js";
+import { isValidLinkedIn, LINKEDIN_ERROR } from "@/lib/validation";
 
 const PHONE_FIELD_LABELS: Record<string, string> = {
   phone: "Phone", mobile: "Mobile", home_phone: "Home phone", other_phone: "Other phone",
@@ -21,6 +22,14 @@ function assertValidContactPhoneFields(payload: Partial<ContactRow>) {
     if (value && !isValidPhoneNumber(value)) {
       throw new Error(`${PHONE_FIELD_LABELS[field]} number isn't valid.`);
     }
+  }
+}
+
+/** Never trust the client alone — reject anything that isn't a real
+ *  linkedin.com URL, same enforcement point as the phone check above. */
+function assertValidContactLinkedIn(payload: Partial<ContactRow>) {
+  if (payload.linkedin && !isValidLinkedIn(payload.linkedin)) {
+    throw new Error(LINKEDIN_ERROR);
   }
 }
 
@@ -135,6 +144,7 @@ export async function findMatchingContact({ email, phone, linkedin }: { email?: 
 
 export async function createContact(payload: Partial<ContactRow>) {
   assertValidContactPhoneFields(payload);
+  assertValidContactLinkedIn(payload);
   const supabase = await createClient();
   const { data, error } = await supabase.from("contacts").insert(payload).select().single();
   if (error) throw error;
@@ -191,6 +201,7 @@ async function syncConvertedLead(
 
 export async function updateContact(id: string, payload: Partial<ContactRow>) {
   assertValidContactPhoneFields(payload);
+  assertValidContactLinkedIn(payload);
   const supabase = await createClient();
   // .select("id") to get the updated row back — PostgREST reports no error when
   // RLS silently blocks an update (0 rows affected looks identical to success

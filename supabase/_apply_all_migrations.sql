@@ -5754,3 +5754,126 @@ ALTER TABLE demo_requests ADD COLUMN IF NOT EXISTS calendar_provider TEXT;
 ALTER TABLE demo_requests DROP CONSTRAINT IF EXISTS demo_requests_email_start_unique;
 ALTER TABLE demo_requests ADD CONSTRAINT demo_requests_email_start_unique
   UNIQUE (business_email, meeting_start_at);
+
+-- >>> FILE: 0152_verified_emails_feature_gate.sql
+-- The "Verified Emails" lead source is a preview feature — unlike the
+-- existing kill switches (which pause something already live), this one
+-- ships LOCKED until the platform admin explicitly turns it on for everyone.
+ALTER TABLE feature_kill_switches DROP CONSTRAINT feature_kill_switches_feature_key_check;
+ALTER TABLE feature_kill_switches ADD CONSTRAINT feature_kill_switches_feature_key_check
+  CHECK (feature_key IN ('launch_campaign', 'send_email', 'send_newsletter', 'verified_emails_source'));
+
+INSERT INTO feature_kill_switches (feature_key, enabled) VALUES
+  ('verified_emails_source', FALSE)
+ON CONFLICT (feature_key) DO NOTHING;
+
+-- >>> FILE: 0153_outreach_disconnect_tombstones.sql
+-- ============================================================================
+-- Fixes a real bug: clicking Disconnect on an Email/LinkedIn connection in
+-- Settings deletes the local outreach_accounts row, but if the account is
+-- still alive on Unipile's side (e.g. the DELETE call to Unipile failed
+-- because the workspace's Unipile subscription lapsed — deleteOutreachAccount
+-- swallows that failure and deletes locally anyway), the very next
+-- window-focus-triggered syncOutreachAccounts() call sees that account still
+-- listed by Unipile and silently re-inserts it as "connected" again. From the
+-- user's side this looks exactly like "I click Disconnect and it doesn't
+-- disconnect."
+--
+-- Fix: remember every account_id the user explicitly disconnected. sync skips
+-- re-adding anything on this list. Starting a fresh Connect for that channel
+-- clears the workspace's tombstones for that channel — explicit reconnect
+-- intent always wins.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS outreach_disconnected_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  account_id VARCHAR(255) NOT NULL,
+  channel VARCHAR(20) NOT NULL,
+  disconnected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (workspace_id, account_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_outreach_disconnected_ws_channel ON outreach_disconnected_accounts(workspace_id, channel);
+
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY['outreach_disconnected_accounts']) LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS auto_workspace_trigger ON %I;', t);
+    EXECUTE format('CREATE TRIGGER auto_workspace_trigger BEFORE INSERT ON %I FOR EACH ROW EXECUTE FUNCTION set_workspace_from_user();', t);
+
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
+    EXECUTE format('DROP POLICY IF EXISTS ws_select_%s ON %I;', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS ws_insert_%s ON %I;', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS ws_delete_%s ON %I;', t, t);
+    EXECUTE format('CREATE POLICY ws_select_%s ON %I FOR SELECT TO authenticated USING (workspace_id = get_current_workspace_id());', t, t);
+    EXECUTE format('CREATE POLICY ws_insert_%s ON %I FOR INSERT TO authenticated WITH CHECK (workspace_id = get_current_workspace_id());', t, t);
+    EXECUTE format('CREATE POLICY ws_delete_%s ON %I FOR DELETE TO authenticated USING (workspace_id = get_current_workspace_id());', t, t);
+  END LOOP;
+END $$;
+
+-- >>> FILE: 0154_lead_search_daily_limits.sql
+-- ============================================================================
+-- Daily cap on Buy Leads / background lead searches, separate from the
+-- existing MONTHLY leads_remaining balance (subscriptions.leads_remaining).
+-- Starter: 100/day, Pro: 200/day (values live in
+-- src/lib/queries/subscriptions.ts's DAILY_LEAD_SEARCH_LIMIT, not here).
+--
+-- Same shape as outreach_send_limits/outreach_send_counts (0070) and
+-- consume_send_quota (0136): a per-workspace, per-calendar-day usage row,
+-- checked read-only before creating a job (lead_search_daily_remaining) and
+-- incremented only after the job is actually created
+-- (increment_lead_search_daily_usage) — two calls instead of one atomic
+-- "consume" so a rejected request never has to be rolled back.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS lead_search_daily_usage (
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  usage_date   DATE NOT NULL,
+  count        INTEGER NOT NULL DEFAULT 0,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (workspace_id, usage_date)
+);
+
+ALTER TABLE lead_search_daily_usage ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ws_select_lead_search_daily_usage ON lead_search_daily_usage;
+CREATE POLICY ws_select_lead_search_daily_usage ON lead_search_daily_usage
+  FOR SELECT TO authenticated USING (workspace_id = get_current_workspace_id());
+-- No insert/update policy for authenticated — writes only happen through the
+-- SECURITY DEFINER function below, same as outreach_send_counts.
+
+CREATE OR REPLACE FUNCTION lead_search_daily_remaining(p_workspace_id uuid, p_daily_limit integer) RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_used INTEGER;
+BEGIN
+  IF get_current_workspace_id() IS NOT NULL AND p_workspace_id <> get_current_workspace_id() THEN
+    RETURN 0;
+  END IF;
+  SELECT count INTO v_used FROM lead_search_daily_usage
+  WHERE workspace_id = p_workspace_id AND usage_date = CURRENT_DATE;
+  RETURN GREATEST(0, p_daily_limit - COALESCE(v_used, 0));
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION increment_lead_search_daily_usage(p_workspace_id uuid, p_amount integer) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF get_current_workspace_id() IS NOT NULL AND p_workspace_id <> get_current_workspace_id() THEN
+    RETURN;
+  END IF;
+  IF p_amount <= 0 THEN RETURN; END IF;
+  INSERT INTO lead_search_daily_usage (workspace_id, usage_date, count)
+  VALUES (p_workspace_id, CURRENT_DATE, p_amount)
+  ON CONFLICT (workspace_id, usage_date)
+  DO UPDATE SET count = lead_search_daily_usage.count + EXCLUDED.count, updated_at = now();
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION lead_search_daily_remaining(uuid, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION lead_search_daily_remaining(uuid, integer) TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION increment_lead_search_daily_usage(uuid, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION increment_lead_search_daily_usage(uuid, integer) TO authenticated, service_role;

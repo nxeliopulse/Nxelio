@@ -29,7 +29,8 @@ function relativeTime(iso: string): string {
   return `${day}d ago`;
 }
 
-type Tab = "unread" | "all";
+type Tab = "unread" | "all" | "background";
+const BACKGROUND_NOTIFICATION_TYPE = "lead_search_job";
 
 export function NotificationsBell({ className }: { className?: string }) {
   const router = useRouter();
@@ -72,7 +73,9 @@ export function NotificationsBell({ className }: { className?: string }) {
   );
 
   const visible = useMemo(() => {
-    let list = tab === "unread" ? items.filter((i) => !i.is_read) : items;
+    let list = tab === "unread" ? items.filter((i) => !i.is_read)
+      : tab === "background" ? items.filter((i) => i.type === BACKGROUND_NOTIFICATION_TYPE)
+      : items;
     if (typeFilter) list = list.filter((i) => i.type === typeFilter);
     return list;
   }, [items, tab, typeFilter]);
@@ -187,7 +190,7 @@ export function NotificationsBell({ className }: { className?: string }) {
 
           {/* Tabs */}
           <div className="flex items-center gap-5 px-4 border-b border-slate-100">
-            {([["unread", `Unread (${unreadCount})`], ["all", "All"]] as [Tab, string][]).map(([id, label]) => (
+            {([["unread", `Unread (${unreadCount})`], ["all", "All"], ["background", "Background Process"]] as [Tab, string][]).map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => { setTab(id); setSelected(new Set()); }}
@@ -270,7 +273,7 @@ export function NotificationsBell({ className }: { className?: string }) {
           <div className="max-h-96 overflow-y-auto">
             {visible.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-slate-500">
-                {tab === "unread" ? "You're all caught up" : "No notifications yet"}
+                {tab === "unread" ? "You're all caught up" : tab === "background" ? "No background searches running or finished yet" : "No notifications yet"}
               </div>
             ) : (
               <ul className="py-1">
