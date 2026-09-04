@@ -382,6 +382,16 @@ function TeamPerformanceBarCard({
                 contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc", fontSize: "12px" }}
                 formatter={(v, name) => (name === "wonValue" ? money(Number(v)) : v)}
               />
+              {/* Subtitle promises "deals closed vs. revenue won", but with no
+                  legend the only way to tell the two bars/axes apart was to
+                  hover for the tooltip — and when Won value is $0, its bar is
+                  invisible, so it looked like only one series existed at all
+                  (QA report D16). formatter/nameFn map the raw dataKeys to
+                  the same human labels already used in the tooltip above. */}
+              <Legend
+                formatter={(value) => (value === "dealsCount" ? "Deals count" : value === "wonValue" ? "Won value" : value)}
+                wrapperStyle={{ fontSize: "12px" }}
+              />
               <Bar yAxisId="left" dataKey="dealsCount" name="Deals count" fill="#6366F1" radius={[6, 6, 0, 0]} isAnimationActive={false} />
               <Bar yAxisId="right" dataKey="wonValue" name="Won value" fill="#06B6D4" radius={[6, 6, 0, 0]} isAnimationActive={false} />
             </BarChart>
@@ -865,8 +875,15 @@ function SetupChecklistCard({ tasks, initialStates }: { tasks: SetupTask[]; init
           <tbody>
             {visible.map((task) => (
               <tr key={task.id} className="border-t border-slate-100 dark:border-slate-800">
-                <td className="px-3 py-3 font-semibold text-slate-800 dark:text-slate-100 whitespace-nowrap">{task.title}</td>
-                <td className="px-3 py-3 text-slate-500 dark:text-slate-400 hidden md:table-cell max-w-xs">{task.description}</td>
+                {/* No dark: variant here on purpose — globals.css already
+                    inverts the slate-* scale under .dark (light shades of
+                    text-slate-N become dark, dark shades become light), so a
+                    literal dark:text-slate-100 gets inverted a SECOND time
+                    back into a dark value, rendering near-invisible dark-grey
+                    text on the dark card (QA report D07). Plain text-slate-800
+                    /text-slate-500 already read correctly in both themes. */}
+                <td className="px-3 py-3 font-semibold text-slate-800 whitespace-nowrap">{task.title}</td>
+                <td className="px-3 py-3 text-slate-500 hidden md:table-cell max-w-xs">{task.description}</td>
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-end gap-1.5">
                     <button

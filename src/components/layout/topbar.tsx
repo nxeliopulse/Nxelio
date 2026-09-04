@@ -126,6 +126,20 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Escape closed none of these — only clicking outside did (QA report D04b,
+  // profile menu specifically, but search/more share the exact same open/
+  // click-outside pattern above and had the identical gap).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      setSearchOpen(false);
+      setMoreMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   function handleSearchChange(v: string) {
     setSearchQuery(v);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);

@@ -520,6 +520,16 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
   const safePage = Math.min(page, pageCount - 1);
   const paged = sorted.slice(safePage * pageSize, safePage * pageSize + pageSize);
 
+  // Distinguishes "this account has never had any prospects" from "a filter
+  // just happens to match none of them" — the empty-state copy below reused
+  // the same all-time-zero message for both cases (QA report D02b), telling
+  // someone with 64 real prospects that they had none, right after they
+  // searched for something that matched nothing.
+  const hasActiveFilter = Boolean(
+    search || industryFilter || interestFilter || dateFrom || dateTo ||
+    activeColumnFilterKeys.length > 0 || quickFilter !== "all" || cardFilter !== "all"
+  );
+
   function displayName(l: LeadRow): string {
     return l.full_name || l.company_name || "—";
   }
@@ -1275,7 +1285,9 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
                 {paged.length === 0 && (
                   <tr>
                     <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
-                      No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.
+                      {hasActiveFilter
+                        ? "No prospects match your search or filters. Try adjusting them."
+                        : <>No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</>}
                     </td>
                   </tr>
                 )}
@@ -1353,7 +1365,11 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
               </div>
             ))}
             {paged.length === 0 && (
-              <p className="col-span-full text-center text-slate-500 dark:text-slate-500 py-16">No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</p>
+              <p className="col-span-full text-center text-slate-500 dark:text-slate-500 py-16">
+                {hasActiveFilter
+                  ? "No prospects match your search or filters. Try adjusting them."
+                  : <>No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</>}
+              </p>
             )}
           </div>
         )}

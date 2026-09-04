@@ -62,11 +62,11 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
       <div
         className={`w-full max-w-[1380px] pointer-events-auto rounded-full transition-all duration-300 ${
           scrolled
-            ? "bg-[#007bfb] border border-blue-400/50 py-2 sm:py-3 px-3.5 sm:px-8 shadow-2xl shadow-blue-950/30 text-white"
-            : "bg-white/95 backdrop-blur-xl border border-white/85 py-3 sm:py-4 px-4 sm:px-8 shadow-xl shadow-black/5 text-[#1f2223]"
+            ? "bg-[#007bfb] border border-blue-400/50 py-2 sm:py-2.5 px-3.5 sm:px-6 xl:px-8 shadow-2xl shadow-blue-950/30 text-white"
+            : "bg-white/95 backdrop-blur-xl border border-white/85 py-2.5 sm:py-3 xl:py-3.5 px-4 sm:px-6 xl:px-8 shadow-xl shadow-black/5 text-[#1f2223]"
         }`}
       >
-        <div className="flex justify-between items-center gap-2 sm:gap-6">
+        <div className="flex justify-between items-center gap-2 lg:gap-4 xl:gap-6 min-w-0">
           
           {scrolled ? (
             /* ============ SCROLLED STATE: Generous Floating Conversion Bar ============ */
@@ -74,7 +74,7 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
               
               {/* Left: Brand / Logo in white */}
               <Link href="/" className="flex items-center gap-2 sm:gap-2.5 shrink-0 group">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 xl:w-10 xl:h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
                   <Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-blue-600" />
                 </div>
                 <span className="text-lg sm:text-2xl font-bold tracking-tight text-white hidden min-[440px]:inline">
@@ -83,8 +83,8 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
               </Link>
 
               {/* Center: Headline (hidden on small phones to prevent overflow) */}
-              <div className="flex-1 text-center px-1 sm:px-2 hidden md:block">
-                <h2 className="text-sm md:text-base lg:text-xl font-extrabold text-white tracking-tight leading-snug">
+              <div className="flex-1 text-center px-1 sm:px-2 hidden md:block min-w-0">
+                <h2 className="text-xs sm:text-sm lg:text-base xl:text-xl font-extrabold text-white tracking-tight leading-snug truncate">
                   Take your marketing &amp; sales to the next level!
                 </h2>
               </div>
@@ -94,13 +94,13 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
                 <button
                   type="button"
                   onClick={onBookDemo}
-                  className="hidden sm:inline-flex h-9 sm:h-10 px-3 sm:px-4 items-center justify-center rounded-full border border-white/60 text-white text-xs sm:text-sm font-semibold hover:bg-white/10 transition-colors cursor-pointer"
+                  className="hidden xl:inline-flex h-9 sm:h-10 px-3 sm:px-4 items-center justify-center rounded-full border border-white/60 text-white text-xs sm:text-sm font-semibold hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   Book Demo
                 </button>
                 <Link
                   href="/signup"
-                  className="inline-flex flex-col items-center justify-center bg-[#fdb813] hover:bg-[#e5a60f] active:scale-95 text-slate-950 px-4 sm:px-7 py-1.5 sm:py-2.5 rounded-full shadow-lg transition-all text-center leading-tight hover:shadow-amber-500/30 cursor-pointer"
+                  className="inline-flex flex-col items-center justify-center bg-[#fdb813] hover:bg-[#e5a60f] active:scale-95 text-slate-950 px-4 sm:px-6 xl:px-7 py-1.5 sm:py-2 xl:py-2.5 rounded-full shadow-lg transition-all text-center leading-tight hover:shadow-amber-500/30 cursor-pointer"
                 >
                   <span className="text-xs sm:text-sm font-black tracking-wide uppercase">
                     7 DAY FREE TRIAL
@@ -117,21 +117,22 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
             <>
               {/* Left: Brand Logo */}
               <Link href="/" className="flex items-center gap-2 sm:gap-2.5 shrink-0 group">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 xl:w-10 xl:h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform">
                   <Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-white" />
                 </div>
                 <span className="text-lg sm:text-2xl font-bold tracking-tight text-[#1f2223]">
-                  Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-medium text-xs sm:text-base">Nurture</span>
+                  Nx<span className="text-blue-600">elio</span>{" "}
+                  <span className="text-slate-500 font-medium text-xs sm:text-base hidden xl:inline">Nurture</span>
                 </span>
               </Link>
 
               {/* Center: Nav Links */}
-              <nav className="hidden lg:flex items-center gap-6 xl:gap-8">
+              <nav className="hidden lg:flex items-center gap-3 lg:gap-3.5 xl:gap-6 2xl:gap-8 shrink min-w-0">
                 {NAV_LINKS.map((link) => (
                   <a
                     key={link.href}
                     href={link.href}
-                    className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors"
+                    className="text-xs xl:text-sm 2xl:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors whitespace-nowrap"
                   >
                     {link.label}
                   </a>
@@ -139,11 +140,11 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
               </nav>
 
               {/* Right: Actions */}
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 xl:gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={onBookDemo}
-                  className="hidden sm:inline-flex h-9 sm:h-10 px-3 sm:px-4 items-center justify-center rounded-full border border-blue-200 bg-white text-xs sm:text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+                  className="hidden xl:inline-flex h-9 sm:h-10 px-3 sm:px-4 items-center justify-center rounded-full border border-blue-200 bg-white text-xs sm:text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm cursor-pointer whitespace-nowrap shrink-0"
                 >
                   Book Demo
                 </button>
@@ -155,7 +156,7 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex h-9 sm:h-11 px-3.5 sm:px-6 items-center justify-center gap-1.5 sm:gap-2 rounded-full bg-[#1f2223] text-white text-xs sm:text-[15px] font-semibold hover:bg-black transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+                  className="inline-flex h-9 sm:h-10 xl:h-11 px-3.5 sm:px-5 xl:px-6 items-center justify-center gap-1.5 sm:gap-2 rounded-full bg-[#1f2223] text-white text-xs sm:text-sm xl:text-[15px] font-semibold hover:bg-black transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
                 >
                   <span>Start Free</span>
                   <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

@@ -209,7 +209,35 @@ export async function getDashboardStats(filters: DashboardFilters = {}): Promise
   const lastMonthConvRate = lastMonthLeads ? (months[months.length - 2].converted / lastMonthLeads) * 100 : 0;
   const conversionTrendPct = pctChange(thisMonthConvRate, lastMonthConvRate);
   const dealsCreatedTrendPct = pctChange(months[months.length - 1]?.dealsCreated ?? 0, months[months.length - 2]?.dealsCreated ?? 0);
-  const pipelineValueTrendPct = pctChange(months[months.length - 1]?.pipelineValue ?? 0, months[months.length - 2]?.pipelineValue ?? 0);
+
+  /** Sum of deal_value for opportunities that were open — created by, and not
+   *  yet closed as of, `cutoffMs`. Reconstructs what the pipeline BALANCE
+   *  actually was at a point in time, from each opportunity's created_at/
+   *  closed_at (closed_at is set for both won and lost — see
+   *  opportunities.ts's CLOSED_STAGES check — so it doubles as "left the open
+   *  pipeline" regardless of outcome). */
+  function openPipelineValueAsOf(cutoffMs: number): number {
+    return oppRows
+      .filter((o) => {
+        if (new Date(o.created_at).getTime() >= cutoffMs) return false;
+        if (!o.closed_at) return true;
+        return new Date(o.closed_at).getTime() >= cutoffMs;
+      })
+      .reduce((s, o) => s + Number(o.deal_value || 0), 0);
+  }
+  // Previously this compared months[].pipelineValue — the sum of deals
+  // CREATED in each calendar month, a flow metric — month over month. That's
+  // the right computation for the separate Revenue Analytics "Pipeline"
+  // series a few lines below (unchanged), but wrong for THIS trend, which
+  // sits next to the dashboard's "Pipeline Value" tile — a running BALANCE
+  // (stats.pipeline.openValue). A workspace whose deals were all created last
+  // month and none this month showed a real, correct "-100%" in
+  // deals-created terms while its actual balance hadn't moved at all (QA
+  // report D13). Comparing the same balance the tile itself shows, now vs.
+  // the boundary between this month and last, means the percentage actually
+  // describes how that $ figure changed.
+  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const pipelineValueTrendPct = pctChange(pipeline.openValue, openPipelineValueAsOf(startOfThisMonth));
 
   const emailsSent = (allCampaigns || []).reduce((s, c) => s + (c.sent_count || 0), 0);
   const aiScored = (leads || []).filter((l) => (l.lead_score || 0) > 0).length;

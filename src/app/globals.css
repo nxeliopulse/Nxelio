@@ -574,9 +574,29 @@ html, body {
    ============================================================================ */
 .force-dark-theme,
 .dark .force-dark-theme {
+  /* Full inverted ramp — this rule previously only set 300/400/500, so an
+     element like text-slate-900 (e.g. the wordmark) fell through to
+     Tailwind's un-inverted framework default (a near-black navy) whenever
+     this class was applied WITHOUT the page also being in .dark: dark text
+     on the forced-dark background below, invisible. .force-light-theme
+     (this class's sibling) covers its full ramp for the same reason — this
+     now matches it, using the same inverted values as .dark's own ramp so
+     force-dark-theme renders correctly standalone, regardless of the
+     visitor's OS/app light-dark preference. 300/400/500 keep their existing,
+     separately-tuned values rather than being overwritten to .dark's.
+     --card is included because bg-white needs it below — every other token
+     in this screen only reaches for the slate and blue scales. */
+  --color-slate-50:  #121620 !important;
+  --color-slate-100: #242c3a !important;
+  --color-slate-200: #313b4d !important;
   --color-slate-300: #cbd5e1 !important;
   --color-slate-400: #94a3b8 !important;
   --color-slate-500: #64748b !important;
+  --color-slate-600: #cbd5e1 !important;
+  --color-slate-700: #e2e8f0 !important;
+  --color-slate-800: #eef2f7 !important;
+  --color-slate-900: #f8fafc !important;
+  --card: #1b212e !important;
   /* Restore real blue — the app-wide --color-blue-* tokens above are
      hijacked to the dashboard's teal accent, which is correct everywhere
      except this deliberately blue-branded auth shell. */
@@ -590,6 +610,17 @@ html, body {
   background-color: #0a0a0d !important;
   color: #ffffff !important;
   color-scheme: dark;
+}
+
+/* bg-white is a special case, not a token: elsewhere in the app it only goes
+   dark via the plain global rule `.dark .bg-white { background: var(--card) }`,
+   which needs the real .dark class present. This screen's tab pill, inputs,
+   and checkbox all use bg-white directly, so without an unconditional rule
+   here they rendered literal white — correct in dark-OS mode (where the
+   ancestor .dark rule above still fired) but wrong in light-OS mode, which
+   was the whole gap this class exists to close. */
+.force-dark-theme .bg-white {
+  background-color: var(--card) !important;
 }
 
 .force-dark-theme input,
