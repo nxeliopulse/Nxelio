@@ -77,8 +77,9 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
                 <div className="w-8 h-8 sm:w-9 sm:h-9 xl:w-10 xl:h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
                   <Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-blue-600" />
                 </div>
-                <span className="text-lg sm:text-2xl font-bold tracking-tight text-white hidden min-[440px]:inline">
-                  Nx<span className="text-amber-300">elio</span>
+                <span className="text-lg sm:text-2xl font-bold tracking-tight text-white">
+                  Nx<span className="text-amber-300">elio</span>{" "}
+                  <span className="text-blue-100 font-medium text-xs sm:text-base">Nurture</span>
                 </span>
               </Link>
 
@@ -122,7 +123,7 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
                 </div>
                 <span className="text-lg sm:text-2xl font-bold tracking-tight text-[#1f2223]">
                   Nx<span className="text-blue-600">elio</span>{" "}
-                  <span className="text-slate-500 font-medium text-xs sm:text-base hidden xl:inline">Nurture</span>
+                  <span className="text-slate-500 font-medium text-xs sm:text-base">Nurture</span>
                 </span>
               </Link>
 
@@ -1188,8 +1189,13 @@ function PricingSection() {
                   </ul>
                 </div>
 
-                {/* Bottom Row: Price on Left & Dark Recessed Sign-up Button on Right */}
-                <div className="pt-6 border-t border-white/20 flex items-end justify-between gap-3 relative z-10">
+                {/* Bottom Row: Price & Sign-up Button — stacked on narrow cards
+                    (a 320px viewport leaves ~176px of card content width once
+                    the section/frame/card padding is subtracted, nowhere near
+                    enough for "$299.99" beside a full-width button; they used
+                    to fight for the same row and the button lost, clipped to
+                    a sliver reading "Sig") side by side once there's room. */}
+                <div className="pt-6 border-t border-white/20 flex flex-col min-[420px]:flex-row min-[420px]:items-end justify-between gap-3 relative z-10">
                   {/* Price */}
                   <div>
                     <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-none">
@@ -1203,7 +1209,7 @@ function PricingSection() {
                   {/* Sign Up Button */}
                   <Link
                     href="/signup"
-                    className="inline-flex items-center gap-2 bg-[#171828] hover:bg-[#0c0d18] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 group/btn cursor-pointer shrink-0 border border-white/10"
+                    className="inline-flex items-center justify-center gap-2 bg-[#171828] hover:bg-[#0c0d18] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 group/btn cursor-pointer min-[420px]:shrink-0 border border-white/10"
                   >
                     <span>Sign up</span>
                     <span className="text-[10px] group-hover/btn:translate-x-0.5 transition-transform">▶</span>

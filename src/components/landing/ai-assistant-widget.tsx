@@ -533,7 +533,7 @@ export function AiAssistantWidget() {
 
             <div className="pb-4 text-center">
               <p className="text-xs text-slate-300">
-                Powered by <span className="text-slate-400 font-medium">Nxelio</span>
+                Powered by <span className="text-slate-400 font-medium">Nxelio Nurture</span>
               </p>
             </div>
           </div>
