@@ -27,6 +27,7 @@ import type { MeetingRow } from "@/lib/queries/meetings";
 import type { LeadHistory } from "@/lib/queries/lead-detail";
 import type { LeadCampaignSummary } from "@/lib/queries/campaigns";
 import { createLeadNote, deleteLeadNote, type LeadNoteRow } from "@/lib/queries/lead-notes";
+import { syncLeadToHubspot } from "@/lib/hubspot/actions";
 import { formatDate, formatDateTime, cn, toAbsoluteUrl } from "@/lib/utils";
 import { allowedNextStatuses, isManualStatusTransitionAllowed, statusTransitionError } from "@/lib/leads/status-flow";
 import { notifyUser } from "@/lib/queries/notifications";
@@ -141,6 +142,7 @@ export function LeadDetailView({
   const [editOpen, setEditOpen] = useState(false);
   const [showAiScoreDrawer, setShowAiScoreDrawer] = useState(false);
   const [findEmailOpen, setFindEmailOpen] = useState(false);
+  const [hubspotSyncing, setHubspotSyncing] = useState(false);
 
   // Tab controls & state
   const [activeTab, setActiveTab] = useState<"activities" | "notes" | "calls" | "email">("activities");
@@ -401,6 +403,21 @@ export function LeadDetailView({
   };
   const activePipelineIndex = getPipelineIndex(lead.status);
 
+  const handlePushToHubspot = async () => {
+    setHubspotSyncing(true);
+    try {
+      const res = await syncLeadToHubspot(lead.id);
+      if (!res.ok) {
+        toast(res.error || "Couldn't sync to HubSpot", "error");
+        return;
+      }
+      toast("Lead synced to HubSpot.", "success");
+      router.refresh();
+    } finally {
+      setHubspotSyncing(false);
+    }
+  };
+
   // Chevron Stepper shape polygons
   const getClipPath = (index: number, total: number) => {
     if (index === 0) {
@@ -485,6 +502,18 @@ export function LeadDetailView({
             title="Refresh"
           >
             <RefreshCw className="h-3.5 w-3.5 text-slate-500" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={hubspotSyncing}
+            onClick={handlePushToHubspot}
+            className="px-3 py-1.5 shadow-sm text-xs font-semibold gap-1.5 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-md"
+            title={lead.hubspot_contact_id ? `Last synced ${formatDateTime(lead.hubspot_synced_at)}` : "Push this lead to HubSpot as a Contact"}
+          >
+            {lead.hubspot_contact_id ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <ExternalLink className="h-3.5 w-3.5 text-orange-500" />}
+            {hubspotSyncing ? "Syncing…" : lead.hubspot_contact_id ? "Synced to HubSpot" : "Push to HubSpot"}
           </Button>
 
           {onClose ? (

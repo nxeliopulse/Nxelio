@@ -4,13 +4,14 @@ import { getBlocklist } from "@/lib/queries/blocklist";
 import { getCalendarAccounts, getCalendarProviderStatus } from "@/lib/queries/calendar-accounts";
 import { getZoomAccounts, getZoomProviderStatus } from "@/lib/queries/zoom-accounts";
 import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach-accounts";
+import { getHubspotAccount, getHubspotProviderStatus } from "@/lib/queries/hubspot-accounts";
 import { getCurrentWorkspace } from "@/lib/queries/workspaces";
 import { getAuditLog } from "@/lib/queries/audit-log";
 import { getSendLimit } from "@/lib/queries/outreach-send-limits";
 import { SettingsView } from "@/components/settings/settings-view";
 
 export default async function SettingsPage() {
-  const [profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomProviderConfigured, outreachAccounts, unipileConfigured, workspace, emailSendLimit, linkedinSendLimit] = await Promise.all([
+  const [profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomProviderConfigured, outreachAccounts, unipileConfigured, workspace, emailSendLimit, linkedinSendLimit, hubspotAccount, hubspotProviderConfigured] = await Promise.all([
     getCurrentUserProfile(),
     getEmailDomainStatus(),
     getBlocklist(),
@@ -23,6 +24,8 @@ export default async function SettingsPage() {
     getCurrentWorkspace(),
     getSendLimit("email"),
     getSendLimit("linkedin"),
+    getHubspotAccount(),
+    getHubspotProviderStatus(),
   ]);
   const mailboxAccounts = outreachAccounts.filter((a) => a.channel === "email");
   const linkedinAccounts = outreachAccounts.filter((a) => a.channel === "linkedin");
@@ -46,6 +49,8 @@ export default async function SettingsPage() {
       auditLog={auditLog}
       emailSendLimit={emailSendLimit}
       linkedinSendLimit={linkedinSendLimit}
+      hubspotAccount={hubspotAccount}
+      hubspotProviderConfigured={hubspotProviderConfigured}
     />
   );
 }

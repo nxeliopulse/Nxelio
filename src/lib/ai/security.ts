@@ -252,6 +252,7 @@ const RATE_LIMITS: Record<string, { windowMs: number; max: number }> = {
   // call — capped low since the per-request batch size already does most of
   // the work; this just stops looping the endpoint to blow past that cap.
   findCompaniesBulk: { windowMs: 60_000, max: 5 },
+  hubspotSyncBulk: { windowMs: 60_000, max: 10 },
   // Nominatim's usage policy caps external callers at ~1 request/second for
   // the WHOLE app (not per user) — heavier automated use risks Nominatim
   // blocking our server's IP entirely. Called with one fixed key regardless

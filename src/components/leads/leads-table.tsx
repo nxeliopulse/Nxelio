@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect, useOptimistic } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, Flame, MailCheck, type LucideIcon } from "lucide-react";
+import { Search, Filter, Plus, ChevronDown, ChevronUp, Lock, Users2, Mail, Briefcase, User, UserCog, Clock, ArrowUpDown, ArrowUp, ArrowDown, Building2, Settings2, Phone, Globe, Calendar, Link2, CheckCircle2, Tag, Share2, Layers3, X, Sparkles, Loader2, MoreVertical, Play, Megaphone, UserPlus, Check, Pencil, LayoutList, LayoutGrid, Download, RefreshCw, Upload, Star, FileText, FileSpreadsheet, Flame, MailCheck, ExternalLink, type LucideIcon } from "lucide-react";
 import { Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -171,6 +171,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [findingCompanyId, setFindingCompanyId] = useState<string | null>(null);
   const [isBulkFindingCompany, setIsBulkFindingCompany] = useState(false);
+  const [isBulkSyncingHubspot, setIsBulkSyncingHubspot] = useState(false);
 
   async function handleFindCompany(l: LeadRow) {
     if (!l.linkedin) {
@@ -276,6 +277,56 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
       toast("Failed to connect to bulk company finder API.", "error");
     } finally {
       setIsBulkFindingCompany(false);
+    }
+  }
+
+  async function handleBulkSyncHubspot() {
+    const targetIds = selected.length > 0 ? selected : filtered.map((l) => l.id);
+    if (!targetIds.length) {
+      toast("No leads to sync.", "info");
+      return;
+    }
+
+    const BATCH_SIZE = 50;
+    const idsToProcess = targetIds.slice(0, BATCH_SIZE);
+    const hasMore = targetIds.length > BATCH_SIZE;
+
+    const proceed = await confirm({
+      title: "Push to HubSpot?",
+      message: `This sends ${idsToProcess.length} lead${idsToProcess.length === 1 ? "" : "s"} to HubSpot as Contacts (leads without an email are skipped). Continue?`,
+      confirmLabel: `Push ${idsToProcess.length} lead${idsToProcess.length === 1 ? "" : "s"}`,
+    });
+    if (!proceed) return;
+
+    setIsBulkSyncingHubspot(true);
+    toast(`Syncing ${idsToProcess.length} lead(s) to HubSpot...`, "info");
+
+    try {
+      const response = await fetch("/api/leads/hubspot-sync-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds: idsToProcess }),
+      });
+      const data = await response.json();
+
+      if (data.ok) {
+        const failNote = data.failedCount > 0 ? ` ${data.failedCount} failed (e.g. missing email).` : "";
+        toast(
+          (hasMore
+            ? `Synced ${data.successCount} lead(s) to HubSpot. Click again for the rest.`
+            : `Synced ${data.successCount} lead(s) to HubSpot.`) + failNote,
+          data.successCount > 0 ? "success" : "error"
+        );
+        start(() => {
+          router.refresh();
+        });
+      } else {
+        toast(data.error || "Could not sync leads to HubSpot.", "error");
+      }
+    } catch {
+      toast("Failed to connect to HubSpot sync API.", "error");
+    } finally {
+      setIsBulkSyncingHubspot(false);
     }
   }
 
@@ -1795,6 +1846,18 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
                 <Play className="h-3.5 w-3.5 fill-current text-blue-600 dark:text-blue-400" />
               )}
               Find Companies
+            </button>
+            <button
+              onClick={handleBulkSyncHubspot}
+              disabled={isBulkSyncingHubspot}
+              className="inline-flex items-center gap-1.5 rounded-full text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950/40 disabled:opacity-50 px-3.5 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              {isBulkSyncingHubspot ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-orange-600 dark:text-orange-400" />
+              ) : (
+                <ExternalLink className="h-3.5 w-3.5" />
+              )}
+              Push to HubSpot
             </button>
             <div className="relative">
               <button

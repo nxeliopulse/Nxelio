@@ -103,7 +103,7 @@ const faqs = [
   },
   {
     q: "What integrations are supported?",
-    a: "Nxelio Nurture ships with Groq (AI), Brevo (email), and Supabase (database, auth, storage) wired in. HubSpot CRM sync is optional and configurable in Settings > API Keys. A general REST API and webhooks are on the roadmap.",
+    a: "Nxelio Nurture ships with Groq (AI), Brevo (email), and Supabase (database, auth, storage) wired in. Connect your own HubSpot account in Settings > Integrations to push leads there as Contacts. A general REST API and webhooks are on the roadmap.",
   },
 ];
 

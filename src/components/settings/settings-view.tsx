@@ -1,10 +1,12 @@
 "use client";
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Mail, Calendar, ScrollText, Sliders, X } from "lucide-react";
+import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Mail, Calendar, ScrollText, Sliders, X, ExternalLink } from "lucide-react";
 import { Linkedin } from "@/components/outreach/linkedin-icon";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 import type { ZoomAccountRow } from "@/lib/queries/zoom-accounts";
+import type { HubspotAccountRow } from "@/lib/queries/hubspot-accounts";
+import { HubspotConnection } from "@/components/settings/hubspot-connection";
 import { syncOutreachAccounts, type OutreachAccountRow } from "@/lib/queries/outreach-accounts";
 import type { AuditLogRow } from "@/lib/queries/audit-log";
 import type { SendLimitRow } from "@/lib/queries/outreach-send-limits";
@@ -38,6 +40,7 @@ const sections = [
   { id: "email", label: "Email", icon: <Mail className="h-4 w-4" /> },
   { id: "linkedin", label: "LinkedIn", icon: <Linkedin className="h-4 w-4" /> },
   { id: "calendar", label: "Calendar", icon: <Calendar className="h-4 w-4" /> },
+  { id: "integrations", label: "Integrations", icon: <ExternalLink className="h-4 w-4" /> },
   { id: "blocklist", label: "Blocklist", icon: <Ban className="h-4 w-4" /> },
 ];
 const AUDIT_SECTION = { id: "audit", label: "Audit Log", icon: <ScrollText className="h-4 w-4" /> };
@@ -64,6 +67,8 @@ interface Props {
   auditLog: AuditLogRow[];
   emailSendLimit: SendLimitRow | null;
   linkedinSendLimit: SendLimitRow | null;
+  hubspotAccount: HubspotAccountRow | null;
+  hubspotProviderConfigured: boolean;
 }
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -126,7 +131,7 @@ const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
   { id: "emerald", name: "Emerald", bg: "bg-emerald-600" },
 ];
 
-export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomConfigured, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit }: Props) {
+export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomConfigured, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit, hubspotAccount, hubspotProviderConfigured }: Props) {
   const router = useRouter();
   const [active, setActive] = useState("profile");
   const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
@@ -604,6 +609,10 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
               zoomConfigured={zoomConfigured}
               bookingSlug={bookingSlug}
             />
+          )}
+
+          {active === "integrations" && (
+            <HubspotConnection account={hubspotAccount} configured={hubspotProviderConfigured} />
           )}
 
           {active === "blocklist" && (

@@ -35,7 +35,7 @@ import { Modal } from "@/components/ui/modal";
 import { DataTable, DataTableHead, DataTableBody, DataTableRow, DataTableTh, DataTableTd, DataTableEmpty } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
-import { deleteSegment, exportSegmentCsv, refreshSegment, type SegmentRow, duplicateSegment, archiveSegment, restoreSegment } from "@/lib/queries/segments";
+import { deleteSegment, exportSegmentCsv, refreshSegment, getSegmentMemberLeads, type SegmentRow, duplicateSegment, archiveSegment, restoreSegment } from "@/lib/queries/segments";
 import { formatDate, cn } from "@/lib/utils";
 import { SegmentHistoryModal } from "@/components/segments/segment-history-modal";
 
@@ -82,6 +82,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignRep, setAssignRep] = useState(SALES_REPS[0]);
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [syncingCrm, setSyncingCrm] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [page, setPage] = useState(0);
   const [historySegmentId, setHistorySegmentId] = useState<string | null>(null);
@@ -178,8 +179,45 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
     router.push(`/workflows/builder?segment=${selected[0]}`);
   }
 
-  function handleSyncCrm() {
-    toast("CRM sync coming soon — connect HubSpot in Settings -> API Keys", "info");
+  async function handleSyncCrm() {
+    if (!selected.length) return;
+    setSyncingCrm(true);
+    try {
+      const leadLists = await Promise.all(selected.map((id) => getSegmentMemberLeads(id)));
+      const leadIds = Array.from(new Set(leadLists.flat().map((l) => l.id)));
+      if (!leadIds.length) {
+        toast("No leads found in the selected segment(s).", "info");
+        return;
+      }
+
+      const BATCH_SIZE = 50;
+      const idsToProcess = leadIds.slice(0, BATCH_SIZE);
+      const hasMore = leadIds.length > BATCH_SIZE;
+
+      toast(`Syncing ${idsToProcess.length} lead(s) to HubSpot...`, "info");
+      const response = await fetch("/api/leads/hubspot-sync-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds: idsToProcess }),
+      });
+      const data = await response.json();
+
+      if (data.ok) {
+        const failNote = data.failedCount > 0 ? ` ${data.failedCount} failed (e.g. missing email).` : "";
+        toast(
+          (hasMore
+            ? `Synced ${data.successCount} lead(s) to HubSpot. Click again for the rest.`
+            : `Synced ${data.successCount} lead(s) to HubSpot.`) + failNote,
+          data.successCount > 0 ? "success" : "error"
+        );
+      } else {
+        toast(data.error || "Could not sync leads to HubSpot.", "error");
+      }
+    } catch {
+      toast("Failed to connect to HubSpot sync API.", "error");
+    } finally {
+      setSyncingCrm(false);
+    }
   }
 
   function handleAiRecommend() {
@@ -209,7 +247,7 @@ export function SegmentsList({ segments }: { segments: (SegmentRow & { contacts:
     { label: "Send campaign", icon: <Send className="h-3.5 w-3.5" />, onClick: handleSendCampaign },
     { label: "Start workflow", icon: <Workflow className="h-3.5 w-3.5" />, onClick: handleStartWorkflow },
     { label: "Export CSV", icon: <Download className="h-3.5 w-3.5" />, onClick: handleExportSelected },
-    { label: "Sync CRM", icon: <RefreshCw className="h-3.5 w-3.5" />, onClick: handleSyncCrm },
+    { label: syncingCrm ? "Syncing…" : "Push to HubSpot", icon: <RefreshCw className={`h-3.5 w-3.5 ${syncingCrm ? "animate-spin" : ""}`} />, onClick: handleSyncCrm },
     { label: "Assign sales rep", icon: <UserPlus className="h-3.5 w-3.5" />, onClick: () => setAssignOpen(true) },
     { label: "AI recommendation", icon: <Sparkles className="h-3.5 w-3.5" />, onClick: handleAiRecommend },
     { label: "Add tags", icon: <Tags className="h-3.5 w-3.5" />, onClick: () => setTagsOpen(true) },

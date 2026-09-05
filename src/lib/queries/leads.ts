@@ -128,6 +128,9 @@ export interface LeadRow {
   tags: string[] | null;
   projects: string[] | null;
   priority: "High" | "Medium" | "Low" | null;
+  /** Set once this lead has been pushed to HubSpot as a Contact. */
+  hubspot_contact_id: string | null;
+  hubspot_synced_at: string | null;
 }
 
 /**
