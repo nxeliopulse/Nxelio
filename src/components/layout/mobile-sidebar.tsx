@@ -79,21 +79,25 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
       />
       <aside
         className={cn(
-          "fixed top-0 left-0 z-50 h-screen w-72 max-w-[85vw] bg-white shadow-2xl flex flex-col transition-transform lg:hidden",
+          "fixed top-0 left-0 z-50 h-screen w-72 max-w-[85vw] bg-white dark:bg-[#1b212e] border-r border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col transition-transform lg:hidden",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <Logo />
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
+          <button
+            onClick={onClose}
+            aria-label="Close menu"
+            className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/5 text-slate-500 dark:text-slate-400 transition-colors"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto scrollbar-hide p-3 space-y-6">
           <div>
-            <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Workspace</p>
-            <ul className="space-y-0.5">
+            <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Workspace</p>
+            <ul className="space-y-1">
               {main.map((item) => {
                 const Icon = item.icon;
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -110,15 +114,17 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
                         type="button"
                         onClick={() => toggleExpanded(item.label)}
                         className={cn(
-                          "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
-                          hasActiveSubItem ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                          "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors group",
+                          hasActiveSubItem
+                            ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold"
+                            : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
                         )}
                       >
                         <div className="flex items-center gap-3">
-                          <Icon className={cn("h-4.5 w-4.5 flex-shrink-0", hasActiveSubItem ? "text-blue-600" : "text-slate-400")} strokeWidth={2} />
+                          <Icon className={cn("h-4.5 w-4.5 flex-shrink-0", hasActiveSubItem ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500")} strokeWidth={2} />
                           <span className="flex-1 text-left">{item.label}</span>
                         </div>
-                        <ChevronDown className={cn("h-4 w-4 transition-transform duration-200 text-slate-400", isExpanded && "rotate-180")} />
+                        <ChevronDown className={cn("h-4 w-4 transition-transform duration-200 text-slate-400 dark:text-slate-500", isExpanded && "rotate-180")} />
                       </button>
                       {isExpanded && (
                         <ul className="pl-9 space-y-1">
@@ -130,8 +136,8 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
                                   href={sub.href}
                                   onClick={onClose}
                                   className={cn(
-                                    "flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                                    subActive ? "text-blue-600 font-semibold" : "text-slate-500 hover:text-slate-800"
+                                    "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                                    subActive ? "text-blue-600 dark:text-blue-400 font-semibold bg-blue-50/50 dark:bg-blue-950/20" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                                   )}
                                 >
                                   <span>{sub.label}</span>
@@ -151,11 +157,13 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
                       href={item.href}
                       onClick={onClose}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
-                        active ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors group",
+                        active
+                          ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
                       )}
                     >
-                      <Icon className={cn("h-4.5 w-4.5 flex-shrink-0", active ? "text-blue-600" : "text-slate-400")} strokeWidth={2} />
+                      <Icon className={cn("h-4.5 w-4.5 flex-shrink-0", active ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500")} strokeWidth={2} />
                       <span className="flex-1">{item.label}</span>
                     </Link>
                   </li>
@@ -166,8 +174,8 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
 
           {admin.length > 0 && (
             <div>
-              <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Admin</p>
-              <ul className="space-y-0.5">
+              <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Admin</p>
+              <ul className="space-y-1">
                 {admin.map((item) => {
                   const Icon = item.icon;
                   const active = pathname === item.href;
@@ -177,11 +185,13 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
                         href={item.href}
                         onClick={onClose}
                         className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group",
-                          active ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                          "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors group",
+                          active
+                            ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold"
+                            : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
                         )}
                       >
-                        <Icon className={cn("h-4.5 w-4.5", active ? "text-blue-600" : "text-slate-400")} strokeWidth={2} />
+                        <Icon className={cn("h-4.5 w-4.5", active ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500")} strokeWidth={2} />
                         <span>{item.label}</span>
                       </Link>
                     </li>
@@ -193,7 +203,7 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
         </nav>
 
         <div className="p-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-4 text-white">
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl p-4 text-white shadow-md">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="h-4.5 w-4.5" />
               <p className="font-bold text-base tracking-tight">AI Credits</p>
@@ -207,10 +217,9 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
             <Link href="/billing" onClick={onClose} className="text-xs font-semibold text-white/90 hover:text-white underline-offset-2 hover:underline inline-block">Upgrade plan →</Link>
           </div>
 
-
-          <Link href="/help" onClick={onClose} className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">
-            <HelpCircle className="h-4.5 w-4.5 text-slate-400" />
-            Help & Support
+          <Link href="/help" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+            <HelpCircle className="h-4.5 w-4.5 text-slate-400 dark:text-slate-500" />
+            Help &amp; Support
           </Link>
 
           {/* Trial expired notice — only rendered when the real trial end date has passed */}
@@ -218,8 +227,8 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
             <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <p className="font-bold text-slate-900 text-sm">Free trial</p>
-                  <p className="text-xs font-semibold text-rose-600 mt-0.5">Expired {trialExpiredDate}</p>
+                  <p className="font-bold text-slate-900 dark:text-white text-sm">Free trial</p>
+                  <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 mt-0.5">Expired {trialExpiredDate}</p>
                 </div>
                 <div className="h-8 w-8 rounded-full ring-2 ring-rose-400 text-rose-500 flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="h-4 w-4" />
@@ -228,7 +237,7 @@ export function MobileSidebar({ open, onClose, role, navAccess }: { open: boolea
               <Link
                 href="/billing"
                 onClick={onClose}
-                className="flex items-center justify-center w-full py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
+                className="flex items-center justify-center w-full py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
               >
                 Upgrade
               </Link>

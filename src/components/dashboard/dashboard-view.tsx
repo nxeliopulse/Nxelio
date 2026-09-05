@@ -382,6 +382,16 @@ function TeamPerformanceBarCard({
                 contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc", fontSize: "12px" }}
                 formatter={(v, name) => (name === "wonValue" ? money(Number(v)) : v)}
               />
+              {/* Subtitle promises "deals closed vs. revenue won", but with no
+                  legend the only way to tell the two bars/axes apart was to
+                  hover for the tooltip — and when Won value is $0, its bar is
+                  invisible, so it looked like only one series existed at all
+                  (QA report D16). formatter/nameFn map the raw dataKeys to
+                  the same human labels already used in the tooltip above. */}
+              <Legend
+                formatter={(value) => (value === "dealsCount" ? "Deals count" : value === "wonValue" ? "Won value" : value)}
+                wrapperStyle={{ fontSize: "12px" }}
+              />
               <Bar yAxisId="left" dataKey="dealsCount" name="Deals count" fill="#6366F1" radius={[6, 6, 0, 0]} isAnimationActive={false} />
               <Bar yAxisId="right" dataKey="wonValue" name="Won value" fill="#06B6D4" radius={[6, 6, 0, 0]} isAnimationActive={false} />
             </BarChart>
@@ -865,8 +875,15 @@ function SetupChecklistCard({ tasks, initialStates }: { tasks: SetupTask[]; init
           <tbody>
             {visible.map((task) => (
               <tr key={task.id} className="border-t border-slate-100 dark:border-slate-800">
-                <td className="px-3 py-3 font-semibold text-slate-800 dark:text-slate-100 whitespace-nowrap">{task.title}</td>
-                <td className="px-3 py-3 text-slate-500 dark:text-slate-400 hidden md:table-cell max-w-xs">{task.description}</td>
+                {/* No dark: variant here on purpose — globals.css already
+                    inverts the slate-* scale under .dark (light shades of
+                    text-slate-N become dark, dark shades become light), so a
+                    literal dark:text-slate-100 gets inverted a SECOND time
+                    back into a dark value, rendering near-invisible dark-grey
+                    text on the dark card (QA report D07). Plain text-slate-800
+                    /text-slate-500 already read correctly in both themes. */}
+                <td className="px-3 py-3 font-semibold text-slate-800 whitespace-nowrap">{task.title}</td>
+                <td className="px-3 py-3 text-slate-500 hidden md:table-cell max-w-xs">{task.description}</td>
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-end gap-1.5">
                     <button
@@ -982,21 +999,16 @@ function AiInsightsCard({ stats, onOpenProspects, onOpenDeals, onOpenCampaigns }
 }
 
 const SPAN_CLASS: Record<WidgetSize, string> = {
-  3: "lg:col-span-3", 4: "lg:col-span-4", 6: "lg:col-span-6", 8: "lg:col-span-8", 12: "lg:col-span-12",
+  3: "col-span-1 sm:col-span-1 md:col-span-3 lg:col-span-3",
+  4: "col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4",
+  6: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-6",
+  8: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-8",
+  12: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-12",
 };
 
 /** One widget's slot in the dashboard grid — a dnd-kit sortable item that
  *  becomes draggable (grip handle) and removable (X) only in edit mode, so
  *  the normal view stays exactly as plain as before this feature existed. */
-/** One widget's slot in the dashboard grid — a dnd-kit sortable item that
- *  becomes draggable (grip handle), removable (X), and resizable (corner
- *  handle) only in edit mode, so the normal view stays exactly as plain as
- *  before this feature existed. Resize is a raw pointer drag rather than a
- *  library (no free-form grid-resize engine already in this project — see
- *  the analytics_dashboard_widgets research this was built alongside): the
- *  handle tracks horizontal drag distance against the widget's own current
- *  pixel width to estimate one grid column's width, then snaps to the
- *  nearest allowed size on every pointermove for live feedback. */
 function SortableWidgetItem({
   id, size, editing, onRemove, onResize, children,
 }: {
@@ -1038,7 +1050,7 @@ function SortableWidgetItem({
   }
 
   return (
-    <div ref={setRefs} style={style} className={`col-span-1 ${SPAN_CLASS[size]} relative`}>
+    <div ref={setRefs} style={style} className={`${SPAN_CLASS[size]} relative`}>
       {editing && (
         <>
           <div className="absolute -top-2 -right-2 z-10 flex gap-1">
@@ -1628,7 +1640,7 @@ export function DashboardView({
       <div className={editing ? "grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 items-start" : ""}>
         <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={(editing ? draftLayout : layout).map((w) => w.key)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 auto-rows-min">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 lg:grid-cols-12 gap-4 sm:gap-5 auto-rows-min">
               {(editing ? draftLayout : layout).map((w) => (
                 <SortableWidgetItem
                   key={w.key} id={w.key} size={w.size} editing={editing}
@@ -1639,7 +1651,7 @@ export function DashboardView({
                 </SortableWidgetItem>
               ))}
               {editing && draftLayout.length === 0 && (
-                <div className="col-span-1 lg:col-span-12 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-sm text-slate-400">
+                <div className="col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-12 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-sm text-slate-400">
                   No widgets yet — add some from the library on the right.
                 </div>
               )}

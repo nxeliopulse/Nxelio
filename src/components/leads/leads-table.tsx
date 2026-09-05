@@ -571,6 +571,16 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
   const safePage = Math.min(page, pageCount - 1);
   const paged = sorted.slice(safePage * pageSize, safePage * pageSize + pageSize);
 
+  // Distinguishes "this account has never had any prospects" from "a filter
+  // just happens to match none of them" — the empty-state copy below reused
+  // the same all-time-zero message for both cases (QA report D02b), telling
+  // someone with 64 real prospects that they had none, right after they
+  // searched for something that matched nothing.
+  const hasActiveFilter = Boolean(
+    search || industryFilter || interestFilter || dateFrom || dateTo ||
+    activeColumnFilterKeys.length > 0 || quickFilter !== "all" || cardFilter !== "all"
+  );
+
   function displayName(l: LeadRow): string {
     return l.full_name || l.company_name || "—";
   }
@@ -1225,7 +1235,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
               <thead className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 backdrop-blur-md">
                 <tr className="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-500">
                   <th
-                    className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-3"
+                    className="sm:sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md px-3 py-3"
                     style={{ width: 40, minWidth: 40, maxWidth: 40 }}
                   >
                     <input
@@ -1245,8 +1255,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
                         key={c.key}
                         className={cn(
                           "px-3 py-3 font-semibold whitespace-nowrap",
-                          c.key === "index" && "sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
-                          c.key === "name" && "sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
+                          c.key === "index" && "sm:sticky left-10 z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md",
+                          c.key === "name" && "sm:sticky left-[88px] z-20 bg-slate-50/90 dark:bg-slate-950/80 backdrop-blur-md"
                         )}
                         // Sticky offsets below (left-10, left-[88px]) are hardcoded pixel
                         // sums of the checkbox + Row# column widths — fix both header AND
@@ -1326,7 +1336,9 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
                 {paged.length === 0 && (
                   <tr>
                     <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
-                      No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.
+                      {hasActiveFilter
+                        ? "No prospects match your search or filters. Try adjusting them."
+                        : <>No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</>}
                     </td>
                   </tr>
                 )}
@@ -1337,7 +1349,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
                     className="group hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <td
-                      className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors px-3 py-3"
+                      className="sm:sticky left-0 z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors px-3 py-3"
                       style={{ width: 40, minWidth: 40, maxWidth: 40 }}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -1353,8 +1365,8 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
                         key={c.key}
                         className={cn(
                           "px-3 py-3",
-                          c.key === "index" && "sticky left-10 z-10 bg-white group-hover:bg-slate-50 transition-colors",
-                          c.key === "name" && "sticky left-[88px] z-10 bg-white group-hover:bg-slate-50 transition-colors"
+                          c.key === "index" && "sm:sticky left-10 z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors",
+                          c.key === "name" && "sm:sticky left-[88px] z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors"
                         )}
                         style={c.key === "index" ? { width: 48, minWidth: 48, maxWidth: 48 } : undefined}
                         onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
@@ -1404,7 +1416,11 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
               </div>
             ))}
             {paged.length === 0 && (
-              <p className="col-span-full text-center text-slate-500 dark:text-slate-500 py-16">No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</p>
+              <p className="col-span-full text-center text-slate-500 dark:text-slate-500 py-16">
+                {hasActiveFilter
+                  ? "No prospects match your search or filters. Try adjusting them."
+                  : <>No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</>}
+              </p>
             )}
           </div>
         )}

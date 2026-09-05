@@ -23,63 +23,71 @@ export function AuthSplitCard({
   children: ReactNode;
 }) {
   return (
-    <div className="h-screen w-full flex flex-col lg:flex-row bg-white font-sans overflow-y-auto lg:overflow-hidden">
+    // force-dark-theme: this screen's own fixed brand identity (built for it
+    // in globals.css, but never actually applied here) — previously it just
+    // used bg-white/text-slate-900 with no pin, so it silently rode whatever
+    // theme the visitor's OS happened to be in instead of staying constant.
+    // That's also what created the QA-reported "jump": dark here (matching
+    // an OS dark-mode visitor) into always-light on /terms and /privacy.
+    <div className="min-h-screen lg:h-screen w-full flex flex-col lg:flex-row bg-white font-sans overflow-y-auto lg:overflow-hidden force-dark-theme">
 
-      {/* LEFT: form panel — 50% width */}
-      <div className="flex-1 flex flex-col justify-between px-6 sm:px-10 lg:px-16 xl:px-24 py-8 relative z-10 lg:w-1/2 shrink-0">
-        <Link href="/" className="inline-flex items-center gap-2 mb-4 w-fit shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20">
-            <Zap className="w-4 h-4 text-white fill-white" />
+      {/* LEFT: form panel — 50% width, independently scrollable on desktop when zoomed */}
+      <div className="flex-1 flex flex-col px-6 sm:px-10 lg:px-16 xl:px-24 py-6 sm:py-8 relative z-10 lg:w-1/2 shrink-0 lg:h-full lg:overflow-y-auto">
+        <div className="min-h-full flex flex-col justify-between max-w-[420px] w-full mx-auto lg:mx-0">
+          <Link href="/" className="inline-flex items-center gap-2 mb-4 w-fit shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20">
+              <Zap className="w-4 h-4 text-white fill-white" />
+            </div>
+            <span className="text-lg font-bold tracking-tight text-slate-900">
+              Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-normal">Nurture</span>
+            </span>
+          </Link>
+
+          <div className="flex-1 flex flex-col justify-center w-full py-4 my-auto">
+            {activeAuthTab && (
+              <div className="flex gap-2 mb-5 w-full p-1 bg-slate-100 rounded-2xl border border-slate-200 shrink-0">
+                <Link
+                  href="/login"
+                  className={`flex-1 text-center py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    activeAuthTab === "login" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  Log In
+                </Link>
+                <Link
+                  href="/signup"
+                  className={`flex-1 text-center py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    activeAuthTab === "signup" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
+
+            {heading && (
+              <div className="mb-5 shrink-0">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                  {Array.isArray(heading) ? heading[0] : heading}
+                </h1>
+                {subheading && (
+                  <p className="text-sm text-slate-500 font-normal mt-1.5">
+                    {subheading}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {children}
           </div>
-          <span className="text-lg font-bold tracking-tight text-slate-900">
-            Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-normal">Nurture</span>
-          </span>
-        </Link>
 
-        <div className="flex-1 flex flex-col justify-center max-w-[400px] w-full mx-auto lg:mx-0 my-auto py-4">
-          {activeAuthTab && (
-            <div className="flex gap-2 mb-6 w-full p-1 bg-slate-100 rounded-2xl border border-slate-200">
-              <Link
-                href="/login"
-                className={`flex-1 text-center py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  activeAuthTab === "login" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Log In
-              </Link>
-              <Link
-                href="/signup"
-                className={`flex-1 text-center py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  activeAuthTab === "signup" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Sign Up
-              </Link>
-            </div>
-          )}
-
-          {heading && (
-            <div className="mb-6">
-              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                {Array.isArray(heading) ? heading[0] : heading}
-              </h1>
-              {subheading && (
-                <p className="text-sm text-slate-500 font-normal mt-1.5">
-                  {subheading}
-                </p>
-              )}
-            </div>
-          )}
-
-          {children}
+          <p className="text-center text-xs text-slate-500 font-medium pt-6 pb-2 shrink-0">
+            &copy; {new Date().getFullYear()} Nxelio Inc. All rights reserved.{" "}
+            <Link href="/privacy" className="text-slate-600 hover:text-slate-900 hover:underline transition-colors">Privacy</Link>
+            {" "}and{" "}
+            <Link href="/terms" className="text-slate-600 hover:text-slate-900 hover:underline transition-colors">Terms</Link>.
+          </p>
         </div>
-
-        <p className="text-center text-xs text-slate-500 font-medium pt-4 pb-2 shrink-0">
-          &copy; {new Date().getFullYear()} Nxelio Inc. All rights reserved.{" "}
-          <Link href="/privacy" className="text-slate-600 hover:text-slate-900 hover:underline transition-colors">Privacy</Link>
-          {" "}and{" "}
-          <Link href="/terms" className="text-slate-600 hover:text-slate-900 hover:underline transition-colors">Terms</Link>.
-        </p>
       </div>
 
       <BrandVisualPanel cta={{ label: "Start Your 7-Day Free Trial", href: "/signup" }} variant="straight" />

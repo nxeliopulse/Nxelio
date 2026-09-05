@@ -116,7 +116,10 @@ function LoginForm() {
       leftEyebrow="You can easily"
       leftTitle="Speed up your work with our Web App"
     >
-      <form onSubmit={handleSubmit} className="space-y-2.5">
+      {/* noValidate: without it, the browser's native "@" tooltip fires on
+          type="email" before onSubmit ever runs, pre-empting the styled
+          fieldErrors.email message below with unstyled browser chrome. */}
+      <form onSubmit={handleSubmit} noValidate className="space-y-2.5">
         {error && (
           <div role="alert" className="flex items-start gap-2.5 rounded-xl p-3.5 text-sm bg-red-50 border border-red-100 text-red-600">
             <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />

@@ -42,9 +42,10 @@ export function AnalyticsShell({
   const [viewerMode, setViewerMode] = useState(false);
 
   return (
-    <div className="flex gap-0 -m-4 sm:-m-6 min-h-[calc(100vh-64px)]">
+    <div className="flex flex-col md:flex-row gap-0 -m-3.5 sm:-m-5 lg:-m-6 min-h-[calc(100vh-64px)]">
+      {/* Desktop Navigation Rail */}
       {!viewerMode && (
-        <div className="w-56 flex-shrink-0 border-r border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/20 p-3 space-y-4 overflow-y-auto">
+        <div className="hidden md:block w-56 flex-shrink-0 border-r border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/20 p-3 space-y-4 overflow-y-auto">
           <div className="space-y-0.5">
             {RAIL_ITEMS.map((item) => {
               const active =
@@ -67,8 +68,8 @@ export function AnalyticsShell({
                   key={item.key}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold",
-                    active ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400" : "text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-900/40"
+                    "flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold transition-colors",
+                    active ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900/40"
                   )}
                 >
                   <item.icon className="h-4 w-4" />
@@ -78,28 +79,67 @@ export function AnalyticsShell({
             })}
             <button
               onClick={toggle}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-900/40"
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900/40 transition-colors"
             >
-              <Sparkles className="h-4 w-4" />
+              <Sparkles className="h-4 w-4 text-amber-500" />
               AI Assistant
             </button>
           </div>
         </div>
       )}
 
+      {/* Main Content Area */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="flex items-center justify-between px-4 py-1.5 border-b border-slate-100 dark:border-slate-800">
+        {/* Top Header Strip with Tabs & Viewer Toggle */}
+        <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 border-b border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40">
           <OpenTabsStrip dashboards={dashboards} reports={reports} />
           <button
             onClick={() => setViewerMode((v) => !v)}
-            className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900/40 ml-2"
+            className="hidden md:flex flex-shrink-0 items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900/40 ml-2 transition-colors"
             title={viewerMode ? "Show navigation" : "Hide navigation (viewer mode)"}
           >
             {viewerMode ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
             {viewerMode ? "Show nav" : "Viewer"}
           </button>
         </div>
-        <div className="flex-1 p-4 sm:p-6">{children}</div>
+
+        {/* Mobile Swipeable Category Pill Bar */}
+        <div className="md:hidden flex items-center gap-1.5 overflow-x-auto scrollbar-hide px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+          {RAIL_ITEMS.map((item) => {
+            const active =
+              item.key === "overview" ? pathname.startsWith("/analytics/overview") :
+              item.key === "prospects" ? pathname.startsWith("/analytics/prospects") :
+              item.key === "segments" ? pathname.startsWith("/analytics/segments") :
+              item.key === "campaigns" ? pathname.startsWith("/analytics/campaigns") :
+              item.key === "engagement" ? pathname.startsWith("/analytics/engagement") :
+              item.key === "meetings" ? pathname.startsWith("/analytics/meetings") :
+              item.key === "pipeline" ? pathname.startsWith("/analytics/pipeline") :
+              item.key === "revenue" ? pathname.startsWith("/analytics/revenue") :
+              item.key === "accounts" ? pathname.startsWith("/analytics/accounts") :
+              item.key === "ai-performance" ? pathname.startsWith("/analytics/ai-performance") :
+              item.key === "team" ? pathname.startsWith("/analytics/team") :
+              item.key === "data" ? pathname.startsWith("/analytics/data") :
+              item.key === "dashboards" ? pathname === "/analytics" && typeParam === "dashboard" :
+              pathname === "/analytics" && typeParam === "report";
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-colors",
+                  active
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                )}
+              >
+                <item.icon className="h-3.5 w-3.5" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="flex-1 p-3.5 sm:p-5 lg:p-6">{children}</div>
       </div>
     </div>
   );

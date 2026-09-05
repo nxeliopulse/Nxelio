@@ -187,15 +187,26 @@ export function ErrorProvider({ children }: { children: React.ReactNode }) {
             pushToast(appError);
           }
 
-          throw appError;
-        }
-        
-        return response;
-      } catch (err: unknown) {
-        if (err instanceof AppError) {
-          throw err;
+          // Real fetch() never throws for an HTTP-level error status (a 400,
+          // a 404) — only for an actual network failure — and this wrapper
+          // previously didn't honor that: it threw here regardless. Any
+          // caller that itself expects standard fetch semantics rather than
+          // an app-specific throw — most notably Supabase's own SDK, used
+          // for login/signup/password-reset — never got the Response object
+          // back to read and turn into its own clean error. Instead it saw
+          // an unexpected exception type from what should've been an
+          // ordinary failed request, which is what surfaced as a full
+          // stack-trace console dump on something as routine as an incorrect
+          // password (QA report L04b). Every caller in this app already
+          // checks response.ok itself (see the fetch call sites in
+          // billing-view.tsx, subscription-gate.tsx, etc.), so falling
+          // through to the same `return response` below doesn't change
+          // their behavior at all — this was pure incidental breakage for
+          // anything that wasn't ours.
         }
 
+        return response;
+      } catch (err: unknown) {
         // Map network connection errors
         const error = err instanceof Error ? err : new Error(String(err));
         const isTimeout = error.name === "AbortError" || error.message?.toLowerCase().includes("timeout");

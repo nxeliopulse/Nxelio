@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const [{ data: profile }, { data: sub }] = await Promise.all([
     supabase.from("users").select("workspace_id, full_name").eq("user_id", user.id).single(),
     supabase.from("subscriptions")
-      .select("stripe_customer_id, stripe_subscription_id, plan_id")
+      .select("stripe_customer_id, stripe_subscription_id, plan_id, status")
       .single(),
   ]);
 
@@ -89,13 +89,31 @@ export async function POST(req: NextRequest) {
         ...(discounts ? { discounts } : {}),
       });
 
+      // While still trialing, Stripe correctly charges $0 for an upgrade —
+      // the trial simply carries over to the new price, which is expected
+      // Stripe behavior, not a bug. What used to compound that into a real
+      // exploit was granting the NEW plan's full credits/leads immediately:
+      // Basic's free 7-day trial → upgrade to Pro → walk away with Pro's
+      // 2,400 credits + 2,000 leads for $0, then cancel before day 7.
+      // Capping the grant at the plan they were already trialing (not the
+      // upgraded one) while `status === "trialing"` closes that without
+      // blocking the upgrade itself — the Stripe price change, and the
+      // plan-gated FEATURES that come with it, still take effect right
+      // away. Once the trial genuinely converts, reset_subscription_cycle
+      // (invoice.paid → subscription_cycle) reads the subscription's own
+      // plan_id — already the upgraded plan by then — straight from
+      // subscription_plans and grants its real allowance in full, so
+      // nothing here needs to "catch up" later.
+      const isStillTrialing = updated.status === "trialing";
+      const grantPlanId = isStillTrialing ? ((sub.plan_id as PlanId) ?? planId) : planId;
+
       await syncSubscriptionFromStripe({
         workspaceId:          profile.workspace_id,
         planId,
         billingInterval,
         status:               updated.status === "trialing" ? "trialing" : "active",
-        creditsTotal:         PLAN_CREDITS[planId] ?? 0,
-        leadsTotal:           PLAN_LEADS[planId] ?? 0,
+        creditsTotal:         PLAN_CREDITS[grantPlanId] ?? 0,
+        leadsTotal:           PLAN_LEADS[grantPlanId] ?? 0,
         currentPeriodStart:   new Date(updated.items.data[0].current_period_start * 1000),
         currentPeriodEnd:     new Date(updated.items.data[0].current_period_end * 1000),
         stripeCustomerId:     sub.stripe_customer_id ?? String(updated.customer),

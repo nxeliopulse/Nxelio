@@ -53,7 +53,7 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
               {/* Its own scroll region (not the page) — keeps the rounded top-left
                   corner anchored to the viewport instead of scrolling away with content. */}
               <main className={cn(
-                "relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-6 bg-slate-50 rounded-tl-2xl transition-[margin,border-radius] duration-300 ease-in-out will-change-[margin,border-radius]",
+                "relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 lg:p-6 bg-slate-50 rounded-none lg:rounded-tl-2xl transition-[margin,border-radius] duration-300 ease-in-out will-change-[margin,border-radius]",
                 assistantOpen && "rounded-2xl mr-2.5 mb-2.5"
               )}>
                 {children}

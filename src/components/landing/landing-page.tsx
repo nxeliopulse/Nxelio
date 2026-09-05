@@ -9,7 +9,7 @@ import {
   Cpu, Globe, Building2, ShieldCheck, Layers, Flame,
   Briefcase, Radio, MessageSquare, TrendingUp, Filter, CheckCheck,
   Phone, Calendar, Megaphone, Contact, FileText, Link2, Clock,
-  DollarSign, PieChart, Sparkle, UserCheck, RefreshCw, Eye, Video, CreditCard
+  DollarSign, PieChart, Sparkle, UserCheck, RefreshCw, Eye, Video, CreditCard, Menu
 } from "lucide-react";
 import { BookDemoModal } from "./book-demo-modal";
 import { AiAssistantWidget } from "./ai-assistant-widget";
@@ -35,65 +35,92 @@ function PostSignupNotice({ notice }: { notice: LandingPageNotice }) {
 
 function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   useEffect(() => {
-    function onScroll() { setScrolled(window.scrollY > 60); }
+    function onScroll() {
+      setScrolled(window.scrollY > 60);
+      if (window.scrollY > 60) setMobileMenuOpen(false);
+    }
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const NAV_LINKS = [
+    { href: "#features", label: "Features" },
+    { href: "#capabilities", label: "Capabilities" },
+    { href: "#testimonials", label: "Reviews" },
+    { href: "#playbooks", label: "Playbooks" },
+    { href: "#integrations", label: "Integrations" },
+    { href: "#pricing", label: "Pricing" },
+    { href: "#faq", label: "FAQ" },
+  ];
+
   return (
-    <header className="fixed top-3.5 sm:top-5 inset-x-0 z-50 px-3 sm:px-6 lg:px-8 pointer-events-none flex justify-center transition-all duration-300">
+    <header className="fixed top-2 sm:top-5 inset-x-0 z-50 px-2 sm:px-6 lg:px-8 pointer-events-none flex flex-col items-center transition-all duration-300">
       <div
         className={`w-full max-w-[1380px] pointer-events-auto rounded-full transition-all duration-300 ${
           scrolled
-            ? "bg-[#007bfb] border border-blue-400/50 py-3 sm:py-3.5 px-5 sm:px-8 shadow-2xl shadow-blue-950/30 text-white"
-            : "bg-white/90 backdrop-blur-xl border border-white/85 py-3.5 sm:py-4 px-6 sm:px-8 shadow-xl shadow-black/5 text-[#1f2223]"
+            ? "bg-[#007bfb] border border-blue-400/50 py-1.5 sm:py-2.5 px-3 sm:px-6 xl:px-8 shadow-2xl shadow-blue-950/30 text-white"
+            : "bg-white/95 backdrop-blur-xl border border-white/85 py-2 sm:py-3 xl:py-3.5 px-3 sm:px-6 xl:px-8 shadow-xl shadow-black/5 text-[#1f2223]"
         }`}
       >
-        <div className="flex justify-between items-center gap-4 sm:gap-6">
+        <div className="flex justify-between items-center gap-2 lg:gap-4 xl:gap-6 min-w-0">
           
           {scrolled ? (
             /* ============ SCROLLED STATE: Generous Floating Conversion Bar ============ */
-            <div className="w-full flex items-center justify-between gap-3 sm:gap-6 animate-fade-in">
+            <div className="w-full flex items-center justify-between gap-2 sm:gap-6 animate-fade-in">
               
               {/* Left: Brand / Logo in white */}
-              <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-                  <Zap className="w-5 h-5 fill-blue-600" />
+              <Link href="/" className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 group">
+                <div className="w-7 h-7 sm:w-9 sm:h-9 xl:w-10 xl:h-10 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                  <Zap className="w-3.5 h-3.5 sm:w-5 sm:h-5 fill-blue-600" />
                 </div>
-                <span className="text-xl sm:text-2xl font-bold tracking-tight text-white hidden sm:inline">
-                  Nx<span className="text-amber-300">elio</span>
+                <span className="text-base sm:text-2xl font-bold tracking-tight text-white">
+                  Nx<span className="text-amber-300">elio</span>{" "}
+                  <span className="text-blue-100 font-medium text-xs sm:text-base hidden sm:inline">Nurture</span>
                 </span>
               </Link>
 
-              {/* Center: Bold Headline */}
-              <div className="flex-1 text-center px-2">
-                <h2 className="text-sm sm:text-base md:text-xl font-extrabold text-white tracking-tight leading-snug">
+              {/* Center: Headline (hidden on small phones to prevent overflow) */}
+              <div className="flex-1 text-center px-1 sm:px-2 hidden md:block min-w-0">
+                <h2 className="text-xs sm:text-sm lg:text-base xl:text-xl font-extrabold text-white tracking-tight leading-snug truncate">
                   Take your marketing &amp; sales to the next level!
                 </h2>
               </div>
 
-              {/* Right: Golden 2-Line Action Button */}
-              <div className="flex items-center gap-2.5 shrink-0">
+              {/* Right: Action Buttons */}
+              <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 ml-auto md:ml-0">
                 <button
                   type="button"
                   onClick={onBookDemo}
-                  className="hidden sm:inline-flex h-9 sm:h-10 px-4 items-center justify-center rounded-full border border-white/60 text-white text-xs sm:text-sm font-semibold hover:bg-white/10 transition-colors cursor-pointer"
+                  className="hidden xl:inline-flex h-9 sm:h-10 px-3 sm:px-4 items-center justify-center rounded-full border border-white/60 text-white text-xs sm:text-sm font-semibold hover:bg-white/10 transition-colors cursor-pointer"
                 >
-                  Book a Demo
+                  Book Demo
                 </button>
                 <Link
                   href="/signup"
-                  className="inline-flex flex-col items-center justify-center bg-[#fdb813] hover:bg-[#e5a60f] active:scale-95 text-slate-950 px-5 sm:px-7 py-2 sm:py-2.5 rounded-full shadow-lg transition-all text-center leading-tight hover:shadow-amber-500/30 cursor-pointer"
+                  className="inline-flex flex-col items-center justify-center bg-[#fdb813] hover:bg-[#e5a60f] active:scale-95 text-slate-950 px-3 sm:px-6 xl:px-7 py-1.5 sm:py-2 xl:py-2.5 rounded-full shadow-lg transition-all text-center leading-tight hover:shadow-amber-500/30 cursor-pointer shrink-0"
                 >
                   <span className="text-xs sm:text-sm font-black tracking-wide uppercase">
-                    7 DAY FREE TRIAL
+                    <span className="sm:hidden">Free Trial</span>
+                    <span className="hidden sm:inline">7 Day Free Trial</span>
                   </span>
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-900/90 tracking-tight hidden min-[480px]:inline">
+                  <span className="text-[10px] sm:text-xs font-semibold text-slate-900/90 tracking-tight hidden lg:inline">
                     No obligation, cancel at any time
                   </span>
                 </Link>
+
+                {/* Mobile Menu Toggle Button in Scrolled State */}
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen((v) => !v)}
+                  aria-label="Toggle navigation menu"
+                  className="lg:hidden h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors shrink-0 ml-0.5"
+                >
+                  {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
+                </button>
               </div>
 
             </div>
@@ -101,54 +128,111 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
             /* ============ INITIAL TOP STATE: Floating Modern Glass Pill Navigation ============ */
             <>
               {/* Left: Brand Logo */}
-              <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform">
-                  <Zap className="w-5 h-5 fill-white" />
+              <Link href="/" className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 group">
+                <div className="w-7 h-7 sm:w-9 sm:h-9 xl:w-10 xl:h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform">
+                  <Zap className="w-3.5 h-3.5 sm:w-5 sm:h-5 fill-white" />
                 </div>
-                <span className="text-xl sm:text-2xl font-bold tracking-tight text-[#1f2223]">
-                  Nx<span className="text-blue-600">elio</span> <span className="text-slate-500 font-medium text-sm sm:text-base">Nurture</span>
+                <span className="text-base sm:text-2xl font-bold tracking-tight text-[#1f2223]">
+                  Nx<span className="text-blue-600">elio</span>{" "}
+                  <span className="text-slate-500 font-medium text-xs sm:text-base hidden sm:inline">Nurture</span>
                 </span>
               </Link>
 
               {/* Center: Nav Links */}
-              <nav className="hidden lg:flex items-center gap-7 lg:gap-8">
-                <a href="#features" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Features</a>
-                <a href="#capabilities" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Capabilities</a>
-                <a href="#testimonials" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Reviews</a>
-                <a href="#playbooks" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Playbooks</a>
-                <a href="#integrations" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Integrations</a>
-                <a href="#pricing" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">Pricing</a>
-                <a href="#faq" className="text-sm sm:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">FAQ</a>
+              <nav className="hidden lg:flex items-center gap-3 lg:gap-3.5 xl:gap-6 2xl:gap-8 shrink min-w-0">
+                {NAV_LINKS.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="text-xs xl:text-sm 2xl:text-[15px] font-semibold text-slate-700 hover:text-blue-600 transition-colors whitespace-nowrap"
+                  >
+                    {link.label}
+                  </a>
+                ))}
               </nav>
 
               {/* Right: Actions */}
-              <div className="flex items-center gap-3 sm:gap-3.5">
+              <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={onBookDemo}
-                  className="hidden sm:inline-flex h-10 px-4 items-center justify-center rounded-full border border-blue-200 bg-white text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+                  className="hidden xl:inline-flex h-9 sm:h-10 px-3 sm:px-4 items-center justify-center rounded-full border border-blue-200 bg-white text-xs sm:text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors shadow-sm cursor-pointer whitespace-nowrap shrink-0"
                 >
-                  Book a Demo
+                  Book Demo
                 </button>
                 <Link
                   href="/login"
-                  className="hidden sm:inline-flex h-10 px-4 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap shrink-0"
+                  className="hidden sm:inline-flex h-9 sm:h-10 px-3.5 sm:px-4 items-center justify-center rounded-full border border-slate-200 bg-white text-xs sm:text-sm font-semibold text-[#1f2223] hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap shrink-0"
                 >
                   Log In
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex h-10 sm:h-11 px-5 sm:px-6 items-center justify-center gap-2 rounded-full bg-[#1f2223] text-white text-sm sm:text-[15px] font-semibold hover:bg-black transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+                  className="inline-flex h-8 sm:h-10 xl:h-11 px-3 sm:px-5 xl:px-6 items-center justify-center gap-1 sm:gap-2 rounded-full bg-[#1f2223] text-white text-xs sm:text-sm xl:text-[15px] font-semibold hover:bg-black transition-all shadow-md hover:shadow-lg hover:scale-102 active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
                 >
-                  <span>Start Free Trial</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Start Free</span>
+                  <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Link>
+
+                {/* Mobile Menu Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen((v) => !v)}
+                  aria-label="Toggle navigation menu"
+                  className="lg:hidden h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-0.5 shrink-0"
+                >
+                  {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
+                </button>
               </div>
             </>
           )}
 
         </div>
       </div>
+
+      {/* Mobile Navigation Dropdown Card */}
+      {mobileMenuOpen && (
+        <div className="w-full max-w-[1380px] pointer-events-auto mt-2 rounded-3xl bg-white/95 backdrop-blur-2xl border border-slate-200/80 shadow-2xl p-4 sm:p-5 lg:hidden animate-fade-up text-[#1f2223]">
+          <nav className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+            {NAV_LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+          <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setMobileMenuOpen(false); onBookDemo(); }}
+                className="w-full py-2 sm:py-2.5 rounded-xl border border-blue-200 bg-white text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors text-center"
+              >
+                Book Demo
+              </button>
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full py-2 sm:py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 hover:bg-slate-50 transition-colors text-center"
+              >
+                Log In
+              </Link>
+            </div>
+            <Link
+              href="/signup"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full py-2 sm:py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors text-center flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20"
+            >
+              <span>Start 7-Day Free Trial</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
@@ -1071,12 +1155,12 @@ function PricingSection() {
     <section id="pricing" className="py-24 sm:py-32 bg-transparent">
       <div className="max-w-[1240px] mx-auto px-5 sm:px-8">
 
-        {/* Outer Dark Frame matching reference mockup */}
-        <div className="bg-[#151726]/90 backdrop-blur-2xl border border-white/15 rounded-[40px] p-6 sm:p-10 lg:p-14 shadow-2xl relative overflow-hidden">
+        {/* Outer Navy Blue Frame matching user request */}
+        <div className="bg-[#0b1b3d]/95 backdrop-blur-2xl border border-blue-400/20 rounded-[40px] p-6 sm:p-10 lg:p-14 shadow-2xl relative overflow-hidden">
           
           {/* Subtle radiant ambient lights */}
-          <div className="absolute -top-24 -left-24 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-24 -left-24 w-72 h-72 bg-blue-500/25 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
 
           {/* Section Header */}
           <div className="max-w-2xl mx-auto text-center mb-12 sm:mb-16 relative z-10">
@@ -1116,8 +1200,13 @@ function PricingSection() {
                   </ul>
                 </div>
 
-                {/* Bottom Row: Price on Left & Dark Recessed Sign-up Button on Right */}
-                <div className="pt-6 border-t border-white/20 flex items-end justify-between gap-3 relative z-10">
+                {/* Bottom Row: Price & Sign-up Button — stacked on narrow cards
+                    (a 320px viewport leaves ~176px of card content width once
+                    the section/frame/card padding is subtracted, nowhere near
+                    enough for "$299.99" beside a full-width button; they used
+                    to fight for the same row and the button lost, clipped to
+                    a sliver reading "Sig") side by side once there's room. */}
+                <div className="pt-6 border-t border-white/20 flex flex-col min-[420px]:flex-row min-[420px]:items-end justify-between gap-3 relative z-10">
                   {/* Price */}
                   <div>
                     <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-none">
@@ -1131,7 +1220,7 @@ function PricingSection() {
                   {/* Sign Up Button */}
                   <Link
                     href="/signup"
-                    className="inline-flex items-center gap-2 bg-[#171828] hover:bg-[#0c0d18] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 group/btn cursor-pointer shrink-0 border border-white/10"
+                    className="inline-flex items-center justify-center gap-2 bg-[#08152e] hover:bg-[#040c1b] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 group/btn cursor-pointer min-[420px]:shrink-0 border border-white/10"
                   >
                     <span>Sign up</span>
                     <span className="text-[10px] group-hover/btn:translate-x-0.5 transition-transform">▶</span>

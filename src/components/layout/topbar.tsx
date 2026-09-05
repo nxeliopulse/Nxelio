@@ -13,7 +13,7 @@ import { switchWorkspace, createWorkspace, type MyWorkspaceRow } from "@/lib/que
 import { NotificationsBell } from "./notifications-bell";
 import { useSidebar } from "./sidebar-context";
 import { Modal } from "@/components/ui/modal";
-import { getStoredAppearance, applyTheme } from "@/lib/theme";
+import { getStoredAppearance, applyTheme, applyAppearance } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 interface TopbarProps {
@@ -29,19 +29,36 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [open, setOpen] = useState(false);
-  const [theme, setTheme] = useState<string>("light");
+  const [isDark, setIsDark] = useState<boolean>(false);
 
-  // Read theme on mount
+  // Sync with actual resolved theme on mount and whenever the DOM class changes
   useEffect(() => {
-    const appearance = getStoredAppearance();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs client-only localStorage value after mount to avoid SSR hydration mismatch
-    setTheme(appearance.theme);
+    const update = () => setIsDark(document.documentElement.classList.contains("dark"));
+    update();
+
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    const onMediaChange = () => {
+      const appearance = getStoredAppearance();
+      if (appearance.theme === "system") {
+        applyAppearance(appearance);
+        update();
+      }
+    };
+    mql.addEventListener("change", onMediaChange);
+
+    return () => {
+      observer.disconnect();
+      mql.removeEventListener("change", onMediaChange);
+    };
   }, []);
 
   const toggleTheme = () => {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    setTheme(nextTheme);
-    applyTheme(nextTheme);
+    const nextDark = !isDark;
+    setIsDark(nextDark);
+    applyTheme(nextDark ? "dark" : "light");
   };
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -107,6 +124,20 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Escape closed none of these — only clicking outside did (QA report D04b,
+  // profile menu specifically, but search/more share the exact same open/
+  // click-outside pattern above and had the identical gap).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      setSearchOpen(false);
+      setMoreMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
   function handleSearchChange(v: string) {
@@ -327,55 +358,55 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
             <MoreHorizontal className="h-4 w-4" />
           </button>
           {moreMenuOpen && (
-            <div className="lp-anim-pop origin-top-right absolute right-0 top-full mt-1.5 w-60 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-50 text-slate-900 p-1">
+            <div className="lp-anim-pop origin-top-right fixed right-3 sm:absolute sm:right-0 top-14 sm:top-full mt-1.5 w-60 max-w-[calc(100vw-24px)] bg-white dark:bg-[#1b212e] rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden z-50 text-slate-900 dark:text-white p-1">
               <Link
                 href="/billing"
                 onClick={() => setMoreMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
               >
                 <ArrowUpRight className="h-4 w-4 text-amber-500" /> Upgrade
               </Link>
               <button
                 onClick={() => { setMoreMenuOpen(false); router.push("/meetings"); }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
               >
-                <Phone className="h-4 w-4 text-slate-400" /> Phone / Calling
+                <Phone className="h-4 w-4 text-slate-400 dark:text-slate-500" /> Phone / Calling
               </button>
               <button
                 onClick={() => { setMoreMenuOpen(false); router.push("/settings?section=email"); }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
               >
-                <ShoppingBag className="h-4 w-4 text-slate-400" /> Marketplace & Integrations
+                <ShoppingBag className="h-4 w-4 text-slate-400 dark:text-slate-500" /> Marketplace & Integrations
               </button>
               <button
                 onClick={() => { setMoreMenuOpen(false); router.push("/dashboard?tour=dashboard"); }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
               >
-                <PlayCircle className="h-4 w-4 text-slate-400" /> Replay product tour
+                <PlayCircle className="h-4 w-4 text-slate-400 dark:text-slate-500" /> Replay product tour
               </button>
               <button
                 onClick={() => { setMoreMenuOpen(false); onToggleAssistant?.(); }}
-                className="sm:hidden w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                className="sm:hidden w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
               >
                 <Sparkles className="h-4 w-4 text-purple-500" /> AI Assistant
               </button>
               <button
                 onClick={() => { setMoreMenuOpen(false); toggleTheme(); }}
-                className="sm:hidden w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                className="sm:hidden w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
               >
-                {theme === "dark" ? (
+                {isDark ? (
                   <Sun className="h-4 w-4 text-amber-500 animate-fade-in" />
                 ) : (
-                  <Moon className="h-4 w-4 text-slate-400 animate-fade-in" />
+                  <Moon className="h-4 w-4 text-slate-400 dark:text-slate-500 animate-fade-in" />
                 )}
-                {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                {isDark ? "Light Mode" : "Dark Mode"}
               </button>
               <Link
                 href="/help"
                 onClick={() => setMoreMenuOpen(false)}
-                className="sm:hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
+                className="sm:hidden flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
               >
-                <HelpCircle className="h-4 w-4 text-slate-400" /> Help & Support
+                <HelpCircle className="h-4 w-4 text-slate-400 dark:text-slate-500" /> Help & Support
               </Link>
             </div>
           )}
@@ -404,11 +435,11 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
         {/* Dark/Light mode theme toggle */}
         <button
           onClick={toggleTheme}
-          aria-label={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          aria-label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
           className="hidden sm:flex p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors animate-fade-in"
         >
-          {theme === "dark" ? (
+          {isDark ? (
             <Sun className="h-4 w-4 text-amber-300 fill-amber-300" />
           ) : (
             <Moon className="h-4 w-4" />

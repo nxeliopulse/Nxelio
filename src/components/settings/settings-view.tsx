@@ -252,41 +252,43 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
     <div className="max-w-[1400px] mx-auto">
       <PageHeader title="Settings" description="Configure your account, integrations, and platform preferences" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6">
-        <Card className="p-2 h-fit">
-          <ul className="space-y-0.5">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-5 sm:gap-6">
+        {/* Navigation: Horizontal scrollable strip on mobile/tablet, vertical sidebar card on lg+ */}
+        <div className="overflow-x-auto scrollbar-hide -mx-1 px-1 lg:overflow-visible flex-shrink-0">
+          <div className="flex lg:flex-col gap-1 p-1.5 rounded-2xl bg-white dark:bg-[#1b212e] border border-slate-200 dark:border-slate-800 shadow-xs min-w-max lg:min-w-0">
             {visibleSections.map((s) => (
-              <li key={s.id}>
-                <button
-                  onClick={() => setActive(s.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    active === s.id ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  {s.icon} {s.label}
-                </button>
-              </li>
+              <button
+                key={s.id}
+                onClick={() => setActive(s.id)}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${
+                  active === s.id
+                    ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                {s.icon} {s.label}
+              </button>
             ))}
-          </ul>
-        </Card>
+          </div>
+        </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5 min-w-0">
           {active === "profile" && (
             <>
-              <Card className="p-6">
-                <h3 className="font-semibold text-slate-900 mb-1">Profile</h3>
-                <p className="text-sm text-slate-500 mb-5">Update your personal information</p>
+              <Card className="p-4 sm:p-6">
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Profile</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Update your personal information</p>
 
-                {profileMsg && <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-700 mb-4"><CheckCircle2 className="h-4 w-4 mt-0.5" />{profileMsg}</div>}
-                {profileErr && <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-4"><AlertCircle className="h-4 w-4 mt-0.5" />{profileErr}</div>}
+                {profileMsg && <div className="flex items-start gap-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 text-sm text-emerald-700 dark:text-emerald-300 mb-4"><CheckCircle2 className="h-4 w-4 mt-0.5" />{profileMsg}</div>}
+                {profileErr && <div className="flex items-start gap-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300 mb-4"><AlertCircle className="h-4 w-4 mt-0.5" />{profileErr}</div>}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Full name</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Full name</label>
                     <Input value={name} onChange={(e) => setName(e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Email</label>
                     <Input defaultValue={profile?.email || ""} disabled />
                   </div>
                   <div>
