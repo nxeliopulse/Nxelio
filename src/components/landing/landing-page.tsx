@@ -1155,12 +1155,12 @@ function PricingSection() {
     <section id="pricing" className="py-24 sm:py-32 bg-transparent">
       <div className="max-w-[1240px] mx-auto px-5 sm:px-8">
 
-        {/* Outer Dark Frame matching reference mockup */}
-        <div className="bg-[#151726]/90 backdrop-blur-2xl border border-white/15 rounded-[40px] p-6 sm:p-10 lg:p-14 shadow-2xl relative overflow-hidden">
+        {/* Outer Navy Blue Frame matching user request */}
+        <div className="bg-[#0b1b3d]/95 backdrop-blur-2xl border border-blue-400/20 rounded-[40px] p-6 sm:p-10 lg:p-14 shadow-2xl relative overflow-hidden">
           
           {/* Subtle radiant ambient lights */}
-          <div className="absolute -top-24 -left-24 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-24 -left-24 w-72 h-72 bg-blue-500/25 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
 
           {/* Section Header */}
           <div className="max-w-2xl mx-auto text-center mb-12 sm:mb-16 relative z-10">
@@ -1220,7 +1220,7 @@ function PricingSection() {
                   {/* Sign Up Button */}
                   <Link
                     href="/signup"
-                    className="inline-flex items-center justify-center gap-2 bg-[#171828] hover:bg-[#0c0d18] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 group/btn cursor-pointer min-[420px]:shrink-0 border border-white/10"
+                    className="inline-flex items-center justify-center gap-2 bg-[#08152e] hover:bg-[#040c1b] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95 group/btn cursor-pointer min-[420px]:shrink-0 border border-white/10"
                   >
                     <span>Sign up</span>
                     <span className="text-[10px] group-hover/btn:translate-x-0.5 transition-transform">▶</span>
