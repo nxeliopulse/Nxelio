@@ -904,10 +904,10 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
       {viewMode === "list" ? (
         <Card className="overflow-hidden bg-white dark:bg-[#0c0d24] border-slate-200 dark:border-slate-800/80 shadow-xs rounded-xl">
           <div className="overflow-x-auto w-full">
-            <DataTable className="min-w-[1000px] w-full text-slate-800 dark:text-slate-700">
+            <DataTable className="min-w-[1200px] w-full text-slate-800 dark:text-slate-700">
               <DataTableHead className="sticky top-0 z-10 bg-slate-50/50 dark:bg-[var(--muted)] border-b border-slate-200/80 dark:border-slate-800">
                 <tr className="text-left text-xs uppercase font-bold text-slate-500 dark:text-slate-500">
-                  <DataTableTh className="w-10 px-3 py-2.5">
+                  <DataTableTh className="w-10 min-w-[40px] max-w-[40px] px-3 py-2.5">
                     <input
                       type="checkbox"
                       checked={selected.length === cardFiltered.length && cardFiltered.length > 0}
@@ -916,47 +916,47 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                     />
                   </DataTableTh>
                   {/* Row # — always shown, fixed position, not part of the Manage Columns toggle (matches leads-table.tsx) */}
-                  <DataTableTh className="w-10 px-3 py-2.5">#</DataTableTh>
-                  <DataTableTh className="px-3 py-2.5">
+                  <DataTableTh className="w-12 min-w-[48px] max-w-[48px] px-3 py-2.5 text-center">#</DataTableTh>
+                  <DataTableTh className="w-[260px] min-w-[220px] max-w-[300px] px-3 py-2.5">
                     <span className="inline-flex items-center gap-1">Name{renderSortButton("name")}</span>
                   </DataTableTh>
                   {cols.phone && (
-                    <DataTableTh className="px-3 py-2.5">
+                    <DataTableTh className="w-[150px] min-w-[140px] px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Phone{renderSortButton("phone")}</span>
                     </DataTableTh>
                   )}
                   {cols.tags && (
-                    <DataTableTh className="px-3 py-2.5">
+                    <DataTableTh className="w-[100px] min-w-[90px] px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Tags{renderSortButton("tags")}</span>
                     </DataTableTh>
                   )}
                   {cols.location && (
-                    <DataTableTh className="px-3 py-2.5">
+                    <DataTableTh className="w-[180px] min-w-[160px] px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Location{renderSortButton("location")}</span>
                     </DataTableTh>
                   )}
                   {cols.rating && (
-                    <DataTableTh className="px-3 py-2.5">
+                    <DataTableTh className="w-[100px] min-w-[90px] px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Rating{renderSortButton("rating")}</span>
                     </DataTableTh>
                   )}
-                  {cols.contact && <DataTableTh className="px-3 py-2.5 text-center">Contact</DataTableTh>}
+                  {cols.contact && <DataTableTh className="w-[140px] min-w-[140px] px-3 py-2.5 text-center">Contact</DataTableTh>}
                   {cols.type && (
-                    <DataTableTh className="px-3 py-2.5">
+                    <DataTableTh className="w-[120px] min-w-[100px] px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Type{renderSortButton("type")}</span>
                     </DataTableTh>
                   )}
                   {cols.owner && (
-                    <DataTableTh className="px-3 py-2.5">
+                    <DataTableTh className="w-[140px] min-w-[130px] px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Owner{renderSortButton("owner")}</span>
                     </DataTableTh>
                   )}
                   {cols.created_at && (
-                    <DataTableTh className="px-3 py-2.5">
+                    <DataTableTh className="w-[130px] min-w-[120px] px-3 py-2.5">
                       <span className="inline-flex items-center gap-1">Created Date{renderSortButton("created_at")}</span>
                     </DataTableTh>
                   )}
-                  <DataTableTh className="w-12 px-3 py-2.5 text-center">Action</DataTableTh>
+                  <DataTableTh className="w-14 min-w-[56px] max-w-[56px] px-3 py-2.5 text-center">Action</DataTableTh>
                 </tr>
               </DataTableHead>
               <DataTableBody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -982,7 +982,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                       )}
                     >
                       {/* Checkbox column */}
-                      <DataTableTd onClick={(e) => e.stopPropagation()} className="px-3 py-2.5">
+                      <DataTableTd onClick={(e) => e.stopPropagation()} className="w-10 min-w-[40px] max-w-[40px] px-3 py-2.5">
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -992,30 +992,36 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                       </DataTableTd>
 
                       {/* Row # — always shown, matches leads-table.tsx's Row # column */}
-                      <DataTableTd className="px-3 py-2.5">
+                      <DataTableTd className="w-12 min-w-[48px] max-w-[48px] px-3 py-2.5 text-center">
                         <span className="text-slate-400 dark:text-slate-500 tabular-nums font-mono text-xs">{rowNumber}</span>
                       </DataTableTd>
 
                       {/* Name with star & Avatar details */}
-                      <DataTableTd className="px-3 py-2.5">
-                        <div className="flex items-center gap-2">
+                      <DataTableTd className="w-[260px] min-w-[220px] max-w-[300px] px-3 py-2.5">
+                        <div className="flex items-center gap-2 min-w-0 w-full">
                           <button
                             type="button"
                             onClick={(e) => toggleStar(a.id, e)}
-                            className="p-1 rounded-md text-slate-350 hover:text-amber-500 transition-colors"
+                            className="p-1 rounded-md text-slate-350 hover:text-amber-500 transition-colors shrink-0"
                           >
                             <Star className={cn("h-4 w-4", isStarred ? "fill-amber-500 text-amber-500" : "text-slate-400")} />
                           </button>
 
-                          <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 shadow-2xs", avatarColor(a.account_name))}>
+                          <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-2xs", avatarColor(a.account_name))}>
                             {a.account_name.trim()[0]?.toUpperCase() || "?"}
                           </div>
 
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-900 dark:text-white truncate whitespace-nowrap mb-0.5 leading-none group-hover:text-blue-500">
+                          <div className="min-w-0 flex-1 overflow-hidden">
+                            <p
+                              className="font-bold text-slate-900 dark:text-white truncate mb-0.5 leading-tight group-hover:text-blue-500"
+                              title={a.account_name}
+                            >
                               {a.account_name}
                             </p>
-                            <p className="text-[10px] text-slate-400 font-medium truncate leading-none">
+                            <p
+                              className="text-[10px] text-slate-400 font-medium truncate leading-none"
+                              title={a.industry || undefined}
+                            >
                               {a.industry || "—"}
                             </p>
                           </div>
@@ -1024,8 +1030,10 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
 
                       {/* Phone Column — matches leads-table.tsx's "+ Add phone" quick-fill treatment */}
                       {cols.phone && (
-                        <td className="px-3 py-2.5 text-slate-500 dark:text-slate-500 whitespace-nowrap font-medium">
-                          {a.phone || (
+                        <td className="w-[150px] min-w-[140px] px-3 py-2.5 text-slate-500 dark:text-slate-500 whitespace-nowrap font-medium">
+                          {a.phone ? (
+                            <span className="truncate block" title={a.phone}>{a.phone}</span>
+                          ) : (
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setEditingAccount(a); }}
@@ -1039,9 +1047,9 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
 
                       {/* Tags Column (Ownership) */}
                       {cols.tags && (
-                        <td className="px-3 py-2.5">
+                        <td className="w-[100px] min-w-[90px] px-3 py-2.5 whitespace-nowrap">
                           {a.ownership ? (
-                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold border", ownershipColor(a.ownership))}>
+                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold border inline-block", ownershipColor(a.ownership))}>
                               {a.ownership}
                             </span>
                           ) : (
@@ -1052,11 +1060,14 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
 
                       {/* Location Column */}
                       {cols.location && (
-                        <td className="px-3 py-2.5 text-slate-600 dark:text-slate-500 font-medium">
+                        <td className="w-[180px] min-w-[160px] max-w-[200px] px-3 py-2.5 text-slate-600 dark:text-slate-500 font-medium">
                           {countryName ? (
-                            <div className="flex items-center gap-1">
+                            <div
+                              className="flex items-center gap-1.5 min-w-0"
+                              title={[a.billing_city, countryName].filter(Boolean).join(", ")}
+                            >
                               <CountryFlag country={countryName} />
-                              <span>{[a.billing_city, countryName].filter(Boolean).join(", ")}</span>
+                              <span className="truncate">{[a.billing_city, countryName].filter(Boolean).join(", ")}</span>
                             </div>
                           ) : (
                             <span className="text-slate-400">—</span>
@@ -1066,7 +1077,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
 
                       {/* Rating Column */}
                       {cols.rating && (
-                        <td className="px-3 py-2.5">
+                        <td className="w-[100px] min-w-[90px] px-3 py-2.5 whitespace-nowrap">
                           {a.rating ? (
                             <Badge variant={a.rating === "Hot" ? "danger" : a.rating === "Warm" ? "warning" : "blue"}>{a.rating}</Badge>
                           ) : (
@@ -1077,8 +1088,8 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
 
                       {/* Contact Icons Column */}
                       {cols.contact && (
-                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="w-[140px] min-w-[140px] px-3 py-2.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1.5">
                             {a.website ? (
                               <a
                                 href={a.website.startsWith("http") ? a.website : `https://${a.website}`}
@@ -1133,9 +1144,9 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
 
                       {/* Type Column */}
                       {cols.type && (
-                        <td className="px-3 py-2.5">
+                        <td className="w-[120px] min-w-[100px] px-3 py-2.5 whitespace-nowrap">
                           {a.account_type ? (
-                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold", accountTypeColor(a.account_type))}>
+                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold inline-block", accountTypeColor(a.account_type))}>
                               {a.account_type}
                             </span>
                           ) : (
@@ -1148,15 +1159,15 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                           account_owner is a UUID (accounts.account_owner references users.user_id) — look
                           up the display name via the owners prop rather than rendering the id directly. */}
                       {cols.owner && (
-                        <td className="px-3 py-2.5">
+                        <td className="w-[140px] min-w-[130px] max-w-[160px] px-3 py-2.5">
                           {(() => {
                             const ownerName = owners.find((o) => o.id === a.account_owner)?.name;
                             return ownerName ? (
-                              <span className="flex items-center gap-1.5 max-w-[140px]">
-                                <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0", avatarColor(ownerName))}>
+                              <span className="flex items-center gap-1.5 min-w-0" title={ownerName}>
+                                <span className={cn("h-5 w-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0", avatarColor(ownerName))}>
                                   {ownerName.trim()[0]?.toUpperCase() || "?"}
                                 </span>
-                                <span className="truncate text-slate-600 dark:text-slate-500 whitespace-nowrap">{ownerName}</span>
+                                <span className="truncate text-slate-600 dark:text-slate-500">{ownerName}</span>
                               </span>
                             ) : (
                               <span className="text-slate-400">—</span>
@@ -1167,20 +1178,20 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
 
                       {/* Created Date Column */}
                       {cols.created_at && (
-                        <td className="px-3 py-2.5 text-slate-500 dark:text-slate-500 text-xs whitespace-nowrap">
+                        <td className="w-[130px] min-w-[120px] px-3 py-2.5 text-slate-500 dark:text-slate-500 text-xs whitespace-nowrap">
                           {formatDate(a.created_at)}
                         </td>
                       )}
 
                       {/* Action Menu Column */}
-                      <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="w-14 min-w-[56px] max-w-[56px] px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={(e) => {
                             const r = e.currentTarget.getBoundingClientRect();
                             setRowMenu({ id: a.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) });
                           }}
                           title="Row actions"
-                          className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
+                          className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
                         >
                           <MoreVertical className="h-4 w-4 text-slate-400" />
                         </button>
@@ -1229,7 +1240,7 @@ export function AccountsTable({ accounts, owners = [] }: { accounts: AccountRow[
                   <div className={cn("h-14 w-14 rounded-full flex items-center justify-center text-white text-base font-bold shadow-sm mb-2.5", avatarColor(a.account_name))}>
                     {a.account_name.trim()[0]?.toUpperCase() || "?"}
                   </div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug group-hover:text-blue-500">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug group-hover:text-blue-500 line-clamp-2" title={a.account_name}>
                     {a.account_name}
                   </h4>
                   <p className="text-xs text-slate-400 font-semibold mt-1">{a.industry || "—"}</p>
