@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 import {
   ChevronDown, LogOut, User as UserIcon, Settings, Menu, Sparkles,
   Phone, ShoppingBag, HelpCircle, PlayCircle, ArrowUpRight, Search, Users2, Megaphone, Loader2,
-  Building2, Check, Plus, Sun, Moon, X, MoreHorizontal,
+  Building2, Sun, Moon, X, MoreHorizontal,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { globalSearch, type GlobalSearchResult } from "@/lib/queries/global-search";
-import { switchWorkspace, createWorkspace, type MyWorkspaceRow } from "@/lib/queries/workspaces";
 import { NotificationsBell } from "./notifications-bell";
 import { useSidebar } from "./sidebar-context";
 import { Modal } from "@/components/ui/modal";
@@ -20,12 +19,12 @@ interface TopbarProps {
   userName?: string;
   userEmail?: string;
   userRole?: string;
-  workspaces?: MyWorkspaceRow[];
+  workspaceName?: string;
   onToggleAssistant?: () => void;
   assistantOpen?: boolean;
 }
 
-export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], onToggleAssistant, assistantOpen = false }: TopbarProps) {
+export function Topbar({ userName = "Guest", userEmail = "", workspaceName = "", onToggleAssistant, assistantOpen = false }: TopbarProps) {
   const router = useRouter();
   const { toggleMobile } = useSidebar();
   const [open, setOpen] = useState(false);
@@ -65,12 +64,6 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<GlobalSearchResult>({ leads: [], campaigns: [] });
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [switchingId, setSwitchingId] = useState<string | null>(null);
-  const [switchError, setSwitchError] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newWorkspaceName, setNewWorkspaceName] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,40 +74,6 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
   const initials = parts.length > 1
     ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     : userName.slice(0, 2).toUpperCase() || "?";
-
-  async function handleSwitchWorkspace(id: string) {
-    setSwitchError(null);
-    setSwitchingId(id);
-    const result = await switchWorkspace(id);
-    // Reset the spinner either way — the client component instance survives
-    // the router navigation below (same layout shell), so leaving switchingId
-    // set on success left the spinner stuck next to that workspace forever,
-    // only clearing on a full manual page reload.
-    setSwitchingId(null);
-    if (!result.ok) {
-      setSwitchError(result.error || "Couldn't switch workspace.");
-      return;
-    }
-    setOpen(false);
-    router.push("/dashboard");
-    router.refresh();
-  }
-
-  async function handleCreateWorkspace() {
-    setCreateError(null);
-    setCreating(true);
-    const result = await createWorkspace(newWorkspaceName);
-    setCreating(false);
-    if (!result.ok) {
-      setCreateError(result.error || "Couldn't create the workspace.");
-      return;
-    }
-    setCreateOpen(false);
-    setNewWorkspaceName("");
-    setOpen(false);
-    router.push("/dashboard");
-    router.refresh();
-  }
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -485,32 +444,13 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
                 <p className="text-xs text-slate-500 truncate">{userEmail}</p>
               </div>
 
-              {workspaces.length > 0 && (
+              {workspaceName && (
                 <div className="p-1 border-b border-slate-100">
-                  <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Workspaces</p>
-                  {switchError && <p className="px-3 pb-1.5 text-xs text-red-600">{switchError}</p>}
-                  {workspaces.map((ws) => (
-                    <button
-                      key={ws.id}
-                      onClick={() => !ws.isActive && handleSwitchWorkspace(ws.id)}
-                      disabled={switchingId !== null}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                    >
-                      <Building2 className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                      <span className="flex-1 min-w-0 truncate text-left">{ws.name}</span>
-                      {switchingId === ws.id ? (
-                        <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin text-slate-400" />
-                      ) : ws.isActive ? (
-                        <Check className="h-3.5 w-3.5 flex-shrink-0 text-emerald-600" />
-                      ) : null}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => { setOpen(false); setCreateOpen(true); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <Plus className="h-4 w-4 text-slate-400" /> Create workspace
-                  </button>
+                  <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Workspace</p>
+                  <div className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700">
+                    <Building2 className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                    <span className="flex-1 min-w-0 truncate text-left">{workspaceName}</span>
+                  </div>
                 </div>
               )}
 
@@ -566,40 +506,6 @@ export function Topbar({ userName = "Guest", userEmail = "", workspaces = [], on
               className="flex-1 py-2.5 rounded-full text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-70"
             >
               {loggingOut ? "Logging out…" : "Log Out"}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={createOpen} onClose={() => { setCreateOpen(false); setCreateError(null); }} title="Create workspace" description="Start a brand-new, separate company account. You'll need to set up billing for it separately." size="sm">
-        <div className="p-5 space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Workspace name</label>
-            <input
-              type="text"
-              autoFocus
-              value={newWorkspaceName}
-              onChange={(e) => setNewWorkspaceName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && newWorkspaceName.trim() && !creating) handleCreateWorkspace(); }}
-              placeholder="e.g. My Side Business"
-              className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]"
-            />
-          </div>
-          {createError && <p className="text-sm text-red-600">{createError}</p>}
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              onClick={() => { setCreateOpen(false); setCreateError(null); }}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreateWorkspace}
-              disabled={creating || !newWorkspaceName.trim()}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium text-white bg-[var(--primary)] hover:opacity-90 disabled:opacity-50"
-            >
-              {creating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Create workspace
             </button>
           </div>
         </div>

@@ -5,7 +5,7 @@ import { getOnboardingStatus } from "@/lib/queries/onboarding";
 import { getSubscription } from "@/lib/queries/subscriptions";
 import { SubscriptionGate } from "@/components/billing/subscription-gate";
 import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
-import { getMyWorkspaces } from "@/lib/queries/workspaces";
+import { getCurrentWorkspace } from "@/lib/queries/workspaces";
 import { isPlatformAdmin } from "@/lib/queries/platform-admin";
 import { getIdleTimeoutMinutes, getWarningLeadMinutes } from "@/lib/idle-timeout-config";
 
@@ -63,7 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const navAccess =
     (profile as { nav_access?: Record<string, boolean> | null } | null)?.nav_access ?? null;
 
-  const workspaces = await getMyWorkspaces();
+  const workspace = await getCurrentWorkspace();
 
   return (
     <AppShell
@@ -71,7 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       userEmail={userEmail}
       userRole={userRole}
       navAccess={navAccess}
-      workspaces={workspaces}
+      workspaceName={workspace?.name ?? ""}
       idleTimeoutMinutes={getIdleTimeoutMinutes()}
       warningLeadMinutes={getWarningLeadMinutes()}
     >

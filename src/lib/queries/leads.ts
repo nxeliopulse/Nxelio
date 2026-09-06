@@ -10,6 +10,7 @@ import { isSuperAdmin } from "@/lib/queries/auth-guards";
 import { isManualStatusTransitionAllowed, statusTransitionError } from "@/lib/leads/status-flow";
 import { isValidPhoneNumber } from "libphonenumber-js";
 import { isValidLinkedIn, LINKEDIN_ERROR } from "@/lib/validation";
+import { assertHasWorkspace } from "@/lib/queries/workspaces";
 
 /**
  * The client always sends phone pre-formatted to international form (e.g.
@@ -201,6 +202,7 @@ export async function getDistinctLeadValues(
 }
 
 export async function createLead(payload: Partial<LeadRow>) {
+  await assertHasWorkspace();
   assertValidLeadPhone(payload);
   assertValidLeadLinkedIn(payload);
   const supabase = await createClient();
@@ -411,6 +413,11 @@ export async function bulkInsertLeads(
   opts?: { defaultSource?: string }
 ): Promise<{ inserted: number; duplicates: number; error?: string }> {
   if (!leads.length) return { inserted: 0, duplicates: 0 };
+  try {
+    await assertHasWorkspace();
+  } catch (err) {
+    return { inserted: 0, duplicates: 0, error: err instanceof Error ? err.message : "You need a workspace before adding leads." };
+  }
   const supabase = await createClient();
 
   // Build a set of existing identifiers (email + linkedin) to skip duplicates —

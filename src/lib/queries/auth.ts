@@ -28,6 +28,13 @@ export async function signUpDirect(args: { email: string; password: string; full
   });
   const createBody = await createRes.json();
   if (!createRes.ok) {
+    // Supabase enforces one login per email project-wide. Its own message
+    // ("A user with this email address has already been registered" /
+    // "email_exists") is accurate but easy to misread as a server error —
+    // spell out what to do instead.
+    if (createBody.code === "email_exists" || /already.*registered/i.test(createBody.msg || "")) {
+      return { ok: false, error: "This email already has an account. Please log in instead." };
+    }
     return { ok: false, error: createBody.msg || createBody.error_description || "Signup failed" };
   }
   const newUserId: string = createBody.id;

@@ -40,6 +40,10 @@ const roleAccessSummary: Record<string, string[]> = {
 
 export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
   const visibleUsers = isAdmin ? users : users.filter((u) => u.user_id === currentUserId);
+  // Exactly one Super Admin per workspace — its creator. Never offer it as an
+  // assignable role, invite or otherwise (enforced again server-side in
+  // inviteUser/updateUserRole — this is just so the option never appears).
+  const assignableRoles = roles.filter((r) => r.role_name !== "Super Admin");
   const { toast, confirm } = useFeedback();
   const [pending, start] = useTransition();
   const [showInvite, setShowInvite] = useState(false);
@@ -290,7 +294,7 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
           <Input type="email" label="Email *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@nxelio.ai" />
           <div className="space-y-1.5">
             <Select label="Role *" value={form.roleId} onChange={(e) => setForm({ ...form, roleId: Number(e.target.value) })}>
-              {roles.map((r) => <option key={r.role_id} value={r.role_id}>{r.role_name}</option>)}
+              {assignableRoles.map((r) => <option key={r.role_id} value={r.role_id}>{r.role_name}</option>)}
             </Select>
             {selectedRole?.role_description && <p className="text-xs text-slate-500 mt-2">{selectedRole.role_description}</p>}
           </div>

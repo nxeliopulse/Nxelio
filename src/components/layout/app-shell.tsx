@@ -13,7 +13,6 @@ import { UiActionProvider } from "@/components/layout/ui-action-provider";
 import { TourProvider } from "@/components/tour/tour-context";
 import { CURRENT_VERSIONS } from "@/components/tour/tour-registry";
 import { markTourSeen } from "@/lib/queries/tour";
-import type { MyWorkspaceRow } from "@/lib/queries/workspaces";
 import { IdleTimeoutProvider } from "@/components/layout/idle-timeout-provider";
 
 interface Props {
@@ -23,13 +22,13 @@ interface Props {
   navAccess?: Record<string, boolean> | null;
   onboardingCompleted?: boolean;
   mailboxConnected?: boolean;
-  workspaces?: MyWorkspaceRow[];
+  workspaceName?: string;
   idleTimeoutMinutes: number;
   warningLeadMinutes: number;
   children: React.ReactNode;
 }
 
-function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted = true, mailboxConnected = true, workspaces = [], children }: Props) {
+function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted = true, mailboxConnected = true, workspaceName = "", children }: Props) {
   const { mobileOpen, setMobileOpen } = useSidebar();
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantExpanded, setAssistantExpanded] = useState(false);
@@ -45,7 +44,7 @@ function Shell({ userName, userEmail, userRole, navAccess, onboardingCompleted =
                 userName={userName}
                 userEmail={userEmail}
                 userRole={userRole}
-                workspaces={workspaces}
+                workspaceName={workspaceName}
                 onToggleAssistant={() => setAssistantOpen((v) => !v)}
                 assistantOpen={assistantOpen}
               />

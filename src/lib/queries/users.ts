@@ -163,6 +163,9 @@ export async function updateUserRole(userId: string, roleId: number, managerId: 
   // A Super Admin can't strip their OWN super-admin role (avoids locking the
   // workspace out of admin access by accident).
   if (userId === callerId && roleId !== 1) throw new Error("You can't change your own role.");
+  // Exactly one Super Admin per workspace — its creator. Nobody else may be
+  // promoted into it after the fact.
+  if (roleId === 1 && userId !== callerId) throw new Error("Only the workspace creator can be Super Admin.");
 
   const admin = createAdminClient();
   // Role is membership-scoped (this workspace) — write it there.
@@ -171,7 +174,7 @@ export async function updateUserRole(userId: string, roleId: number, managerId: 
   // manager_id stays a global (not per-workspace) field on users for now.
   // Also sync users.role_id when the target is currently ACTIVE in this exact
   // workspace, so their live session's permissions update immediately (the
-  // same "copy onto the active pointer" mechanism switchWorkspace() uses).
+  // same "copy onto the active pointer" mechanism transferUserToWorkspace() uses).
   const { data: target } = await admin.from("users").select("workspace_id").eq("user_id", userId).single();
   const patch: Record<string, unknown> = { manager_id: managerId };
   if (target?.workspace_id === workspaceId) patch.role_id = roleId;
@@ -261,6 +264,10 @@ export async function inviteUser(email: string, fullName: string, roleId: number
     const { data: role } = await admin.from("roles").select("role_id").eq("role_id", roleId).single();
     if (!role) return { ok: false, error: "Invalid role" };
 
+    // Exactly one Super Admin per workspace — its creator, set at signup.
+    // Nobody else may be granted it, invite or otherwise.
+    if (roleId === 1) return { ok: false, error: "Only the workspace creator can be Super Admin. Choose a different role." };
+
     // Supabase Auth requires every email to be globally unique across the whole
     // project, but that's an auth-identity constraint, not a workspace one — a
     // login can be a member of several workspaces. If this email already has an
@@ -326,6 +333,62 @@ export async function inviteUser(email: string, fullName: string, roleId: number
     return { ok: true, user: { id: created.id, email }, tempPassword };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Couldn't create the user." };
+  }
+}
+
+export interface TransferWorkspaceResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Moves a user to a different workspace. Admin-only — under the
+ * one-workspace-per-user model there is no self-service switch/create, so
+ * this is the only way a login's workspace ever changes after signup. The
+ * user's existing leads/campaigns/etc. stay behind in their old workspace;
+ * they start clean in the new one (workspace_id is the only thing tenant
+ * tables are scoped by, so nothing needs to be re-tagged).
+ */
+export async function transferUserToWorkspace(userId: string, newWorkspaceId: string): Promise<TransferWorkspaceResult> {
+  try {
+    const { workspaceId: callerWorkspaceId } = await requireSuperAdmin();
+    await assertTargetInWorkspace(userId, callerWorkspaceId);
+    if (newWorkspaceId === callerWorkspaceId) return { ok: false, error: "That user is already in this workspace." };
+
+    const admin = createAdminClient();
+
+    const { data: newWorkspace } = await admin.from("workspaces").select("id").eq("id", newWorkspaceId).maybeSingle();
+    if (!newWorkspace) return { ok: false, error: "That workspace doesn't exist." };
+
+    const { data: targetUser } = await admin.from("users").select("role_id").eq("user_id", userId).single();
+    const roleId = targetUser?.role_id ?? 1;
+
+    const { error: updateError } = await admin.from("users").update({ workspace_id: newWorkspaceId }).eq("user_id", userId);
+    if (updateError) return { ok: false, error: updateError.message };
+
+    // The old membership is no longer active; the new one becomes the user's
+    // single active workspace membership.
+    await admin
+      .from("workspace_members")
+      .update({ status: "REMOVED" })
+      .eq("user_id", userId)
+      .eq("workspace_id", callerWorkspaceId);
+
+    const { error: memberError } = await admin
+      .from("workspace_members")
+      .upsert({ user_id: userId, workspace_id: newWorkspaceId, role_id: roleId, status: "ACTIVE" }, { onConflict: "user_id,workspace_id" });
+    if (memberError) return { ok: false, error: memberError.message };
+
+    revalidatePath("/users");
+    await logAudit({
+      action: "user.transferred_workspace",
+      entityType: "user",
+      entityId: userId,
+      metadata: { fromWorkspaceId: callerWorkspaceId, toWorkspaceId: newWorkspaceId },
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Couldn't transfer the user." };
   }
 }
 
