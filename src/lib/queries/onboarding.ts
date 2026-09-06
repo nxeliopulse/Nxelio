@@ -10,6 +10,9 @@ export interface OnboardingData {
   company_size?: string;
   founded_year?: string;
   hq_location?: string;
+  /** Company website/domain — shown/edited in Settings > Profile's Business
+   *  Details card. Not asked during onboarding itself. */
+  company_website?: string;
   annual_revenue?: string;
   goals: string[];
   company_description?: string;

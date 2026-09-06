@@ -44,6 +44,7 @@ import {
   updateSegment,
   getSegmentWithRules,
   getSegmentPreviewBundle,
+  getStaticSegmentPreviewBundle,
   duplicateSegment,
   archiveSegment,
   deleteSegment,
@@ -234,6 +235,45 @@ export default function SegmentBuilderPage() {
   // debounced effect below calls this on every edit, and "Run Preview" calls
   // it directly for an immediate refresh instead of waiting out the debounce.
   const refreshPreview = useCallback(async (days: number = trendDays) => {
+    // A Static segment is a fixed hand-picked list, not a rule — it has no
+    // rule tree to evaluate, so running it through the rule-preview pipeline
+    // below always saw an empty tree and showed all-zero stats no matter how
+    // many real members it had. Read its actual segment_members instead,
+    // UNLESS the user has started building a real rule here (hasAnyComplete)
+    // — that turns it into a Dynamic segment on save (see handleSave), so the
+    // preview should reflect the rule they're building, not the old members.
+    if (type === "Static" && !hasAnyComplete(root)) {
+      if (!editId) {
+        setPreview({ matched: 0, suppressed: 0, eligible: 0, companies: 0, avgScore: 0 });
+        setSamples([]);
+        setBreakdown({ industries: [], countries: [] });
+        setTrendData([]);
+        setFunnelSteps([]);
+        setStepCounts([]);
+        return;
+      }
+      setCounting(true);
+      try {
+        const { preview: p, samples: s, breakdown: b, trend: t, funnel: f, stepCounts: steps } = await getStaticSegmentPreviewBundle(editId, days);
+        setPreview(p);
+        setSamples(s);
+        setBreakdown(b);
+        setTrendData(t);
+        setFunnelSteps(f);
+        setStepCounts(steps);
+      } catch {
+        setPreview(null);
+        setSamples([]);
+        setBreakdown({ industries: [], countries: [] });
+        setTrendData([]);
+        setFunnelSteps([]);
+        setStepCounts([]);
+      } finally {
+        setCounting(false);
+      }
+      return;
+    }
+
     if (!hasAnyComplete(root)) {
       setPreview({ matched: 0, suppressed: 0, eligible: 0, companies: 0, avgScore: 0 });
       setSamples([]);
@@ -263,7 +303,7 @@ export default function SegmentBuilderPage() {
       setCounting(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [root]);
+  }, [root, type, editId]);
 
   useEffect(() => {
     const t = setTimeout(() => refreshPreview(), 500);

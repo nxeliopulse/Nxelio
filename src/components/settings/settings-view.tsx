@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Mail, Calendar, ScrollText, Sliders, X, ExternalLink } from "lucide-react";
+import { User, Ban, Check, Trash2, AlertCircle, CheckCircle2, Palette, Mail, Calendar, ScrollText, Sliders, X, ExternalLink, Building2, Globe, Sparkles } from "lucide-react";
 import { Linkedin } from "@/components/outreach/linkedin-icon";
 import type { CalendarAccountRow } from "@/lib/queries/calendar-accounts";
 import type { ZoomAccountRow } from "@/lib/queries/zoom-accounts";
@@ -17,6 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { updateProfile, updatePassword } from "@/lib/queries/profile";
+import { saveOnboarding, type OnboardingData } from "@/lib/queries/onboarding";
+import type { CompanyScoreResult } from "@/lib/queries/company-score";
+import { generateCompanyScore } from "@/lib/ai/actions";
+import { cn } from "@/lib/utils";
 import { addBlocklistEntry, removeBlocklistEntry, type BlocklistEntry } from "@/lib/queries/blocklist";
 import {
   getStoredAppearance,
@@ -69,6 +73,10 @@ interface Props {
   linkedinSendLimit: SendLimitRow | null;
   hubspotAccount: HubspotAccountRow | null;
   hubspotProviderConfigured: boolean;
+  /** From onboarding — null only if the workspace never completed onboarding. */
+  business: OnboardingData | null;
+  /** The workspace's last-generated Company Score, or null if none yet. */
+  companyScore: CompanyScoreResult | null;
 }
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -131,7 +139,7 @@ const ACCENT_COLORS: { id: AccentColor; name: string; bg: string }[] = [
   { id: "emerald", name: "Emerald", bg: "bg-emerald-600" },
 ];
 
-export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomConfigured, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit, hubspotAccount, hubspotProviderConfigured }: Props) {
+export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts, calendarProviderStatus, zoomAccounts, zoomConfigured, mailboxAccounts, linkedinAccounts, unipileConfigured, bookingSlug, isSuperAdmin, auditLog, emailSendLimit, linkedinSendLimit, hubspotAccount, hubspotProviderConfigured, business, companyScore: initialCompanyScore }: Props) {
   const router = useRouter();
   const [active, setActive] = useState("profile");
   const visibleSections = isSuperAdmin ? [...sections, AUDIT_SECTION] : sections;
@@ -182,6 +190,15 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
   const [pwMsg, setPwMsg] = useState<string | null>(null);
   const [pwErr, setPwErr] = useState<string | null>(null);
 
+  const [companyName, setCompanyName] = useState(business?.company_name || "");
+  const [companyWebsite, setCompanyWebsite] = useState(business?.company_website || "");
+  const [businessMsg, setBusinessMsg] = useState<string | null>(null);
+  const [businessErr, setBusinessErr] = useState<string | null>(null);
+
+  const [companyScore, setCompanyScore] = useState(initialCompanyScore);
+  const [scoringPending, startScoring] = useTransition();
+  const [scoringErr, setScoringErr] = useState<string | null>(null);
+
   const [blockInput, setBlockInput] = useState("");
   const [blockErr, setBlockErr] = useState<string | null>(null);
 
@@ -210,6 +227,39 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
         setProfileMsg("Profile updated");
       } catch (err) {
         setProfileErr(err instanceof Error ? err.message : "Failed");
+      }
+    });
+  }
+
+  function saveBusinessDetails() {
+    setBusinessMsg(null); setBusinessErr(null);
+    start(async () => {
+      try {
+        // saveOnboarding overwrites the whole onboarding blob, so merge onto
+        // whatever else was already collected (industry, goals, etc.)
+        // instead of clobbering it — business may be null if this workspace
+        // somehow never completed onboarding at all.
+        const res = await saveOnboarding({
+          ...(business ?? { company_name: "", industry: "", goals: [], target_customer_type: "", primary_product: "" }),
+          company_name: companyName.trim(),
+          company_website: companyWebsite.trim(),
+        });
+        if (!res.ok) { setBusinessErr(res.error || "Failed"); return; }
+        setBusinessMsg("Business details updated");
+      } catch (err) {
+        setBusinessErr(err instanceof Error ? err.message : "Failed");
+      }
+    });
+  }
+
+  function generateCompanyScoreNow() {
+    setScoringErr(null);
+    startScoring(async () => {
+      try {
+        const result = await generateCompanyScore();
+        setCompanyScore(result);
+      } catch (err) {
+        setScoringErr(err instanceof Error ? err.message : "Couldn't generate a score.");
       }
     });
   }
@@ -309,6 +359,94 @@ export function SettingsView({ profile, emailDomain, blocklist, calendarAccounts
                 <div className="flex justify-end gap-2 mt-5">
                   <Button variant="outline" onClick={() => setName(profile?.full_name || "")} disabled={pending}>Cancel</Button>
                   <Button onClick={saveProfile} disabled={pending}>{pending ? "Saving..." : "Save changes"}</Button>
+                </div>
+              </Card>
+
+              <Card className="p-4 sm:p-6">
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Business Details</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Your company info from onboarding, plus an AI read of your business</p>
+
+                {businessMsg && <div className="flex items-start gap-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 text-sm text-emerald-700 dark:text-emerald-300 mb-4"><CheckCircle2 className="h-4 w-4 mt-0.5" />{businessMsg}</div>}
+                {businessErr && <div className="flex items-start gap-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300 mb-4"><AlertCircle className="h-4 w-4 mt-0.5" />{businessErr}</div>}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Company name</label>
+                    <Input leftIcon={<Building2 className="h-3.5 w-3.5 text-slate-400" />} value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Acme Inc." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Company website</label>
+                    <Input leftIcon={<Globe className="h-3.5 w-3.5 text-slate-400" />} value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} placeholder="acme.com" />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 mb-5">
+                  <Button variant="outline" onClick={() => { setCompanyName(business?.company_name || ""); setCompanyWebsite(business?.company_website || ""); }} disabled={pending}>Cancel</Button>
+                  <Button onClick={saveBusinessDetails} disabled={pending}>{pending ? "Saving..." : "Save changes"}</Button>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      "h-11 w-11 rounded-full text-white flex items-center justify-center flex-shrink-0",
+                      !companyScore ? "bg-slate-400" : companyScore.score >= 70 ? "bg-rose-500" : companyScore.score >= 40 ? "bg-amber-500" : "bg-blue-500"
+                    )}>
+                      <Sparkles className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-slate-500 dark:text-slate-500">Company Score</p>
+                      {companyScore ? (
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">
+                          {companyScore.score}<span className="text-sm font-normal text-slate-400"> / 100</span>
+                        </p>
+                      ) : (
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Not generated yet</p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={generateCompanyScoreNow}
+                      disabled={scoringPending}
+                      title="Uses 1 AI credit"
+                    >
+                      {scoringPending ? "Analyzing…" : companyScore ? "Refresh (1 credit)" : "Generate score (1 credit)"}
+                    </Button>
+                  </div>
+
+                  {scoringErr && <p className="text-sm text-red-600 dark:text-red-400 mt-3">{scoringErr}</p>}
+
+                  {companyScore && (
+                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">{companyScore.summary}</p>
+                      {!companyScore.websiteFetched && (
+                        <p className="text-xs text-amber-700 dark:text-amber-400">Couldn&apos;t read your website — this score is based on your onboarding profile only. Check the website field above.</p>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {companyScore.strengths.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-1.5">Strengths</p>
+                            <ul className="space-y-1">
+                              {companyScore.strengths.map((s, i) => (
+                                <li key={i} className="text-sm text-slate-600 dark:text-slate-400 flex gap-1.5"><span className="text-emerald-500">•</span>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {companyScore.risks.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-1.5">Risks / gaps</p>
+                            <ul className="space-y-1">
+                              {companyScore.risks.map((r, i) => (
+                                <li key={i} className="text-sm text-slate-600 dark:text-slate-400 flex gap-1.5"><span className="text-amber-500">•</span>{r}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400">Generated {new Date(companyScore.generatedAt).toLocaleString()}</p>
+                    </div>
+                  )}
                 </div>
               </Card>
 

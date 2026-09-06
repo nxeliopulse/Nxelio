@@ -3,6 +3,7 @@ import { aiChat, aiJson, aiConfigured } from "./client";
 import { scanPrompt } from "@/lib/ai/security";
 import { getLeadById, updateLead, getDistinctLeadValues } from "@/lib/queries/leads";
 import { getOnboarding } from "@/lib/queries/onboarding";
+import { saveCompanyScore } from "@/lib/queries/company-score";
 import { NEWSLETTER_IMAGE_TOPICS, pickImageForTopic } from "@/lib/newsletter-image-topics";
 import { canAfford, deductCredits } from "@/lib/queries/subscriptions";
 import { getPicklistValues } from "@/lib/queries/picklists";
@@ -192,6 +193,98 @@ Return JSON:
   const result = await aiJson<AiCompanyIntel>({ system, prompt, temperature: 0.6 });
   await chargeCredits("company_intel", 1, { leadId });
   return result;
+}
+
+// ============================================================================
+// AI Company Score — a real read of the WORKSPACE'S OWN business (Settings >
+// Profile's Business Details card), not a lead. Combines the onboarding
+// profile with a live fetch of the company's own website, unlike
+// generateCompanyIntel above (which only ever guesses from a lead's
+// name/industry, never visits a real URL).
+// ============================================================================
+
+/** Plain-text, best-effort fetch of a page — deliberately no HTML parser
+ *  (jsdom/cheerio): this project avoids them elsewhere too (see the comment
+ *  in lib/queries/account-notes.ts) since Next's serverless bundle can't
+ *  load jsdom. A crude tag-strip is good enough context for an LLM prompt;
+ *  it's not used for anything security-sensitive. Returns null on ANY
+ *  failure (bad URL, timeout, non-200, blocked) — score generation falls
+ *  back to onboarding data alone rather than failing outright. */
+async function fetchWebsiteText(rawUrl: string): Promise<string | null> {
+  const url = rawUrl.trim();
+  if (!url) return null;
+  const withScheme = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  try {
+    const res = await fetch(withScheme, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; NxelioBot/1.0; +https://www.nxelio.ai)" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/\s+/g, " ")
+      .trim();
+    return text.slice(0, 4000) || null;
+  } catch {
+    return null;
+  }
+}
+
+export interface CompanyScoreResult {
+  score: number;
+  summary: string;
+  strengths: string[];
+  risks: string[];
+  websiteFetched: boolean;
+  generatedAt: string;
+}
+
+/** Generates (and persists) the workspace's Company Score. Requires
+ *  onboarding to be complete — there's nothing to score otherwise. */
+export async function generateCompanyScore(): Promise<CompanyScoreResult> {
+  await assertCredits();
+  const { data: onboarding } = await getOnboarding();
+  if (!onboarding) throw new Error("Complete onboarding before generating a company score.");
+
+  const websiteText = onboarding.company_website ? await fetchWebsiteText(onboarding.company_website) : null;
+
+  const system = `You are a B2B business analyst. Score how strong and credible this company's market position looks, based ONLY on the business profile and website content given — never invent specific facts (exact funding, revenue, employee counts). If the website content is missing or thin, say so honestly in your summary rather than guessing. Return ONLY valid JSON.`;
+
+  const prompt = `Company profile (self-reported at onboarding):
+Name: ${onboarding.company_name}
+Industry: ${onboarding.industry}
+Target customers: ${onboarding.target_customer_type || "not specified"}
+Primary product/service: ${onboarding.primary_product || "not specified"}
+${onboarding.company_description ? `Description: ${onboarding.company_description}\n` : ""}${onboarding.key_competitors ? `Competitors: ${onboarding.key_competitors}\n` : ""}${onboarding.avg_deal_size ? `Average deal size: ${onboarding.avg_deal_size}\n` : ""}${onboarding.sales_cycle ? `Sales cycle: ${onboarding.sales_cycle}\n` : ""}
+Website content (${websiteText ? `fetched live from ${onboarding.company_website}` : "could not be fetched — score from the profile above only"}):
+${websiteText || "(not available)"}
+
+Return JSON in exactly this shape:
+{
+  "score": <0-100 overall business strength/credibility score>,
+  "summary": "2-3 sentence honest assessment",
+  "strengths": ["short strength", "..."],
+  "risks": ["short risk or gap", "..."]
+}`;
+
+  const result = await aiJson<{ score: number; summary: string; strengths: string[]; risks: string[] }>({ system, prompt, temperature: 0.5 });
+  await chargeCredits("company_scoring", 1);
+
+  const scoreResult: CompanyScoreResult = {
+    score: Math.max(0, Math.min(100, Math.round(result.score))),
+    summary: result.summary || "",
+    strengths: result.strengths || [],
+    risks: result.risks || [],
+    websiteFetched: Boolean(websiteText),
+    generatedAt: new Date().toISOString(),
+  };
+  await saveCompanyScore(scoreResult);
+  return scoreResult;
 }
 
 // ============================================================================

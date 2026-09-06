@@ -379,6 +379,69 @@ export async function getSegmentPreviewBundle(rule: Group, days: number = 30): P
 }
 
 /**
+ * Same shape as getSegmentPreviewBundle, but for a STATIC segment — one with
+ * no rule at all, just a fixed hand-picked member list (see
+ * createStaticSegment below). The builder page used to run every static
+ * segment through the rule-preview pipeline above, which always saw an empty
+ * rule tree and showed all-zero stats regardless of how many real members
+ * the segment had. This reads the real segment_members list instead.
+ */
+export async function getStaticSegmentPreviewBundle(segmentId: string, days: number = 30): Promise<SegmentPreviewBundle> {
+  const supabase = await createClient();
+  const [matched, { count: totalCount }] = await Promise.all([
+    getSegmentMemberLeads(segmentId),
+    supabase.from("leads").select("id", { count: "exact", head: true }),
+  ]);
+  const total = totalCount || 0;
+
+  const suppressedCount = matched.filter(isSuppressed).length;
+  const companies = new Set(matched.map((l) => l.company_name).filter((v): v is string => Boolean(v))).size;
+  const avgScore = matched.length ? Math.round(matched.reduce((sum, l) => sum + (l.lead_score || 0), 0) / matched.length) : 0;
+  const preview: SegmentPreview = { matched: matched.length, suppressed: suppressedCount, eligible: matched.length - suppressedCount, companies, avgScore };
+
+  const samples = matched
+    .filter((l) => !isSuppressed(l))
+    .slice(0, 5)
+    .map((l) => ({ id: l.id, name: l.full_name || l.company_name || "—", title: l.job_title, company: l.company_name, score: l.lead_score, country: l.country }));
+
+  let breakdown: SegmentPreviewBundle["breakdown"] = { industries: [], countries: [] };
+  if (matched.length) {
+    const bucket = (key: "industry" | "country") => {
+      const counts = new Map<string, number>();
+      for (const l of matched) {
+        const v = (l as unknown as Record<string, string | null>)[key] || "Unknown";
+        counts.set(v, (counts.get(v) || 0) + 1);
+      }
+      const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+      const top = sorted.slice(0, 4).map(([n, c]) => ({ name: n, value: Math.round((c / matched.length) * 100) }));
+      const restCount = sorted.slice(4).reduce((sum, [, c]) => sum + c, 0);
+      if (restCount > 0) top.push({ name: "Other", value: Math.round((restCount / matched.length) * 100) });
+      return top;
+    };
+    breakdown = { industries: bucket("industry"), countries: bucket("country") };
+  }
+
+  const matchedDates = matched.map((l) => new Date(l.created_at).getTime()).filter((t) => !Number.isNaN(t));
+  const now = new Date();
+  const trend: { date: string; count: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(now);
+    day.setDate(now.getDate() - i);
+    day.setHours(23, 59, 59, 999);
+    trend.push({
+      date: day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      count: matchedDates.filter((t) => t <= day.getTime()).length,
+    });
+  }
+
+  // A fixed hand-picked list has no rule steps to narrow through — just
+  // Total Prospects (workspace-wide) -> Final Segment (the member list).
+  const funnel = [{ label: "Total Prospects", value: total }, { label: "Final Segment", value: matched.length }];
+
+  return { preview, samples, breakdown, trend, funnel, stepCounts: [] };
+}
+
+/**
  * Creates a "Static" segment from an explicit, manually-picked set of leads
  * (e.g. the leads table's bulk "Create segment" action) — no rules, membership
  * never changes on its own. Kept separate from createSegment() because a
