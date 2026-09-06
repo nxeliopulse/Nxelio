@@ -554,7 +554,12 @@ export async function purchaseCompanyWiseLeads(prospects: GeneratedProspect[]): 
  */
 export async function importGeneratedProspects(
   prospects: GeneratedProspect[],
-  source: "brightdata" | "anysite" | "ai" | null
+  source: "brightdata" | "anysite" | "ai" | null,
+  /** Set only when importing a finished background search's results (the
+   *  Purchased Leads jobs page) — tags every inserted lead with the job it
+   *  came from, so the Prospects table can group by search batch. Left
+   *  undefined for the wizard's instant "Search now" import. */
+  searchJobId?: string
 ): Promise<ImportGeneratedProspectsResult> {
   if (!prospects.length) return { ok: false, inserted: 0, duplicates: 0, error: "No prospects to import." };
   if (!(await canAffordLeads(prospects.length))) {
@@ -579,7 +584,7 @@ export async function importGeneratedProspects(
     status: "New",
   }));
 
-  const res = await bulkInsertLeads(payload, { defaultSource: sourceLabel });
+  const res = await bulkInsertLeads(payload, { defaultSource: sourceLabel, searchJobId });
   if (res.error) return { ok: false, inserted: 0, duplicates: res.duplicates, error: res.error };
 
   let leadsRemaining: number | undefined;

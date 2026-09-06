@@ -5,21 +5,25 @@
 // `node --test` (scripts/test-feature-kill-switches.mjs), the same way
 // src/lib/ai/planner/planner.ts is tested.
 
-export type KillSwitchFeature = "launch_campaign" | "send_email" | "send_newsletter" | "verified_emails_source";
+export type KillSwitchFeature = "launch_campaign" | "send_email" | "send_newsletter" | "verified_emails_source" | "company_wise_leads";
 
-export const ALL_KILL_SWITCH_FEATURES: KillSwitchFeature[] = ["launch_campaign", "send_email", "send_newsletter", "verified_emails_source"];
+export const ALL_KILL_SWITCH_FEATURES: KillSwitchFeature[] = ["launch_campaign", "send_email", "send_newsletter", "verified_emails_source", "company_wise_leads"];
 
 export const FEATURE_LABELS: Record<KillSwitchFeature, string> = {
   launch_campaign: "Campaign launches",
   send_email: "Sending email",
   send_newsletter: "Sending newsletters",
   verified_emails_source: "Verified Emails lead source",
+  company_wise_leads: "Company-wise Leads",
 };
 
 /** Features that ship LOCKED by default (a not-yet-released preview an admin
  *  opts into), as opposed to the other kill switches which ship ENABLED by
- *  default (an incident-response pause on something already live). */
-export const DEFAULT_LOCKED_FEATURES: KillSwitchFeature[] = ["verified_emails_source"];
+ *  default (an incident-response pause on something already live).
+ *  company_wise_leads is the opposite direction — an already-shipped feature
+ *  pulled back out temporarily — but reuses the same "locked unless an admin
+ *  turns it on" mechanism, so it lives in this list too. */
+export const DEFAULT_LOCKED_FEATURES: KillSwitchFeature[] = ["verified_emails_source", "company_wise_leads"];
 
 /**
  * The admin-bypass rule: the platform admin (admin@nxelio.com) can always

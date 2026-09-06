@@ -14,6 +14,7 @@ import { getPicklistValues } from "@/lib/queries/picklists";
 import { EditLeadModal } from "@/components/leads/edit-lead-modal";
 import { FindEmailPicker } from "@/components/leads/find-email-picker";
 import { updateLead, type LeadRow } from "@/lib/queries/leads";
+import type { LeadSearchJobSummary } from "@/lib/leads/lead-search-jobs";
 import { findAndSaveLeadCompany } from "@/lib/leads/find-company";
 import { createStaticSegment } from "@/lib/queries/segments";
 import { getOutreachAccounts } from "@/lib/queries/outreach-accounts";
@@ -78,6 +79,9 @@ interface Props {
    *  been imported yet — glows the Verified Leads button so it acts like a
    *  real notification instead of a permanent decoration. */
   hasReadyVerifiedLeads?: boolean;
+  /** Every background Buy Leads search for this workspace — powers the
+   *  "Group" view (leads grouped by the search batch they were bought in). */
+  searchJobs?: LeadSearchJobSummary[];
 }
 
 /** Bold solid status pill — same real status vocabulary as before (plus the legacy
@@ -127,7 +131,7 @@ function CompanyLogo({ name }: { name?: string | null }) {
   );
 }
 
-export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners = {}, hasReadyVerifiedLeads = false }: Props) {
+export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners = {}, hasReadyVerifiedLeads = false, searchJobs = [] }: Props) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   usePageTour("leads", LEADS_TOUR_STEPS);
@@ -145,6 +149,21 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"list" | "grid">("list");
+  // "Group" view — groups by the Buy Leads search batch a lead was bought
+  // in (leads.search_job_id), with everything else (manual/CSV/Company-wise/
+  // instant-search leads) under one "Added manually" catch-all. List-view
+  // only; overrides normal pagination while on (see groupedSections below).
+  const [groupByBatch, setGroupByBatch] = useState(false);
+  // Every group starts COLLAPSED (opposite of before) — rendering hundreds of
+  // full lead rows at once (e.g. every legacy lead landing in one "Added
+  // manually" bucket) is what made turning Group on feel slow; nothing
+  // renders until a group is actually opened.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  // Per-group safety cap even once expanded — a single very large batch
+  // (hundreds of rows) still renders in one paginated chunk at a time
+  // instead of everything at once.
+  const GROUP_PAGE_SIZE = 50;
+  const [groupPageByKey, setGroupPageByKey] = useState<Record<string, number>>({});
 
   const [industries, setIndustries] = useState(FALLBACK_INDUSTRIES);
   const [interestAreas, setInterestAreas] = useState(FALLBACK_INTEREST_AREAS);
@@ -570,6 +589,158 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
   const paged = sorted.slice(safePage * pageSize, safePage * pageSize + pageSize);
+
+  // "Search #NNN" is a friendly display number, not a real stored id — every
+  // job for this workspace, oldest first, numbered 1.. in that order.
+  const jobNumberById = new Map(
+    [...searchJobs]
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .map((j, i) => [j.id, i + 1] as const)
+  );
+  const searchJobById = new Map(searchJobs.map((j) => [j.id, j] as const));
+
+  interface GroupSection { key: string; title: string; subtitle: string; sortTime: number; rows: LeadRow[] }
+
+  /** Groups the given rows by search batch — used for the Group view below.
+   *  Only ever called on `sorted` (post-filter, pre-pagination): grouping
+   *  shows every matching lead at once rather than one pagination page at a
+   *  time, since a batch split across pages would defeat the point. */
+  function buildGroupSections(rows: LeadRow[]): GroupSection[] {
+    const byJob = new Map<string, LeadRow[]>();
+    const manual: LeadRow[] = [];
+    for (const l of rows) {
+      if (l.search_job_id) {
+        const arr = byJob.get(l.search_job_id) ?? [];
+        arr.push(l);
+        byJob.set(l.search_job_id, arr);
+      } else {
+        manual.push(l);
+      }
+    }
+
+    const jobSections: GroupSection[] = [...byJob.entries()].map(([jobId, rowsForJob]) => {
+      const job = searchJobById.get(jobId);
+      const num = jobNumberById.get(jobId);
+      const criteria = job ? [job.criteria.role, job.criteria.industry].filter(Boolean).join(" · ") : "";
+      const loc = job?.criteria.locations?.length ? ` · ${job.criteria.locations.join(", ")}` : "";
+      const time = job ? new Date(job.completedAt || job.createdAt).getTime() : 0;
+      const dateLabel = time ? new Date(time).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+      return {
+        key: jobId,
+        title: (criteria || "Any") + loc,
+        subtitle: `Bought ${dateLabel}${num ? ` · Search #${String(num).padStart(3, "0")}` : ""}`,
+        sortTime: time,
+        rows: rowsForJob,
+      };
+    }).sort((a, b) => b.sortTime - a.sortTime);
+
+    if (manual.length) {
+      jobSections.push({ key: "manual", title: "Added manually", subtitle: "Not part of a purchase", sortTime: 0, rows: manual });
+    }
+    return jobSections;
+  }
+
+  const groupedSections = groupByBatch ? buildGroupSections(sorted) : [];
+  function toggleGroupExpanded(key: string) {
+    setExpandedGroups((s) => {
+      const next = new Set(s);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  /** One lead's row — shared by the plain paginated view and every group
+   *  in Group view, so the two never drift apart. */
+  function renderLeadRow(l: LeadRow, rowNumber: number) {
+    return (
+      <tr
+        key={l.id}
+        onClick={() => openLead(l.id)}
+        className="group hover:bg-slate-50 transition-colors cursor-pointer"
+      >
+        <td
+          className="sm:sticky left-0 z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors px-3 py-3"
+          style={{ width: 40, minWidth: 40, maxWidth: 40 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={selected.includes(l.id)}
+            onChange={() => toggle(l.id)}
+            className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
+          />
+        </td>
+        {visibleCols.map((c) => (
+          <td
+            key={c.key}
+            className={cn(
+              "px-3 py-3",
+              c.key === "index" && "sm:sticky left-10 z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors",
+              c.key === "name" && "sm:sticky left-[88px] z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors"
+            )}
+            style={c.key === "index" ? { width: 48, minWidth: 48, maxWidth: 48 } : undefined}
+            onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
+          >
+            {renderCell(c.key, l, rowNumber)}
+          </td>
+        ))}
+        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setRowMenu({ id: l.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) }); }}
+            title="Row actions"
+            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
+          >
+            <MoreVertical className="h-4 w-4 text-slate-400" />
+          </button>
+        </td>
+      </tr>
+    );
+  }
+
+  /** One group's header — the batch label, "Bought <date> · Search #NNN",
+   *  a lead count, and a collapse chevron. No "View search"/"Export batch"
+   *  actions yet (deliberately deferred — grouping/collapse ships first). */
+  function renderGroupHeader(section: GroupSection) {
+    const expanded = expandedGroups.has(section.key);
+    return (
+      <tr key={`group-${section.key}`} className="bg-slate-50 dark:bg-slate-900/60">
+        <td colSpan={visibleCols.length + 2} className="px-3 py-2.5">
+          <button
+            type="button"
+            onClick={() => toggleGroupExpanded(section.key)}
+            className="w-full flex items-center gap-2.5 text-left"
+          >
+            <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 flex-shrink-0 transition-transform", !expanded && "-rotate-90")} />
+            <span className="font-bold text-sm text-slate-900 dark:text-white truncate">{section.title}</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">{section.subtitle}</span>
+            <span className="ml-auto flex-shrink-0 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 text-[11px] font-semibold px-2 py-0.5">
+              {section.rows.length} lead{section.rows.length === 1 ? "" : "s"}
+            </span>
+          </button>
+        </td>
+      </tr>
+    );
+  }
+
+  /** A "Load N more" row shown at the bottom of an expanded group once it has
+   *  more leads than the current per-group page reveals. */
+  function renderGroupLoadMore(section: GroupSection, shownCount: number) {
+    const remaining = section.rows.length - shownCount;
+    if (remaining <= 0) return null;
+    return (
+      <tr key={`group-more-${section.key}`}>
+        <td colSpan={visibleCols.length + 2} className="px-3 py-2.5 text-center">
+          <button
+            type="button"
+            onClick={() => setGroupPageByKey((s) => ({ ...s, [section.key]: (s[section.key] ?? 1) + 1 }))}
+            className="text-xs font-semibold text-[var(--primary)] hover:underline"
+          >
+            Load {Math.min(remaining, GROUP_PAGE_SIZE)} more (of {remaining} remaining)
+          </button>
+        </td>
+      </tr>
+    );
+  }
 
   // Distinguishes "this account has never had any prospects" from "a filter
   // just happens to match none of them" — the empty-state copy below reused
@@ -1032,7 +1203,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
           </Button>
           <Link
             href="/leads/verified-jobs"
-            title={hasReadyVerifiedLeads ? "A background search has finished — ready to review" : "Background searches you've queued from Verified Emails"}
+            title={hasReadyVerifiedLeads ? "A background search has finished — ready to review" : "Leads you've bought from Verified Emails"}
             className={cn(
               "relative inline-flex items-center gap-1.5 rounded-xl h-8 px-3 text-xs font-semibold transition-shadow",
               hasReadyVerifiedLeads
@@ -1043,7 +1214,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
             {hasReadyVerifiedLeads && (
               <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-slate-950" />
             )}
-            <MailCheck className="h-3.5 w-3.5" /> Verified Leads
+            <MailCheck className="h-3.5 w-3.5" /> Purchased Leads
           </Link>
         </div>
       </div>
@@ -1222,6 +1393,24 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
             <span>Sort By: {SORT_OPTIONS.find((o) => o.value === currentSortValue)?.label}</span>
             <ChevronDown className="h-3 w-3" />
           </Button>
+
+          {/* Group Toggle — groups by the Buy Leads search batch a lead was
+              bought in (see buildGroupSections above). List view only. */}
+          {view === "list" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setGroupByBatch((v) => !v)}
+              className={cn(
+                "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
+                groupByBatch && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
+              )}
+              title="Group by search batch"
+            >
+              <Layers3 className="h-3.5 w-3.5" />
+              <span>Group</span>
+            </Button>
+          )}
         </div>
 
         {/* Table Container */}
@@ -1333,58 +1522,40 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
-                {paged.length === 0 && (
-                  <tr>
-                    <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
-                      {hasActiveFilter
-                        ? "No prospects match your search or filters. Try adjusting them."
-                        : <>No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</>}
-                    </td>
-                  </tr>
-                )}
-                {paged.map((l, i) => (
-                  <tr
-                    key={l.id}
-                    onClick={() => openLead(l.id)}
-                    className="group hover:bg-slate-50 transition-colors cursor-pointer"
-                  >
-                    <td
-                      className="sm:sticky left-0 z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors px-3 py-3"
-                      style={{ width: 40, minWidth: 40, maxWidth: 40 }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(l.id)}
-                        onChange={() => toggle(l.id)}
-                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-offset-0 transition duration-150 ease-in-out cursor-pointer"
-                      />
-                    </td>
-                    {visibleCols.map((c) => (
-                      <td
-                        key={c.key}
-                        className={cn(
-                          "px-3 py-3",
-                          c.key === "index" && "sm:sticky left-10 z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors",
-                          c.key === "name" && "sm:sticky left-[88px] z-10 bg-white dark:bg-[#1b212e] group-hover:bg-slate-50 transition-colors"
-                        )}
-                        style={c.key === "index" ? { width: 48, minWidth: 48, maxWidth: 48 } : undefined}
-                        onClick={c.key === "linkedin" || c.key === "website" ? (e) => e.stopPropagation() : undefined}
-                      >
-                        {renderCell(c.key, l, safePage * pageSize + i + 1)}
+                {groupByBatch ? (
+                  groupedSections.length === 0 ? (
+                    <tr>
+                      <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
+                        {hasActiveFilter
+                          ? "No prospects match your search or filters. Try adjusting them."
+                          : <>No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</>}
                       </td>
-                    ))}
-                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setRowMenu({ id: l.id, top: r.bottom + 4, left: Math.max(8, r.right - 140) }); }}
-                        title="Row actions"
-                        className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm"
-                      >
-                        <MoreVertical className="h-4 w-4 text-slate-400" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                    </tr>
+                  ) : (
+                    groupedSections.flatMap((section) => {
+                      if (!expandedGroups.has(section.key)) return [renderGroupHeader(section)];
+                      const shownCount = Math.min(section.rows.length, (groupPageByKey[section.key] ?? 1) * GROUP_PAGE_SIZE);
+                      return [
+                        renderGroupHeader(section),
+                        ...section.rows.slice(0, shownCount).map((l, i) => renderLeadRow(l, i + 1)),
+                        renderGroupLoadMore(section, shownCount),
+                      ];
+                    })
+                  )
+                ) : (
+                  <>
+                    {paged.length === 0 && (
+                      <tr>
+                        <td colSpan={visibleCols.length + 2} className="px-4 py-16 text-center text-slate-500">
+                          {hasActiveFilter
+                            ? "No prospects match your search or filters. Try adjusting them."
+                            : <>No prospects yet. Click <strong>Add Prospect</strong> to import from LinkedIn, social, or a CSV.</>}
+                        </td>
+                      </tr>
+                    )}
+                    {paged.map((l, i) => renderLeadRow(l, safePage * pageSize + i + 1))}
+                  </>
+                )}
               </tbody>
             </table>
           </div>
@@ -1425,7 +1596,10 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
           </div>
         )}
 
-        {/* Footer */}
+        {/* Footer — Group view shows every matching lead across its groups
+            at once (splitting a batch across pages would defeat the point),
+            so plain pagination doesn't apply while it's on. */}
+        {!groupByBatch && (
         <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-500">
           <div className="flex items-center gap-1.5 text-xs">
             <span>Show</span>
@@ -1499,6 +1673,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
             </button>
           </div>
         </div>
+        )}
       </Card>
 
       {editingLead && (

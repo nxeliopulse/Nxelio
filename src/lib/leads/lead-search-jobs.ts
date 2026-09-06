@@ -106,6 +106,10 @@ export interface LeadSearchJobSummary {
   requestedCount: number;
   status: LeadSearchJobStatus;
   foundCount: number;
+  /** Real count of completed search rounds (see runSearchRound) — used to
+   *  tell "still scanning for matches" from "found some, now enriching them"
+   *  on the progress screen, without inventing a fake sub-status. */
+  round: number;
   note: string | null;
   timeEstimate: string | null;
   createdAt: string;
@@ -124,6 +128,7 @@ function toSummary(r: JobDbRow): LeadSearchJobSummary {
     requestedCount: r.requested_count,
     status: r.status,
     foundCount: r.found_count,
+    round: r.round,
     note: r.note,
     timeEstimate: r.time_estimate,
     createdAt: r.created_at,

@@ -12,10 +12,10 @@ test("resolveEffectiveEnabled: a regular user gets the real flag, no bypass", ()
   assert.equal(resolveEffectiveEnabled(false, false), false);
 });
 
-test("ALL_KILL_SWITCH_FEATURES lists exactly the four switches this feature ships", () => {
+test("ALL_KILL_SWITCH_FEATURES lists exactly the five switches this feature ships", () => {
   assert.deepEqual(
     [...ALL_KILL_SWITCH_FEATURES].sort(),
-    ["launch_campaign", "send_email", "send_newsletter", "verified_emails_source"]
+    ["company_wise_leads", "launch_campaign", "send_email", "send_newsletter", "verified_emails_source"]
   );
 });
 
@@ -25,8 +25,8 @@ test("every feature key has a human-readable label for its error message", () =>
   }
 });
 
-test("DEFAULT_LOCKED_FEATURES names only preview features that ship off, not the incident kill switches", () => {
-  assert.deepEqual(DEFAULT_LOCKED_FEATURES, ["verified_emails_source"]);
+test("DEFAULT_LOCKED_FEATURES names only preview/pulled-back features that ship off, not the incident kill switches", () => {
+  assert.deepEqual(DEFAULT_LOCKED_FEATURES, ["verified_emails_source", "company_wise_leads"]);
   for (const key of DEFAULT_LOCKED_FEATURES) {
     assert.ok(ALL_KILL_SWITCH_FEATURES.includes(key), `${key} must also be a real feature key`);
   }

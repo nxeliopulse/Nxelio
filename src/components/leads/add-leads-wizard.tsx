@@ -19,12 +19,12 @@ import {
   searchBuyLeads, searchPeopleAtCompanies, purchaseCompanyWiseLeads, importGeneratedProspects,
   type GeneratedProspect, type CompanyPeopleCriteria,
 } from "@/lib/leads/buy-leads";
-import { createLeadSearchJob } from "@/lib/leads/lead-search-jobs";
-import { LINKEDIN_INDUSTRIES, COMMON_ROLES } from "@/lib/leads/buy-leads-options";
+import { createLeadSearchJob, type LeadSearchJobDetail } from "@/lib/leads/lead-search-jobs";
+import { getBuyLeadsWizardBootstrap } from "@/lib/leads/wizard-bootstrap";
+import { BuyProgressView } from "@/components/leads/buy-progress-view";
+import { LINKEDIN_INDUSTRIES, getRolesForIndustry } from "@/lib/leads/buy-leads-options";
 import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
-import { hasFeature, getMaxBuyLeadsCount } from "@/lib/queries/subscriptions";
-import { isFeatureEnabledForCurrentUser } from "@/lib/queries/feature-kill-switches";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
 import { cn, toAbsoluteUrl } from "@/lib/utils";
@@ -207,7 +207,7 @@ export function AddLeadsWizard({
   initialSource?: SourceId | null;
 }) {
   const router = useRouter();
-  const { confirm, toast } = useFeedback();
+  const { confirm } = useFeedback();
   const [step, setStep] = useState(1);
   const [source, setSource] = useState<SourceId | null>(null);
 
@@ -233,6 +233,11 @@ export function AddLeadsWizard({
   const [buySource, setBuySource] = useState<"brightdata" | "anysite" | "ai" | null>(null);
   const [buyLoading, setBuyLoading] = useState(false);
   const [bgQueueLoading, setBgQueueLoading] = useState(false);
+  // A background search already in flight for this workspace — reopening
+  // Buy Leads / Verified Emails while one is running shows its live progress
+  // instead of a blank criteria form (see the effect below and isBuy render).
+  const [activeJob, setActiveJob] = useState<LeadSearchJobDetail | null>(null);
+  const [activeJobChecked, setActiveJobChecked] = useState(false);
   // Per-request cap: at most 100, further capped by what's left on the plan this cycle.
   const [maxBuyCount, setMaxBuyCount] = useState(100);
 
@@ -264,20 +269,26 @@ export function AddLeadsWizard({
   // feature-kill-switches.ts). Separate from the plan-based `locked` above:
   // this one is "not released yet", not "not on your plan".
   const [verifiedEmailsReleased, setVerifiedEmailsReleased] = useState(false);
+  // Same kill-switch mechanism, opposite direction — Company-wise Leads was
+  // already live and is temporarily pulled back out of the product. Ships
+  // locked; turn back on from Admin > Feature Access.
+  const [companyWiseLeadsEnabled, setCompanyWiseLeadsEnabled] = useState(false);
+  // Everything above (plan gate, both feature kill switches, the plan's max
+  // count, and whether a background search is already active) in ONE round
+  // trip — see wizard-bootstrap.ts for why this used to be 5 separate calls.
   useEffect(() => {
     if (!open) return;
-    hasFeature("discovery")
-      .then((discovery) => setLocked({ discovery: !discovery }))
-      .catch(() => {});
-    isFeatureEnabledForCurrentUser("verified_emails_source")
-      .then(setVerifiedEmailsReleased)
-      .catch(() => {});
-    getMaxBuyLeadsCount()
-      .then((max) => {
-        setMaxBuyCount(max);
-        setBuy((b) => ({ ...b, count: Math.min(b.count, max) }));
+    getBuyLeadsWizardBootstrap()
+      .then((b) => {
+        setLocked({ discovery: !b.discoveryEnabled });
+        setVerifiedEmailsReleased(b.verifiedEmailsReleased);
+        setCompanyWiseLeadsEnabled(b.companyWiseLeadsEnabled);
+        setMaxBuyCount(b.maxBuyCount);
+        setBuy((buy) => ({ ...buy, count: Math.min(buy.count, b.maxBuyCount) }));
+        setActiveJob(b.activeJob);
       })
-      .catch(() => {});
+      .catch(() => setActiveJob(null))
+      .finally(() => setActiveJobChecked(true));
   }, [open]);
 
   const isCsv = source === "csv";
@@ -459,9 +470,9 @@ export function AddLeadsWizard({
     createLeadSearchJob(buy)
       .then((res) => {
         if (!res.ok) { setStep2Error(res.error || "Could not queue the search."); return; }
-        const eta = res.timeEstimate ? ` Usually takes ${res.timeEstimate}, but we'll keep going as long as it takes to find all ${buy.count}.` : "";
-        const leadWord = buy.requireVerifiedEmail ? "verified leads" : "leads";
-        toast(`We'll email you and notify you in the app when your ${buy.count} ${leadWord} are ready.${eta} Check Verified Leads under Prospects any time to see progress.`, "success");
+        // Straight back to Prospects — no separate progress page. Reopening
+        // Buy Leads / Verified Emails from here shows this job's live
+        // progress instead (see the activeJob effect above).
         reset();
         onClose();
       })
@@ -739,7 +750,11 @@ export function AddLeadsWizard({
               <ManualEntryForm entries={entries} setEntries={setEntries} error={step2Error} />
             ) : isBuy ? (
               <div className="space-y-6">
-                {source === "buy" && (
+                {/* Company-wise Leads is temporarily pulled from the product
+                    (see Admin > Feature Access) — the tab (and the picker
+                    entirely, since there'd be nothing left to switch
+                    between) only shows once it's turned back on. */}
+                {source === "buy" && companyWiseLeadsEnabled && (
                   <Tabs
                     tabs={[
                       { id: "individual", label: "Individual Leads", icon: <User className="h-4 w-4" /> },
@@ -754,7 +769,9 @@ export function AddLeadsWizard({
                     BuyForm's onRunInBackground handling. Guaranteeing the exact count
                     the user asked for needs patience an on-screen wait can't honestly
                     promise, and it lets the user leave and keep working elsewhere. */}
-                {source === "verified-emails" || buyMode === "individual" ? (
+                {(source === "verified-emails" || buyMode === "individual" || !companyWiseLeadsEnabled) && activeJobChecked && activeJob ? (
+                  <BuyProgressView jobId={activeJob.id} initialJob={activeJob} />
+                ) : source === "verified-emails" || buyMode === "individual" || !companyWiseLeadsEnabled ? (
                   <BuyForm
                     buy={buy}
                     setBuy={(b) => { setBuy(b); setBuyResults(null); setBuySource(null); }}
@@ -1363,7 +1380,19 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-base font-semibold text-slate-800 mb-2">Industry</label>
-            <Select value={buy.industry} onChange={(e) => setBuy({ ...buy, industry: e.target.value })} disabled={backgroundLoading} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
+            <Select
+              value={buy.industry}
+              onChange={(e) => {
+                const industry = e.target.value;
+                // Role list narrows to this industry's titles — drop the
+                // current pick if it doesn't exist in the new list rather
+                // than silently keeping a role that no longer applies.
+                const roleStillValid = !buy.role || getRolesForIndustry(industry).includes(buy.role);
+                setBuy({ ...buy, industry, role: roleStillValid ? buy.role : "" });
+              }}
+              disabled={backgroundLoading}
+              className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+            >
               <option value="">Any industry</option>
               {LINKEDIN_INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
             </Select>
@@ -1372,7 +1401,7 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
             <label className="block text-base font-semibold text-slate-800 mb-2">Job title / role</label>
             <Select value={buy.role} onChange={(e) => setBuy({ ...buy, role: e.target.value })} disabled={backgroundLoading} className="h-11 text-base bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed">
               <option value="">Any role</option>
-              {COMMON_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+              {getRolesForIndustry(buy.industry).map((r) => <option key={r} value={r}>{r}</option>)}
             </Select>
           </div>
         </div>

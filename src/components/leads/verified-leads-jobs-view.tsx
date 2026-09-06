@@ -69,7 +69,7 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
   function runImport() {
     if (!detail) return;
     startImport(async () => {
-      const res = await importGeneratedProspects(detail.results, JOB_RESULT_SOURCE);
+      const res = await importGeneratedProspects(detail.results, JOB_RESULT_SOURCE, detail.id);
       if (!res.ok) { toast(res.error || "Import failed", "error"); return; }
       toast(
         `Imported ${res.inserted} lead${res.inserted === 1 ? "" : "s"}${res.duplicates ? ` — ${res.duplicates} duplicate${res.duplicates === 1 ? "" : "s"} skipped` : ""}.`,
@@ -82,14 +82,22 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
     });
   }
 
+  // A job already imported in an earlier visit has this set server-side
+  // (markLeadSearchJobImported) — importedIds only covers imports done in
+  // THIS page load, so relying on it alone reverted to "Review & import"
+  // for anything imported before the last refresh. Real persisted state wins.
+  function isImported(job: Pick<LeadSearchJobSummary, "id" | "importedAt">): boolean {
+    return Boolean(job.importedAt) || importedIds.has(job.id);
+  }
+
   const openSummary = jobs.find((j) => j.id === openId);
 
   if (openId && openSummary) {
-    const alreadyImported = importedIds.has(openId);
+    const alreadyImported = isImported(openSummary);
     return (
       <div className="max-w-[1200px] mx-auto w-full">
         <button onClick={() => setOpenId(null)} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-4">
-          <ArrowLeft className="h-4 w-4" /> Back to Verified Leads
+          <ArrowLeft className="h-4 w-4" /> Back to Purchased Leads
         </button>
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -132,7 +140,7 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
         <ArrowLeft className="h-4 w-4" /> Back to Prospects
       </Link>
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Verified Leads</h1>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Purchased Leads</h1>
         <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">Background searches queued from the Verified Emails source — they finish here, no matter how long they take.</p>
       </div>
 
@@ -173,7 +181,7 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
                   <td className="px-4 py-3 text-right">
                     {j.status === "done" && (
                       <Button size="sm" variant="outline" onClick={() => openJob(j.id)}>
-                        {importedIds.has(j.id) ? "View" : "Review & import"}
+                        {isImported(j) ? "View" : "Review & import"}
                       </Button>
                     )}
                     {j.status === "failed" && (

@@ -27,6 +27,11 @@ const FEATURES: { key: KillSwitchFeature; label: string; description: string }[]
     label: "Verified Emails (Coming Soon)",
     description: "The \"Verified Emails\" card in Add Prospects → Choose a source. Ships locked — turn on to release it to every workspace.",
   },
+  {
+    key: "company_wise_leads",
+    label: "Company-wise Leads (Temporarily Disabled)",
+    description: "The \"Company-wise Leads\" tab inside Buy Leads. Pulled from the product for now — turn on to bring it back for every workspace.",
+  },
 ];
 
 export function FeatureKillSwitchesTab({ initialSwitches }: { initialSwitches: Record<KillSwitchFeature, boolean> }) {

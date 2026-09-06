@@ -132,6 +132,10 @@ export interface LeadRow {
   /** Set once this lead has been pushed to HubSpot as a Contact. */
   hubspot_contact_id: string | null;
   hubspot_synced_at: string | null;
+  /** The background Buy Leads search (lead_search_jobs.id) this lead was
+   *  imported from, if any — null for manual/CSV/Company-wise/instant-search
+   *  leads. Powers the Prospects table's "Group" view. */
+  search_job_id: string | null;
 }
 
 /**
@@ -410,7 +414,7 @@ export async function bulkDeleteLeads(ids: string[]) {
 
 export async function bulkInsertLeads(
   leads: Array<Partial<LeadRow>>,
-  opts?: { defaultSource?: string }
+  opts?: { defaultSource?: string; searchJobId?: string }
 ): Promise<{ inserted: number; duplicates: number; error?: string }> {
   if (!leads.length) return { inserted: 0, duplicates: 0 };
   try {
@@ -492,6 +496,7 @@ export async function bulkInsertLeads(
       source: l.source ?? opts?.defaultSource ?? "Import",
       status: l.status ?? "New",
       discovered_account_id: l.discovered_account_id ?? null,
+      search_job_id: opts?.searchJobId ?? null,
     });
   }
 
