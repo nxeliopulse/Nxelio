@@ -23,13 +23,10 @@ export function AuthSplitCard({
   children: ReactNode;
 }) {
   return (
-    // force-dark-theme: this screen's own fixed brand identity (built for it
-    // in globals.css, but never actually applied here) — previously it just
-    // used bg-white/text-slate-900 with no pin, so it silently rode whatever
-    // theme the visitor's OS happened to be in instead of staying constant.
-    // That's also what created the QA-reported "jump": dark here (matching
-    // an OS dark-mode visitor) into always-light on /terms and /privacy.
-    <div className="min-h-screen lg:h-screen w-full flex flex-col lg:flex-row bg-white font-sans overflow-y-auto lg:overflow-hidden force-dark-theme">
+    // force-light-theme: pins this screen to always-light, matching /terms
+    // and /privacy, so it never rides the visitor's OS/app dark-mode setting
+    // (that's what caused the QA-reported "jump" between auth and legal pages).
+    <div className="min-h-screen lg:h-screen w-full flex flex-col lg:flex-row bg-white font-sans overflow-y-auto lg:overflow-hidden force-light-theme">
 
       {/* LEFT: form panel — 50% width, independently scrollable on desktop when zoomed */}
       <div className="flex-1 flex flex-col px-6 sm:px-10 lg:px-16 xl:px-24 py-6 sm:py-8 relative z-10 lg:w-1/2 shrink-0 lg:h-full lg:overflow-y-auto">
