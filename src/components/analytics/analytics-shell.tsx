@@ -1,17 +1,76 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { LayoutDashboard, FileText, Database, Sparkles, Eye, EyeOff, Gauge, Users, PieChart, Megaphone, Mail, CalendarCheck, GitBranch, DollarSign, Building2, Bot, Trophy } from "lucide-react";
+import {
+  LayoutDashboard,
+  FileText,
+  Database,
+  Sparkles,
+  LayoutGrid,
+  ChevronDown,
+  Gauge,
+  Users,
+  PieChart,
+  Megaphone,
+  Mail,
+  CalendarCheck,
+  GitBranch,
+  DollarSign,
+  Building2,
+  Trophy,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAssistant } from "@/components/layout/assistant-context";
 import { OpenTabsStrip } from "@/components/analytics/open-tabs-strip";
 import type { DashboardSummary } from "@/lib/queries/analytics-dashboards";
 import type { ReportDefinition } from "@/lib/analytics-reports";
 
-const RAIL_ITEMS = [
+const PRIMARY_TABS = [
+  {
+    key: "explorer",
+    label: "Explorer",
+    icon: LayoutGrid,
+    href: "/analytics",
+    isActive: (pathname: string, typeParam: string | null) =>
+      pathname === "/analytics" && !typeParam,
+  },
+  {
+    key: "dashboards",
+    label: "Dashboards",
+    icon: LayoutDashboard,
+    href: "/analytics?type=dashboard",
+    isActive: (pathname: string, typeParam: string | null) =>
+      (pathname === "/analytics" && typeParam === "dashboard") ||
+      pathname.startsWith("/analytics/dashboards"),
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    icon: FileText,
+    href: "/analytics?type=report",
+    isActive: (pathname: string, typeParam: string | null) =>
+      (pathname === "/analytics" && typeParam === "report") ||
+      pathname.startsWith("/analytics/reports"),
+  },
+  {
+    key: "data",
+    label: "Data",
+    icon: Database,
+    href: "/analytics/data",
+    isActive: (pathname: string) => pathname.startsWith("/analytics/data"),
+  },
+  {
+    key: "ai-insights",
+    label: "AI Insights",
+    icon: Sparkles,
+    href: "/analytics/ai-performance",
+    isActive: (pathname: string) => pathname.startsWith("/analytics/ai-performance"),
+  },
+];
+
+const DOMAIN_ITEMS = [
   { key: "overview", label: "Overview", icon: Gauge, href: "/analytics/overview" },
-  { key: "dashboards", label: "Dashboards", icon: LayoutDashboard, href: "/analytics?type=dashboard" },
   { key: "prospects", label: "Prospects", icon: Users, href: "/analytics/prospects" },
   { key: "segments", label: "Segments", icon: PieChart, href: "/analytics/segments" },
   { key: "campaigns", label: "Campaigns", icon: Megaphone, href: "/analytics/campaigns" },
@@ -20,10 +79,7 @@ const RAIL_ITEMS = [
   { key: "pipeline", label: "Pipeline", icon: GitBranch, href: "/analytics/pipeline" },
   { key: "revenue", label: "Revenue", icon: DollarSign, href: "/analytics/revenue" },
   { key: "accounts", label: "Accounts", icon: Building2, href: "/analytics/accounts" },
-  { key: "ai-performance", label: "AI Performance", icon: Bot, href: "/analytics/ai-performance" },
   { key: "team", label: "Team", icon: Trophy, href: "/analytics/team" },
-  { key: "reports", label: "Reports", icon: FileText, href: "/analytics?type=report" },
-  { key: "data", label: "Data", icon: Database, href: "/analytics/data" },
 ];
 
 export function AnalyticsShell({
@@ -39,108 +95,129 @@ export function AnalyticsShell({
   const searchParams = useSearchParams();
   const typeParam = searchParams.get("type");
   const { toggle } = useAssistant();
-  const [viewerMode, setViewerMode] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close domains dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen]);
+
+  // Close dropdown on route change
+  useEffect(() => {
+    setDropdownOpen(false);
+  }, [pathname, searchParams]);
+
+  const activeDomain = DOMAIN_ITEMS.find((d) => pathname.startsWith(d.href));
 
   return (
-    <div className="flex flex-col md:flex-row gap-0 -m-3.5 sm:-m-5 lg:-m-6 min-h-[calc(100vh-64px)]">
-      {/* Desktop Navigation Rail */}
-      {!viewerMode && (
-        <div className="hidden md:block w-56 flex-shrink-0 border-r border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/20 p-3 space-y-4 overflow-y-auto">
-          <div className="space-y-0.5">
-            {RAIL_ITEMS.map((item) => {
-              const active =
-                item.key === "overview" ? pathname.startsWith("/analytics/overview") :
-                item.key === "prospects" ? pathname.startsWith("/analytics/prospects") :
-                item.key === "segments" ? pathname.startsWith("/analytics/segments") :
-                item.key === "campaigns" ? pathname.startsWith("/analytics/campaigns") :
-                item.key === "engagement" ? pathname.startsWith("/analytics/engagement") :
-                item.key === "meetings" ? pathname.startsWith("/analytics/meetings") :
-                item.key === "pipeline" ? pathname.startsWith("/analytics/pipeline") :
-                item.key === "revenue" ? pathname.startsWith("/analytics/revenue") :
-                item.key === "accounts" ? pathname.startsWith("/analytics/accounts") :
-                item.key === "ai-performance" ? pathname.startsWith("/analytics/ai-performance") :
-                item.key === "team" ? pathname.startsWith("/analytics/team") :
-                item.key === "data" ? pathname.startsWith("/analytics/data") :
-                item.key === "dashboards" ? pathname === "/analytics" && typeParam === "dashboard" :
-                pathname === "/analytics" && typeParam === "report";
-              return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold transition-colors",
-                    active ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900/40"
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-            <button
-              onClick={toggle}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900/40 transition-colors"
-            >
-              <Sparkles className="h-4 w-4 text-amber-500" />
-              AI Assistant
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top Header Strip with Tabs & Viewer Toggle */}
-        <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 border-b border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40">
-          <OpenTabsStrip dashboards={dashboards} reports={reports} />
-          <button
-            onClick={() => setViewerMode((v) => !v)}
-            className="hidden md:flex flex-shrink-0 items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900/40 ml-2 transition-colors"
-            title={viewerMode ? "Show navigation" : "Hide navigation (viewer mode)"}
-          >
-            {viewerMode ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-            {viewerMode ? "Show nav" : "Viewer"}
-          </button>
-        </div>
-
-        {/* Mobile Swipeable Category Pill Bar */}
-        <div className="md:hidden flex items-center gap-1.5 overflow-x-auto scrollbar-hide px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
-          {RAIL_ITEMS.map((item) => {
-            const active =
-              item.key === "overview" ? pathname.startsWith("/analytics/overview") :
-              item.key === "prospects" ? pathname.startsWith("/analytics/prospects") :
-              item.key === "segments" ? pathname.startsWith("/analytics/segments") :
-              item.key === "campaigns" ? pathname.startsWith("/analytics/campaigns") :
-              item.key === "engagement" ? pathname.startsWith("/analytics/engagement") :
-              item.key === "meetings" ? pathname.startsWith("/analytics/meetings") :
-              item.key === "pipeline" ? pathname.startsWith("/analytics/pipeline") :
-              item.key === "revenue" ? pathname.startsWith("/analytics/revenue") :
-              item.key === "accounts" ? pathname.startsWith("/analytics/accounts") :
-              item.key === "ai-performance" ? pathname.startsWith("/analytics/ai-performance") :
-              item.key === "team" ? pathname.startsWith("/analytics/team") :
-              item.key === "data" ? pathname.startsWith("/analytics/data") :
-              item.key === "dashboards" ? pathname === "/analytics" && typeParam === "dashboard" :
-              pathname === "/analytics" && typeParam === "report";
+    <div className="space-y-6 pb-12">
+      {/* Compact Horizontal Analytics Navigation Bar */}
+      <div className="bg-white dark:bg-[#1b212e] border border-slate-200 dark:border-slate-800 rounded-2xl p-2 sm:p-2.5 shadow-xs flex items-center justify-between gap-3 flex-wrap relative z-30">
+        {/* Navigation Tabs / Pills */}
+        <div className="flex items-center gap-1.5 flex-wrap overflow-visible">
+          {PRIMARY_TABS.map((tab) => {
+            const active = tab.isActive(pathname, typeParam);
+            const Icon = tab.icon;
             return (
               <Link
-                key={item.key}
-                href={item.href}
+                key={tab.key}
+                href={tab.href}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-colors",
+                  "inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap",
                   active
                     ? "bg-blue-600 text-white shadow-xs"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
                 )}
               >
-                <item.icon className="h-3.5 w-3.5" />
-                {item.label}
+                <Icon className={cn("h-4 w-4", active ? "text-white" : "text-slate-500 dark:text-slate-400")} />
+                {tab.label}
               </Link>
             );
           })}
+
+          {/* Domains Dropdown */}
+          <div className="relative shrink-0" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap",
+                activeDomain
+                  ? "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 ring-1 ring-blue-300 dark:ring-blue-800"
+                  : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
+              )}
+            >
+              {activeDomain ? (
+                <>
+                  <activeDomain.icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span>{activeDomain.label}</span>
+                </>
+              ) : (
+                <span>Domains</span>
+              )}
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", dropdownOpen && "rotate-180")} />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute left-0 top-full mt-2 w-52 rounded-xl bg-white dark:bg-[#1b212e] border border-slate-200 dark:border-slate-800 shadow-2xl p-1.5 z-50 max-h-[75vh] overflow-y-auto">
+                <p className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Domain Metrics
+                </p>
+                <div className="space-y-0.5 mt-0.5">
+                  {DOMAIN_ITEMS.map((item) => {
+                    const itemActive = pathname.startsWith(item.href);
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        onClick={() => setDropdownOpen(false)}
+                        className={cn(
+                          "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors",
+                          itemActive
+                            ? "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-semibold"
+                            : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                        )}
+                      >
+                        <Icon className={cn("h-4 w-4", itemActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400")} />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex-1 p-3.5 sm:p-5 lg:p-6">{children}</div>
+        {/* Right side: AI Assistant button */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={toggle}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 border border-slate-200 dark:border-slate-800 transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+            <span className="hidden sm:inline">AI Assistant</span>
+          </button>
+        </div>
       </div>
+
+      {/* Recently Opened Tabs Strip (rendered when tabs exist) */}
+      <OpenTabsStrip dashboards={dashboards} reports={reports} />
+
+      {/* Main Analytics Content */}
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
