@@ -27,7 +27,8 @@ import { MultiLocationInput } from "@/components/leads/location-search-input";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { notifyCreditsChanged } from "@/lib/credits-refresh";
 import { getPicklistValues } from "@/lib/queries/picklists";
-import { cn, toAbsoluteUrl } from "@/lib/utils";
+import { cn, toAbsoluteUrl, avatarColor, initials } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
 import { PhoneInput, formatPhoneForStorage, isPhoneValid, detectCountry, type CountryCode } from "@/components/ui/phone-input";
 import { isValidLinkedIn } from "@/lib/validation";
 
@@ -1506,33 +1507,76 @@ export function BuyForm({ buy, setBuy, results, source, loading, onGenerate, err
   );
 }
 
+const SENIORITY_BADGE: Record<string, "purple" | "blue" | "pink" | "default"> = {
+  "C-Level": "purple",
+  VP: "blue",
+  Director: "blue",
+  Manager: "pink",
+  "Individual Contributor": "default",
+};
+
 export function BuyReview({ prospects, criteria }: { prospects: GeneratedProspect[]; criteria: { industry: string; role: string; locations: string[] } }) {
   const withLinkedIn = prospects.filter((p) => p.linkedin).length;
   const withEmail = prospects.filter((p) => p.email).length;
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
-        Prospects for <span className="font-medium text-slate-900">{criteria.role || "decision makers"}</span> in <span className="font-medium text-slate-900">{criteria.industry || "any industry"}</span>{criteria.locations.length ? <> · {criteria.locations.join(", ")}</> : null}
-        {prospects.length > 0 && <span className="text-slate-400"> · {withLinkedIn} with LinkedIn · {withEmail} with an email</span>}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Card className="p-4 flex items-center gap-3 bg-amber-500/[0.04] dark:bg-amber-500/[0.08]">
+          <span className="h-10 w-10 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0"><Users2 className="h-4.5 w-4.5" /></span>
+          <div className="min-w-0">
+            <p className="text-xs text-slate-500 dark:text-slate-500">Total prospects</p>
+            <p className="text-lg font-bold text-slate-900 dark:text-white">{prospects.length}</p>
+          </div>
+        </Card>
+        <Card className="p-4 flex items-center gap-3 bg-blue-500/[0.04] dark:bg-blue-500/[0.08]">
+          <span className="h-10 w-10 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0"><Link2 className="h-4.5 w-4.5" /></span>
+          <div className="min-w-0">
+            <p className="text-xs text-slate-500 dark:text-slate-500">With LinkedIn</p>
+            <p className="text-lg font-bold text-slate-900 dark:text-white">{withLinkedIn}</p>
+          </div>
+        </Card>
+        <Card className="p-4 flex items-center gap-3 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]">
+          <span className="h-10 w-10 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0"><MailCheck className="h-4.5 w-4.5" /></span>
+          <div className="min-w-0">
+            <p className="text-xs text-slate-500 dark:text-slate-500">With email</p>
+            <p className="text-lg font-bold text-slate-900 dark:text-white">{withEmail}</p>
+          </div>
+        </Card>
       </div>
-      <div className="border border-slate-200 rounded-lg overflow-hidden">
+
+      <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-950/20 px-4 py-2.5 text-sm text-indigo-900 dark:text-indigo-300">
+        Prospects for <span className="font-semibold">{criteria.role || "decision makers"}</span> in <span className="font-semibold">{criteria.industry || "any industry"}</span>{criteria.locations.length ? <> · {criteria.locations.join(", ")}</> : null}
+      </div>
+
+      <Card className="overflow-hidden p-0">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="bg-slate-50 dark:bg-slate-900 text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-3 py-2 text-left font-semibold">Name</th>
-              <th className="px-3 py-2 text-left font-semibold">Title</th>
-              <th className="px-3 py-2 text-left font-semibold">Seniority</th>
-              <th className="px-3 py-2 text-left font-semibold">Email</th>
-              <th className="px-3 py-2 text-left font-semibold">LinkedIn</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Name</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Title</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Seniority</th>
+              <th className="px-3 py-2.5 text-left font-semibold">Email</th>
+              <th className="px-3 py-2.5 text-left font-semibold">LinkedIn</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {prospects.slice(0, 15).map((p, i) => (
-              <tr key={i}>
-                <td className="px-3 py-2 align-top">{p.full_name || <span className="text-slate-400">—</span>}</td>
-                <td className="px-3 py-2 text-slate-600 align-top"><span className="line-clamp-2">{p.title || "—"}</span></td>
-                <td className="px-3 py-2 text-slate-600 align-top">{p.seniority || <span className="text-slate-400">—</span>}</td>
-                <td className="px-3 py-2 text-slate-600 align-top">
+              <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                <td className="px-3 py-2.5 align-top">
+                  {p.full_name ? (
+                    <span className="flex items-center gap-2">
+                      <span className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", avatarColor(p.full_name))}>
+                        {initials(p.full_name)}
+                      </span>
+                      <span className="font-medium text-slate-900 dark:text-white">{p.full_name}</span>
+                    </span>
+                  ) : <span className="text-slate-400">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400 align-top"><span className="line-clamp-2">{p.title || "—"}</span></td>
+                <td className="px-3 py-2.5 align-top">
+                  {p.seniority ? <Badge variant={SENIORITY_BADGE[p.seniority] ?? "default"}>{p.seniority}</Badge> : <span className="text-slate-400">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400 align-top">
                   {p.email ? (
                     <span className="flex items-center gap-1.5">
                       {p.email}
@@ -1541,13 +1585,13 @@ export function BuyReview({ prospects, criteria }: { prospects: GeneratedProspec
                     </span>
                   ) : <span className="text-slate-400">—</span>}
                 </td>
-                <td className="px-3 py-2 align-top">{p.linkedin ? <a href={toAbsoluteUrl(p.linkedin)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Profile</a> : <span className="text-slate-400">—</span>}</td>
+                <td className="px-3 py-2.5 align-top">{p.linkedin ? <a href={toAbsoluteUrl(p.linkedin)} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Profile</a> : <span className="text-slate-400">—</span>}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {prospects.length > 15 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 border-t border-slate-100">Showing first 15 of {prospects.length}</p>}
-      </div>
+        {prospects.length > 15 && <p className="text-xs text-slate-500 px-3 py-2 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">Showing first 15 of {prospects.length}</p>}
+      </Card>
     </div>
   );
 }

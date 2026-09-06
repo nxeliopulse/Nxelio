@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { Clock, Loader2, CheckCircle2, XCircle, ArrowLeft, MailCheck } from "lucide-react";
+import { Clock, Loader2, CheckCircle2, XCircle, ArrowLeft, MailCheck, ShoppingCart, Search, Users2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { useFeedback } from "@/components/ui/feedback";
 import {
   listLeadSearchJobs, getLeadSearchJob, markLeadSearchJobImported,
@@ -99,8 +100,11 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
         <button onClick={() => setOpenId(null)} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Purchased Leads
         </button>
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="h-10 w-10 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0">
+            <ShoppingCart className="h-4.5 w-4.5" />
+          </span>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white flex-1">
             {openSummary.foundCount} of {openSummary.requestedCount} requested
           </h1>
           <StatusBadge status={openSummary.status} />
@@ -134,6 +138,10 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
     );
   }
 
+  const readyCount = jobs.filter((j) => j.status === "done" && !isImported(j)).length;
+  const totalFound = jobs.reduce((sum, j) => sum + j.foundCount, 0);
+  const importedCount = jobs.filter((j) => isImported(j)).length;
+
   return (
     <div className="max-w-[1200px] mx-auto w-full">
       <Link href="/leads" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-4">
@@ -150,49 +158,91 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
           <p>No background searches yet. Choose &quot;Run in background &amp; email me&quot; on the Verified Emails source to queue one.</p>
         </div>
       ) : (
-        <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-900 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-2.5 text-left font-semibold">Criteria</th>
-                <th className="px-4 py-2.5 text-left font-semibold">Requested</th>
-                <th className="px-4 py-2.5 text-left font-semibold">Found</th>
-                <th className="px-4 py-2.5 text-left font-semibold">Status</th>
-                <th className="px-4 py-2.5 text-left font-semibold">Requested on</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {jobs.map((j) => (
-                <tr key={j.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                    {[j.criteria.role, j.criteria.industry].filter(Boolean).join(" · ") || "Any"}
-                    {j.criteria.locations?.length ? <span className="text-slate-400"> · {j.criteria.locations.join(", ")}</span> : null}
-                  </td>
-                  <td className="px-4 py-3">{j.requestedCount}</td>
-                  <td className="px-4 py-3">{j.foundCount}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={j.status} />
-                    {(j.status === "pending" || j.status === "running") && j.timeEstimate && (
-                      <div className="text-[11px] text-slate-400 mt-1">usually {j.timeEstimate}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{new Date(j.createdAt).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right">
-                    {j.status === "done" && (
-                      <Button size="sm" variant="outline" onClick={() => openJob(j.id)}>
-                        {isImported(j) ? "View" : "Review & import"}
-                      </Button>
-                    )}
-                    {j.status === "failed" && (
-                      <Button size="sm" variant="outline" onClick={() => openJob(j.id)}>View</Button>
-                    )}
-                  </td>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <Card className="p-4 flex items-center gap-3 bg-amber-500/[0.04] dark:bg-amber-500/[0.08]">
+              <span className="h-11 w-11 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0"><Search className="h-5 w-5" /></span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-500">Total searches</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{jobs.length}</p>
+              </div>
+            </Card>
+            <Card className="p-4 flex items-center gap-3 bg-indigo-500/[0.04] dark:bg-indigo-500/[0.08]">
+              <span className="h-11 w-11 rounded-full bg-indigo-500 text-white flex items-center justify-center flex-shrink-0"><CheckCircle2 className="h-5 w-5" /></span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-500">Ready to import</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{readyCount}</p>
+              </div>
+            </Card>
+            <Card className="p-4 flex items-center gap-3 bg-blue-500/[0.04] dark:bg-blue-500/[0.08]">
+              <span className="h-11 w-11 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0"><Users2 className="h-5 w-5" /></span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-500">Leads found</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{totalFound}</p>
+              </div>
+            </Card>
+            <Card className="p-4 flex items-center gap-3 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]">
+              <span className="h-11 w-11 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0"><MailCheck className="h-5 w-5" /></span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-500">Imported</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">{importedCount}</p>
+              </div>
+            </Card>
+          </div>
+
+          <Card className="overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-900 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-2.5 text-left font-semibold">Criteria</th>
+                  <th className="px-4 py-2.5 text-left font-semibold">Requested</th>
+                  <th className="px-4 py-2.5 text-left font-semibold">Found</th>
+                  <th className="px-4 py-2.5 text-left font-semibold">Status</th>
+                  <th className="px-4 py-2.5 text-left font-semibold">Requested on</th>
+                  <th className="px-4 py-2.5" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {jobs.map((j) => (
+                  <tr key={j.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                      <span className="flex items-center gap-2.5">
+                        <span className="h-8 w-8 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                          <ShoppingCart className="h-4 w-4" />
+                        </span>
+                        <span>
+                          <span className="font-medium text-slate-900 dark:text-white">{[j.criteria.role, j.criteria.industry].filter(Boolean).join(" · ") || "Any"}</span>
+                          {j.criteria.locations?.length ? <span className="text-slate-400"> · {j.criteria.locations.join(", ")}</span> : null}
+                        </span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{j.requestedCount}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">{j.foundCount}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={j.status} />
+                      {(j.status === "pending" || j.status === "running") && j.timeEstimate && (
+                        <div className="text-[11px] text-slate-400 mt-1">usually {j.timeEstimate}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{new Date(j.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right">
+                      {j.status === "done" && (
+                        <Button size="sm" variant={isImported(j) ? "outline" : "primary"} onClick={() => openJob(j.id)}>
+                          {isImported(j) ? "View" : "Review & import"}
+                        </Button>
+                      )}
+                      {j.status === "failed" && (
+                        <Button size="sm" variant="outline" onClick={() => openJob(j.id)}>View</Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </>
       )}
     </div>
   );

@@ -5,6 +5,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const AVATAR_COLORS = ["bg-blue-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-violet-600", "bg-cyan-600", "bg-pink-600", "bg-indigo-600"];
+
+/** First letter of the first and last word — "?" for an unnamed lead. Shared
+ *  across every prospect-avatar surface (Prospects table, Buy Leads review,
+ *  Purchased Leads) so they all render the exact same initials/color. */
+export function initials(name: string): string {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length || name === "—") return "?";
+  const first = parts[0][0] || "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase() || "?";
+}
+
+/** Deterministic color per name so the same person always gets the same avatar color. */
+export function avatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < (name || "").length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
 /**
  * Locale- AND timezone-pinned date formatting. Always pass dates through
  * these helpers in components that server-render: bare `toLocaleDateString()`
