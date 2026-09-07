@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { sendVerificationCode, verifyEmailCode } from "@/lib/queries/email-verification";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN = 30;
@@ -137,7 +138,7 @@ function VerifyEmailForm() {
           </div>
         )}
 
-        <div className="flex justify-center gap-2">
+        <div className="flex justify-center gap-2 sm:gap-2.5">
           {digits.map((d, i) => (
             <input
               key={i}
@@ -149,7 +150,13 @@ function VerifyEmailForm() {
               onChange={(e) => handleDigitChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onPaste={handlePaste}
-              className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold text-slate-900 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 bg-white outline-none transition-all"
+              className={cn(
+                "w-11 h-14 sm:w-12 sm:h-14 text-center text-xl font-bold rounded-xl border-2 outline-none transition-all shadow-xs",
+                d
+                  ? "border-slate-400 bg-slate-50 text-slate-900 font-extrabold"
+                  : "border-slate-300 hover:border-slate-400 bg-white text-slate-900",
+                "focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 focus:bg-white"
+              )}
             />
           ))}
         </div>
