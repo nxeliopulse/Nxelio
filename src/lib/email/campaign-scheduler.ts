@@ -9,6 +9,7 @@ import {
   isAlreadyLinkedInConnection,
 } from "@/lib/outreach/unipile";
 import { consumeSendQuota } from "@/lib/outreach/send-quota";
+import { claimDueJobs } from "@/lib/outreach/claim";
 import { isSuppressed } from "@/lib/segments";
 import { exitEnrollmentByLead, advanceEnrollmentStep, completeEnrollment, checkAndCompleteCampaign } from "@/lib/campaigns/enrollment";
 import { isFeatureEnabledForSystem } from "@/lib/queries/feature-kill-switches";
@@ -291,14 +292,11 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
   const db = createAdminClient();
   const nowIso = new Date().toISOString();
 
-  const { data: jobs } = await db
-    .from("campaign_jobs")
-    .select("*")
-    .eq("status", "pending")
-    .lte("run_at", nowIso)
-    .order("run_at", { ascending: true })
-    .limit(limit);
-  if (!jobs?.length) return result;
+  // Claimed, not just selected — see claimDueJobs. A plain select hands the
+  // same due rows to every replica behind the load balancer, and the lead
+  // receives the step once per replica.
+  const jobs = await claimDueJobs<Record<string, string> & { id: string }>(db, "campaign_jobs", limit);
+  if (!jobs.length) return result;
 
   // Resolve each workspace's "From Name" once and reuse across its jobs.
   const fromNameCache = new Map<string, string>();
@@ -330,7 +328,15 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
     return p;
   }
 
-  for (const job of jobs as Record<string, string>[]) {
+  /** Puts a claimed job back on the queue for a later tick. Paths that mean
+   *  "not now, try again later" must call this, or the row stays 'processing'
+   *  until the stale-claim sweep releases it. */
+  const releaseClaim = (jobId: string, extra: Record<string, unknown> = {}) =>
+    db.from("campaign_jobs")
+      .update({ status: "pending", claimed_at: null, updated_at: nowIso, ...extra })
+      .eq("id", jobId);
+
+  for (const job of jobs) {
     result.processed++;
 
     const { data: campaign } = await db
@@ -345,7 +351,7 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
       result.skipped++;
       continue;
     }
-    if (campaign.status !== "Active") { result.skipped++; continue; }
+    if (campaign.status !== "Active") { await releaseClaim(job.id); result.skipped++; continue; }
 
     const { data: lead } = await db
       .from("leads")
@@ -407,7 +413,7 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
     // 0070). No limit configured → always granted, i.e. unchanged behavior.
     const granted = await consumeSendQuota(db, wsId, jobChannel, 1);
     if (granted < 1) {
-      await db.from("campaign_jobs").update({ run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), updated_at: nowIso }).eq("id", job.id);
+      await releaseClaim(job.id, { run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() });
       result.deferred++;
       continue;
     }
@@ -426,8 +432,10 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
     if (r.ok) {
       await db.from("campaign_jobs").update({ status: "sent", updated_at: nowIso }).eq("id", job.id);
       await db.from("campaigns").update({ sent_count: (campaign.sent_count || 0) + 1 }).eq("id", job.campaign_id);
+      // 'processing' counts as remaining too: a sibling step claimed in this
+      // same batch is still going to send, so the enrollment isn't finished.
       const { count: remaining } = await db.from("campaign_jobs").select("id", { count: "exact", head: true })
-        .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).eq("status", "pending");
+        .eq("campaign_id", job.campaign_id).eq("lead_id", job.lead_id).in("status", ["pending", "processing"]);
       await advanceEnrollmentStep(job.campaign_id, job.lead_id, Number(job.step_order) || 0, null);
       if (!remaining) {
         await completeEnrollment(job.campaign_id, job.lead_id);

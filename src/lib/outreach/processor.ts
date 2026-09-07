@@ -4,6 +4,7 @@ import { substituteMergeTags } from "@/lib/email/merge-tags";
 import { sendEmail as brevoSendEmail } from "@/lib/email/resend";
 import { isSuppressed } from "@/lib/segments";
 import { consumeSendQuota } from "@/lib/outreach/send-quota";
+import { claimDueJobs } from "@/lib/outreach/claim";
 import {
   unipileConfigured,
   unipileSendEmail,
@@ -47,18 +48,15 @@ export async function processDueJobs(limit = 25): Promise<ProcessResult> {
   const db = createAdminClient();
   const nowIso = new Date().toISOString();
 
-  const { data: jobs } = await db
-    .from("outreach_jobs")
-    .select("*")
-    .eq("status", "pending")
-    .lte("run_at", nowIso)
-    .order("run_at", { ascending: true })
-    .limit(limit);
+  // Claimed, not just selected — see claimDueJobs. Without this every replica
+  // behind the load balancer drains the same rows and the prospect receives
+  // the same step once per replica.
+  const jobs = await claimDueJobs<JobRow>(db, "outreach_jobs", limit);
 
   const result: ProcessResult = { processed: 0, sent: 0, failed: 0, skipped: 0 };
-  if (!jobs?.length) return result;
+  if (!jobs.length) return result;
 
-  for (const job of jobs as JobRow[]) {
+  for (const job of jobs) {
     result.processed++;
 
     // Enrollment must still be active — replies/pauses cancel the rest.
@@ -97,7 +95,10 @@ export async function processDueJobs(limit = 25): Promise<ProcessResult> {
     // campaign-scheduler.ts) — retry this exact job tomorrow rather than
     // advancing the sequence, so the step is delayed, not silently dropped.
     if (outcome.status === "deferred") {
-      await db.from("outreach_jobs").update({ run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), updated_at: nowIso }).eq("id", job.id);
+      // Released back to 'pending', not left claimed — this job is meant to be
+      // picked up again tomorrow rather than sitting in 'processing' until the
+      // stale-claim sweep notices it.
+      await db.from("outreach_jobs").update({ status: "pending", claimed_at: null, run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), updated_at: nowIso }).eq("id", job.id);
       result.skipped++;
       continue;
     }
