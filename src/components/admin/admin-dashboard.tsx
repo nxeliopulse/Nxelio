@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle, ShieldAlert, Users, CalendarClock, PhoneCall, XCircle } from "lucide-react";
+import { LogOut, LayoutDashboard, Archive, CreditCard, Plug, Sparkles, Sun, Moon, Ticket, MessageCircle, ShieldAlert, Users, CalendarClock, PhoneCall, XCircle, Hourglass } from "lucide-react";
 import { platformAdminSignOut } from "@/lib/queries/platform-admin";
 import { OverviewTab } from "@/components/admin/overview-tab";
 import { SubscriptionsTab } from "@/components/admin/subscriptions-tab";
@@ -11,6 +11,7 @@ import { AiProviderTab } from "@/components/admin/ai-provider-tab";
 import { LeadProviderTab } from "@/components/admin/lead-provider-tab";
 import { PromoCodesTab } from "@/components/admin/promo-codes-tab";
 import { FeatureKillSwitchesTab } from "@/components/admin/feature-kill-switches-tab";
+import { TrialSettingsTab } from "@/components/admin/trial-settings-tab";
 import { DemoRequestsTab } from "@/components/admin/demo-requests-tab";
 import { DemoCallAdminTab } from "@/components/admin/demo-call-admin-tab";
 import type { DemoCallPerson, DemoCallSlot } from "@/lib/queries/demo-call-admin";
@@ -48,6 +49,7 @@ const TABS = [
   { id: "lead-provider", label: "Lead Provider", icon: Users },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "feature-access", label: "Feature Access", icon: ShieldAlert },
+  { id: "trial", label: "Trial Period", icon: Hourglass },
   { id: "cancellations", label: "Cancellations", icon: XCircle },
 ] as const;
 
@@ -65,6 +67,7 @@ export function AdminDashboard({
   whatsappAccounts,
   unipileConfigured,
   featureKillSwitches,
+  trialDays,
   demoRequests,
   demoCallPeople,
   demoCallSlots,
@@ -85,6 +88,7 @@ export function AdminDashboard({
   whatsappAccounts: OutreachAccountRow[];
   unipileConfigured: boolean;
   featureKillSwitches: Record<KillSwitchFeature, boolean>;
+  trialDays: number;
   demoRequests: DemoRequestRow[];
   demoCallPeople: DemoCallPerson[];
   demoCallSlots: DemoCallSlot[];
@@ -252,6 +256,7 @@ export function AdminDashboard({
           <WhatsAppConnectorView isSuperAdmin whatsappAccounts={whatsappAccounts} connectorReady={unipileConfigured} />
         )}
         {tab === "feature-access" && <FeatureKillSwitchesTab initialSwitches={featureKillSwitches} />}
+        {tab === "trial" && <TrialSettingsTab initialTrialDays={trialDays} />}
         {tab === "cancellations" && (
           <CancellationsTab
             initialRequests={cancellationRequests}

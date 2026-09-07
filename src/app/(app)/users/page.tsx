@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getUsers, getRoles, getCurrentUserProfile } from "@/lib/queries/users";
 import { getPicklistCategories } from "@/lib/queries/picklists";
 import { listSalesQuotas } from "@/lib/queries/sales-quotas";
+import { getTrialUserUsage } from "@/lib/queries/trial-settings";
 import { AdministrationView } from "@/components/administration/administration-view";
 
 export default async function UsersPage() {
@@ -18,9 +19,10 @@ export default async function UsersPage() {
     redirect("/dashboard");
   }
 
-  const [picklistCategories, salesQuotas] = await Promise.all([
+  const [picklistCategories, salesQuotas, trialUsage] = await Promise.all([
     getPicklistCategories().catch(() => []),
     listSalesQuotas().catch(() => []),
+    getTrialUserUsage(),
   ]);
 
   return (
@@ -31,6 +33,7 @@ export default async function UsersPage() {
       currentUserId={p?.user_id ?? null}
       picklistCategories={picklistCategories}
       salesQuotas={salesQuotas}
+      trialUsage={trialUsage}
     />
   );
 }
