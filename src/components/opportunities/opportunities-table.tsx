@@ -18,7 +18,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { formatDate, cn } from "@/lib/utils";
 import { moveOpportunityStage, updateOpportunity, deleteOpportunity } from "@/lib/queries/opportunities";
 import {
-  OPPORTUNITY_STAGES, STAGE_LABELS,
+  AUTO_CLOSE_LOSS_REASON, OPPORTUNITY_STAGES, STAGE_LABELS,
   type OpportunityRow, type OpportunityStage, type PipelineStats,
 } from "@/lib/opportunities";
 
@@ -538,7 +538,18 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
                           </DataTableTd>
                         )}
                         {visibleCols.value && <DataTableTd className="text-slate-600 dark:text-slate-600">{money(Number(row.deal_value || 0))}</DataTableTd>}
-                        {visibleCols.stage && <DataTableTd><Badge variant={stageBadgeVariant(row.stage)}>{STAGE_TABLE_LABEL[row.stage]}</Badge></DataTableTd>}
+                        {visibleCols.stage && (() => {
+                          const autoClosed = row.stage === "lost" && row.loss_reason === AUTO_CLOSE_LOSS_REASON;
+                          return (
+                            <DataTableTd>
+                              <span title={autoClosed ? AUTO_CLOSE_LOSS_REASON : undefined}>
+                                <Badge variant={stageBadgeVariant(row.stage)}>
+                                  {STAGE_TABLE_LABEL[row.stage]}{autoClosed ? " (Auto)" : ""}
+                                </Badge>
+                              </span>
+                            </DataTableTd>
+                          );
+                        })()}
                         {visibleCols.closeDate && <DataTableTd className="text-slate-500 dark:text-slate-500 whitespace-nowrap">{row.expected_close_date ? formatDate(row.expected_close_date) : "—"}</DataTableTd>}
                         {visibleCols.status && <DataTableTd><OpenClosedPill closed={closed} /></DataTableTd>}
                         <DataTableTd onClick={(e) => e.stopPropagation()}>

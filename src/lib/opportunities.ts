@@ -26,6 +26,12 @@ export const STAGE_LABELS: Record<OpportunityStage, string> = {
 
 export const CLOSED_STAGES: OpportunityStage[] = ["won", "lost"];
 
+/** loss_reason value stamped on a deal that was force-closed by the overdue
+ *  sweep (see queries/opportunities.ts's autoCloseOverdueOpportunities), so
+ *  the UI can tell "the system closed this because nobody decided in time"
+ *  apart from a rep manually marking it Lost. */
+export const AUTO_CLOSE_LOSS_REASON = "Auto-closed — expected close date passed without a decision.";
+
 export interface OpportunityRow {
   id: string;
   lead_id: string | null;

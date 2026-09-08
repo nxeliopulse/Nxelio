@@ -3,9 +3,29 @@ import { createClient } from "@/lib/supabase/server";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
-import { CLOSED_STAGES, type OpportunityRow, type OpportunityStage, type PipelineStats } from "@/lib/opportunities";
+import { AUTO_CLOSE_LOSS_REASON, CLOSED_STAGES, type OpportunityRow, type OpportunityStage, type PipelineStats } from "@/lib/opportunities";
+
+/**
+ * Force-closes any still-open opportunity whose expected close date has
+ * already passed — nobody decided Won/Lost in time, so it's marked Lost
+ * with a distinct loss_reason the UI can point out as automatic rather than
+ * a rep's decision. Runs lazily whenever the Opportunities list or an
+ * opportunity's detail page is loaded (see call sites below) instead of a
+ * scheduled job — simplest option, no cron/edge-function infra needed, and
+ * "closes within one page load of becoming overdue" is good enough here.
+ */
+export async function autoCloseOverdueOpportunities(): Promise<void> {
+  const supabase = await createClient();
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  await supabase
+    .from("opportunities")
+    .update({ stage: "lost", closed_at: new Date().toISOString(), loss_reason: AUTO_CLOSE_LOSS_REASON })
+    .lt("expected_close_date", todayUtc)
+    .not("stage", "in", `(${CLOSED_STAGES.join(",")})`);
+}
 
 export async function getOpportunities(): Promise<OpportunityRow[]> {
+  await autoCloseOverdueOpportunities();
   const supabase = await createClient();
   const { data } = await supabase
     .from("opportunities")
@@ -16,6 +36,7 @@ export async function getOpportunities(): Promise<OpportunityRow[]> {
 
 /** A single lead's opportunities, newest-first — for the lead detail page's related list. */
 export async function getOpportunityById(id: string): Promise<OpportunityRow | null> {
+  await autoCloseOverdueOpportunities();
   const supabase = await createClient();
   const { data } = await supabase.from("opportunities").select("*").eq("id", id).single();
   return data as OpportunityRow | null;
@@ -249,6 +270,10 @@ export async function moveOpportunityStage(id: string, stage: OpportunityStage):
     .update({
       stage,
       closed_at: closed ? new Date().toISOString() : null,
+      // A rep moving a deal off "lost" is an explicit decision that overrides
+      // whatever closed it — clear a stale AUTO_CLOSE_LOSS_REASON so the "(Auto)"
+      // indication doesn't linger on a deal that's no longer even Lost.
+      ...(stage !== "lost" ? { loss_reason: null } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -282,6 +307,7 @@ export async function updateOpportunity(id: string, input: UpdateOpportunityInpu
   if (input.stage !== undefined) {
     patch.stage = input.stage;
     patch.closed_at = CLOSED_STAGES.includes(input.stage) ? new Date().toISOString() : null;
+    if (input.stage !== "lost") patch.loss_reason = null;
   }
   const { error } = await supabase.from("opportunities").update(patch).eq("id", id);
   if (error) throw error;

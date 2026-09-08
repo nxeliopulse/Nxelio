@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { useFeedback } from "@/components/ui/feedback";
 import { moveOpportunityStage, updateOpportunity } from "@/lib/queries/opportunities";
-import { OPPORTUNITY_STAGES, STAGE_LABELS, getStageForecast, type OpportunityStage, type OpportunityRow } from "@/lib/opportunities";
+import { AUTO_CLOSE_LOSS_REASON, OPPORTUNITY_STAGES, STAGE_LABELS, getStageForecast, type OpportunityStage, type OpportunityRow } from "@/lib/opportunities";
 import type { AccountRow } from "@/lib/queries/accounts";
 import { formatDateTime } from "@/lib/utils";
 import {
@@ -154,7 +154,11 @@ export function OpportunityDetailView({
           <FieldRow label="Close Date" value={<FieldRenderer definition={dateFieldDef} value={opportunity.expected_close_date} />} />
           <FieldRow label="Probability" value={`${forecast.probability}%`} />
         </InfoGrid>
-        {stage === "lost" ? (
+        {stage === "lost" && opportunity.loss_reason === AUTO_CLOSE_LOSS_REASON ? (
+          <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 dark:bg-amber-950/30 dark:border-amber-900/50 dark:text-amber-400">
+            Automatically closed as Lost — its expected close date passed with no decision made.
+          </p>
+        ) : stage === "lost" ? (
           <p className="text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-400">This opportunity was marked Lost.</p>
         ) : (
           <StageProgress

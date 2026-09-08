@@ -8,6 +8,7 @@ import { useFeedback } from "@/components/ui/feedback";
 import { createOpportunityFromContact } from "@/lib/queries/opportunities";
 import type { OpportunityStage } from "@/lib/opportunities";
 import type { OwnerOption } from "@/components/contacts/contacts-table";
+import { todayLocalISO } from "@/lib/utils";
 
 const PIPELINES = ["Sales", "Marketing", "Calls"];
 const STATUSES = ["Open", "Won", "Lost"] as const;
@@ -103,6 +104,7 @@ export function AddDealModal({
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const today = todayLocalISO();
 
   if (!open) return null;
 
@@ -121,7 +123,9 @@ export function AddDealModal({
     if (!period) { setError("Period is required."); return; }
     if (!periodValue) { setError("Period value is required."); return; }
     if (!dueDate) { setError("Due date is required."); return; }
+    if (dueDate < today) { setError("Due date can't be in the past."); return; }
     if (!expectedCloseDate) { setError("Expected closing date is required."); return; }
+    if (expectedCloseDate < today) { setError("Expected closing date can't be in the past."); return; }
     if (!ownerId) { setError("Assignee is required."); return; }
     if (!followUpDate) { setError("Follow up date is required."); return; }
     if (!source) { setError("Source is required."); return; }
@@ -245,10 +249,10 @@ export function AddDealModal({
             </Field>
 
             <Field label="Due Date" required>
-              <input type="date" className={fieldStyle} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              <input type="date" min={today} className={fieldStyle} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </Field>
             <Field label="Expected Closing Date" required>
-              <input type="date" className={fieldStyle} value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} />
+              <input type="date" min={today} className={fieldStyle} value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} />
             </Field>
 
             <Field label="Assignee" required className="sm:col-span-2">

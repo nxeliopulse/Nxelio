@@ -25,6 +25,16 @@ export function avatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+/** Today's date as "YYYY-MM-DD" in the *visitor's local* timezone — for pinning
+ *  a date `<input>`'s `min` so users can't pick a past date. Deliberately
+ *  builds the string from local getFullYear/getMonth/getDate rather than
+ *  `toISOString()`, which reports UTC and would show the wrong day for anyone
+ *  west of UTC near midnight. */
+export function todayLocalISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /**
  * Locale- AND timezone-pinned date formatting. Always pass dates through
  * these helpers in components that server-render: bare `toLocaleDateString()`
