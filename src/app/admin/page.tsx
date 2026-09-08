@@ -12,6 +12,7 @@ import { getLeadProviderStatus } from "@/lib/queries/lead-provider-settings";
 import { getEmailPromoCodes } from "@/lib/queries/admin-promo-codes";
 import { getOutreachAccounts, isUnipileConfigured } from "@/lib/queries/outreach-accounts";
 import { getFeatureKillSwitches } from "@/lib/queries/feature-kill-switches";
+import { getTrialDays } from "@/lib/queries/trial-settings";
 import { getDemoRequests } from "@/lib/queries/demo-requests-admin";
 import { getDemoCallPeople, getDemoCallSlots } from "@/lib/queries/demo-call-admin";
 import { getCancellationRequests } from "@/lib/queries/cancellation-requests";
@@ -39,6 +40,7 @@ export default async function AdminPage() {
     cancellationRequests,
     calendarAccounts,
     calendarProviderStatus,
+    trialDays,
   ] = await Promise.all([
     getPlatformOverviewStats(),
     getHotCustomers(),
@@ -59,6 +61,7 @@ export default async function AdminPage() {
     getCancellationRequests(),
     getCalendarAccounts(),
     getCalendarProviderStatus(),
+    getTrialDays(),
   ]);
   const whatsappAccounts = outreachAccounts.filter((a) => a.channel === "whatsapp");
 
@@ -83,6 +86,7 @@ export default async function AdminPage() {
       cancellationRequests={cancellationRequests}
       calendarAccounts={calendarAccounts}
       calendarProviderStatus={calendarProviderStatus}
+      trialDays={trialDays}
     />
   );
 }

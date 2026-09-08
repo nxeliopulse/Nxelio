@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { stripe, STRIPE_PRICE_IDS, PLAN_CREDITS, PLAN_LEADS } from "@/lib/stripe";
 import { startPromoRedemption, attachCheckoutSessionToRedemption, finalizePendingPromotion } from "@/lib/queries/promotions";
 import { syncSubscriptionFromStripe } from "@/lib/queries/subscriptions";
+import { getTrialDays } from "@/lib/queries/trial-settings";
 import type { BillingInterval, PlanId } from "@/lib/queries/subscriptions";
 
 const PLAN_ORDER: Record<string, number> = { basic: 0, starter: 1, pro: 2 };
@@ -146,7 +147,10 @@ export async function POST(req: NextRequest) {
     // trial_period_days configured on the Price itself, so without this the
     // card is charged in full immediately regardless of plan. Set it per
     // checkout session instead of relying on Price-level config.
-    const trialDays = planId === "basic" ? 7 : undefined;
+    // Was hardcoded to 7 here while the signup trigger used its own 7 — both
+    // now read the Admin page's single value (see 0160_trial_settings.sql), so
+    // the advertised trial and the granted trial can't drift apart again.
+    const trialDays = planId === "basic" ? await getTrialDays() : undefined;
     const session = await sc.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],

@@ -9,6 +9,7 @@ import { SalesQuotasManager } from "@/components/administration/sales-quotas-man
 import type { UserWithRole } from "@/lib/queries/users";
 import type { PicklistCategoryRow } from "@/lib/picklists";
 import type { SalesQuotaRow } from "@/lib/queries/sales-quotas";
+import type { TrialUserUsage } from "@/lib/trial-rules";
 
 const TABS = [
   { id: "users", label: "User Management", icon: <Users2 className="h-4 w-4" /> },
@@ -24,9 +25,10 @@ interface Props {
   currentUserId: string | null;
   picklistCategories: PicklistCategoryRow[];
   salesQuotas: SalesQuotaRow[];
+  trialUsage: TrialUserUsage;
 }
 
-export function AdministrationView({ users, roles, isAdmin, currentUserId, picklistCategories, salesQuotas }: Props) {
+export function AdministrationView({ users, roles, isAdmin, currentUserId, picklistCategories, salesQuotas, trialUsage }: Props) {
   const [active, setActive] = useState<(typeof TABS)[number]["id"]>("users");
 
   return (
@@ -47,7 +49,7 @@ export function AdministrationView({ users, roles, isAdmin, currentUserId, pickl
         ))}
       </div>
 
-      {active === "users" && <UsersView users={users} roles={roles} isAdmin={isAdmin} currentUserId={currentUserId} />}
+      {active === "users" && <UsersView users={users} roles={roles} isAdmin={isAdmin} currentUserId={currentUserId} trialUsage={trialUsage} />}
       {active === "picklists" && <PicklistsManager categories={picklistCategories} />}
       {active === "custom-fields" && <CustomFieldsBuilder />}
       {active === "sales-quotas" && <SalesQuotasManager quotas={salesQuotas} users={users} />}

@@ -2,6 +2,8 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
+import { getTrialUserUsageForWorkspace } from "@/lib/queries/trial-settings";
+import { canAddTrialUser, TRIAL_USER_LIMIT_MESSAGE } from "@/lib/trial-rules";
 
 export interface UserRow {
   user_id: string;
@@ -242,6 +244,9 @@ export interface InviteUserResult {
   tempPassword?: string;
   existingUser?: boolean;
   error?: string;
+  /** Set when the block was the trial seat cap rather than a bad input, so
+   *  the UI can offer an Upgrade link instead of just an error. */
+  upgradeRequired?: boolean;
 }
 
 /**
@@ -258,6 +263,17 @@ export async function inviteUser(email: string, fullName: string, roleId: number
 
     // 1. Only a Super Admin may invite users; scope to their workspace.
     const { workspaceId: inviterWorkspaceId } = await requireSuperAdmin();
+
+    // 1b. Trial seat cap. Checked HERE, before either creation branch below,
+    // because both of them end up inserting into workspace_members — the
+    // "email already has a login elsewhere" path would otherwise slip a 4th
+    // member past the cap. The count is live, so a deleted member frees a
+    // slot. Paid and expired accounts return limit: null and pass straight
+    // through to their plan's own limits.
+    const trialUsage = await getTrialUserUsageForWorkspace(inviterWorkspaceId);
+    if (!canAddTrialUser(trialUsage)) {
+      return { ok: false, error: TRIAL_USER_LIMIT_MESSAGE, upgradeRequired: true };
+    }
 
     // Only allow assigning a role that actually exists (was hardcoded to [1,2,3],
     // which silently rejected any role added later, e.g. Reviewer).

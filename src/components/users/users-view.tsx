@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useTransition } from "react";
-import { Search, Plus, Shield, ShieldCheck, User, AlertCircle, CheckCircle2, Copy, Check, KeyRound, Trash2, Calendar, Mail, RefreshCw, Lock, X } from "lucide-react";
+import { Search, Plus, Shield, ShieldCheck, User, AlertCircle, CheckCircle2, Copy, Check, KeyRound, Trash2, Calendar, Mail, RefreshCw, Lock, X, Users2, ArrowUpRight } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { useFeedback } from "@/components/ui/feedback";
 import { inviteUser, deleteUser, resetUserPassword, getUserAuthInfo, updateUserNavAccess, type UserWithRole } from "@/lib/queries/users";
 import { navMainItems, navAdminItems } from "@/lib/nav-config";
+import { canAddTrialUser, type TrialUserUsage } from "@/lib/trial-rules";
 import { formatDate, formatDateTime, cn } from "@/lib/utils";
 
 interface Props {
@@ -19,6 +20,9 @@ interface Props {
   roles: { role_id: number; role_name: string; role_description?: string | null }[];
   isAdmin: boolean;
   currentUserId: string | null;
+  /** Live seat count for the trial cap. limit is null once the account is on
+   *  a paid plan, in which case none of the trial UI below renders. */
+  trialUsage: TrialUserUsage;
 }
 
 const roleIcon: Record<string, React.ReactNode> = {
@@ -38,8 +42,12 @@ const roleAccessSummary: Record<string, string[]> = {
   "Marketing Admin": ["Dashboard", "Segments", "Newsletters", "Workflows", "Analytics", "Templates"],
 };
 
-export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
+export function UsersView({ users, roles, isAdmin, currentUserId, trialUsage }: Props) {
   const visibleUsers = isAdmin ? users : users.filter((u) => u.user_id === currentUserId);
+  // Seat count comes from the server (a count of workspace_members) rather
+  // than users.length, which is filtered for non-admins and would under-report.
+  const trialSeatsLeft = trialUsage.limit === null ? null : trialUsage.limit - trialUsage.used;
+  const atTrialLimit = !canAddTrialUser(trialUsage);
   // Exactly one Super Admin per workspace — its creator. Never offer it as an
   // assignable role, invite or otherwise (enforced again server-side in
   // inviteUser/updateUserRole — this is just so the option never appears).
@@ -50,6 +58,9 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
   const [form, setForm] = useState({ fullName: "", email: "", roleId: roles.find((r) => r.role_name === "Sales Admin")?.role_id ?? 3 });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // Set only when the invite was refused by the trial cap, so the Upgrade
+  // link appears next to that one error and not next to ordinary validation.
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [search, setSearch] = useState("");
   const [detailUser, setDetailUser] = useState<UserWithRole | null>(null);
   const [authInfo, setAuthInfo] = useState<{ last_sign_in_at: string | null; email_confirmed_at: string | null } | null>(null);
@@ -92,7 +103,12 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
     if (!form.fullName || !form.email) { setError("Name and email required"); return; }
     start(async () => {
       const result = await inviteUser(form.email, form.fullName, form.roleId, null);
-      if (!result.ok) { setError(result.error || "Failed"); return; }
+      if (!result.ok) {
+        setError(result.error || "Failed");
+        setShowUpgrade(Boolean(result.upgradeRequired));
+        return;
+      }
+      setShowUpgrade(false);
       setSuccess(
         result.existingUser
           ? "They already have an account — added to this workspace. They can switch to it from their workspace menu next time they log in."
@@ -167,13 +183,65 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
       <PageHeader
         title="User Management"
         description="Click any user to view details or reset their password."
-        actions={isAdmin ? <Button onClick={() => { setShowInvite(true); setError(null); setSuccess(null); }}><Plus className="h-4 w-4" /> Create User</Button> : null}
+        actions={isAdmin ? (
+          <div className="flex items-center gap-3">
+            {trialUsage.limit !== null && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold",
+                  atTrialLimit
+                    ? "border-amber-300 bg-amber-50 text-amber-800"
+                    : "border-slate-200 bg-slate-50 text-slate-600"
+                )}
+                title="Trial accounts are limited during the trial period"
+              >
+                <Users2 className="h-3.5 w-3.5" />
+                {trialUsage.used} of {trialUsage.limit} users used
+              </span>
+            )}
+            <Button
+              onClick={() => { setShowInvite(true); setError(null); setSuccess(null); setShowUpgrade(false); }}
+              disabled={atTrialLimit}
+              title={atTrialLimit ? "Trial user limit reached — upgrade to add more" : undefined}
+            >
+              <Plus className="h-4 w-4" /> Create User
+            </Button>
+          </div>
+        ) : null}
       />
 
       {!isAdmin && (
         <div className="mb-6 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>You don&apos;t have permission to manage users. Please ask a Super Admin.</span>
+        </div>
+      )}
+
+      {isAdmin && atTrialLimit && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3.5 text-sm text-amber-900">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>
+              <span className="font-semibold">Trial user limit reached.</span>{" "}
+              Trial accounts are limited to {trialUsage.limit} users. Upgrade to add more.
+            </span>
+          </div>
+          <a
+            href="/billing"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          >
+            Upgrade plan <ArrowUpRight className="h-3.5 w-3.5" />
+          </a>
+        </div>
+      )}
+
+      {isAdmin && trialUsage.limit !== null && !atTrialLimit && trialSeatsLeft === 1 && (
+        <div className="mb-6 flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-600">
+          <Users2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <span>
+            1 user slot left on your trial. Deleting a user frees a slot, or upgrade for
+            unlimited seats.
+          </span>
         </div>
       )}
 
@@ -287,7 +355,25 @@ export function UsersView({ users, roles, isAdmin, currentUserId }: Props) {
       {/* Create User Modal */}
       <Modal open={showInvite} onClose={() => setShowInvite(false)} title="Create new user" description="They'll be invited to this workspace with the selected role">
         <div className="p-5 space-y-4">
-          {error && <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{error}</span></div>}
+          {error && (
+            <div className={cn(
+              "flex flex-col gap-2.5 rounded-lg border p-3 text-sm",
+              showUpgrade ? "bg-amber-50 border-amber-200 text-amber-900" : "bg-red-50 border-red-200 text-red-700"
+            )}>
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+              {showUpgrade && (
+                <a
+                  href="/billing"
+                  className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                >
+                  Upgrade plan <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+          )}
           {success && <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{success}</span></div>}
 
           <Input label="Full Name *" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="John Smith" />
