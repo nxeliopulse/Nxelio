@@ -257,10 +257,10 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
             <span className="text-slate-600 dark:text-slate-600 font-medium">Opportunities</span>
           </div>
         </div>
-        {/* Opportunities can only be created by converting a lead (no standalone-create endpoint exists),
-            so this links to Leads rather than faking an "Add Opportunity" form. */}
-        <Link href="/leads">
-          <Button><Plus className="h-4 w-4" /> Convert a lead</Button>
+        {/* Opportunities can only be created from an Account's "Add Deal" flow (no standalone-create
+            endpoint exists), so this links to Accounts rather than faking an "Add Opportunity" form. */}
+        <Link href="/accounts">
+          <Button><Plus className="h-4 w-4" /> Add a deal from an Account</Button>
         </Link>
       </div>
 
@@ -301,7 +301,7 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
           </div>
           <p className="font-semibold text-slate-900 dark:text-white">No opportunities yet</p>
           <p className="text-sm text-slate-500 dark:text-slate-500 mt-1 max-w-md mx-auto">
-            Open a lead and click <span className="font-medium text-slate-700 dark:text-slate-700">Convert to Opportunity</span> to start building your pipeline.
+            Open an account and click <span className="font-medium text-slate-700 dark:text-slate-700">Add Deal</span> to start building your pipeline.
           </p>
         </Card>
       ) : (

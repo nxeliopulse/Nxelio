@@ -7,7 +7,6 @@ import { getLeadDetail } from "@/lib/queries/lead-detail";
 import { findMatchingAccount, createAccount, getAccountById, type AccountRow } from "@/lib/queries/accounts";
 import { findMatchingContact, createContact, type ContactRow } from "@/lib/queries/contacts";
 import { updateLead } from "@/lib/queries/leads";
-import { resolveLeadAttribution, type OpportunityStage } from "@/lib/opportunities";
 
 /** Auto-matches an in-progress lead against existing Accounts/Contacts, for the Convert Lead modal's pre-fill. */
 export async function getConversionMatches(leadId: string): Promise<{ account: AccountRow | null; contact: ContactRow | null }> {
@@ -30,20 +29,20 @@ export interface ConvertLeadInput {
   leadId: string;
   account: { mode: "existing"; id: string } | { mode: "new"; payload: Partial<AccountRow> };
   contact: { mode: "existing"; id: string } | { mode: "new"; payload: Partial<ContactRow> };
-  opportunity: null | { name: string; stage: OpportunityStage; dealValue: number; expectedCloseDate: string | null };
 }
 
 export interface ConvertLeadResult {
   accountId: string;
   contactId: string;
-  opportunityId: string | null;
 }
 
 /**
  * Converts a Lead into a real Account + Contact (created or matched to an
- * existing one) and an optional Opportunity. The Lead itself is never
- * deleted — it's marked Converted and keeps permanent links to whatever it
- * became, so "View Account/Contact/Opportunity" always has somewhere to go.
+ * existing one). The Lead itself is never deleted — it's marked Converted
+ * and keeps permanent links to whatever it became, so "View Account/Contact"
+ * always has somewhere to go. Opportunities are intentionally NOT created
+ * here — only an Account (Company) can be turned into an Opportunity, from
+ * the Account page's "Add Deal" flow (see opportunities.ts createOpportunityFromAccount).
  */
 export async function convertLead(input: ConvertLeadInput): Promise<ConvertLeadResult> {
   const { lead } = await getLeadDetail(input.leadId);
@@ -65,58 +64,26 @@ export async function convertLead(input: ConvertLeadInput): Promise<ConvertLeadR
   }
 
   const supabase = await createClient();
-  const [{ data: account }, { data: contact }] = await Promise.all([
+  const [{ data: account }] = await Promise.all([
     supabase.from("accounts").select("account_name").eq("id", accountId).single(),
-    supabase.from("contacts").select("first_name, last_name, email").eq("id", contactId).single(),
   ]);
 
-  // 3. Optionally create the Opportunity, linked to both.
-  let opportunityId: string | null = null;
-  if (input.opportunity) {
-    const [{ data: user }, attribution] = await Promise.all([
-      supabase.auth.getUser(),
-      resolveLeadAttribution(supabase, input.leadId),
-    ]);
-    const { data: opp, error: oppError } = await supabase
-      .from("opportunities")
-      .insert({
-        lead_id: input.leadId,
-        account_id: accountId,
-        contact_id: contactId,
-        name: input.opportunity.name,
-        company: account?.account_name ?? null,
-        contact_name: contact ? `${contact.first_name} ${contact.last_name}`.trim() : null,
-        contact_email: contact?.email ?? null,
-        deal_value: input.opportunity.dealValue || 0,
-        stage: input.opportunity.stage,
-        expected_close_date: input.opportunity.expectedCloseDate,
-        owner_id: user.user?.id ?? null,
-        source: (lead as { source?: string | null }).source ?? null,
-        campaign_id: attribution.campaignId,
-        segment_id: attribution.segmentId,
-      })
-      .select("id")
-      .single();
-    if (oppError) throw oppError;
-    opportunityId = opp.id;
-  }
-
-  // 4. Mark the lead Converted and permanently link it to what it became.
+  // 3. Mark the lead Converted and permanently link it to what it became.
   // allowConvertedStatus: this is the one legitimate place status: "Converted"
   // may be set — every other caller (edit modal, AI tool, etc.) is blocked
   // from setting it manually, since that would fake a conversion with no
-  // Account/Contact/Opportunity ever actually created (see status-flow.ts).
+  // Account/Contact ever actually created (see status-flow.ts). Opportunities
+  // are never created here — only an Account (Company) can become one.
   await updateLead(input.leadId, {
     status: "Converted",
     converted_account_id: accountId,
     converted_contact_id: contactId,
-    converted_opportunity_id: opportunityId,
   }, { allowConvertedStatus: true });
 
   await supabase.from("lead_activities").insert({
     lead_id: input.leadId,
-    activity_type: "CONVERTED_TO_OPPORTUNITY",
-    metadata: { account_id: accountId, contact_id: contactId, opportunity_id: opportunityId },
+    activity_type: "CONVERTED",
+    metadata: { account_id: accountId, contact_id: contactId },
   });
 
   await notifyCurrentUser({
@@ -129,13 +96,12 @@ export async function convertLead(input: ConvertLeadInput): Promise<ConvertLeadR
   revalidatePath(`/leads/${input.leadId}`);
   revalidatePath("/accounts");
   revalidatePath("/contacts");
-  revalidatePath("/opportunities");
   await logAudit({
     action: "lead.converted",
     entityType: "lead",
     entityId: input.leadId,
-    metadata: { accountId, contactId, opportunityId },
+    metadata: { accountId, contactId },
   });
 
-  return { accountId, contactId, opportunityId };
+  return { accountId, contactId };
 }

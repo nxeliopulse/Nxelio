@@ -5,11 +5,12 @@
  *
  * Business rules (confirmed with the user):
  *  - "Converted" is never a manual dropdown choice — it's set ONLY by the
- *    Convert flow (lead-conversion.ts), which builds the Account/Contact/
- *    Opportunity records. Manually typing/selecting "Converted" would mark
- *    the lead as converted without ever creating those records.
- *  - "Win"/"Lost" are NOT lead statuses at all — they live on the Opportunity
- *    record instead, once a lead has been converted.
+ *    Convert flow (lead-conversion.ts), which builds the Account/Contact
+ *    records. Manually typing/selecting "Converted" would mark the lead as
+ *    converted without ever creating those records.
+ *  - Only an Account (Company) can become an Opportunity — never a Prospect
+ *    directly. "Win"/"Lost" are NOT lead statuses at all — they live on the
+ *    Opportunity record instead, once an Account has a deal created for it.
  *  - Converted is a dead end: once set, nothing can manually move a lead's
  *    status away from it.
  */
@@ -52,7 +53,7 @@ export function isManualStatusTransitionAllowed(current: string, next: string): 
 /** Human-readable reason a blocked transition was rejected, for error messages. */
 export function statusTransitionError(current: string, next: string): string {
   if (next === "Converted") {
-    return 'Status can\'t be set to "Converted" manually — use the Convert button instead, which creates the Account, Contact, and Opportunity records.';
+    return 'Status can\'t be set to "Converted" manually — use the Convert button instead, which creates the Account and Contact records.';
   }
   const allowed = allowedNextStatuses(current);
   return allowed.length

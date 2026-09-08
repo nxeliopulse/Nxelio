@@ -122,7 +122,7 @@ export function PipelineBoard({ initial, stats }: { initial: OpportunityRow[]; s
           </div>
           <p className="font-semibold text-slate-900">No opportunities yet</p>
           <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
-            Open a lead and click <span className="font-medium text-slate-700">Convert to Opportunity</span> to start building your pipeline.
+            Open an account and click <span className="font-medium text-slate-700">Add Deal</span> to start building your pipeline.
           </p>
         </Card>
       ) : (

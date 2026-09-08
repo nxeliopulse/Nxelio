@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
-import { CLOSED_STAGES, resolveLeadAttribution, type OpportunityRow, type OpportunityStage, type PipelineStats } from "@/lib/opportunities";
+import { CLOSED_STAGES, type OpportunityRow, type OpportunityStage, type PipelineStats } from "@/lib/opportunities";
 
 export async function getOpportunities(): Promise<OpportunityRow[]> {
   const supabase = await createClient();
@@ -87,70 +87,6 @@ export async function getPipelineStats(): Promise<PipelineStats> {
     lostCount: lost.length,
     winRate: closed ? Math.round((won.length / closed) * 1000) / 10 : 0,
   };
-}
-
-export interface CreateOpportunityInput {
-  leadId: string;
-  name: string;
-  company?: string | null;
-  contactName?: string | null;
-  contactEmail?: string | null;
-  dealValue: number;
-  stage?: OpportunityStage;
-  expectedCloseDate?: string | null;
-  notes?: string | null;
-}
-
-/** Convert a lead into a pipeline opportunity, and mark the lead Converted. */
-export async function createOpportunityFromLead(input: CreateOpportunityInput): Promise<OpportunityRow> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: leadRow }, attribution] = await Promise.all([
-    supabase.from("leads").select("source").eq("id", input.leadId).single(),
-    resolveLeadAttribution(supabase, input.leadId),
-  ]);
-
-  const { data, error } = await supabase
-    .from("opportunities")
-    .insert({
-      lead_id: input.leadId,
-      name: input.name,
-      company: input.company ?? null,
-      contact_name: input.contactName ?? null,
-      contact_email: input.contactEmail ?? null,
-      deal_value: input.dealValue || 0,
-      stage: input.stage || "new",
-      expected_close_date: input.expectedCloseDate || null,
-      notes: input.notes ?? null,
-      owner_id: user?.id ?? null,
-      source: (leadRow as { source: string | null } | null)?.source ?? null,
-      campaign_id: attribution.campaignId,
-      segment_id: attribution.segmentId,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-
-  // Reflect conversion on the lead + activity log
-  await supabase.from("leads").update({ status: "Converted" }).eq("id", input.leadId);
-  await supabase.from("lead_activities").insert({
-    lead_id: input.leadId,
-    activity_type: "CONVERTED_TO_OPPORTUNITY",
-    metadata: { opportunity_id: data.id, deal_value: input.dealValue },
-  });
-
-  await notifyCurrentUser({
-    type: "opportunity",
-    title: "Lead converted to opportunity",
-    message: `${input.name}${input.dealValue ? ` — $${input.dealValue.toLocaleString()}` : ""}`,
-    link: "/opportunities",
-  });
-
-  revalidatePath("/opportunities");
-  revalidatePath(`/leads/${input.leadId}`);
-  revalidatePath("/dashboard");
-  await logAudit({ action: "opportunity.created", entityType: "opportunity", entityId: data.id, entityLabel: input.name, metadata: { deal_value: input.dealValue, lead_id: input.leadId } });
-  return data as OpportunityRow;
 }
 
 export interface CreateOpportunityFromContactInput {

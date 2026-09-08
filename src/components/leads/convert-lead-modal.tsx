@@ -1,14 +1,12 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Briefcase, Loader2, Building2, User as UserIcon, X, ArrowLeft, Plus, Sparkles, Mail, Phone, ShieldCheck, CalendarClock } from "lucide-react";
+import { Briefcase, Loader2, Building2, User as UserIcon, X, ArrowLeft, Plus, Sparkles, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { useFeedback } from "@/components/ui/feedback";
 import { getConversionMatches, convertLead } from "@/lib/queries/lead-conversion";
 import type { AccountRow } from "@/lib/queries/accounts";
 import type { ContactRow } from "@/lib/queries/contacts";
-import { OPPORTUNITY_STAGES, STAGE_LABELS, type OpportunityStage } from "@/lib/opportunities";
 import type { LeadRow } from "@/lib/queries/leads";
 import { cn } from "@/lib/utils";
 import { isValidEmail, isValidWebsite, EMAIL_ERROR, WEBSITE_ERROR } from "@/lib/validation";
@@ -66,7 +64,7 @@ export function ConvertLeadModal({
   open: boolean;
   onClose: () => void;
   lead: LeadRow;
-  onConverted: (result: { accountId: string; contactId: string; opportunityId: string | null }) => void;
+  onConverted: (result: { accountId: string; contactId: string }) => void;
 }) {
   const router = useRouter();
   const { toast } = useFeedback();
@@ -87,11 +85,6 @@ export function ConvertLeadModal({
   const [contactPhone, setContactPhone] = useState(lead.phone || "");
   const [contactPhoneCountry, setContactPhoneCountry] = useState<CountryCode>(() => detectCountry(lead.phone));
 
-  const [createOpportunity, setCreateOpportunity] = useState(true);
-  const [oppName, setOppName] = useState("");
-  const [oppStage, setOppStage] = useState<OpportunityStage>("qualified");
-  const [oppAmount, setOppAmount] = useState("");
-  const [oppCloseDate, setOppCloseDate] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -106,17 +99,9 @@ export function ConvertLeadModal({
         setContactMode(contact ? "existing" : "new");
       })
       .finally(() => setLoadingMatches(false));
-
-    const in30 = new Date(Date.now() + 30 * 86400000);
-    setOppCloseDate(in30.toISOString().slice(0, 10));
   }, [open, lead.id]);
 
   const effectiveAccountName = accountMode === "existing" ? matchedAccount?.account_name || "" : accountName;
-  useEffect(() => {
-    if (!open) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- refreshes the suggested deal name once the matched account resolves; oppName stays user-editable afterward
-    setOppName(effectiveAccountName ? `${effectiveAccountName} - New Deal` : "New Deal");
-  }, [effectiveAccountName, open]);
 
   async function handleConvert() {
     if (accountMode === "new" && !isValidWebsite(accountWebsite)) { toast(WEBSITE_ERROR, "error"); return; }
@@ -162,9 +147,6 @@ export function ConvertLeadModal({
                   mailing_zip: lead.postal_code || null,
                 },
               },
-        opportunity: createOpportunity
-          ? { name: oppName.trim() || "New Deal", stage: oppStage, dealValue: parseFloat(oppAmount) || 0, expectedCloseDate: oppCloseDate || null }
-          : null,
       });
       toast("Prospect converted successfully.", "success");
       onConverted(result);
@@ -203,7 +185,7 @@ export function ConvertLeadModal({
               <h2 className="font-bold text-base text-slate-900 dark:text-white leading-tight">
                 Convert Prospect: <span className="text-[#18A7B8]">{lead.full_name || lead.company_name || "Prospect"}</span>
               </h2>
-              <p className="text-[10px] text-slate-450 mt-1 uppercase tracking-wider font-bold">Link or create account, contact, and opportunities</p>
+              <p className="text-[10px] text-slate-450 mt-1 uppercase tracking-wider font-bold">Link or create account and contact</p>
             </div>
           </div>
           <button onClick={onClose} aria-label="Close" className="text-slate-450 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg p-1.5 transition-colors">
@@ -323,38 +305,6 @@ export function ConvertLeadModal({
                       <input className={`${fieldStyle} bg-slate-50 dark:bg-slate-800/60 cursor-not-allowed`} value={matchedContact.phone || ""} disabled readOnly />
                     </div>
                     <p className="text-xs text-slate-400 sm:col-span-4 -mt-1">Linking to an existing contact — these fields come from that record and can&apos;t be edited here.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Step 3: Opportunity Selection */}
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 bg-white dark:bg-slate-900/40">
-                <StepHeader
-                  n={3}
-                  title="Opportunity (Deal)"
-                  description="Create a new opportunity associated with this converted account"
-                  right={<Switch checked={createOpportunity} onChange={setCreateOpportunity} aria-label="Create opportunity" />}
-                />
-                {createOpportunity && (
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1.5 animate-in fade-in duration-200">
-                    <div className="col-span-2">
-                      <label className={labelStyle}>Opportunity Name</label>
-                      <input className={fieldStyle} value={oppName} onChange={(e) => setOppName(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className={labelStyle}>Stage</label>
-                      <select className={fieldStyle} value={oppStage} onChange={(e) => setOppStage(e.target.value as OpportunityStage)}>
-                        {OPPORTUNITY_STAGES.map((s) => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelStyle}>Amount ($)</label>
-                      <input type="number" min="0" placeholder="0" className={fieldStyle} value={oppAmount} onChange={(e) => setOppAmount(e.target.value)} />
-                    </div>
-                    <div className="col-span-4">
-                      <label className={labelStyle}>Close Date</label>
-                      <input type="date" className={fieldStyle} value={oppCloseDate} onChange={(e) => setOppCloseDate(e.target.value)} />
-                    </div>
                   </div>
                 )}
               </div>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, X, Mail, Phone, Globe, Calendar, Star, Send, Building2,
   Target, Users, BarChart3, FileDown, MailOpen, Lock, ThumbsUp,
-  Mouse, Briefcase, Pencil, CalendarDays, ChevronDown, ChevronUp, Paperclip, Trash2,
+  Mouse, Pencil, CalendarDays, ChevronDown, ChevronUp, Paperclip, Trash2,
   RefreshCw, Sparkles, Filter, CheckCircle2, UserCheck, Plus, ExternalLink, History as HistoryIcon, Megaphone, Info,
   type LucideIcon,
 } from "lucide-react";
@@ -69,6 +69,7 @@ const activityMeta: Record<string, { label: string; color: string; icon: LucideI
   EMAIL_REPLIED: { label: "Replied to outreach", color: "bg-teal-500", icon: Send },
   EMAIL_BOUNCED: { label: "Email bounced", color: "bg-rose-500", icon: MailOpen },
   EMAIL_UNSUBSCRIBED: { label: "Unsubscribed", color: "bg-slate-500", icon: MailOpen },
+  CONVERTED: { label: "Converted to account/contact", color: "bg-emerald-600", icon: Target },
   CONVERTED_TO_OPPORTUNITY: { label: "Converted to opportunity", color: "bg-emerald-600", icon: Target },
   GUIDE_DOWNLOADED: { label: "Downloaded resource guide", color: "bg-indigo-500", icon: FileDown },
   WEBINAR_ATTENDED: { label: "Attended live webinar", color: "bg-amber-500", icon: Calendar },
@@ -611,19 +612,14 @@ export function LeadDetailView({
             </Button>
             
             {!converted && (
-              <>
-                <Button size="sm" onClick={() => setConvertOpen(true)} className="text-xs font-bold gap-1 bg-[#18A7B8] hover:bg-[#14929f] text-white py-1 px-2.5 h-auto border-none">
-                  <Briefcase className="h-3.5 w-3.5" /> Convert
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setConvertOpen(true)}
-                  title="Create accounts and contacts from lead record"
-                  className="text-xs font-bold gap-1 bg-green-600 hover:bg-green-700 text-white py-1 px-2.5 h-auto border-none"
-                >
-                  <Building2 className="h-3.5 w-3.5" /> Create Account & Contact
-                </Button>
-              </>
+              <Button
+                size="sm"
+                onClick={() => setConvertOpen(true)}
+                title="Create an account and contact from this lead record"
+                className="text-xs font-bold gap-1 bg-green-600 hover:bg-green-700 text-white py-1 px-2.5 h-auto border-none"
+              >
+                <Building2 className="h-3.5 w-3.5" /> Create Account & Contact
+              </Button>
             )}
           </div>
         </div>
@@ -1219,7 +1215,6 @@ export function LeadDetailView({
             status: "Converted",
             converted_account_id: result.accountId,
             converted_contact_id: result.contactId,
-            converted_opportunity_id: result.opportunityId
           }));
           setConvertOpen(false);
           toast("Lead successfully converted.", "success");
