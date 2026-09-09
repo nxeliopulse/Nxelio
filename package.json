@@ -24,9 +24,10 @@
     "test:report-schedules": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-report-schedules.mjs",
     "test:auth-errors": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs",
     "test:subscription-types": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-subscription-types.mjs",
+    "test:trial-rules": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-trial-rules.mjs",
     "test:cancellation-types": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-cancellation-types.mjs",
-    "test:stripe-price-mode": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-stripe-price-mode.mjs",
-    "test:unit": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs scripts/test-subscription-types.mjs scripts/test-cancellation-types.mjs scripts/test-idle-timeout.mjs scripts/test-stripe-price-mode.mjs"
+    "test:stripe-price-mode": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-stripe-price-mode.mjs scripts/test-trial-rules.mjs",
+    "test:unit": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs scripts/test-subscription-types.mjs scripts/test-cancellation-types.mjs scripts/test-idle-timeout.mjs scripts/test-stripe-price-mode.mjs scripts/test-trial-rules.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
