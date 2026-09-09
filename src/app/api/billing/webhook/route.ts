@@ -69,7 +69,14 @@ async function upsertFromSubscription(sub: Stripe.Subscription, checkoutSessionI
       status:               mapStripeStatus(sub.status),
       current_period_start: new Date(item.current_period_start * 1000).toISOString(),
       current_period_end:   new Date(item.current_period_end * 1000).toISOString(),
-      trial_ends_at:        sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+      // Only overwrite the trial end when Stripe actually supplies one.
+      // Stripe reports trial_end = null for every subscription it doesn't
+      // consider trialing, and blindly writing that null erased the date the
+      // signup trigger had set — leaving rows with status='trialing' and no
+      // end date at all. The expiry guard in 0126_secure_billing_rpcs.sql
+      // requires `trial_ends_at IS NOT NULL` to block, so such a row is a
+      // trial that never expires. Omitting the key leaves the column alone.
+      ...(sub.trial_end ? { trial_ends_at: new Date(sub.trial_end * 1000).toISOString() } : {}),
       stripe_customer_id:   customerId(sub),
       stripe_subscription_id: sub.id,
       cancel_at_period_end: sub.cancel_at_period_end,
