@@ -1,0 +1,146 @@
+-- ============================================================================
+-- 0162 — Billing reconciler cron (documentation + re-schedule instructions)
+--
+-- No schema changes. This file records an incident and the SQL that repairs
+-- the pg_cron job behind it, because that job was created by hand and exists
+-- in no migration.
+--
+-- ── What happened ──────────────────────────────────────────────────────────
+-- On 2026-09-07, 11 of 14 `active` subscriptions had a `current_period_end`
+-- 7-15 days in the past and had never been topped up. Root cause: the Stripe
+-- webhook endpoint
+--
+--     we_1TxNFiCRKbhmPQVVTrWZHYjX  ("whimsical-voyage-snapshot")
+--       -> https://nxelio.vercel.app/api/billing/webhook
+--       status: disabled          (created 2026-07-26, re-enabled 2026-09-07)
+--
+-- was in Stripe's `disabled` state. A disabled endpoint receives NOTHING —
+-- not a 400, not a retry — so every renewal event since it went dark was
+-- dropped on Stripe's side. Corroborating evidence:
+--
+--   * credit_ledger contained ZERO rows of operation_type='cycle_reset',
+--     ever. No renewal has ever been processed by this database.
+--   * stripe_processed_events held 85 rows, all stamped 2026-08-31, and
+--     included test_helpers.test_clock.* events — a local `stripe listen`
+--     session, never production traffic.
+--   * The route itself was healthy the whole time: POST with a bad signature
+--     returned 400 {"error":"Invalid signature"} as designed.
+--
+-- The application code was not at fault. invoice.paid and
+-- customer.subscription.updated were both handled correctly, and the
+-- `invoice.parent.subscription_details.subscription` / item-level
+-- `current_period_start` field paths match the endpoint's pinned API version
+-- (2026-06-24.dahlia).
+--
+-- Sharpest single illustration: at 2026-09-05T23:59 a complete checkout fired
+-- 15 events in Stripe (checkout.session.completed, customer.subscription
+-- .created, invoice.paid, ...). None of them appear in
+-- stripe_processed_events. The workspace row for that signup exists anyway,
+-- because /checkout-return syncs synchronously on the success redirect. That
+-- is precisely why new signups looked healthy while renewals — which have no
+-- redirect and depend entirely on the webhook — silently stopped.
+--
+-- ── Second destination on the same URL ─────────────────────────────────────
+-- The same URL also has a v2 event destination:
+--
+--     ed_test_61V6lD59Q7KL3psZd16V5nXlLBSQBLHhMF1ByPKXg8gK
+--       name: whimsical-voyage-thin    event_payload: thin
+--       created 2026-07-26T08:17:43 — one second after the snapshot one,
+--       so the same setup action created both.
+--
+-- It does NOT appear in `GET /v1/webhook_endpoints`; thin/v2 destinations are
+-- only listed by `GET /v2/core/event_destinations`. Worth knowing, because the
+-- v1 list disagreeing with the dashboard is otherwise very confusing.
+--
+-- It is inert for this outage: all 24 of its subscribed events are
+-- v1.billing.meter.* / v2.commerce.* / v2.core.* account and meter events, and
+-- not one is a subscription or invoice event. It is still a latent hazard —
+-- it has its own signing secret and a thin payload shape, so any delivery it
+-- ever makes would fail signature verification at this route and 400. This app
+-- uses neither v2 accounts nor billing meters, so deleting it loses nothing.
+--
+-- ── The orphaned job ───────────────────────────────────────────────────────
+-- pg_cron jobid 2 ('reset-monthly-credits', hourly) had been calling
+--   https://nxelio.vercel.app/api/cron/reset-monthly-credits
+-- which did not exist, so it 404ed every hour since it was created. That
+-- route now exists as a reconciler: it reads Stripe as the source of truth
+-- and repairs drifted rows. It does NOT renew on its own 30-day clock —
+-- three of the drifted rows were already canceled in Stripe, and a naive
+-- renewer would have granted them a fresh month of credits.
+--
+-- The job still needs re-creating, because it sends no Authorization header
+-- and the route (correctly) fails closed with 401 without one.
+--
+-- ── Re-schedule it (run by hand, with the real secret) ─────────────────────
+-- Set BILLING_CRON_SECRET in Vercel first, or reuse OUTREACH_CRON_SECRET —
+-- the route accepts either. Then, as a Supabase superuser:
+--
+--   SELECT cron.unschedule(2);   -- or cron.unschedule('reset-monthly-credits')
+--
+--   SELECT cron.schedule(
+--     'reset-monthly-credits',
+--     '17 * * * *',                        -- hourly, off the top of the hour
+--     $$
+--     SELECT net.http_post(
+--       url     := 'https://nxelio.vercel.app/api/cron/reset-monthly-credits',
+--       headers := jsonb_build_object(
+--         'Content-Type', 'application/json',
+--         'Authorization', 'Bearer YOUR_BILLING_CRON_SECRET'
+--       ),
+--       body    := '{}'::jsonb
+--     );
+--     $$
+--   );
+--
+-- Verify the current state of the job at any time with:
+--   SELECT jobid, jobname, schedule, active, command FROM cron.job;
+--   SELECT jobid, status, return_message, start_time
+--     FROM cron.job_run_details ORDER BY start_time DESC LIMIT 20;
+--
+-- Check the route by hand without writing anything (?dryRun=1 reports only):
+--   curl -H "Authorization: Bearer $BILLING_CRON_SECRET" \
+--     "https://nxelio.vercel.app/api/cron/reset-monthly-credits?dryRun=1"
+--
+-- ── Also required, and not fixable from SQL ────────────────────────────────
+-- 1. DONE 2026-09-07: we_1TxNFiCRKbhmPQVVTrWZHYjX now reads status=enabled.
+--    This reconciler closes gaps within the hour; the webhook closes them in
+--    seconds and remains the primary path.
+-- 2. STILL OPEN: confirm that endpoint's signing secret matches
+--    STRIPE_WEBHOOK_SECRET in Vercel. If it does not, every delivery returns
+--    400 and Stripe disables the endpoint again — the same outage from a
+--    different cause. Being enabled is not proof: no event has fired since it
+--    was re-enabled, so delivery is still unverified.
+--
+--    Prove it with a benign event rather than waiting for a renewal. Send a
+--    test `customer.updated` from the destination's dashboard page: the route
+--    ignores unhandled types but still records every verified event, so
+--
+--      SELECT event_id, event_type, processed_at
+--        FROM stripe_processed_events ORDER BY processed_at DESC LIMIT 5;
+--
+--    gaining a fresh row proves the signature verified. No row means the
+--    secret is wrong. Do NOT probe with invoice.paid — a subscription_cycle
+--    invoice grants real credits.
+-- 3. Consider deleting the thin destination described above.
+--
+-- ── Backfilling the 15 rows this outage broke ─────────────────────────────
+-- Stripe does not retro-deliver missed events, so re-enabling the endpoint
+-- does not repair the existing rows. Run:
+--
+--   npm run reconcile:subscriptions               (dry run — prints the diff)
+--   npm run reconcile:subscriptions -- --confirm  (applies it)
+--
+-- It uses the same decision function and the same RPCs as the cron route, so
+-- the approved diff is exactly what the hourly job will maintain from then on.
+-- ============================================================================
+
+-- Intentionally no DDL. reset_subscription_cycle() and
+-- sync_subscription_from_stripe() already exist (0124 and 0126/0150) and the
+-- reconciler calls them unchanged, so it inherits their row locking, their
+-- ledger writes, and their idempotency.
+--
+-- Note for whoever runs this: migrations in this project have been applied by
+-- hand, so a migration file is not proof a function is live in the database.
+-- reset_subscription_cycle() in particular had never executed even once.
+-- scripts/reconcile-subscriptions.mjs preflights for it before writing.
+SELECT 1;

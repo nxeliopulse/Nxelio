@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "reconcile:subscriptions": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs scripts/reconcile-subscriptions.mjs",
     "test:ai-builder": "npx tsx scripts/test-ai-builder-resolver.mjs",
     "test:ai-planner": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-intent-planner.mjs",
     "test:ai-agents": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-ai-agents.mjs",
