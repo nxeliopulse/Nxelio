@@ -9,6 +9,13 @@ import {
 } from "@/lib/queries/subscriptions";
 import { mapStripeStatus } from "@/lib/queries/subscription-types";
 import { stripe, PRICE_ID_TO_PLAN, PLAN_CREDITS, PLAN_LEADS } from "@/lib/stripe";
+import {
+  RECONCILE_STATUSES,
+  hasPeriodAdvanced,
+  shouldRefillCycle,
+  stripeCustomerIdOf,
+  resolvePlanFromPriceId,
+} from "@/lib/subscription-reconcile-rules";
 import type Stripe from "stripe";
 
 /**
@@ -32,21 +39,23 @@ import type Stripe from "stripe";
  * as-is. That is what makes running it on a schedule safe.
  */
 
-/** Mirrors resolvePlan() in the webhook route. Duplicated deliberately rather
- *  than refactoring the live payment path for a background job — the webhook
- *  handles real charges and is left untouched. If the price map or plan
- *  shape ever changes, BOTH copies need the change. */
+/** Thin adapters over the unit-tested pure rules in
+ *  @/lib/subscription-reconcile-rules. Every decision lives there so it can
+ *  be tested without the Next runtime; this file only does I/O. */
 function resolvePlan(
   sub: Stripe.Subscription
 ): { planId: PlanId; billingInterval: BillingInterval; priceId: string } | null {
-  const priceId = sub.items.data[0]?.price.id ?? "";
-  const mapped = PRICE_ID_TO_PLAN[priceId];
-  if (!mapped) return null;
-  return { planId: mapped.planId as PlanId, billingInterval: mapped.interval as BillingInterval, priceId };
+  const r = resolvePlanFromPriceId(sub.items.data[0]?.price.id, PRICE_ID_TO_PLAN);
+  if (!r) return null;
+  return {
+    planId: r.planId as PlanId,
+    billingInterval: r.billingInterval as BillingInterval,
+    priceId: r.priceId,
+  };
 }
 
 function customerIdOf(sub: Stripe.Subscription): string {
-  return typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+  return stripeCustomerIdOf(sub.customer);
 }
 
 async function resolveWorkspace(sub: Stripe.Subscription): Promise<string | null> {
@@ -87,7 +96,7 @@ export async function reconcileStaleSubscriptions(limit = 50): Promise<Reconcile
   const { data: stale, error } = await admin
     .from("subscriptions")
     .select("workspace_id, stripe_subscription_id, current_period_end, credits_remaining")
-    .in("status", ["active", "trialing", "past_due"])
+    .in("status", [...RECONCILE_STATUSES])
     .lt("current_period_end", nowIso)
     .not("stripe_subscription_id", "is", null)
     .order("current_period_end", { ascending: true })
@@ -120,13 +129,7 @@ export async function reconcileStaleSubscriptions(limit = 50): Promise<Reconcile
       }
 
       const periodEnd = new Date(item.current_period_end * 1000);
-      // Compare as instants, NOT as strings. Postgres returns
-      // "2026-09-08T05:05:12+00:00" while toISOString() produces
-      // "2026-09-08T05:05:12.000Z" — for the SAME instant a string compare
-      // reaches "." vs "+" and reports the Stripe value as greater, which
-      // would refill credits on a period that never moved.
-      const storedEnd = row.current_period_end ? new Date(row.current_period_end as string).getTime() : 0;
-      const advanced = periodEnd.getTime() > storedEnd;
+      const advanced = hasPeriodAdvanced(periodEnd, row.current_period_end as string | null);
 
       const resolved = resolvePlan(sub);
       if (!resolved) {
@@ -171,7 +174,7 @@ export async function reconcileStaleSubscriptions(limit = 50): Promise<Reconcile
         // than granting a second free cycle.
         const invoiceRef = sub.latest_invoice;
         const invoiceId = typeof invoiceRef === "string" ? invoiceRef : invoiceRef?.id;
-        if (invoiceId && mapStripeStatus(sub.status) === "active") {
+        if (invoiceId && shouldRefillCycle(advanced, mapStripeStatus(sub.status))) {
           await resetCycleCredits(workspaceId, invoiceId);
           result.refilled++;
         }
