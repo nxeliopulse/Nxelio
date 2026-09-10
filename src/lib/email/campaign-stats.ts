@@ -1,5 +1,6 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { revalidatePath } from "next/cache";
 
 export interface CampaignEngagement {
@@ -36,12 +37,20 @@ interface ActivityRow {
  */
 export async function getCampaignLeadActivity(campaignId: string): Promise<LeadEngagementRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("lead_activities")
-    .select("lead_id, activity_type, created_at, leads(full_name, company_name, email)")
-    .eq("metadata->>campaign_id", campaignId)
-    .in("activity_type", ["EMAIL_SENT", "EMAIL_OPENED", "EMAIL_CLICKED", "EMAIL_REPLIED", "EMAIL_BOUNCED"])
-    .order("created_at", { ascending: true });
+  // Paged: scoped to ONE campaign, but a single send to 500 leads produces
+  // well over 1000 sent/open/click rows, so this cleared the cap routinely.
+  const { data } = await fetchAll(
+    (from, to) =>
+      supabase
+        .from("lead_activities")
+        .select("lead_id, activity_type, created_at, leads(full_name, company_name, email)")
+        .eq("metadata->>campaign_id", campaignId)
+        .in("activity_type", ["EMAIL_SENT", "EMAIL_OPENED", "EMAIL_CLICKED", "EMAIL_REPLIED", "EMAIL_BOUNCED"])
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    { label: "getCampaignLeadActivity" }
+  );
 
   const byLead = new Map<string, LeadEngagementRow>();
   for (const row of (data as unknown as ActivityRow[]) ?? []) {
@@ -80,12 +89,21 @@ export async function recomputeCampaignStats(campaignId: string): Promise<Campai
   const { data: campaign } = await db.from("campaigns").select("sent_count").eq("id", campaignId).single();
   const sent = campaign?.sent_count || 0;
 
-  const { data: actsData } = await db
-    .from("lead_activities")
-    .select("lead_id, activity_type")
-    .eq("metadata->>campaign_id", campaignId)
-    .in("activity_type", ["EMAIL_OPENED", "EMAIL_CLICKED", "EMAIL_BOUNCED", "EMAIL_REPLIED"]);
-  const acts = (actsData || []) as { lead_id: string | null; activity_type: string }[];
+  // Paged for the same reason — these rows ARE the open/click/bounce/reply
+  // rates written back onto the campaign, so a clamp under-reported every
+  // rate the user sees and acts on.
+  const { data: actsData } = await fetchAll(
+    (from, to) =>
+      db
+        .from("lead_activities")
+        .select("lead_id, activity_type")
+        .eq("metadata->>campaign_id", campaignId)
+        .in("activity_type", ["EMAIL_OPENED", "EMAIL_CLICKED", "EMAIL_BOUNCED", "EMAIL_REPLIED"])
+        .order("id")
+        .range(from, to),
+    { label: "recomputeCampaignStats activities" }
+  );
+  const acts = actsData as { lead_id: string | null; activity_type: string }[];
 
   const distinct = (type: string) =>
     new Set(acts.filter((a) => a.activity_type === type).map((a) => a.lead_id)).size;

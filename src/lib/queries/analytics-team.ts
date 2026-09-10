@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { calcWinRate } from "@/lib/analytics/overview-metrics";
 import { CLOSED_STAGES, type OpportunityStage } from "@/lib/opportunities";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
@@ -61,14 +62,23 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
   const scopedToSelf = !ctx.isAdmin && ctx.directReportIds.length === 0;
   const visibleUserIds = scopedToSelf ? [ctx.userId] : ctx.isAdmin ? null : [ctx.userId, ...ctx.directReportIds];
 
-  const { data: usersData } = await supabase.from("users").select("user_id, full_name");
-  const allUsers = (usersData as { user_id: string; full_name: string }[]) || [];
+  const { data: allUsers } = await fetchAll<{ user_id: string; full_name: string }>(
+    (from, to) => supabase.from("users").select("user_id, full_name").order("user_id").range(from, to),
+    { label: "team users" }
+  );
   const users = visibleUserIds ? allUsers.filter((u) => visibleUserIds.includes(u.user_id)) : allUsers;
 
-  let leadsQuery = supabase.from("leads").select("id, owner_id, status");
-  if (visibleUserIds) leadsQuery = leadsQuery.in("owner_id", visibleUserIds);
-  const { data: leadsData } = await leadsQuery;
-  const leads = (leadsData as { id: string; owner_id: string | null; status: string }[]) || [];
+  // Paged: the per-rep leaderboard counts are derived from these rows, so a
+  // clamp dropped whole reps' numbers rather than trimming a list.
+  // `visibleUserIds` is a small teammate list, so it stays a plain `.in()`.
+  const { data: leads } = await fetchAll<{ id: string; owner_id: string | null; status: string }>(
+    (from, to) => {
+      let q = supabase.from("leads").select("id, owner_id, status");
+      if (visibleUserIds) q = q.in("owner_id", visibleUserIds);
+      return q.order("id").range(from, to);
+    },
+    { label: "team leads" }
+  );
   const leadIds = leads.map((l) => l.id);
 
   let activities: { lead_id: string; activity_type: string }[] = [];
@@ -76,11 +86,27 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
   const oppsByOwner = new Map<string, { deal_value: number; stage: OpportunityStage }[]>();
   if (leadIds.length) {
     const [{ data: acts }, { data: meetings }] = await Promise.all([
-      supabase.from("lead_activities").select("lead_id, activity_type").in("lead_id", leadIds).in("activity_type", ["EMAIL_SENT", "EMAIL_REPLIED", "LINKEDIN_AUTO_ASK_CONTACT_INFO"]),
-      supabase.from("meetings").select("lead_id").in("lead_id", leadIds),
+      fetchAllIn(
+        leadIds,
+        (chunk, from, to) =>
+          supabase
+            .from("lead_activities")
+            .select("lead_id, activity_type")
+            .in("lead_id", chunk)
+            .in("activity_type", ["EMAIL_SENT", "EMAIL_REPLIED", "LINKEDIN_AUTO_ASK_CONTACT_INFO"])
+            .order("id")
+            .range(from, to),
+        { label: "team activities" }
+      ),
+      fetchAllIn(
+        leadIds,
+        (chunk, from, to) =>
+          supabase.from("meetings").select("lead_id").in("lead_id", chunk).order("id").range(from, to),
+        { label: "team meetings" }
+      ),
     ]);
-    activities = (acts as typeof activities) || [];
-    meetingLeadIds = new Set(((meetings as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);
+    activities = acts as typeof activities;
+    meetingLeadIds = new Set((meetings as { lead_id: string | null }[]).map((m) => m.lead_id).filter(Boolean) as string[]);
   }
   // Tasks Completed — this schema has no generic task system, only
   // per-contact and per-account task lists (contact_tasks/account_tasks),
@@ -94,10 +120,15 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
   const [{ count: contactTasksDone }, { count: accountTasksDone }] = await Promise.all([contactTasksQuery, accountTasksQuery]);
   const tasksCompleted = (contactTasksDone ?? 0) + (accountTasksDone ?? 0);
 
-  let oppsQuery = supabase.from("opportunities").select("owner_id, deal_value, stage");
-  if (visibleUserIds) oppsQuery = oppsQuery.in("owner_id", visibleUserIds);
-  const { data: oppsData } = await oppsQuery;
-  for (const o of (oppsData as { owner_id: string | null; deal_value: number; stage: OpportunityStage }[]) || []) {
+  const { data: oppsData } = await fetchAll<{ owner_id: string | null; deal_value: number; stage: OpportunityStage }>(
+    (from, to) => {
+      let q = supabase.from("opportunities").select("owner_id, deal_value, stage");
+      if (visibleUserIds) q = q.in("owner_id", visibleUserIds);
+      return q.order("id").range(from, to);
+    },
+    { label: "team opportunities" }
+  );
+  for (const o of oppsData) {
     if (!o.owner_id) continue;
     if (!oppsByOwner.has(o.owner_id)) oppsByOwner.set(o.owner_id, []);
     oppsByOwner.get(o.owner_id)!.push({ deal_value: o.deal_value, stage: o.stage });
@@ -147,9 +178,22 @@ export async function getTeamAnalytics(): Promise<TeamAnalyticsData> {
   // message on the same lead (real data: inbox_messages.direction/created_at).
   const responseTimesMinutes: number[] = [];
   if (leadIds.length) {
-    const { data: inboxData } = await supabase.from("inbox_messages").select("lead_id, direction, created_at").in("lead_id", leadIds).order("created_at", { ascending: true });
+    // `id` tiebreaker after created_at: timestamps collide on bulk-synced
+    // messages, and paging an order with ties can repeat and drop rows.
+    const { data: inboxData } = await fetchAllIn(
+      leadIds,
+      (chunk, from, to) =>
+        supabase
+          .from("inbox_messages")
+          .select("lead_id, direction, created_at")
+          .in("lead_id", chunk)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+      { label: "team inbox response times" }
+    );
     const byLead = new Map<string, { direction: string; created_at: string }[]>();
-    for (const m of (inboxData as { lead_id: string | null; direction: string; created_at: string }[]) || []) {
+    for (const m of inboxData as { lead_id: string | null; direction: string; created_at: string }[]) {
       if (!m.lead_id) continue;
       if (!byLead.has(m.lead_id)) byLead.set(m.lead_id, []);
       byLead.get(m.lead_id)!.push(m);

@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { resolveDateRangePreset, type DateRangePreset, type DateRange } from "@/lib/analytics/overview-metrics";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
 import { filterAndRecordRecommendations } from "@/lib/queries/ai-recommendations";
@@ -67,12 +68,17 @@ export async function getMeetingsAnalytics(filters: MeetingsFilters): Promise<Me
       ? { from: new Date(filters.customFrom), to: new Date(filters.customTo) }
       : resolveDateRangePreset(filters.dateRange === "custom" ? "last_30_days" : filters.dateRange, now);
 
-  const { data: meetingsData } = await supabase
-    .from("meetings")
-    .select("id, lead_id, status, created_at")
-    .gte("created_at", range.from.toISOString())
-    .lte("created_at", range.to.toISOString());
-  const meetings = (meetingsData as { id: string; lead_id: string | null; status: string; created_at: string }[]) || [];
+  const { data: meetings } = await fetchAll<{ id: string; lead_id: string | null; status: string; created_at: string }>(
+    (from, to) =>
+      supabase
+        .from("meetings")
+        .select("id, lead_id, status, created_at")
+        .gte("created_at", range.from.toISOString())
+        .lte("created_at", range.to.toISOString())
+        .order("id")
+        .range(from, to),
+    { label: "meetings analytics base" }
+  );
   const meetingLeadIds = Array.from(new Set(meetings.map((m) => m.lead_id).filter(Boolean) as string[]));
 
   let leadsById = new Map<string, { id: string; status: string; source: string | null; industry: string | null; owner_id: string | null; created_at: string; updated_at: string }>();
@@ -80,13 +86,39 @@ export async function getMeetingsAnalytics(filters: MeetingsFilters): Promise<Me
   let oppLeadIds = new Set<string>();
   if (meetingLeadIds.length) {
     const [{ data: leadRows }, { data: replyRows }, { data: oppRows }] = await Promise.all([
-      supabase.from("leads").select("id, status, source, industry, owner_id, created_at, updated_at").in("id", meetingLeadIds),
-      supabase.from("lead_activities").select("lead_id").in("lead_id", meetingLeadIds).eq("activity_type", "EMAIL_REPLIED"),
-      supabase.from("opportunities").select("lead_id").in("lead_id", meetingLeadIds),
+      fetchAllIn(
+        meetingLeadIds,
+        (chunk, from, to) =>
+          supabase
+            .from("leads")
+            .select("id, status, source, industry, owner_id, created_at, updated_at")
+            .in("id", chunk)
+            .order("id")
+            .range(from, to),
+        { label: "meetings analytics leads" }
+      ),
+      fetchAllIn(
+        meetingLeadIds,
+        (chunk, from, to) =>
+          supabase
+            .from("lead_activities")
+            .select("lead_id")
+            .in("lead_id", chunk)
+            .eq("activity_type", "EMAIL_REPLIED")
+            .order("id")
+            .range(from, to),
+        { label: "meetings analytics replies" }
+      ),
+      fetchAllIn(
+        meetingLeadIds,
+        (chunk, from, to) =>
+          supabase.from("opportunities").select("lead_id").in("lead_id", chunk).order("id").range(from, to),
+        { label: "meetings analytics opportunities" }
+      ),
     ]);
-    leadsById = new Map(((leadRows as { id: string; status: string; source: string | null; industry: string | null; owner_id: string | null; created_at: string; updated_at: string }[]) || []).map((l) => [l.id, l]));
-    repliedLeadIds = new Set(((replyRows as { lead_id: string }[]) || []).map((r) => r.lead_id));
-    oppLeadIds = new Set(((oppRows as { lead_id: string | null }[]) || []).map((o) => o.lead_id).filter(Boolean) as string[]);
+    leadsById = new Map((leadRows as { id: string; status: string; source: string | null; industry: string | null; owner_id: string | null; created_at: string; updated_at: string }[]).map((l) => [l.id, l]));
+    repliedLeadIds = new Set((replyRows as { lead_id: string }[]).map((r) => r.lead_id));
+    oppLeadIds = new Set((oppRows as { lead_id: string | null }[]).map((o) => o.lead_id).filter(Boolean) as string[]);
   }
 
   const qualifiedLeadIds = new Set(meetingLeadIds.filter((id) => {

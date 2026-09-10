@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllIn } from "@/lib/supabase/fetch-all";
 import { revalidatePath } from "next/cache";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { aiJson, aiConfigured } from "@/lib/ai/client";
@@ -89,11 +90,15 @@ export async function enrollLeads(sequenceId: string, leadIds: string[]): Promis
   let failed = 0;
   if (createdJobIds.length) {
     await processDueJobs(Math.max(25, createdJobIds.length));
-    const { data: jobRows } = await supabase
-      .from("outreach_jobs")
-      .select("status")
-      .in("id", createdJobIds);
-    for (const j of jobRows ?? []) {
+    // Chunked: one job per enrolled lead per step, so a bulk enrollment
+    // makes this id list long enough to overrun the request URL.
+    const { data: jobRows } = await fetchAllIn(
+      createdJobIds,
+      (chunk, from, to) =>
+        supabase.from("outreach_jobs").select("status").in("id", chunk).order("id").range(from, to),
+      { label: "outreach job outcomes" }
+    );
+    for (const j of jobRows as { status: string }[]) {
       if (j.status === "sent") sent++;
       else if (j.status === "failed") failed++;
     }

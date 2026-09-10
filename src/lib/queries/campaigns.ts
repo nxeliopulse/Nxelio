@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { logAudit } from "@/lib/queries/audit-log";
 import { hasConnectedOutreachChannel } from "@/lib/queries/outreach-accounts";
 import { resolveUniqueName } from "@/lib/queries/name-uniqueness";
@@ -36,14 +37,27 @@ export interface CampaignRow {
 
 export async function getCampaigns(): Promise<CampaignRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("campaigns").select("*").order("updated_at", { ascending: false });
-  return data || [];
+  const { data } = await fetchAll<CampaignRow>(
+    (from, to) =>
+      supabase
+        .from("campaigns")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to),
+    { label: "getCampaigns" }
+  );
+  return data;
 }
 
 export async function getCampaignStats() {
   const supabase = await createClient();
-  const { data } = await supabase.from("campaigns").select("status, sent_count, open_rate, reply_rate");
-  if (!data) return { active: 0, totalSent: 0, avgOpen: 0, avgReply: 0 };
+  const { data } = await fetchAll<{ status: string; sent_count: number; open_rate: number; reply_rate: number }>(
+    (from, to) =>
+      supabase.from("campaigns").select("status, sent_count, open_rate, reply_rate").order("id").range(from, to),
+    { label: "getCampaignStats" }
+  );
+  if (!data.length) return { active: 0, totalSent: 0, avgOpen: 0, avgReply: 0 };
   const active = data.filter((c) => c.status === "Active").length;
   const totalSent = data.reduce((sum, c) => sum + (c.sent_count || 0), 0);
   const activeCampaigns = data.filter((c) => c.sent_count > 0);

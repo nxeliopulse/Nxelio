@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getStageForecast, CLOSED_STAGES, STAGE_LABELS, OPPORTUNITY_STAGES, type OpportunityStage } from "@/lib/opportunities";
 import { AGING_BUCKETS, agingBucketFor, daysBetween, isStalled } from "@/lib/analytics/pipeline-metrics";
 import { calcWinRate, calcWeightedForecast, resolveDateRangePreset, type DateRangePreset, type DateRange } from "@/lib/analytics/overview-metrics";
@@ -136,12 +137,20 @@ export async function getPipelineAnalytics(filters: PipelineFilters): Promise<Pi
 
   const ownerIds = filters.owner === "all" ? null : filters.owner === "team" ? [ctx.userId, ...ctx.directReportIds] : filters.owner ? [filters.owner] : ctx.isAdmin ? null : [ctx.userId];
 
-  let query = supabase.from("opportunities").select("id, name, deal_value, stage, owner_id, account_id, company, loss_reason, source, created_at, updated_at, closed_at");
-  if (ownerIds) query = query.in("owner_id", ownerIds);
-  if (filters.stage) query = query.eq("stage", filters.stage);
-  if (filters.source) query = query.eq("source", filters.source);
-  const { data } = await query;
-  const opps = (data as OppRow[]) || [];
+  // Paged: the whole pipeline page (stage buckets, values, velocity) is
+  // computed from this one array, so a clamp understated every figure at once.
+  const { data: opps } = await fetchAll<OppRow>(
+    (from, to) => {
+      let q = supabase
+        .from("opportunities")
+        .select("id, name, deal_value, stage, owner_id, account_id, company, loss_reason, source, created_at, updated_at, closed_at");
+      if (ownerIds) q = q.in("owner_id", ownerIds);
+      if (filters.stage) q = q.eq("stage", filters.stage);
+      if (filters.source) q = q.eq("source", filters.source);
+      return q.order("id").range(from, to);
+    },
+    { label: "pipeline opportunities" }
+  );
 
   // Last-activity proxy: opportunities have no dedicated activity log of
   // their own, so `updated_at` (bumped on every edit/stage move) is the

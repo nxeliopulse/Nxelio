@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { sendEmail } from "@/lib/email/resend";
 import { substituteMergeTags } from "@/lib/email/merge-tags";
 import { parseDelay, delayToMinutes } from "@/lib/sequence-delay";
@@ -313,15 +314,34 @@ export async function processDueCampaignJobs(limit = 50): Promise<CampaignProces
     let p = repliedDomainsCache.get(campaignId);
     if (!p) {
       p = (async () => {
-        const { data: replies } = await db
-          .from("inbox_messages")
-          .select("lead_id")
-          .eq("campaign_id", campaignId)
-          .eq("direction", "inbound");
-        const leadIds = [...new Set((replies || []).map((r: { lead_id: string }) => r.lead_id).filter(Boolean))];
+        // Paged and chunked: this set SUPPRESSES sends to domains that have
+        // already replied. Clamped, replies past the first 1000 were absent
+        // from the set, so the sequence kept emailing people who were
+        // already mid-conversation — the exact thing it exists to prevent.
+        const { data: replies } = await fetchAll<{ lead_id: string }>(
+          (from, to) =>
+            db
+              .from("inbox_messages")
+              .select("lead_id")
+              .eq("campaign_id", campaignId)
+              .eq("direction", "inbound")
+              .order("id")
+              .range(from, to),
+          { label: "campaignScheduler replied leads" }
+        );
+        const leadIds = [...new Set(replies.map((r) => r.lead_id).filter(Boolean))];
         if (!leadIds.length) return new Set<string>();
-        const { data: repliedLeads } = await db.from("leads").select("email").in("id", leadIds);
-        return new Set((repliedLeads || []).map((l: { email: string | null }) => l.email?.split("@")[1]?.toLowerCase()).filter(Boolean) as string[]);
+        const { data: repliedLeads } = await fetchAllIn(
+          leadIds,
+          (chunk, from, to) =>
+            db.from("leads").select("email").in("id", chunk).order("id").range(from, to),
+          { label: "campaignScheduler replied domains" }
+        );
+        return new Set(
+          (repliedLeads as { email: string | null }[])
+            .map((l) => l.email?.split("@")[1]?.toLowerCase())
+            .filter(Boolean) as string[]
+        );
       })();
       repliedDomainsCache.set(campaignId, p);
     }

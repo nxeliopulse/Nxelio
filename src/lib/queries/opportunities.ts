@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
@@ -27,11 +28,17 @@ export async function autoCloseOverdueOpportunities(): Promise<void> {
 export async function getOpportunities(): Promise<OpportunityRow[]> {
   await autoCloseOverdueOpportunities();
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("opportunities")
-    .select("*")
-    .order("created_at", { ascending: false });
-  return (data as OpportunityRow[]) || [];
+  const { data } = await fetchAll<OpportunityRow>(
+    (from, to) =>
+      supabase
+        .from("opportunities")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to),
+    { label: "getOpportunities" }
+  );
+  return data;
 }
 
 /** A single lead's opportunities, newest-first — for the lead detail page's related list. */
@@ -77,11 +84,19 @@ export async function getOpportunitiesForLead(leadId: string): Promise<Opportuni
 /** Sibling ids (by created_at order) for the detail page's Prev/Next nav. */
 export async function getAdjacentOpportunityIds(id: string): Promise<{ prevId: string | null; nextId: string | null }> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("opportunities")
-    .select("id")
-    .order("created_at", { ascending: false });
-  const ids = ((data as { id: string }[]) || []).map((r) => r.id);
+  // Paged: prev/next navigation walks this whole ordered list, so past the
+  // cap the arrows dead-ended in the middle of the pipeline.
+  const { data } = await fetchAll<{ id: string }>(
+    (from, to) =>
+      supabase
+        .from("opportunities")
+        .select("id")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to),
+    { label: "getAdjacentOpportunityIds" }
+  );
+  const ids = data.map((r) => r.id);
   const index = ids.indexOf(id);
   if (index === -1) return { prevId: null, nextId: null };
   return {
@@ -92,8 +107,10 @@ export async function getAdjacentOpportunityIds(id: string): Promise<{ prevId: s
 
 export async function getPipelineStats(): Promise<PipelineStats> {
   const supabase = await createClient();
-  const { data } = await supabase.from("opportunities").select("deal_value, stage");
-  const rows = (data as { deal_value: number; stage: OpportunityStage }[]) || [];
+  const { data: rows } = await fetchAll<{ deal_value: number; stage: OpportunityStage }>(
+    (from, to) => supabase.from("opportunities").select("deal_value, stage").order("id").range(from, to),
+    { label: "getPipelineStats" }
+  );
 
   const open = rows.filter((r) => !CLOSED_STAGES.includes(r.stage));
   const won = rows.filter((r) => r.stage === "won");

@@ -14,6 +14,21 @@ import {
   type DateRange,
 } from "@/lib/analytics/overview-metrics";
 import { getStageForecast, CLOSED_STAGES, STAGE_LABELS, OPPORTUNITY_STAGES, type OpportunityStage } from "@/lib/opportunities";
+import { fetchAll, fetchAllIn, countRowsIn } from "@/lib/supabase/fetch-all";
+
+/** The lead columns this page's cohort query reads. Named so the paged fetch
+ *  is typed at the call rather than cast inline at every use. */
+interface CohortLead {
+  id: string;
+  status: string;
+  lead_score: number;
+  industry: string | null;
+  linkedin: string | null;
+  website_url: string | null;
+  source: string | null;
+  created_at: string;
+  owner_id: string | null;
+}
 
 // Approximation, clearly flagged: the real schema has no "buying intent"
 // field or configured priority threshold yet, so High-Priority Prospects
@@ -196,14 +211,26 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
   // ── Base lead cohort: leads created in the selected period, matching the
   // shared filters. The funnel and Total Prospects KPI both walk forward
   // from this same cohort. ─────────────────────────────────────────────────
-  let leadsQuery = supabase
-    .from("leads")
-    .select("id, status, lead_score, industry, linkedin, website_url, source, created_at, owner_id")
-    .gte("created_at", range.from.toISOString())
-    .lte("created_at", range.to.toISOString());
-  if (ownerIds) leadsQuery = leadsQuery.in("owner_id", ownerIds);
-  if (filters.industry) leadsQuery = leadsQuery.eq("industry", filters.industry);
-  if (filters.source) leadsQuery = leadsQuery.eq("source", filters.source);
+  // Built per page rather than once: paging needs a fresh builder for every
+  // range, and a Supabase builder cannot be replayed after it is awaited.
+  //
+  // This cohort used to be read unpaged, so it stopped at db-max-rows (1000)
+  // while `prevLeadsQuery` right below it counted with `head: true` and was
+  // exact. Two different ceilings on the two sides of the same comparison:
+  // once a period held more than 1000 leads the KPI, the whole funnel, and
+  // every "vs previous period" delta on this page were wrong — a flat month
+  // rendered as a steep drop purely because `leads.length` was clamped.
+  const leadsPage = (from: number, to: number) => {
+    let q = supabase
+      .from("leads")
+      .select("id, status, lead_score, industry, linkedin, website_url, source, created_at, owner_id")
+      .gte("created_at", range.from.toISOString())
+      .lte("created_at", range.to.toISOString());
+    if (ownerIds) q = q.in("owner_id", ownerIds);
+    if (filters.industry) q = q.eq("industry", filters.industry);
+    if (filters.source) q = q.eq("source", filters.source);
+    return q.order("id").range(from, to);
+  };
 
   let prevLeadsQuery = comparisonRange
     ? supabase
@@ -216,23 +243,52 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
   if (prevLeadsQuery && filters.industry) prevLeadsQuery = prevLeadsQuery.eq("industry", filters.industry);
   if (prevLeadsQuery && filters.source) prevLeadsQuery = prevLeadsQuery.eq("source", filters.source);
 
-  const [{ data: leadsData }, prevLeadsResult] = await Promise.all([
-    leadsQuery,
+  const [leadsResult, prevLeadsResult] = await Promise.all([
+    fetchAll<CohortLead>(leadsPage, { label: "analyticsOverview lead cohort" }),
     prevLeadsQuery ?? Promise.resolve({ count: null }),
   ]);
-  const leads = (leadsData as { id: string; status: string; lead_score: number; industry: string | null; linkedin: string | null; website_url: string | null; source: string | null; created_at: string; owner_id: string | null }[]) || [];
+  const leads = leadsResult.data;
   const leadIds = leads.map((l) => l.id);
   const prevLeadsCount = "count" in prevLeadsResult ? prevLeadsResult.count ?? null : null;
 
   // ── Downstream signals for this exact cohort (activities/meetings tied to
   // these lead ids), regardless of when the downstream event happened. ────
-  const [activityRes, meetingsRes, oppsForCohortRes] = leadIds.length
-    ? await Promise.all([
-        supabase.from("lead_activities").select("lead_id, activity_type").in("lead_id", leadIds).in("activity_type", [...CONTACTED_ACTIVITY_TYPES, ...REPLIED_ACTIVITY_TYPES]),
-        supabase.from("meetings").select("lead_id").in("lead_id", leadIds),
-        supabase.from("opportunities").select("id, lead_id, stage, deal_value, created_at").in("lead_id", leadIds),
-      ])
-    : [{ data: [] }, { data: [] }, { data: [] }];
+  // fetchAllIn, not a bare `.in()`: now that the cohort above is complete,
+  // `leadIds` routinely runs into the thousands, and `.in()` is serialized
+  // into the request URL — one filter holding that many uuids is tens of KB
+  // of query string and the gateway rejects it outright. It also chunks AND
+  // pages, because a few hundred leads own far more than 1000 activities.
+  const [activityRes, meetingsRes, oppsForCohortRes] = await Promise.all([
+    fetchAllIn(
+      leadIds,
+      (chunk, from, to) =>
+        supabase
+          .from("lead_activities")
+          .select("lead_id, activity_type")
+          .in("lead_id", chunk)
+          .in("activity_type", [...CONTACTED_ACTIVITY_TYPES, ...REPLIED_ACTIVITY_TYPES])
+          .order("id")
+          .range(from, to),
+      { label: "analyticsOverview cohort activities" }
+    ),
+    fetchAllIn(
+      leadIds,
+      (chunk, from, to) =>
+        supabase.from("meetings").select("lead_id").in("lead_id", chunk).order("id").range(from, to),
+      { label: "analyticsOverview cohort meetings" }
+    ),
+    fetchAllIn(
+      leadIds,
+      (chunk, from, to) =>
+        supabase
+          .from("opportunities")
+          .select("id, lead_id, stage, deal_value, created_at")
+          .in("lead_id", chunk)
+          .order("id")
+          .range(from, to),
+      { label: "analyticsOverview cohort opportunities" }
+    ),
+  ]);
 
   const activities = (activityRes.data as { lead_id: string; activity_type: string }[]) || [];
   const contactedLeadIds = new Set(activities.filter((a) => CONTACTED_ACTIVITY_TYPES.includes(a.activity_type)).map((a) => a.lead_id));
@@ -276,56 +332,67 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
   // ambiguity wrong — this two-step approach is simpler to verify).
   let ownerLeadIds: string[] | null = null;
   if (ownerIds) {
-    const { data: ownerLeadRows } = await supabase.from("leads").select("id").in("owner_id", ownerIds);
-    ownerLeadIds = ((ownerLeadRows as { id: string }[]) || []).map((r) => r.id);
+    // Paged: this is the owner scope every KPI below is filtered by, so a
+    // clamp here silently shrank the whole page rather than one tile.
+    // `ownerIds` itself is a handful of teammates, so it needs no chunking.
+    const { data: ownerLeadRows } = await fetchAll<{ id: string }>(
+      (from, to) => supabase.from("leads").select("id").in("owner_id", ownerIds).order("id").range(from, to),
+      { label: "analyticsOverview owner lead scope" }
+    );
+    ownerLeadIds = ownerLeadRows.map((r) => r.id);
   }
 
   // ── Meetings KPI (all meetings booked in-period for the owner scope, not
   // just this cohort — a meeting can be booked for a lead created earlier). ─
-  let meetingsInRangeQuery = supabase
-    .from("meetings")
-    .select("id, lead_id, status")
-    .gte("created_at", range.from.toISOString())
-    .lte("created_at", range.to.toISOString());
-  if (ownerLeadIds) meetingsInRangeQuery = meetingsInRangeQuery.in("lead_id", ownerLeadIds);
-  let prevMeetingsQuery = comparisonRange
-    ? supabase
-        .from("meetings")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", comparisonRange.from.toISOString())
-        .lte("created_at", comparisonRange.to.toISOString())
+  const meetingsInRangePage = (chunk: string[] | null, from: number, to: number) => {
+    let q = supabase
+      .from("meetings")
+      .select("id, lead_id, status")
+      .gte("created_at", range.from.toISOString())
+      .lte("created_at", range.to.toISOString());
+    if (chunk) q = q.in("lead_id", chunk);
+    return q.order("id").range(from, to);
+  };
+  // The comparison count is exact (head: true dodges the row cap) but its
+  // `.in()` scope still has to be chunked and summed, because ownerLeadIds
+  // is now the complete list and no longer quietly capped at 1000.
+  const prevMeetingsCountFor = comparisonRange
+    ? (chunk: string[] | null) => {
+        let q = supabase
+          .from("meetings")
+          .select("id", { count: "exact", head: true })
+          .gte("created_at", comparisonRange.from.toISOString())
+          .lte("created_at", comparisonRange.to.toISOString());
+        if (chunk) q = q.in("lead_id", chunk);
+        return q;
+      }
     : null;
-  if (prevMeetingsQuery && ownerLeadIds) prevMeetingsQuery = prevMeetingsQuery.in("lead_id", ownerLeadIds);
 
   // ── Replies KPI: distinct leads with a reply activity in-period + total
   // outreach delivered in-period (for the reply-rate denominator). ────────
-  let repliesQuery = supabase
-    .from("lead_activities")
-    .select("lead_id")
-    .eq("activity_type", "EMAIL_REPLIED")
-    .gte("created_at", range.from.toISOString())
-    .lte("created_at", range.to.toISOString());
-  if (ownerLeadIds) repliesQuery = repliesQuery.in("lead_id", ownerLeadIds);
-  let deliveredQuery = supabase
-    .from("lead_activities")
-    .select("lead_id")
-    .eq("activity_type", "EMAIL_SENT")
-    .gte("created_at", range.from.toISOString())
-    .lte("created_at", range.to.toISOString());
-  if (ownerLeadIds) deliveredQuery = deliveredQuery.in("lead_id", ownerLeadIds);
+  // Both of these were only ever used as `.length` — so they become exact
+  // counts. That removes the cap AND stops shipping one row per email just
+  // to count them, which on a busy workspace was the heaviest query here.
+  const activityCountFor = (activityType: string) => (chunk: string[] | null) => {
+    let q = supabase
+      .from("lead_activities")
+      .select("id", { count: "exact", head: true })
+      .eq("activity_type", activityType)
+      .gte("created_at", range.from.toISOString())
+      .lte("created_at", range.to.toISOString());
+    if (chunk) q = q.in("lead_id", chunk);
+    return q;
+  };
 
-  const [meetingsInRangeRes, prevMeetingsRes, repliesRes, deliveredRes] = await Promise.all([
-    meetingsInRangeQuery,
-    prevMeetingsQuery ?? Promise.resolve({ count: null }),
-    repliesQuery,
-    deliveredQuery,
+  const [meetingsInRangeResult, prevMeetingsCount, repliesCount, deliveredCount] = await Promise.all([
+    fetchAllIn(ownerLeadIds, meetingsInRangePage, { label: "analyticsOverview meetings in range" }),
+    prevMeetingsCountFor ? countRowsIn(ownerLeadIds, prevMeetingsCountFor) : Promise.resolve(null),
+    countRowsIn(ownerLeadIds, activityCountFor("EMAIL_REPLIED")),
+    countRowsIn(ownerLeadIds, activityCountFor("EMAIL_SENT")),
   ]);
-  const meetingsInRangeRows = (meetingsInRangeRes.data as { id: string; lead_id: string | null; status: string }[]) || [];
+  const meetingsInRangeRows = meetingsInRangeResult.data as { id: string; lead_id: string | null; status: string }[];
   const meetingsInRangeCount = meetingsInRangeRows.length;
   const meetingsCompletedCount = meetingsInRangeRows.filter((m) => m.status === "completed").length;
-  const prevMeetingsCount = "count" in prevMeetingsRes ? prevMeetingsRes.count ?? null : null;
-  const repliesCount = (repliesRes.data || []).length;
-  const deliveredCount = (deliveredRes.data || []).length;
 
   // ── Opportunities: current open snapshot (not date-filtered — "open
   // pipeline" is a point-in-time total, not tied to when deals were
@@ -337,42 +404,63 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
   // today's stage on opportunities that already existed by the comparison
   // window's end — i.e. "how much of today's total is genuinely new since
   // then." Flagged here since it's an approximation, not a true snapshot. ──
-  let openOppsQuery = supabase.from("opportunities").select("id, deal_value, stage, created_at").not("stage", "in", `(${CLOSED_STAGES.join(",")})`);
-  if (ownerIds) openOppsQuery = openOppsQuery.in("owner_id", ownerIds);
-  if (filters.campaignId) openOppsQuery = openOppsQuery.eq("campaign_id", filters.campaignId);
-  if (filters.segmentId) openOppsQuery = openOppsQuery.eq("segment_id", filters.segmentId);
-  if (filters.stage) openOppsQuery = openOppsQuery.eq("stage", filters.stage);
+  // All four are paged: each one is summed or bucketed in JS below, so a
+  // clamp understated Open Pipeline, Weighted Forecast, Win Rate and
+  // Closed-Won Revenue together. `ownerIds` is a small teammate list, so it
+  // stays a plain `.in()`.
+  const openOppsPage = (from: number, to: number) => {
+    let q = supabase
+      .from("opportunities")
+      .select("id, deal_value, stage, created_at")
+      .not("stage", "in", `(${CLOSED_STAGES.join(",")})`);
+    if (ownerIds) q = q.in("owner_id", ownerIds);
+    if (filters.campaignId) q = q.eq("campaign_id", filters.campaignId);
+    if (filters.segmentId) q = q.eq("segment_id", filters.segmentId);
+    if (filters.stage) q = q.eq("stage", filters.stage);
+    return q.order("id").range(from, to);
+  };
 
-  let closedOppsQuery = supabase
-    .from("opportunities")
-    .select("id, deal_value, stage, closed_at")
-    .in("stage", CLOSED_STAGES)
-    .gte("closed_at", range.from.toISOString())
-    .lte("closed_at", range.to.toISOString());
-  if (ownerIds) closedOppsQuery = closedOppsQuery.in("owner_id", ownerIds);
-  if (filters.campaignId) closedOppsQuery = closedOppsQuery.eq("campaign_id", filters.campaignId);
-  if (filters.segmentId) closedOppsQuery = closedOppsQuery.eq("segment_id", filters.segmentId);
+  const closedOppsPage = (from: number, to: number) => {
+    let q = supabase
+      .from("opportunities")
+      .select("id, deal_value, stage, closed_at")
+      .in("stage", CLOSED_STAGES)
+      .gte("closed_at", range.from.toISOString())
+      .lte("closed_at", range.to.toISOString());
+    if (ownerIds) q = q.in("owner_id", ownerIds);
+    if (filters.campaignId) q = q.eq("campaign_id", filters.campaignId);
+    if (filters.segmentId) q = q.eq("segment_id", filters.segmentId);
+    return q.order("id").range(from, to);
+  };
 
-  let prevClosedOppsQuery = comparisonRange
-    ? supabase
-        .from("opportunities")
-        .select("id, deal_value, stage, closed_at")
-        .in("stage", CLOSED_STAGES)
-        .gte("closed_at", comparisonRange.from.toISOString())
-        .lte("closed_at", comparisonRange.to.toISOString())
+  const prevClosedOppsPage = comparisonRange
+    ? (from: number, to: number) => {
+        let q = supabase
+          .from("opportunities")
+          .select("id, deal_value, stage, closed_at")
+          .in("stage", CLOSED_STAGES)
+          .gte("closed_at", comparisonRange.from.toISOString())
+          .lte("closed_at", comparisonRange.to.toISOString());
+        if (ownerIds) q = q.in("owner_id", ownerIds);
+        return q.order("id").range(from, to);
+      }
     : null;
-  if (prevClosedOppsQuery && ownerIds) prevClosedOppsQuery = prevClosedOppsQuery.in("owner_id", ownerIds);
 
   // All opportunities (any stage) — for the Pipeline-by-Stage chart and Top
   // Campaigns table, which need every stage, not just open/closed buckets.
-  let allOppsQuery = supabase.from("opportunities").select("id, deal_value, stage, campaign_id, created_at");
-  if (ownerIds) allOppsQuery = allOppsQuery.in("owner_id", ownerIds);
+  const allOppsPage = (from: number, to: number) => {
+    let q = supabase.from("opportunities").select("id, deal_value, stage, campaign_id, created_at");
+    if (ownerIds) q = q.in("owner_id", ownerIds);
+    return q.order("id").range(from, to);
+  };
 
   const [openOppsRes, closedOppsRes, prevClosedOppsRes, allOppsRes] = await Promise.all([
-    openOppsQuery,
-    closedOppsQuery,
-    prevClosedOppsQuery ?? Promise.resolve({ data: [] }),
-    allOppsQuery,
+    fetchAll(openOppsPage, { label: "analyticsOverview open opportunities" }),
+    fetchAll(closedOppsPage, { label: "analyticsOverview closed opportunities" }),
+    prevClosedOppsPage
+      ? fetchAll(prevClosedOppsPage, { label: "analyticsOverview prev closed opportunities" })
+      : Promise.resolve({ data: [] as unknown[], error: null, truncated: false }),
+    fetchAll(allOppsPage, { label: "analyticsOverview all opportunities" }),
   ]);
   const openOpps = (openOppsRes.data as { id: string; deal_value: number; stage: OpportunityStage; created_at: string }[]) || [];
   const closedOpps = (closedOppsRes.data as { id: string; deal_value: number; stage: OpportunityStage; closed_at: string }[]) || [];
@@ -412,8 +500,16 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
   });
 
   // ── Active Campaigns KPI ─────────────────────────────────────────────────
-  const { data: campaignsData } = await supabase.from("campaigns").select("id, campaign_name, status, sent_count, reply_rate, bounce_rate");
-  const campaigns = (campaignsData as { id: string; campaign_name: string; status: string; sent_count: number; reply_rate: number; bounce_rate: number }[]) || [];
+  const { data: campaignsData } = await fetchAll<{ id: string; campaign_name: string; status: string; sent_count: number; reply_rate: number; bounce_rate: number }>(
+    (from, to) =>
+      supabase
+        .from("campaigns")
+        .select("id, campaign_name, status, sent_count, reply_rate, bounce_rate")
+        .order("id")
+        .range(from, to),
+    { label: "analyticsOverview campaigns" }
+  );
+  const campaigns = campaignsData;
   const activeCampaigns = campaigns.filter((c) => c.status === "Active");
   const pausedCampaigns = campaigns.filter((c) => c.status === "Paused");
   // "Needs attention": sending but bouncing heavily, or high volume with zero replies.
@@ -528,29 +624,61 @@ async function buildTopCampaigns(
   if (campaigns.length === 0) return [];
   const campaignIds = campaigns.map((c) => c.id);
 
+  // All three feed Set/Map lookups below, so a clamp on any of them silently
+  // zeroed rows in the Top Campaigns table: an unfetched enrollment made a
+  // campaign look empty, and an unfetched reply/meeting made it look inert.
   const [{ data: enrollments }, { data: replyActivities }, { data: meetingRows }] = await Promise.all([
-    supabase.from("campaign_enrollments").select("campaign_id, lead_id").in("campaign_id", campaignIds),
-    supabase.from("lead_activities").select("lead_id, metadata").eq("activity_type", "EMAIL_REPLIED"),
-    supabase.from("meetings").select("lead_id"),
+    fetchAllIn(
+      campaignIds,
+      (chunk, from, to) =>
+        supabase
+          .from("campaign_enrollments")
+          .select("campaign_id, lead_id")
+          .in("campaign_id", chunk)
+          .order("id")
+          .range(from, to),
+      { label: "topCampaigns enrollments" }
+    ),
+    fetchAll<{ lead_id: string }>(
+      (from, to) =>
+        supabase
+          .from("lead_activities")
+          .select("lead_id, metadata")
+          .eq("activity_type", "EMAIL_REPLIED")
+          .order("id")
+          .range(from, to),
+      { label: "topCampaigns replies" }
+    ),
+    fetchAll<{ lead_id: string | null }>(
+      (from, to) => supabase.from("meetings").select("lead_id").order("id").range(from, to),
+      { label: "topCampaigns meetings" }
+    ),
   ]);
-  const enrollmentRows = (enrollments as { campaign_id: string; lead_id: string }[]) || [];
+  const enrollmentRows = enrollments as { campaign_id: string; lead_id: string }[];
   const leadIdsByCampaign = new Map<string, Set<string>>();
   for (const e of enrollmentRows) {
     if (!leadIdsByCampaign.has(e.campaign_id)) leadIdsByCampaign.set(e.campaign_id, new Set());
     leadIdsByCampaign.get(e.campaign_id)!.add(e.lead_id);
   }
 
-  const replyLeadIds = new Set(((replyActivities as { lead_id: string }[]) || []).map((r) => r.lead_id));
+  const replyLeadIds = new Set(replyActivities.map((r) => r.lead_id));
   // Meetings have no campaign_id of their own — attribute a meeting back to
   // a campaign via the enrolled-lead set built above (same approach as
   // replies/qualified below), rather than leaving this permanently at 0.
-  const meetingLeadIdSet = new Set(((meetingRows as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);
+  const meetingLeadIdSet = new Set(meetingRows.map((m) => m.lead_id).filter(Boolean) as string[]);
 
   let leadStatusByCampaign = new Map<string, { id: string; status: string }[]>();
   const allEnrolledLeadIds = Array.from(new Set(enrollmentRows.map((e) => e.lead_id)));
   if (allEnrolledLeadIds.length) {
-    const { data: leadRows } = await supabase.from("leads").select("id, status").in("id", allEnrolledLeadIds);
-    const byId = new Map(((leadRows as { id: string; status: string }[]) || []).map((l) => [l.id, l]));
+    // Chunked + paged: every enrolled lead across all campaigns lands here,
+    // which is easily thousands of ids in one `.in()`.
+    const { data: leadRows } = await fetchAllIn(
+      allEnrolledLeadIds,
+      (chunk, from, to) =>
+        supabase.from("leads").select("id, status").in("id", chunk).order("id").range(from, to),
+      { label: "topCampaigns enrolled lead statuses" }
+    );
+    const byId = new Map((leadRows as { id: string; status: string }[]).map((l) => [l.id, l]));
     leadStatusByCampaign = new Map(
       Array.from(leadIdsByCampaign.entries()).map(([campaignId, ids]) => [campaignId, Array.from(ids).map((id) => byId.get(id)).filter(Boolean) as { id: string; status: string }[]])
     );

@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { sendEmail } from "@/lib/email/resend";
 import { getOnboarding } from "@/lib/queries/onboarding";
 import { logAudit } from "@/lib/queries/audit-log";
@@ -51,10 +52,19 @@ const SELECT = "id, title, description, start_at, end_at, location, join_url, pr
 
 export async function getMeetings(): Promise<MeetingRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("meetings")
-    .select(SELECT)
-    .order("start_at", { ascending: true });
+  // Row type left to inference: the embedded `lead:leads(...)` relation is
+  // typed as an array by PostgREST but used as a single object here, which
+  // is why the existing cast on the return is `as unknown as MeetingRow[]`.
+  const { data, error } = await fetchAll(
+    (from, to) =>
+      supabase
+        .from("meetings")
+        .select(SELECT)
+        .order("start_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    { label: "getMeetings" }
+  );
   if (error) {
     // Table not migrated yet (0031) or query error — fail soft so the page renders.
     return [];

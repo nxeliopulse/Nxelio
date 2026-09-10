@@ -1,6 +1,7 @@
 "use server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { getCampaignById, type CampaignRow } from "@/lib/queries/campaigns";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
@@ -101,16 +102,52 @@ async function runCampaignSend(supabase: SupabaseClient, campaign: CampaignRow, 
   // need an email; LinkedIn-first sequences need a LinkedIn URL.
   const reqCol = step1.channel === "linkedin" ? "linkedin" : "email";
   let matchedLeads: StepLead[] = [];
+  // Paged and chunked at both steps. This is the audience an actual send is
+  // queued against, so the row cap did not just misreport it — launching a
+  // campaign to a 5000-member segment read 1000 members, resolved 1000
+  // leads, queued 1000 jobs and reported success. The other 4000 recipients
+  // were never contacted and nothing anywhere said so.
   if (campaign.segment_id) {
-    const { data: members } = await supabase.from("segment_members").select("lead_id").eq("segment_id", campaign.segment_id);
-    const ids = (members || []).map((m) => m.lead_id).filter(Boolean);
+    const { data: members } = await fetchAll<{ lead_id: string }>(
+      (from, to) =>
+        supabase
+          .from("segment_members")
+          .select("lead_id")
+          .eq("segment_id", campaign.segment_id)
+          .order("id")
+          .range(from, to),
+      { label: "campaignSend segment members" }
+    );
+    const ids = members.map((m) => m.lead_id).filter(Boolean);
     if (ids.length) {
-      const { data } = await supabase.from("leads").select(AUDIENCE_COLS).in("id", ids).not(reqCol, "is", null).neq(reqCol, "");
-      matchedLeads = (data as unknown as StepLead[]) || [];
+      const { data } = await fetchAllIn(
+        ids,
+        (chunk, from, to) =>
+          supabase
+            .from("leads")
+            .select(AUDIENCE_COLS)
+            .in("id", chunk)
+            .not(reqCol, "is", null)
+            .neq(reqCol, "")
+            .order("id")
+            .range(from, to),
+        { label: "campaignSend segment audience" }
+      );
+      matchedLeads = data as unknown as StepLead[];
     }
   } else {
-    const { data } = await supabase.from("leads").select(AUDIENCE_COLS).not(reqCol, "is", null).neq(reqCol, "");
-    matchedLeads = (data as unknown as StepLead[]) || [];
+    const { data } = await fetchAll(
+      (from, to) =>
+        supabase
+          .from("leads")
+          .select(AUDIENCE_COLS)
+          .not(reqCol, "is", null)
+          .neq(reqCol, "")
+          .order("id")
+          .range(from, to),
+      { label: "campaignSend workspace audience" }
+    );
+    matchedLeads = data as unknown as StepLead[];
   }
 
   if (matchedLeads.length === 0) {

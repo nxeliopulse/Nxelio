@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { CLOSED_STAGES, type OpportunityStage } from "@/lib/opportunities";
 import { isStalled } from "@/lib/analytics/pipeline-metrics";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
@@ -94,21 +95,47 @@ export async function getAccountsAnalytics(filters: AccountsFilters = {}): Promi
   await getAnalyticsContext();
   const now = new Date();
 
-  let accountsQuery = supabase.from("accounts").select("id, account_name, account_owner, industry, employees, created_at, updated_at");
-  if (filters.industry) accountsQuery = accountsQuery.eq("industry", filters.industry);
-  const { data: accountsData } = await accountsQuery;
-  const accounts = (accountsData as AccountRow[]) || [];
+  const { data: accounts } = await fetchAll<AccountRow>(
+    (from, to) => {
+      let q = supabase
+        .from("accounts")
+        .select("id, account_name, account_owner, industry, employees, created_at, updated_at");
+      if (filters.industry) q = q.eq("industry", filters.industry);
+      return q.order("id").range(from, to);
+    },
+    { label: "account analytics accounts" }
+  );
   const accountIds = accounts.map((a) => a.id);
 
   let contacts: { id: string; account_id: string | null; updated_at: string }[] = [];
   let opps: OppRow[] = [];
   if (accountIds.length) {
     const [{ data: contactsData }, { data: oppsData }] = await Promise.all([
-      supabase.from("contacts").select("id, account_id, updated_at").in("account_id", accountIds),
-      supabase.from("opportunities").select("id, account_id, deal_value, stage, updated_at").in("account_id", accountIds),
+      fetchAllIn(
+        accountIds,
+        (chunk, from, to) =>
+          supabase
+            .from("contacts")
+            .select("id, account_id, updated_at")
+            .in("account_id", chunk)
+            .order("id")
+            .range(from, to),
+        { label: "account analytics contacts" }
+      ),
+      fetchAllIn(
+        accountIds,
+        (chunk, from, to) =>
+          supabase
+            .from("opportunities")
+            .select("id, account_id, deal_value, stage, updated_at")
+            .in("account_id", chunk)
+            .order("id")
+            .range(from, to),
+        { label: "account analytics opportunities" }
+      ),
     ]);
-    contacts = (contactsData as typeof contacts) || [];
-    opps = (oppsData as OppRow[]) || [];
+    contacts = contactsData as typeof contacts;
+    opps = oppsData as OppRow[];
   }
 
   const contactsByAccount = new Map<string, typeof contacts>();

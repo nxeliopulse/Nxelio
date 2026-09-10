@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { resolveDateRangePreset, calcReplyRate, calcQualificationRate, type DateRangePreset } from "@/lib/analytics/overview-metrics";
 import { CLOSED_STAGES, type OpportunityStage } from "@/lib/opportunities";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
@@ -71,18 +72,30 @@ export async function getSegmentsAnalytics(filters: SegmentsFilters): Promise<Se
     ? { from: new Date(filters.customFrom), to: new Date(filters.customTo) }
     : resolveDateRangePreset(filters.dateRange === "custom" ? "last_30_days" : filters.dateRange, now);
 
-  let segmentsQuery = supabase.from("segments").select("id, segment_name, segment_type, status");
-  if (filters.segmentType) segmentsQuery = segmentsQuery.eq("segment_type", filters.segmentType);
-  if (filters.status) segmentsQuery = segmentsQuery.eq("status", filters.status);
-
-  const [{ data: segmentsData }, { data: membersData }, { data: campaignsData }] = await Promise.all([
-    segmentsQuery,
-    supabase.from("segment_members").select("segment_id, lead_id"),
-    supabase.from("campaigns").select("id, campaign_name, segment_id, status"),
+  // segment_members is the biggest table on this page by far — one row per
+  // lead per segment, so a handful of segments over a few thousand leads
+  // clears the cap immediately. Clamped, every segment's size and every rate
+  // derived from its membership was understated.
+  const [{ data: segments }, { data: members }, { data: campaigns }] = await Promise.all([
+    fetchAll<{ id: string; segment_name: string; segment_type: string; status: string }>(
+      (from, to) => {
+        let q = supabase.from("segments").select("id, segment_name, segment_type, status");
+        if (filters.segmentType) q = q.eq("segment_type", filters.segmentType);
+        if (filters.status) q = q.eq("status", filters.status);
+        return q.order("id").range(from, to);
+      },
+      { label: "segment analytics segments" }
+    ),
+    fetchAll<{ segment_id: string; lead_id: string }>(
+      (from, to) => supabase.from("segment_members").select("segment_id, lead_id").order("id").range(from, to),
+      { label: "segment analytics members" }
+    ),
+    fetchAll<{ id: string; campaign_name: string; segment_id: string | null; status: string }>(
+      (from, to) =>
+        supabase.from("campaigns").select("id, campaign_name, segment_id, status").order("id").range(from, to),
+      { label: "segment analytics campaigns" }
+    ),
   ]);
-  const segments = (segmentsData as { id: string; segment_name: string; segment_type: string; status: string }[]) || [];
-  const members = (membersData as { segment_id: string; lead_id: string }[]) || [];
-  const campaigns = (campaignsData as { id: string; campaign_name: string; segment_id: string | null; status: string }[]) || [];
 
   const leadIdsBySegment = new Map<string, Set<string>>();
   for (const m of members) {
@@ -103,15 +116,51 @@ export async function getSegmentsAnalytics(filters: SegmentsFilters): Promise<Se
   const oppsByLead = new Map<string, { deal_value: number; stage: OpportunityStage }[]>();
   if (allMemberLeadIds.length) {
     const [{ data: leads }, { data: acts }, { data: meetings }, { data: opps }] = await Promise.all([
-      supabase.from("leads").select("id, status, do_not_contact, email_opt_out").in("id", allMemberLeadIds),
-      supabase.from("lead_activities").select("lead_id, activity_type").in("lead_id", allMemberLeadIds).in("activity_type", ["EMAIL_SENT", "EMAIL_REPLIED"]),
-      supabase.from("meetings").select("lead_id").in("lead_id", allMemberLeadIds),
-      supabase.from("opportunities").select("lead_id, deal_value, stage").in("lead_id", allMemberLeadIds),
+      fetchAllIn(
+        allMemberLeadIds,
+        (chunk, from, to) =>
+          supabase
+            .from("leads")
+            .select("id, status, do_not_contact, email_opt_out")
+            .in("id", chunk)
+            .order("id")
+            .range(from, to),
+        { label: "segment analytics leads" }
+      ),
+      fetchAllIn(
+        allMemberLeadIds,
+        (chunk, from, to) =>
+          supabase
+            .from("lead_activities")
+            .select("lead_id, activity_type")
+            .in("lead_id", chunk)
+            .in("activity_type", ["EMAIL_SENT", "EMAIL_REPLIED"])
+            .order("id")
+            .range(from, to),
+        { label: "segment analytics activities" }
+      ),
+      fetchAllIn(
+        allMemberLeadIds,
+        (chunk, from, to) =>
+          supabase.from("meetings").select("lead_id").in("lead_id", chunk).order("id").range(from, to),
+        { label: "segment analytics meetings" }
+      ),
+      fetchAllIn(
+        allMemberLeadIds,
+        (chunk, from, to) =>
+          supabase
+            .from("opportunities")
+            .select("lead_id, deal_value, stage")
+            .in("lead_id", chunk)
+            .order("id")
+            .range(from, to),
+        { label: "segment analytics opportunities" }
+      ),
     ]);
-    leadRows = (leads as typeof leadRows) || [];
-    activities = (acts as typeof activities) || [];
-    meetingLeadIds = new Set(((meetings as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);
-    for (const o of (opps as { lead_id: string | null; deal_value: number; stage: OpportunityStage }[]) || []) {
+    leadRows = leads as typeof leadRows;
+    activities = acts as typeof activities;
+    meetingLeadIds = new Set((meetings as { lead_id: string | null }[]).map((m) => m.lead_id).filter(Boolean) as string[]);
+    for (const o of opps as { lead_id: string | null; deal_value: number; stage: OpportunityStage }[]) {
       if (!o.lead_id) continue;
       if (!oppsByLead.has(o.lead_id)) oppsByLead.set(o.lead_id, []);
       oppsByLead.get(o.lead_id)!.push({ deal_value: o.deal_value, stage: o.stage });

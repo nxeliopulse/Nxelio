@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllIn } from "@/lib/supabase/fetch-all";
 import { isSuppressed } from "@/lib/segments";
 import type { LeadRow } from "@/lib/queries/leads";
 import { checkLeadEligibility, type CampaignEligibilityRules, type EligibilityResult } from "./eligibility-core";
@@ -77,12 +78,23 @@ export async function summarizeAudienceEligibility(
 
   const activeMap = new Set<string>();
   if (campaignId) {
-    const { data: active } = await supabase
-      .from("campaign_enrollments")
-      .select("lead_id")
-      .in("lead_id", leadIds)
-      .in("status", ["active", "scheduled", "pending_review"]);
-    for (const row of active || []) activeMap.add(row.lead_id);
+    // Chunked and paged: `leadIds` is the whole audience being screened, so
+    // one `.in()` overran the URL limit, and a clamped result left already-
+    // enrolled leads out of activeMap — which is what stops a lead being
+    // enrolled into the same campaign twice.
+    const { data: active } = await fetchAllIn(
+      leadIds,
+      (chunk, from, to) =>
+        supabase
+          .from("campaign_enrollments")
+          .select("lead_id")
+          .in("lead_id", chunk)
+          .in("status", ["active", "scheduled", "pending_review"])
+          .order("id")
+          .range(from, to),
+      { label: "eligibility active enrollments" }
+    );
+    for (const row of active as { lead_id: string }[]) activeMap.add(row.lead_id);
   }
 
   let suppressed = 0;

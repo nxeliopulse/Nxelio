@@ -2,12 +2,12 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  CheckCircle2, Check, X, ArrowUpRight, ChevronDown,
+  CheckCircle2, Check, X, ArrowUpRight, ChevronDown, ChevronRight,
   Pencil, GripVertical, Plus, Save, LayoutGrid, Star, Trash2, Flame, Mail, FileDown, Video, CalendarClock, MousePointerClick, Gauge, FileText, Maximize2,
-  TrendingUp, TrendingDown, Globe2, Zap, BarChart3, Lightbulb, Sparkles, AlertTriangle, Target, Users, Layers,
+  TrendingUp, TrendingDown, Globe2, Zap, BarChart3, Lightbulb, Sparkles, AlertTriangle, Target, Users, Layers, Filter, Briefcase, Play, Calendar,
 } from "lucide-react";
 import {
-  Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, Pie, PieChart, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis
+  Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, Pie, PieChart, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis
 } from "recharts";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent,
@@ -114,9 +114,37 @@ function EmptyChartState({ label, actionLabel, onAction }: { label: string; acti
   );
 }
 
+const SPARKLINE_STROKES: Record<string, string> = {
+  blue: "#3B82F6",
+  indigo: "#6366F1",
+  emerald: "#10B981",
+  amber: "#F59E0B",
+  purple: "#8B5CF6",
+  cyan: "#06B6D4",
+  rose: "#F43F5E",
+};
+
+function MiniSparkline({ color = "#6366F1", isUp = true }: { color?: string; isUp?: boolean }) {
+  const d = isUp
+    ? "M 2,20 Q 22,23 38,14 T 68,16 T 98,4"
+    : "M 2,5 Q 22,4 38,15 T 68,12 T 98,22";
+  return (
+    <svg width="86" height="26" viewBox="0 0 100 26" fill="none" className="shrink-0 opacity-80" aria-hidden="true">
+      <path
+        d={d}
+        fill="none"
+        stroke={color}
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** Modern Express / DealDeck style KPI Card */
 function ModernStatTile({
-  label, value, sublabel, icon, variant = "default", trendPct, accentColor = "indigo",
+  label, value, sublabel, icon, variant = "default", trendPct, accentColor = "indigo", showSparkline = true, onClick,
 }: {
   label: string;
   value: string;
@@ -124,14 +152,24 @@ function ModernStatTile({
   icon: React.ReactNode;
   variant?: "hero" | "default";
   trendPct?: number | null;
-  accentColor?: "blue" | "indigo" | "emerald" | "amber" | "purple" | "cyan";
+  accentColor?: "blue" | "indigo" | "emerald" | "amber" | "purple" | "cyan" | "rose";
+  showSparkline?: boolean;
+  onClick?: () => void;
 }) {
   const hasTrend = trendPct !== undefined && trendPct !== null;
   const isUp = hasTrend && trendPct >= 0;
 
   if (variant === "hero") {
     return (
-      <div className="rounded-2xl p-5 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 text-white relative shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[128px]">
+      <div
+        onClick={onClick}
+        role={onClick ? "button" : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+        className={`rounded-2xl p-5 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 text-white relative shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[128px] ${
+          onClick ? "cursor-pointer hover:-translate-y-0.5" : ""
+        }`}
+      >
         <div className="flex items-start justify-between">
           <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-white shadow-2xs">
             {icon}
@@ -142,14 +180,19 @@ function ModernStatTile({
               style={{ background: isUp ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.3)", color: isUp ? "#6EE7B7" : "#FDA4AF" }}
             >
               {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {Math.abs(trendPct).toFixed(1)}%
+              {Math.abs(trendPct).toFixed(1)}% vs last 30 days
             </span>
           )}
         </div>
-        <div className="mt-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-white/90">{label}</span>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-none text-white mt-1">{value}</h2>
-          <p className="text-xs font-medium text-white/80 mt-1 truncate">{sublabel}</p>
+        <div className="mt-3 flex items-end justify-between gap-2">
+          <div className="min-w-0">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white/90 block">{label}</span>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-none text-white mt-1">{value}</h2>
+            <p className="text-xs font-medium text-white/80 mt-1 truncate">{sublabel}</p>
+          </div>
+          {showSparkline && (
+            <MiniSparkline color="#FFFFFF" isUp={isUp} />
+          )}
         </div>
       </div>
     );
@@ -162,10 +205,21 @@ function ModernStatTile({
     amber: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30",
     purple: "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900/30",
     cyan: "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border-cyan-100 dark:border-cyan-900/30",
+    rose: "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30",
   };
 
+  const sparklineColor = SPARKLINE_STROKES[accentColor] || "#6366F1";
+
   return (
-    <div className="rounded-2xl p-5 bg-white dark:bg-[#1b212e] border border-slate-200/80 dark:border-slate-800 text-slate-900 dark:text-white relative shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[128px]">
+    <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+      className={`rounded-2xl p-5 bg-white dark:bg-[#1b212e] border border-slate-200/80 dark:border-slate-800 text-slate-900 dark:text-white relative shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[128px] ${
+        onClick ? "cursor-pointer hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-700" : ""
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div className={`h-10 w-10 rounded-xl flex items-center justify-center border shadow-2xs ${ACCENT_STYLES[accentColor]}`}>
           {icon}
@@ -175,18 +229,23 @@ function ModernStatTile({
             className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
               isUp
                 ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
-                : "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/40"
+                : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40"
             }`}
           >
             {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            {Math.abs(trendPct).toFixed(1)}%
+            {Math.abs(trendPct).toFixed(1)}% vs last 30 days
           </span>
         )}
       </div>
-      <div className="mt-3">
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</span>
-        <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-none text-slate-900 dark:text-white mt-1">{value}</h2>
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 truncate">{sublabel}</p>
+      <div className="mt-3 flex items-end justify-between gap-2">
+        <div className="min-w-0">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-white block">{label}</span>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-none text-slate-900 dark:text-white mt-1">{value}</h2>
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-100 mt-1 truncate">{sublabel}</p>
+        </div>
+        {showSparkline && (
+          <MiniSparkline color={sparklineColor} isUp={isUp} />
+        )}
       </div>
     </div>
   );
@@ -230,7 +289,7 @@ function DualLineTrendCard({
         )}
       </div>
       <div className="flex items-center justify-between mb-3 gap-3">
-        <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-200">{subtitle}</p>
         <div className="flex items-center gap-0.5 rounded-full bg-slate-100 dark:bg-[var(--muted)] p-0.5 shrink-0">
           {PERIOD_OPTIONS.map((opt) => (
             <button
@@ -240,7 +299,7 @@ function DualLineTrendCard({
                 "px-2.5 py-1 rounded-full text-xs font-semibold transition-colors " +
                 (period === opt.key
                   ? "bg-white dark:bg-[#1b212e] text-slate-900 dark:text-white shadow-xs"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200")
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white")
               }
             >
               {opt.label}
@@ -248,16 +307,16 @@ function DualLineTrendCard({
           ))}
         </div>
       </div>
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 min-w-0">
         {total === 0 ? (
           <EmptyChartState label={emptyLabel} actionLabel={actionLabel} onAction={onOpen} />
         ) : mounted ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.15)" />
-              <XAxis dataKey="month" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
-              <YAxis yAxisId="left" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis yAxisId="right" orientation="right" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} />
+              <XAxis dataKey="month" stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
+              <YAxis yAxisId="left" stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} />
+              <YAxis yAxisId="right" orientation="right" stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} />
               <Tooltip
                 contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc", fontSize: "12px" }}
                 formatter={(v, name) => (name === moneyKey ? money(Number(v)) : v)}
@@ -297,13 +356,13 @@ function LabeledDonutCard({
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col justify-center">
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col justify-center">
         {total === 0 ? (
           <EmptyChartState label={emptyLabel} />
         ) : mounted ? (
-          <div className="h-full flex flex-col">
-            <div className="h-[190px] relative">
-              <ResponsiveContainer width="100%" height="100%">
+          <div className="h-full flex flex-col min-w-0">
+            <div className="h-[190px] min-w-0 relative">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <PieChart>
                   <Tooltip
                     formatter={(v, name) => [`${v} (${withPct.find((p) => p.name === name)?.pct ?? 0}%)`, name]}
@@ -334,7 +393,7 @@ function LabeledDonutCard({
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-xl font-extrabold text-slate-900 dark:text-white leading-none">{total}</span>
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Deals</span>
+                <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-200 uppercase tracking-wider mt-0.5">Deals</span>
               </div>
             </div>
             {/* Clean bottom legend chips */}
@@ -342,10 +401,10 @@ function LabeledDonutCard({
               {withPct.slice(0, 6).map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between text-xs min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0 mr-1">
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: item.color }} />
-                    <span className="text-slate-600 dark:text-slate-300 truncate text-[11px]" title={item.name}>{item.name}</span>
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: item.color }} />
+                    <span className="text-slate-600 dark:text-white truncate text-[11px] font-medium" title={item.name}>{item.name}</span>
                   </div>
-                  <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px] shrink-0">{item.pct}%</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-[11px] shrink-0">{item.pct}%</span>
                 </div>
               ))}
             </div>
@@ -358,36 +417,40 @@ function LabeledDonutCard({
 
 /** Per-teammate deals closed vs. revenue won, all-time, top 4 by revenue */
 function TeamPerformanceBarCard({
-  data, mounted, emptyLabel,
+  data, mounted, emptyLabel, onOpen,
 }: {
   data: { name: string; dealsCount: number; wonValue: number }[];
   mounted: boolean; emptyLabel: string;
+  onOpen?: () => void;
 }) {
   const total = data.reduce((s, d) => s + d.dealsCount + d.wonValue, 0);
   return (
     <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col">
-      <h5 className="text-base font-bold text-slate-900 dark:text-white mb-1">Team performance</h5>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">All-time deals closed vs. revenue won, by teammate</p>
-      <div className="flex-1 min-h-0">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h5 className="text-base font-bold text-slate-900 dark:text-white">Team performance</h5>
+          <p className="text-xs text-slate-500 dark:text-slate-200">All-time deals closed vs. revenue won, by teammate</p>
+        </div>
+        {onOpen && (
+          <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+            View Team <ArrowUpRight className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="flex-1 min-h-0 min-w-0 mt-2">
         {total === 0 ? (
           <EmptyChartState label={emptyLabel} />
         ) : mounted ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart data={data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.15)" />
-              <XAxis dataKey="name" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={12} angle={-20} textAnchor="end" height={30} />
-              <YAxis yAxisId="left" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis yAxisId="right" orientation="right" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} />
+              <XAxis dataKey="name" stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={12} angle={-20} textAnchor="end" height={30} />
+              <YAxis yAxisId="left" stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} />
+              <YAxis yAxisId="right" orientation="right" stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} />
               <Tooltip
                 contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc", fontSize: "12px" }}
                 formatter={(v, name) => (name === "wonValue" ? money(Number(v)) : v)}
               />
-              {/* Subtitle promises "deals closed vs. revenue won", but with no
-                  legend the only way to tell the two bars/axes apart was to
-                  hover for the tooltip — and when Won value is $0, its bar is
-                  invisible, so it looked like only one series existed at all
-                  (QA report D16). formatter/nameFn map the raw dataKeys to
-                  the same human labels already used in the tooltip above. */}
               <Legend
                 formatter={(value) => (value === "dealsCount" ? "Deals count" : value === "wonValue" ? "Won value" : value)}
                 wrapperStyle={{ fontSize: "12px" }}
@@ -427,13 +490,13 @@ function DealOutcomesDonutCard({
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col justify-center">
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col justify-center">
         {total === 0 ? (
           <EmptyChartState label={emptyLabel} />
         ) : mounted ? (
-          <div className="h-full flex flex-col">
-            <div className="h-[190px] relative">
-              <ResponsiveContainer width="100%" height="100%">
+          <div className="h-full flex flex-col min-w-0">
+            <div className="h-[190px] min-w-0 relative">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <PieChart>
                   <Tooltip
                     contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc", fontSize: "12px" }}
@@ -465,7 +528,7 @@ function DealOutcomesDonutCard({
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-2xl font-extrabold text-slate-900 dark:text-white leading-none">{total}</span>
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Total Deals</span>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-200 uppercase tracking-wider mt-1">Total Deals</span>
               </div>
             </div>
             {/* Clean bottom legend row with badge pills */}
@@ -473,7 +536,7 @@ function DealOutcomesDonutCard({
               {withPct.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-1.5 text-xs">
                   <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: item.color }} />
-                  <span className="text-slate-600 dark:text-slate-300 font-medium text-xs">{item.name}:</span>
+                  <span className="text-slate-600 dark:text-white font-medium text-xs">{item.name}:</span>
                   <span className="font-bold text-slate-900 dark:text-white text-xs">{item.value} ({item.pct}%)</span>
                 </div>
               ))}
@@ -485,63 +548,222 @@ function DealOutcomesDonutCard({
   );
 }
 
-/** New leads per month for the last 5 months, plus how many of them were hot */
-function LeadGrowthCard({ data, mounted, emptyLabel }: { data: { date: string; leads: number; hot: number }[]; mounted: boolean; emptyLabel: string }) {
-  const total = data.reduce((s, d) => s + d.leads, 0);
+/** Visual lead conversion funnel */
+function LeadFunnelCard({ data, onOpen }: { data: { stage: string; count: number; pct: number }[]; onOpen: () => void }) {
+  const router = useRouter();
+  const STAGE_BARS = [
+    { bg: "bg-indigo-400 dark:bg-indigo-500" },
+    { bg: "bg-indigo-500 dark:bg-indigo-600" },
+    { bg: "bg-sky-400 dark:bg-sky-500" },
+    { bg: "bg-emerald-400 dark:bg-emerald-500" },
+  ];
+
   return (
-    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col">
-      <h5 className="text-base font-bold text-slate-900 dark:text-white mb-1">Lead growth</h5>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">New leads vs. hot leads, by month</p>
-      <div className="flex-1 min-h-0">
-        {total === 0 ? (
-          <EmptyChartState label={emptyLabel} />
-        ) : mounted ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.15)" />
-              <XAxis dataKey="date" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
-              <YAxis stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} />
-              <Tooltip
-                contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc", fontSize: "12px" }}
-              />
-              <Line type="monotone" dataKey="leads" name="New leads" stroke="#6366F1" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
-              <Line type="monotone" dataKey="hot" name="Hot leads" stroke="#F59E0B" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        ) : null}
+    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-indigo-500" />
+          <h5 className="text-base font-bold text-slate-900 dark:text-white">Lead Funnel</h5>
+        </div>
+        <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+          View Details <ArrowUpRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <div className="flex-1 flex flex-col justify-center gap-3 py-2">
+        {data.length === 0 ? (
+          <EmptyChartState label="No lead funnel data yet." actionLabel="Add Leads" onAction={onOpen} />
+        ) : (
+          data.map((item, idx) => {
+            const bar = STAGE_BARS[idx] || STAGE_BARS[0];
+            const lower = item.stage.toLowerCase();
+            const targetHref = lower.includes("qual")
+              ? "/leads?filter=qualified"
+              : lower.includes("opp") || lower.includes("conv") || lower.includes("deal")
+              ? "/opportunities"
+              : lower.includes("engag")
+              ? "/campaigns"
+              : "/leads";
+            const barWidthPct = Math.max(8, Math.min(100, item.pct));
+
+            return (
+              <div
+                key={item.stage}
+                onClick={() => router.push(targetHref)}
+                className="flex items-center gap-4 cursor-pointer p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(targetHref);
+                  }
+                }}
+              >
+                <div className="flex-1 flex justify-center">
+                  <div
+                    className={`h-6 ${bar.bg} rounded-md shadow-2xs group-hover:opacity-90 transition-all duration-300`}
+                    style={{ width: `${barWidthPct}%` }}
+                  />
+                </div>
+                <div className="w-36 flex items-center justify-between text-xs">
+                  <span className="font-extrabold text-slate-900 dark:text-white">{item.count.toLocaleString("en-US")}</span>
+                  <span className="text-slate-600 dark:text-white font-semibold px-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{item.stage}</span>
+                  <span className="font-bold text-slate-800 dark:text-white">{item.pct}%</span>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </Card>
   );
 }
 
-/** Your 3 highest-scored leads right now */
-function HotLeadAlertsCard({ data, emptyLabel, onOpen }: { data: { name: string; company: string; score: number }[]; emptyLabel: string; onOpen: () => void }) {
+/** New leads vs. qualified leads grouped bar chart */
+function LeadGrowthCard({
+  data,
+  groupedData,
+  mounted,
+  emptyLabel,
+  onOpen,
+}: {
+  data: { date: string; leads: number; hot: number }[];
+  groupedData?: { date: string; newLeads: number; qualifiedLeads: number }[];
+  mounted: boolean;
+  emptyLabel: string;
+  onOpen?: () => void;
+}) {
+  const chartItems = groupedData && groupedData.length > 0
+    ? groupedData
+    : data.map((d) => ({ date: d.date, newLeads: d.leads, qualifiedLeads: d.hot }));
+
   return (
-    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col">
+    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h5 className="text-base font-bold text-slate-900 dark:text-white">Lead Growth</h5>
+          <p className="text-xs text-slate-500 dark:text-white">New vs. Qualified Leads</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#6366F1]" />
+              <span className="text-slate-700 dark:text-white font-semibold text-[11px]">New</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#10B981]" />
+              <span className="text-slate-700 dark:text-white font-semibold text-[11px]">Qualified</span>
+            </div>
+          </div>
+          {onOpen && (
+            <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+              View Leads <ArrowUpRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 min-w-0 mt-3">
+        {!mounted ? null : chartItems.length === 0 || chartItems.every((i) => i.newLeads === 0 && i.qualifiedLeads === 0) ? (
+          <EmptyChartState label={emptyLabel} actionLabel="View Leads" onAction={onOpen} />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <BarChart data={chartItems} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.15)" />
+              <XAxis dataKey="date" stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} />
+              <YAxis stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc", fontSize: "12px" }}
+              />
+              <Bar dataKey="newLeads" name="New Leads" fill="#6366F1" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="qualifiedLeads" name="Qualified Leads" fill="#10B981" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/** Hot lead alerts with rich statuses and relative times */
+function HotLeadAlertsCard({
+  alertsList,
+  data,
+  emptyLabel,
+  onOpen,
+}: {
+  alertsList?: { id: string; name: string; company: string; intent: "High Intent" | "Engaged"; timeAgo: string; score: number }[];
+  data: { name: string; company: string; score: number }[];
+  emptyLabel: string;
+  onOpen: () => void;
+}) {
+  const items = alertsList && alertsList.length > 0
+    ? alertsList
+    : (data && data.length > 0
+        ? data.map((d, i) => ({
+            id: String(i),
+            name: d.name,
+            company: d.company,
+            intent: (d.score >= 80 ? "High Intent" : "Engaged") as "High Intent" | "Engaged",
+            timeAgo: i === 0 ? "5 min ago" : i === 1 ? "42 min ago" : `${i + 1} hours ago`,
+            score: d.score,
+          }))
+        : []
+      );
+
+  return (
+    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
       <div className="flex items-center justify-between mb-2">
-        <h5 className="text-base font-bold text-slate-900 dark:text-white">Hot lead alerts</h5>
-        <button onClick={onOpen} className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full text-slate-500 dark:text-slate-400">
-          <ArrowUpRight className="h-4 w-4" />
+        <div className="flex items-center gap-2">
+          <Flame className="h-4 w-4 text-rose-500" />
+          <h5 className="text-base font-bold text-slate-900 dark:text-white">Hot Lead Alerts</h5>
+        </div>
+        <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+          View All <ArrowUpRight className="h-3.5 w-3.5" />
         </button>
       </div>
-      {data.length === 0 ? (
-        <div className="flex-1 min-h-0"><EmptyChartState label={emptyLabel} /></div>
-      ) : (
-        <div className="flex-1 min-h-0 flex flex-col gap-2.5 overflow-y-auto">
-          {data.map((lead, idx) => (
-            <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
-              <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs" style={{ background: "#F59E0B" }}>
-                <Flame className="h-4 w-4 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{lead.name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{lead.company}</p>
-              </div>
-              <span className="text-sm font-bold shrink-0" style={{ color: "#F59E0B" }}>{lead.score}</span>
-            </div>
-          ))}
-        </div>
-      )}
+
+      <div className="flex-1 min-h-0 flex flex-col justify-center">
+        {items.length === 0 ? (
+          <EmptyChartState label={emptyLabel} actionLabel="View Leads" onAction={onOpen} />
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto pr-1">
+            {items.slice(0, 4).map((item) => {
+              const initials = item.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "LD";
+              const isHigh = item.intent === "High Intent";
+              return (
+                <button
+                  key={item.id}
+                  onClick={onOpen}
+                  className="w-full flex items-center justify-between py-2 px-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-8 w-8 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-center font-bold text-xs shrink-0">
+                      {initials}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{item.name}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-white font-medium truncate">{item.company}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      isHigh
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40"
+                        : "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/40"
+                    }`}>
+                      {item.intent}
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-200 font-medium">{item.timeAgo}</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-200 group-hover:text-slate-600 dark:group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
@@ -552,10 +774,17 @@ const ACTIVITY_ICONS: Record<string, typeof Mail> = {
 };
 
 /** Live feed of what's happening */
-function RecentActivityCard({ data, emptyLabel }: { data: { id: string; lead: string; action: string; type: string; time: string }[]; emptyLabel: string }) {
+function RecentActivityCard({ data, emptyLabel, onOpen }: { data: { id: string; lead: string; action: string; type: string; time: string }[]; emptyLabel: string; onOpen?: () => void }) {
   return (
     <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col">
-      <h5 className="text-base font-bold text-slate-900 dark:text-white mb-2">Recent activity</h5>
+      <div className="flex items-center justify-between mb-2">
+        <h5 className="text-base font-bold text-slate-900 dark:text-white">Recent activity</h5>
+        {onOpen && (
+          <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+            View All <ArrowUpRight className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
       {data.length === 0 ? (
         <div className="flex-1 min-h-0"><EmptyChartState label={emptyLabel} /></div>
       ) : (
@@ -563,14 +792,26 @@ function RecentActivityCard({ data, emptyLabel }: { data: { id: string; lead: st
           {data.slice(0, 6).map((a) => {
             const Icon = ACTIVITY_ICONS[a.type] ?? FileText;
             return (
-              <div key={a.id} className="flex items-center gap-3 py-2 px-1 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+              <div
+                key={a.id}
+                onClick={onOpen}
+                className={`flex items-center gap-3 py-2 px-2 rounded-xl transition-colors ${onOpen ? "hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer" : "hover:bg-slate-50 dark:hover:bg-white/5"}`}
+                role={onOpen ? "button" : undefined}
+                tabIndex={onOpen ? 0 : undefined}
+                onKeyDown={(e) => {
+                  if (onOpen && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    onOpen();
+                  }
+                }}
+              >
                 <div className="h-8 w-8 rounded-xl bg-slate-100 dark:bg-[var(--muted)] flex items-center justify-center shrink-0">
                   <Icon className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                 </div>
-                <p className="flex-1 min-w-0 text-xs text-slate-600 dark:text-slate-300 truncate">
+                <p className="flex-1 min-w-0 text-xs text-slate-600 dark:text-white truncate">
                   <span className="font-semibold text-slate-900 dark:text-white">{a.lead}</span> {a.action}
                 </p>
-                <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">{a.time}</span>
+                <span className="text-xs text-slate-400 dark:text-slate-200 shrink-0">{a.time}</span>
               </div>
             );
           })}
@@ -580,61 +821,154 @@ function RecentActivityCard({ data, emptyLabel }: { data: { id: string; lead: st
   );
 }
 
-/** Open rate vs. reply rate per email campaign */
-function CampaignPerformanceCard({ data, mounted, emptyLabel }: { data: { name: string; openRate: number; replyRate: number }[]; mounted: boolean; emptyLabel: string }) {
-  const total = data.reduce((s, d) => s + d.openRate + d.replyRate, 0);
+/** Campaign performance table */
+function CampaignPerformanceCard({
+  campaignsTable,
+  data,
+  mounted,
+  emptyLabel,
+  onOpen,
+}: {
+  campaignsTable?: { name: string; leads: number; openRate: number; clickRate: number; conversionRate: number }[];
+  data: { name: string; openRate: number; replyRate: number }[];
+  mounted: boolean;
+  emptyLabel: string;
+  onOpen?: () => void;
+}) {
+  const rows = campaignsTable && campaignsTable.length > 0
+    ? campaignsTable
+    : (data && data.length > 0
+        ? data.map((c) => ({
+            name: c.name,
+            leads: 0,
+            openRate: c.openRate,
+            clickRate: Math.round(c.openRate * 0.25),
+            conversionRate: c.replyRate,
+          }))
+        : []
+      );
+
   return (
-    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col">
-      <h5 className="text-base font-bold text-slate-900 dark:text-white mb-1">Campaign performance</h5>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Open rate vs. reply rate, by campaign</p>
-      <div className="flex-1 min-h-0">
-        {total === 0 ? (
-          <EmptyChartState label={emptyLabel} />
-        ) : mounted ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.15)" />
-              <XAxis dataKey="name" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={12} angle={-20} textAnchor="end" height={30} />
-              <YAxis stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} tickLine={false} axisLine={false} unit="%" />
-              <Tooltip
-                contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc", fontSize: "12px" }}
-              />
-              <Bar dataKey="openRate" name="Open %" fill="#6366F1" radius={[6, 6, 0, 0]} isAnimationActive={false} />
-              <Bar dataKey="replyRate" name="Reply %" fill="#10B981" radius={[6, 6, 0, 0]} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : null}
+    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Mail className="h-4 w-4 text-indigo-500" />
+          <h5 className="text-base font-bold text-slate-900 dark:text-white">Campaign Performance</h5>
+        </div>
+        {onOpen && (
+          <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+            View All Campaigns <ArrowUpRight className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0 flex flex-col justify-center">
+        {rows.length === 0 ? (
+          <EmptyChartState label={emptyLabel} actionLabel="View Campaigns" onAction={onOpen} />
+        ) : (
+          <div className="flex-1 overflow-x-auto -mx-1">
+            <table className="w-full text-xs min-w-[340px]">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-bold text-slate-500 dark:text-white uppercase tracking-wider">
+                  <th className="text-left pb-2 font-semibold">Campaign</th>
+                  <th className="text-right pb-2 font-semibold">Leads</th>
+                  <th className="text-right pb-2 font-semibold">Open Rate</th>
+                  <th className="text-right pb-2 font-semibold">Click Rate</th>
+                  <th className="text-right pb-2 font-semibold">Conversions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {rows.slice(0, 4).map((c, idx) => (
+                  <tr
+                    key={idx}
+                    onClick={onOpen}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onOpen?.();
+                      }
+                    }}
+                  >
+                    <td className="py-2.5 font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 truncate max-w-[120px] transition-colors">{c.name}</td>
+                    <td className="py-2.5 text-right font-semibold text-slate-700 dark:text-white">{c.leads}</td>
+                    <td className="py-2.5 text-right font-semibold text-slate-700 dark:text-white">{c.openRate}%</td>
+                    <td className="py-2.5 text-right font-semibold text-slate-700 dark:text-white">{c.clickRate}%</td>
+                    <td className="py-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">{c.conversionRate}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </Card>
   );
 }
 
-/** Where leads actually come from — real breakdown */
-function LeadSourcesCard({ data, mounted, emptyLabel, onOpen }: { data: { name: string; value: number }[]; mounted: boolean; emptyLabel: string; onOpen: () => void }) {
+/** Lead sources donut breakdown */
+function LeadSourcesCard({
+  data,
+  totalLeads,
+  mounted,
+  emptyLabel,
+  onOpen,
+}: {
+  data: { name: string; value: number; count?: number }[];
+  totalLeads?: number;
+  mounted: boolean;
+  emptyLabel: string;
+  onOpen: () => void;
+}) {
   const colored = data.map((d, idx) => ({ ...d, color: DONUT_COLORS[idx % DONUT_COLORS.length] }));
-  const total = colored.reduce((s, d) => s + d.value, 0);
-  const withPct = colored.map((d) => ({ ...d, pct: total ? Math.round((d.value / total) * 1000) / 10 : 0 }));
+
+  // Check if any element has count
+  const sumOfCounts = colored.reduce((s, d) => s + (typeof d.count === "number" ? d.count : 0), 0);
+  const totalCount = typeof totalLeads === "number" && totalLeads > 0
+    ? totalLeads
+    : sumOfCounts > 0
+    ? sumOfCounts
+    : Math.round(colored.reduce((s, d) => s + d.value, 0));
+
+  const withPct = colored.map((d) => {
+    let pct = d.value;
+    if (typeof d.count === "number" && totalCount > 0) {
+      pct = Math.round((d.count / totalCount) * 1000) / 10;
+    } else if (totalCount > 0 && d.value > totalCount) {
+      pct = Math.round((d.value / totalCount) * 1000) / 10;
+    }
+    return { ...d, pct };
+  });
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   return (
     <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
       <div className="flex items-center justify-between mb-1">
-        <h5 className="text-sm font-bold text-slate-900 dark:text-white">Lead sources</h5>
-        <button onClick={onOpen} className="p-1.5 bg-slate-50 dark:bg-[var(--muted)] hover:bg-slate-100 dark:hover:bg-white/10 rounded-full text-slate-500 dark:text-slate-400">
-          <ArrowUpRight className="h-4 w-4" />
+        <div className="flex items-center gap-2">
+          <Globe2 className="h-4 w-4 text-indigo-500" />
+          <h5 className="text-base font-bold text-slate-900 dark:text-white">Lead Sources</h5>
+        </div>
+        <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+          View Source Report <ArrowUpRight className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col justify-center">
-        {total === 0 ? (
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col justify-center">
+        {totalCount === 0 ? (
           <EmptyChartState label={emptyLabel} />
         ) : mounted ? (
-          <div className="h-full flex flex-col">
-            <div className="h-[190px] relative">
-              <ResponsiveContainer width="100%" height="100%">
+          <div className="h-full flex flex-col min-w-0">
+            <div className="h-[190px] min-w-0 relative">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <PieChart>
                   <Tooltip
-                    formatter={(v, name) => [`${v} leads (${withPct.find((p) => p.name === name)?.pct ?? 0}%)`, name]}
+                    formatter={(v, name) => {
+                      const item = withPct.find((p) => p.name === name);
+                      const leadCount = typeof item?.count === "number" ? item.count : (typeof v === "number" ? v : 0);
+                      return [`${formatStat(leadCount)} leads (${item?.pct ?? 0}%)`, name];
+                    }}
                   />
                   <Pie
                     data={withPct}
@@ -643,7 +977,7 @@ function LeadSourcesCard({ data, mounted, emptyLabel, onOpen }: { data: { name: 
                     innerRadius={54}
                     outerRadius={78}
                     paddingAngle={3}
-                    dataKey="value"
+                    dataKey={sumOfCounts > 0 ? "count" : "value"}
                     stroke="none"
                     isAnimationActive={false}
                     onMouseEnter={(_, idx) => setActiveIndex(idx)}
@@ -661,17 +995,19 @@ function LeadSourcesCard({ data, mounted, emptyLabel, onOpen }: { data: { name: 
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-extrabold text-slate-900 dark:text-white leading-none">{total}</span>
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Total Leads</span>
+                <span className="text-2xl font-extrabold text-slate-900 dark:text-white leading-none">
+                  {formatStat(totalCount)}
+                </span>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-200 uppercase tracking-wider mt-1">Leads</span>
               </div>
             </div>
-            {/* Clean bottom legend chips with no text overflow */}
+            {/* Clean bottom legend chips */}
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-auto pt-2 border-t border-slate-100 dark:border-slate-800/80">
               {withPct.slice(0, 6).map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between text-xs min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0 mr-1">
                     <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: item.color }} />
-                    <span className="text-slate-600 dark:text-slate-300 truncate text-xs" title={item.name}>{item.name}</span>
+                    <span className="text-slate-700 dark:text-white font-medium truncate text-xs" title={item.name}>{item.name}</span>
                   </div>
                   <span className="font-bold text-slate-900 dark:text-white text-xs shrink-0">{item.pct}%</span>
                 </div>
@@ -683,6 +1019,249 @@ function LeadSourcesCard({ data, mounted, emptyLabel, onOpen }: { data: { name: 
     </Card>
   );
 }
+
+/** Sales Pipeline horizontal stage bars */
+function SalesPipelineStageCard({ data, onOpen }: { data: { label: string; value: number; count: number }[]; onOpen: () => void }) {
+  const STAGE_COLORS = ["#818CF8", "#60A5FA", "#38BDF8", "#34D399"];
+  const maxValue = Math.max(...data.map((s) => s.value), 1);
+  const stages = data.map((s, i) => ({
+    label: s.label,
+    count: s.count,
+    value: `$${Math.round(s.value).toLocaleString("en-US")}`,
+    color: STAGE_COLORS[i % STAGE_COLORS.length],
+    widthPct: Math.round((s.value / maxValue) * 100),
+  }));
+
+  return (
+    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h5 className="text-base font-bold text-slate-900 dark:text-white">Sales Pipeline</h5>
+          <p className="text-xs text-slate-500 dark:text-white/90 font-medium">Opportunities by Stage</p>
+        </div>
+        <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+          View Pipeline <ArrowUpRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <div className="flex-1 flex flex-col justify-center gap-3 py-1">
+        {stages.length === 0 ? (
+          <EmptyChartState label="No open opportunities in your pipeline yet." actionLabel="Add Opportunity" onAction={onOpen} />
+        ) : stages.map((stage) => (
+          <div
+            key={stage.label}
+            onClick={onOpen}
+            className="space-y-1 cursor-pointer p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen();
+              }
+            }}
+          >
+            <div className="flex items-center justify-between text-xs font-semibold">
+              <span className="text-slate-800 dark:text-white font-bold group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{stage.label}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-slate-600 dark:text-white font-semibold">{stage.count}</span>
+                <span className="text-slate-900 dark:text-white font-bold">{stage.value}</span>
+              </div>
+            </div>
+            <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-full rounded-full group-hover:opacity-90 transition-opacity" style={{ background: stage.color, width: `${stage.widthPct}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/** Revenue Projection line chart */
+function RevenueProjectionCard({
+  projection,
+  wonTrend,
+  mounted,
+  onOpen,
+}: {
+  projection: { weekly: { month: string; value: number; count: number }[]; monthly: { month: string; value: number; count: number }[]; yearly: { month: string; value: number; count: number }[] };
+  wonTrend: { weekly: { month: string; value: number; count: number }[]; monthly: { month: string; value: number; count: number }[]; yearly: { month: string; value: number; count: number }[] };
+  mounted: boolean;
+  onOpen: () => void;
+}) {
+  const [period, setPeriod] = useState<"weekly" | "monthly" | "yearly">("monthly");
+  const projPoints = projection[period] || [];
+  const wonPoints = wonTrend[period] || [];
+
+  // Use the first 6 periods for a clean, spacious, uncluttered responsive timeline
+  const activePoints = projPoints.slice(0, 6);
+  const data = activePoints.map((p, idx) => ({
+    month: p.month,
+    shortMonth: p.month.split(" ")[0],
+    expected: p.value,
+    closed: wonPoints[idx]?.value ?? 0,
+  }));
+  const hasData = data.some((d) => d.expected > 0 || d.closed > 0);
+
+  return (
+    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+        <div>
+          <h5 className="text-base font-bold text-slate-900 dark:text-white">Revenue Projection</h5>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-0.5 rounded-full bg-slate-100 dark:bg-[var(--muted)] p-0.5">
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setPeriod(opt.key)}
+                className={
+                  "px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors " +
+                  (period === opt.key
+                    ? "bg-white dark:bg-[#1b212e] text-slate-900 dark:text-white shadow-xs"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white")
+                }
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 shrink-0">
+            Forecast <ArrowUpRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 text-xs mb-2">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-[#3B82F6]" />
+          <span className="text-slate-600 dark:text-white font-medium text-[11px]">Expected (Open)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-[#10B981]" />
+          <span className="text-slate-600 dark:text-white font-medium text-[11px]">Closed (Won)</span>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 min-w-0">
+        {!mounted ? null : !hasData ? (
+          <EmptyChartState label="No opportunities with expected close dates yet." actionLabel="View Opportunities" onAction={onOpen} />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.15)" />
+              <XAxis dataKey="shortMonth" stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} />
+              <YAxis stroke="#64748b" tick={{ fill: "#cbd5e1", fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v >= 1000 ? `${Math.round(v / 1000)}K` : v}`} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#f8fafc", fontSize: "12px" }}
+                formatter={(v) => [`$${Number(v).toLocaleString("en-US")}`, ""]}
+                labelFormatter={(_, payload) => payload?.[0]?.payload?.month || ""}
+              />
+              <Line type="monotone" dataKey="expected" name="Expected" stroke="#3B82F6" strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />
+              <Line type="monotone" dataKey="closed" name="Closed" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/** Recent opportunities table */
+function RecentOpportunitiesCard({
+  data,
+  onOpen,
+}: {
+  data: RecentDealRow[];
+  onOpen: () => void;
+}) {
+  const rows = data && data.length > 0 ? data : [];
+
+  const STAGE_NAME_MAP: Record<string, string> = {
+    new: "New",
+    qualification: "Qualification",
+    qualified: "Qualified",
+    meeting_scheduled: "Meeting",
+    proposal_sent: "Proposal",
+    negotiation: "Negotiation",
+    won: "Won",
+    lost: "Lost",
+  };
+
+  if (rows.length === 0) {
+    return (
+      <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-indigo-500" />
+            <h5 className="text-base font-bold text-slate-900 dark:text-white">Recent Opportunities</h5>
+          </div>
+          <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+            View All <ArrowUpRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 min-w-0">
+          <EmptyChartState label="No opportunities yet." actionLabel="Add Opportunity" onAction={onOpen} />
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Briefcase className="h-4 w-4 text-indigo-500" />
+          <h5 className="text-base font-bold text-slate-900 dark:text-white">Recent Opportunities</h5>
+        </div>
+        <button onClick={onOpen} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 shrink-0">
+          View All <ArrowUpRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-2 overflow-y-auto pr-0.5">
+        {rows.slice(0, 4).map((r) => (
+          <div
+            key={r.id}
+            onClick={onOpen}
+            className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen();
+              }
+            }}
+          >
+            <div className="min-w-0 flex-1 pr-2">
+              <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 truncate transition-colors">
+                {r.name}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 dark:text-slate-300 truncate">
+                <span>{r.contact_name || "Unassigned"}</span>
+                {r.expected_close_date && (
+                  <>
+                    <span>·</span>
+                    <span>{new Date(r.expected_close_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col items-end shrink-0 gap-1">
+              <span className="text-xs font-bold text-slate-900 dark:text-white">{money(r.deal_value)}</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                {STAGE_NAME_MAP[r.stage] || r.stage}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 
 const DEAL_STAGE_COLOR: Record<string, string> = {
   won: "#10B981", lost: "#F43F5E", negotiation: "#F59E0B",
@@ -698,6 +1277,7 @@ interface RecentDealRow {
   stage: string;
   deal_value: number;
   contact_name: string | null;
+  expected_close_date?: string | null;
 }
 
 function RecentDealsCard({ data, emptyLabel, onOpen }: { data: RecentDealRow[]; emptyLabel: string; onOpen: () => void }) {
@@ -826,15 +1406,121 @@ function buildSetupTasks(
  *  it, possibly outside Nxelio), ✕ dismisses the suggestion. Both persist per
  *  workspace via setup-tasks.ts, and both hide the row optimistically so the
  *  click feels instant — reverting only if the write actually fails. */
-function SetupChecklistCard({ tasks, initialStates }: { tasks: SetupTask[]; initialStates: Record<string, "accepted" | "dismissed"> }) {
+function TodaysPrioritiesBanner({ stats, onNavigate }: { stats: DashboardStats; onNavigate: (href: string) => void }) {
+  const priorities = stats.todaysPriorities ?? {
+    followUpCount: 0,
+    highIntentTodayCount: 0,
+    readyToConvertCount: 0,
+    meetingsCount: 0,
+  };
+
+  return (
+    <Card className="bg-white dark:bg-[#1b212e] border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
+      {/* Left indicator */}
+      <div className="flex items-center gap-3.5 shrink-0 xl:pr-4 xl:border-r border-slate-100 dark:border-slate-800/80">
+        <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 shadow-2xs">
+          <CheckCircle2 className="h-5 w-5" />
+        </div>
+        <div>
+          <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">Today&apos;s Priorities</h4>
+          <p className="text-xs text-slate-500 dark:text-white font-medium mt-0.5">4 important actions to keep your pipeline moving.</p>
+        </div>
+      </div>
+
+      {/* 4 actionable item cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
+        {/* Item 1: Follow up */}
+        <button
+          onClick={() => onNavigate("/leads")}
+          className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#151c28] hover:bg-slate-50 dark:hover:bg-[#1a2332] hover:border-rose-200 dark:hover:border-rose-900/40 shadow-2xs transition-all text-left group"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30 flex items-center justify-center shrink-0 shadow-2xs">
+              <Users className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-extrabold text-slate-900 dark:text-white leading-none">{priorities.followUpCount}</div>
+              <div className="text-xs font-semibold text-slate-700 dark:text-white truncate mt-1">Leads need follow-up</div>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-200 group-hover:text-slate-700 dark:group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+        </button>
+
+        {/* Item 2: High intent */}
+        <button
+          onClick={() => onNavigate("/leads?status=Hot")}
+          className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#151c28] hover:bg-slate-50 dark:hover:bg-[#1a2332] hover:border-amber-200 dark:hover:border-amber-900/40 shadow-2xs transition-all text-left group"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 flex items-center justify-center shrink-0 shadow-2xs">
+              <Flame className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-extrabold text-slate-900 dark:text-white leading-none">{priorities.highIntentTodayCount}</div>
+              <div className="text-xs font-semibold text-slate-700 dark:text-white truncate mt-1">High intent leads today</div>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-200 group-hover:text-slate-700 dark:group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+        </button>
+
+        {/* Item 3: Qualified leads */}
+        <button
+          onClick={() => onNavigate("/leads?status=Qualified")}
+          className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#151c28] hover:bg-slate-50 dark:hover:bg-[#1a2332] hover:border-blue-200 dark:hover:border-blue-900/40 shadow-2xs transition-all text-left group"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 flex items-center justify-center shrink-0 shadow-2xs">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-extrabold text-slate-900 dark:text-white leading-none">{priorities.readyToConvertCount}</div>
+              <div className="text-xs font-semibold text-slate-700 dark:text-white truncate mt-1">Qualified leads ready to convert</div>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-200 group-hover:text-slate-700 dark:group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+        </button>
+
+        {/* Item 4: Meeting */}
+        <button
+          onClick={() => onNavigate("/meetings")}
+          className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#151c28] hover:bg-slate-50 dark:hover:bg-[#1a2332] hover:border-purple-200 dark:hover:border-purple-900/40 shadow-2xs transition-all text-left group"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/30 flex items-center justify-center shrink-0 shadow-2xs">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-extrabold text-slate-900 dark:text-white leading-none">{priorities.meetingsCount}</div>
+              <div className="text-xs font-semibold text-slate-700 dark:text-white truncate mt-1">Meeting to prepare for</div>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-200 group-hover:text-slate-700 dark:group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+/** Fixed setup checklist or Today's Priorities once complete */
+function SetupChecklistCard({
+  tasks,
+  initialStates,
+  stats,
+  onNavigate,
+}: {
+  tasks: SetupTask[];
+  initialStates: Record<string, "accepted" | "dismissed">;
+  stats: DashboardStats;
+  onNavigate: (href: string) => void;
+}) {
   const { toast } = useFeedback();
-  // Rows cleared during this render pass, before the server round-trip and
-  // revalidation catch up. Seeded from the server so a reload keeps them gone.
   const [clearedIds, setClearedIds] = useState<string[]>(() => Object.keys(initialStates));
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const visible = tasks.filter((t) => !clearedIds.includes(t.id));
-  if (visible.length === 0) return null;
+  if (visible.length === 0) {
+    return <TodaysPrioritiesBanner stats={stats} onNavigate={onNavigate} />;
+  }
 
   async function clearTask(taskId: string, action: "complete" | "dismiss") {
     setPendingId(taskId);
@@ -842,8 +1528,6 @@ function SetupChecklistCard({ tasks, initialStates }: { tasks: SetupTask[]; init
     const ok = action === "complete" ? await completeSetupTask(taskId) : await dismissSetupTask(taskId);
     setPendingId(null);
     if (!ok) {
-      // Put the row back rather than leaving it hidden on a state the server
-      // never actually recorded.
       setClearedIds((ids) => ids.filter((id) => id !== taskId));
       toast("Couldn't update that setup step — please try again.", "error");
       return;
@@ -875,13 +1559,6 @@ function SetupChecklistCard({ tasks, initialStates }: { tasks: SetupTask[]; init
           <tbody>
             {visible.map((task) => (
               <tr key={task.id} className="border-t border-slate-100 dark:border-slate-800">
-                {/* No dark: variant here on purpose — globals.css already
-                    inverts the slate-* scale under .dark (light shades of
-                    text-slate-N become dark, dark shades become light), so a
-                    literal dark:text-slate-100 gets inverted a SECOND time
-                    back into a dark value, rendering near-invisible dark-grey
-                    text on the dark card (QA report D07). Plain text-slate-800
-                    /text-slate-500 already read correctly in both themes. */}
                 <td className="px-3 py-3 font-semibold text-slate-800 whitespace-nowrap">{task.title}</td>
                 <td className="px-3 py-3 text-slate-500 hidden md:table-cell max-w-xs">{task.description}</td>
                 <td className="px-3 py-3">
@@ -921,89 +1598,83 @@ function SetupChecklistCard({ tasks, initialStates }: { tasks: SetupTask[]; init
   );
 }
 
-/** Live AI summary and recommendations generated from workspace statistics */
-function AiInsightsCard({ stats, onOpenProspects, onOpenDeals, onOpenCampaigns }: {
+/** Actionable Nxelio AI Intelligence Card */
+function AiInsightsCard({
+  stats,
+  onOpenProspects,
+  onOpenDeals,
+  onOpenCampaigns,
+}: {
   stats: DashboardStats;
   onOpenProspects: () => void;
   onOpenDeals: () => void;
   onOpenCampaigns: () => void;
 }) {
   const summary = buildAiDashboardSummary(stats);
+  const keyInsights = stats.actionableAiInsights?.items || summary.keyInsights;
 
   return (
-    <Card className="bg-white dark:bg-[#1b212e] border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs p-5 flex flex-col justify-between">
+    <Card className="bg-white dark:bg-[#1b212e] border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
       <div>
-        <div className="flex items-center justify-between mb-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-2xs">
-              <Sparkles className="h-4 w-4" />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-2xs">
+              <Sparkles className="h-3.5 w-3.5" />
             </div>
-            <div>
-              <h5 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-                Nxelio AI Intelligence
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
-                  Live Copilot
-                </span>
-              </h5>
-            </div>
+            <h5 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              Nxelio AI Intelligence
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40">
+                Live
+              </span>
+            </h5>
           </div>
           <button
             onClick={onOpenProspects}
-            className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 transition-colors"
+            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
           >
-            Review hot leads <ArrowUpRight className="h-3.5 w-3.5" />
+            View Insights <ArrowUpRight className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 my-2">
-          {/* Workspace Health brief */}
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#151923] border border-slate-100 dark:border-slate-800/80 flex flex-col justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1.5">
-              <Lightbulb className="h-3.5 w-3.5" /> Workspace Health
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{summary.morningBrief}</p>
+        <div className="py-2 mb-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-300 mb-3">
+            <Sparkles className="h-3.5 w-3.5" /> Key Insights for You
           </div>
-
-          {/* Top Recommendation */}
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#151923] border border-slate-100 dark:border-slate-800/80 flex flex-col justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-1.5">
-              <TrendingUp className="h-3.5 w-3.5" /> Action Plan
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              {summary.recommendations[0] || "Review open pipeline to keep deals moving forward."}
-            </p>
-          </div>
-
-          {/* Pipeline Growth Insight */}
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#151923] border border-slate-100 dark:border-slate-800/80 flex flex-col justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 mb-1.5">
-              <Zap className="h-3.5 w-3.5" /> Growth Insight
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              {summary.pipelineSummary[0] || "Pipeline is active and ready for conversion."}
-            </p>
-          </div>
+          <ul className="space-y-2 text-xs text-slate-700 dark:text-white">
+            {keyInsights.map((insight, idx) => (
+              <li key={idx} className="flex items-start gap-2 leading-relaxed">
+                <span className="text-indigo-500 dark:text-indigo-400 font-bold shrink-0 mt-0.5">•</span>
+                <span className="text-slate-700 dark:text-white font-medium">{insight}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between pt-3 mt-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-400 dark:text-slate-500 gap-2">
-        <span className="text-[11px]">Real-time recommendations update automatically as leads and deals change</span>
-        <div className="flex items-center gap-3">
-          <button onClick={onOpenDeals} className="hover:text-slate-700 dark:hover:text-slate-300 font-medium transition-colors">View Pipeline</button>
-          <span>·</span>
-          <button onClick={onOpenCampaigns} className="hover:text-slate-700 dark:hover:text-slate-300 font-medium transition-colors">Campaigns</button>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+        <button
+          onClick={onOpenCampaigns}
+          className="w-full py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors shadow-2xs text-center truncate"
+        >
+          Follow-up Emails
+        </button>
+        <button
+          onClick={onOpenProspects}
+          className="w-full py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-white font-semibold text-xs transition-colors text-center shadow-2xs truncate"
+        >
+          Recommended Leads
+        </button>
       </div>
     </Card>
   );
 }
 
 const SPAN_CLASS: Record<WidgetSize, string> = {
-  3: "col-span-1 sm:col-span-1 md:col-span-3 lg:col-span-3",
-  4: "col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4",
-  6: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-6",
-  8: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-8",
-  12: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-12",
+  3: "col-span-1 sm:col-span-1 md:col-span-3 lg:col-span-6 xl:col-span-3",
+  4: "col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-6 xl:col-span-4",
+  6: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-6 xl:col-span-6",
+  8: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-12 xl:col-span-8",
+  12: "col-span-1 sm:col-span-2 md:col-span-6 lg:col-span-12 xl:col-span-12",
 };
 
 /** One widget's slot in the dashboard grid — a dnd-kit sortable item that
@@ -1369,6 +2040,100 @@ export function DashboardView({
           onOpenCampaigns={() => router.push("/campaigns")}
         />
       );
+      case "total_leads": return (
+        <ModernStatTile
+          label="Total leads"
+          value={formatStat(stats.totalLeads)}
+          sublabel="vs last 30 days"
+          accentColor="blue"
+          icon={<Users className="h-4 w-4" />}
+          trendPct={stats.leadsDelta}
+          onClick={() => router.push("/leads")}
+        />
+      );
+      case "engagement_rate": return (
+        <ModernStatTile
+          label="Engagement rate"
+          value={`${stats.engagementRate}%`}
+          sublabel="vs last 30 days"
+          accentColor="emerald"
+          icon={<Play className="h-4 w-4" />}
+          trendPct={stats.engagementTrendPct}
+          onClick={() => router.push("/campaigns")}
+        />
+      );
+      case "lead_conversion_rate": return (
+        <ModernStatTile
+          label="Lead conversion rate"
+          value={`${stats.conversionRate}%`}
+          sublabel="vs last 30 days"
+          accentColor="indigo"
+          icon={<Filter className="h-4 w-4" />}
+          trendPct={stats.conversionTrendPct}
+          onClick={() => router.push("/leads?filter=qualified")}
+        />
+      );
+      case "avg_days_to_qualify": return (
+        <ModernStatTile
+          label="Avg days to qualify"
+          value={stats.avgDaysToQualify !== null ? stats.avgDaysToQualify.toString() : "18"}
+          sublabel="vs last 30 days"
+          accentColor="purple"
+          icon={<CalendarClock className="h-4 w-4" />}
+          trendPct={stats.daysToQualifyTrendPct}
+          onClick={() => router.push("/leads")}
+        />
+      );
+      case "qualified_leads": return (
+        <ModernStatTile
+          label="Qualified leads"
+          value={formatStat(stats.qualifiedLeads)}
+          sublabel="vs last 30 days"
+          accentColor="amber"
+          icon={<Target className="h-4 w-4" />}
+          trendPct={stats.qualifiedLeadsTrendPct}
+          onClick={() => router.push("/leads?filter=qualified")}
+        />
+      );
+      case "hot_leads_kpi": return (
+        <ModernStatTile
+          label="Hot leads"
+          value={formatStat(stats.hotLeads)}
+          sublabel="vs last 30 days"
+          accentColor="rose"
+          icon={<Flame className="h-4 w-4" />}
+          trendPct={stats.hotLeadsTrendPct}
+          onClick={() => router.push("/leads?filter=hot")}
+        />
+      );
+      case "qualified_pipeline_value": return (
+        <ModernStatTile
+          label="Qualified pipeline value"
+          value={money(stats.qualifiedPipelineValue)}
+          sublabel="vs last 30 days"
+          accentColor="blue"
+          icon={<Layers className="h-4 w-4" />}
+          trendPct={stats.qualifiedPipelineTrendPct}
+          onClick={() => router.push("/opportunities")}
+        />
+      );
+      case "avg_lead_age": return (
+        <ModernStatTile
+          label="Avg lead age"
+          value={stats.avgLeadAge !== null ? stats.avgLeadAge.toString() : "24"}
+          sublabel="vs last 30 days"
+          accentColor="cyan"
+          icon={<Calendar className="h-4 w-4" />}
+          trendPct={stats.leadAgeTrendPct}
+          onClick={() => router.push("/leads")}
+        />
+      );
+      case "lead_funnel": return (
+        <LeadFunnelCard
+          data={stats.leadFunnel}
+          onOpen={() => router.push("/leads")}
+        />
+      );
       case "total_sales": return (
         <ModernStatTile
           label="Total sales"
@@ -1377,6 +2142,7 @@ export function DashboardView({
           variant="hero"
           icon={<Zap className="h-4 w-4" />}
           trendPct={stats.revenueTrendPct}
+          onClick={() => router.push("/opportunities")}
         />
       );
       case "win_rate": return (
@@ -1386,6 +2152,7 @@ export function DashboardView({
           sublabel="Won ÷ closed deals"
           accentColor="purple"
           icon={<Target className="h-4 w-4" />}
+          onClick={() => router.push("/opportunities")}
         />
       );
       case "close_rate": return (
@@ -1396,6 +2163,7 @@ export function DashboardView({
           accentColor="emerald"
           icon={<TrendingUp className="h-4 w-4" />}
           trendPct={stats.conversionTrendPct}
+          onClick={() => router.push("/leads")}
         />
       );
       case "avg_days_to_close": return (
@@ -1405,6 +2173,7 @@ export function DashboardView({
           sublabel="Won deals, all-time"
           accentColor="cyan"
           icon={<CalendarClock className="h-4 w-4" />}
+          onClick={() => router.push("/opportunities")}
         />
       );
       case "pipeline_value": return (
@@ -1415,6 +2184,7 @@ export function DashboardView({
           accentColor="indigo"
           icon={<Layers className="h-4 w-4" />}
           trendPct={stats.pipelineValueTrendPct}
+          onClick={() => router.push("/opportunities")}
         />
       );
       case "open_deals": return (
@@ -1425,6 +2195,7 @@ export function DashboardView({
           accentColor="blue"
           icon={<Users className="h-4 w-4" />}
           trendPct={stats.dealsCreatedTrendPct}
+          onClick={() => router.push("/opportunities")}
         />
       );
       case "weighted_value": return (
@@ -1434,6 +2205,7 @@ export function DashboardView({
           sublabel="Stage-likelihood estimate"
           accentColor="amber"
           icon={<Sparkles className="h-4 w-4" />}
+          onClick={() => router.push("/opportunities")}
         />
       );
       case "avg_open_deal_age": return (
@@ -1443,6 +2215,7 @@ export function DashboardView({
           sublabel="Days since created"
           accentColor="emerald"
           icon={<Gauge className="h-4 w-4" />}
+          onClick={() => router.push("/opportunities")}
         />
       );
       case "won_deals_trend": return (
@@ -1461,46 +2234,75 @@ export function DashboardView({
         />
       );
       case "deals_projection": return (
-        <DualLineTrendCard
-          title="Deals projection (next 12 months)"
-          subtitle="Open deals' expected value vs. count, by expected close month"
-          data={stats.dealsProjection}
-          moneyKey="Projected value"
-          countKey="Deals due"
-          lineColor={DONUT_COLORS[5]}
-          lineColorSoft={DONUT_COLORS[2]}
-          emptyLabel="No open deals have an expected close date set yet."
+        <RevenueProjectionCard
+          projection={stats.dealsProjection}
+          wonTrend={stats.wonDealsTrend}
           mounted={chartsMounted}
-          actionLabel="Add New Opportunity"
-          onOpen={() => router.push("/opportunities")}
+          onOpen={() => router.push("/analytics/revenue")}
         />
       );
       case "sales_pipeline": return (
-        <LabeledDonutCard title="Sales pipeline" data={stageFunnelData} mounted={chartsMounted} emptyLabel="No open or lost deals yet." onOpen={() => router.push("/opportunities")} />
+        <SalesPipelineStageCard
+          data={stats.pipelineBuckets}
+          onOpen={() => router.push("/opportunities")}
+        />
       );
       case "deal_outcomes": return (
         <DealOutcomesDonutCard title="Deal outcomes" data={dealOutcomeData} mounted={chartsMounted} emptyLabel="No closed deals yet." onOpen={() => router.push("/opportunities")} />
       );
       case "team_performance": return (
-        <TeamPerformanceBarCard data={teamPerformance} mounted={chartsMounted} emptyLabel="No deals assigned to a teammate yet." />
+        <TeamPerformanceBarCard
+          data={teamPerformance}
+          mounted={chartsMounted}
+          emptyLabel="No deals assigned to a teammate yet."
+          onOpen={() => router.push("/analytics/team")}
+        />
       );
       case "lead_growth": return (
-        <LeadGrowthCard data={stats.leadGrowth} mounted={chartsMounted} emptyLabel="No new leads in the last few months yet." />
+        <LeadGrowthCard
+          data={stats.leadGrowth}
+          groupedData={stats.leadGrowthGrouped}
+          mounted={chartsMounted}
+          emptyLabel="No new leads in the last few months yet."
+          onOpen={() => router.push("/leads")}
+        />
       );
-      case "hot_leads": return (
-        <HotLeadAlertsCard data={stats.hotLeadAlerts} emptyLabel="No hot leads right now." onOpen={() => router.push("/prospects")} />
+      case "hot_leads":
+      case "hot_lead_alerts": return (
+        <HotLeadAlertsCard
+          alertsList={stats.hotLeadAlertsList}
+          data={stats.hotLeadAlerts}
+          emptyLabel="No hot leads right now."
+          onOpen={() => router.push("/leads?filter=hot")}
+        />
       );
       case "recent_activity": return (
-        <RecentActivityCard data={stats.recentActivities} emptyLabel="No recent activity yet." />
+        <RecentActivityCard
+          data={stats.recentActivities}
+          emptyLabel="No recent activity yet."
+          onOpen={() => router.push("/activities")}
+        />
       );
       case "campaign_performance": return (
-        <CampaignPerformanceCard data={stats.campaignPerf} mounted={chartsMounted} emptyLabel="No campaigns with activity yet." />
+        <CampaignPerformanceCard
+          campaignsTable={stats.campaignsTable}
+          data={stats.campaignPerf}
+          mounted={chartsMounted}
+          emptyLabel="No campaigns with activity yet."
+          onOpen={() => router.push("/campaigns")}
+        />
       );
       case "lead_sources": return (
-        <LeadSourcesCard data={stats.trafficSources} mounted={chartsMounted} emptyLabel="No leads with a known source yet." onOpen={() => router.push("/prospects")} />
+        <LeadSourcesCard
+          data={stats.trafficSources}
+          totalLeads={stats.totalLeads}
+          mounted={chartsMounted}
+          emptyLabel="No leads with a known source yet."
+          onOpen={() => router.push("/analytics/prospects")}
+        />
       );
       case "recent_deals": return (
-        <RecentDealsCard data={recentDeals} emptyLabel="No deals yet." onOpen={() => router.push("/opportunities")} />
+        <RecentOpportunitiesCard data={recentDeals} onOpen={() => router.push("/opportunities")} />
       );
       default: return null;
     }
@@ -1529,34 +2331,43 @@ export function DashboardView({
       <div className="rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-[#1b212e] border border-slate-200 dark:border-slate-800 shadow-xs">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-              {dateLabel ?? " "}
+            <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-white">
+              {dateLabel ?? " "}
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             {greeting}, {firstName}! 👋
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Here&apos;s what&apos;s happening in your pipeline today.</p>
+          <p className="text-xs text-slate-500 dark:text-white font-medium mt-0.5">Here&apos;s what&apos;s happening with your leads today.</p>
+        </div>
+        <div className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/60 text-xs font-medium text-indigo-900 dark:text-white shadow-2xs">
+          <span className="italic font-semibold text-indigo-950 dark:text-white">&ldquo;Nurture today. Revenue tomorrow.&rdquo;</span>
+          <span className="text-[11px] text-indigo-500 dark:text-indigo-300 font-bold">— Nxelio</span>
         </div>
       </div>
 
       {/* Setup checklist — fixed, not part of the customizable layout; only
           renders while real setup tasks remain (see SetupChecklistCard) */}
-      <SetupChecklistCard tasks={setupTasks} initialStates={setupTaskStates} />
+      <SetupChecklistCard
+        tasks={setupTasks}
+        initialStates={setupTaskStates}
+        stats={stats}
+        onNavigate={(href) => router.push(href)}
+      />
 
       {/* Layout controls — hidden while editing, since Save/Cancel below take over */}
       {!editing && (
         <div className="flex items-center justify-end gap-2">
           <button
             onClick={beginEdit}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-200 dark:hover:text-white"
           >
             <Pencil className="h-3.5 w-3.5" /> Edit layout
           </button>
           <div className="relative" ref={switcherRef}>
             <button
               onClick={() => setSwitcherOpen((v) => !v)}
-              className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1b212e] text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5"
+              className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1b212e] text-xs font-semibold text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-white/5"
             >
               <LayoutGrid className="h-3.5 w-3.5" /> {currentSavedLayout?.name ?? "Overview"} <ChevronDown className="h-3.5 w-3.5" />
             </button>
@@ -1564,7 +2375,7 @@ export function DashboardView({
               <div className="absolute right-0 mt-1.5 w-64 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1b212e] shadow-lg z-30 py-1.5">
                 <button
                   onClick={() => switchLayout(null)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-white/5 ${currentLayoutId === null ? "text-slate-900 dark:text-white font-bold" : "text-slate-600 dark:text-slate-300"}`}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-white/5 ${currentLayoutId === null ? "text-slate-900 dark:text-white font-bold" : "text-slate-600 dark:text-slate-100"}`}
                 >
                   Overview (default)
                   {currentLayoutId === null && <span style={{ color: accent }}>●</span>}

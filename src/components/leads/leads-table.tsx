@@ -73,6 +73,8 @@ interface Props {
   campaignFilter?: { id: string; name: string };
   /** Pre-populate the search box (from global search). */
   initialSearch?: string;
+  /** Pre-populate quick filter (e.g. from dashboard priority or KPI clicks). */
+  initialQuickFilter?: "all" | "new" | "qualified" | "hot" | "followup";
   /** Maps owner_id -> full name, for the Owner column. */
   owners?: Record<string, string>;
   /** True when a background Verified Leads search has finished and hasn't
@@ -131,7 +133,7 @@ function CompanyLogo({ name }: { name?: string | null }) {
   );
 }
 
-export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners = {}, hasReadyVerifiedLeads = false, searchJobs = [] }: Props) {
+export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initialQuickFilter, owners = {}, hasReadyVerifiedLeads = false, searchJobs = [] }: Props) {
   const { confirm, toast } = useFeedback();
   const router = useRouter();
   usePageTour("leads", LEADS_TOUR_STEPS);
@@ -176,7 +178,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, owners
   // "Needs Follow-up" is a chosen proxy (no dedicated field exists): a lead
   // that's been Contacted or is in Nurturing, i.e. worked but not yet resolved.
   type QuickFilter = "all" | "new" | "qualified" | "hot" | "followup";
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(initialQuickFilter ?? "all");
   const [cardFilter, setCardFilter] = useState<"all" | "hot" | "scored" | "converted">("all");
   const handleCardFilterChange = (newFilter: "all" | "hot" | "scored" | "converted") => {
     setCardFilter(newFilter);

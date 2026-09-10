@@ -1,5 +1,6 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { fetchAllIn } from "@/lib/supabase/fetch-all";
 import { calcWeightedForecast } from "@/lib/analytics/overview-metrics";
 import { CLOSED_STAGES, getStageForecast, type OpportunityStage } from "@/lib/opportunities";
 
@@ -22,11 +23,22 @@ export async function recordDailyPipelineSnapshots(): Promise<{ workspacesProces
   const workspaceIds = ((workspaces as { id: string }[]) || []).map((w) => w.id);
   if (!workspaceIds.length) return { workspacesProcessed: 0 };
 
-  const { data: oppsData } = await admin
-    .from("opportunities")
-    .select("workspace_id, deal_value, stage")
-    .in("workspace_id", workspaceIds);
-  const opps = (oppsData as { workspace_id: string; deal_value: number; stage: OpportunityStage }[]) || [];
+  // Chunked and paged: this runs with the admin client across EVERY tenant,
+  // so it is the single largest read in the app. Clamped, the nightly
+  // snapshot recorded a fraction of each workspace's pipeline, and the
+  // trend chart built on those snapshots was permanently wrong.
+  const { data: oppsData } = await fetchAllIn(
+    workspaceIds,
+    (chunk, from, to) =>
+      admin
+        .from("opportunities")
+        .select("workspace_id, deal_value, stage")
+        .in("workspace_id", chunk)
+        .order("id")
+        .range(from, to),
+    { label: "pipelineSnapshot opportunities" }
+  );
+  const opps = oppsData as { workspace_id: string; deal_value: number; stage: OpportunityStage }[];
 
   const byWorkspace = new Map<string, typeof opps>();
   for (const o of opps) {

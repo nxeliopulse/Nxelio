@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, insertAllReturning } from "@/lib/supabase/fetch-all";
 import { logAudit } from "@/lib/queries/audit-log";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { revalidatePath } from "next/cache";
@@ -69,10 +70,16 @@ async function getCurrentUserName(supabase: Awaited<ReturnType<typeof createClie
 
 export async function getAccounts(): Promise<AccountRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const { data, error } = await fetchAll<AccountRow>(
+    (from, to) =>
+      supabase
+        .from("accounts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to),
+    { label: "getAccounts" }
+  );
   if (error) {
     console.error("getAccounts error:", error.message, error.details, error.hint, error.code);
     return [];
@@ -199,7 +206,12 @@ export async function bulkInsertAccounts(
   const actorName = await getCurrentUserName(supabase);
 
   // Build dedup sets from what's already in the DB.
-  const { data: existingRows } = await supabase.from("accounts").select("account_name, website");
+  // Paged: this is the dedup set. Clamped, an import silently re-created
+  // accounts that already existed past the first 1000 rows.
+  const { data: existingRows } = await fetchAll<{ account_name: string | null; website: string | null }>(
+    (from, to) => supabase.from("accounts").select("account_name, website").order("id").range(from, to),
+    { label: "bulkInsertAccounts dedup" }
+  );
   const existingHosts = new Set<string>();
   const existingNames = new Set<string>();
   for (const r of existingRows || []) {
@@ -248,7 +260,13 @@ export async function bulkInsertAccounts(
 
   if (!rows.length) return { inserted: 0, duplicates };
 
-  const { data, error } = await supabase.from("accounts").insert(rows).select();
+  // Batched: an insert's returned rows are capped too, and `data` is what
+  // the inserted count is read from.
+  const { data, error } = await insertAllReturning<Record<string, unknown>, { id: string }>(
+    rows,
+    (batch) => supabase.from("accounts").insert(batch).select(),
+    { label: "bulkInsertAccounts" }
+  );
   if (error) {
     console.error("bulkInsertAccounts error:", error);
     return { inserted: 0, duplicates, error: error.message };

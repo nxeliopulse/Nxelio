@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import {
   resolveDateRangePreset,
   previousPeriodRange,
@@ -164,39 +165,74 @@ export async function getProspectsAnalytics(filters: ProspectsFilters): Promise<
 
   // Base set: every lead matching the non-date filters (a live snapshot,
   // not bound to the date range — "Total Prospects" is a current count).
-  let baseQuery = supabase
-    .from("leads")
-    .select("id, full_name, company_name, job_title, source, industry, company_size, country, status, lead_score, linkedin, website_url, owner_id, created_at, updated_at");
-  if (ownerIds) baseQuery = baseQuery.in("owner_id", ownerIds);
-  if (filters.source) baseQuery = baseQuery.eq("source", filters.source);
-  if (filters.industry) baseQuery = baseQuery.eq("industry", filters.industry);
-  if (filters.companySize) baseQuery = baseQuery.eq("company_size", filters.companySize);
-  if (filters.country) baseQuery = baseQuery.eq("country", filters.country);
-  if (filters.status) baseQuery = baseQuery.eq("status", filters.status);
-  if (filters.aiScoreMin != null) baseQuery = baseQuery.gte("lead_score", filters.aiScoreMin);
-  if (filters.aiScoreMax != null) baseQuery = baseQuery.lte("lead_score", filters.aiScoreMax);
-
   let segmentLeadIds: string[] | null = null;
   if (filters.segmentId) {
-    const { data: members } = await supabase.from("segment_members").select("lead_id").eq("segment_id", filters.segmentId);
-    segmentLeadIds = ((members as { lead_id: string }[]) || []).map((m) => m.lead_id);
-    baseQuery = baseQuery.in("id", segmentLeadIds.length ? segmentLeadIds : ["00000000-0000-0000-0000-000000000000"]);
+    // Paged: a clamp here quietly narrowed the segment filter to its first
+    // 1000 members, so filtering by a large segment showed a subset and
+    // called it the whole segment.
+    const { data: members } = await fetchAll<{ lead_id: string }>(
+      (from, to) =>
+        supabase
+          .from("segment_members")
+          .select("lead_id")
+          .eq("segment_id", filters.segmentId!)
+          .order("id")
+          .range(from, to),
+      { label: "prospects segment members" }
+    );
+    segmentLeadIds = members.map((m) => m.lead_id);
+    // A segment with no members must match nothing, not everything.
+    if (!segmentLeadIds.length) segmentLeadIds = ["00000000-0000-0000-0000-000000000000"];
   }
 
-  const { data: baseData } = await baseQuery;
-  const leads = (baseData as LeadRow[]) || [];
+  // Chunked on the segment scope and paged either way. Every KPI, band and
+  // breakdown on this page is counted from `leads`, so the clamp skewed all
+  // of them together.
+  const { data: leads } = await fetchAllIn(
+    segmentLeadIds,
+    (chunk, from, to) => {
+      let q = supabase
+        .from("leads")
+        .select("id, full_name, company_name, job_title, source, industry, company_size, country, status, lead_score, linkedin, website_url, owner_id, created_at, updated_at");
+      if (chunk) q = q.in("id", chunk);
+      if (ownerIds) q = q.in("owner_id", ownerIds);
+      if (filters.source) q = q.eq("source", filters.source);
+      if (filters.industry) q = q.eq("industry", filters.industry);
+      if (filters.companySize) q = q.eq("company_size", filters.companySize);
+      if (filters.country) q = q.eq("country", filters.country);
+      if (filters.status) q = q.eq("status", filters.status);
+      if (filters.aiScoreMin != null) q = q.gte("lead_score", filters.aiScoreMin);
+      if (filters.aiScoreMax != null) q = q.lte("lead_score", filters.aiScoreMax);
+      return q.order("id").range(from, to);
+    },
+    { label: "prospects base cohort" }
+  ) as { data: LeadRow[] };
   const leadIds = leads.map((l) => l.id);
 
   // Downstream signals for engagement/score-band conversion — activities,
   // replies, meetings tied to this exact lead set.
-  const [activityRes, meetingsRes] = leadIds.length
-    ? await Promise.all([
-        supabase.from("lead_activities").select("lead_id, activity_type, created_at").in("lead_id", leadIds).in("activity_type", [...CONTACTED_ACTIVITY_TYPES, "EMAIL_REPLIED"]),
-        supabase.from("meetings").select("lead_id").in("lead_id", leadIds),
-      ])
-    : [{ data: [] }, { data: [] }];
-  const activities = (activityRes.data as { lead_id: string; activity_type: string; created_at: string }[]) || [];
-  const meetingLeadIds = new Set(((meetingsRes.data as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);
+  const [activityRes, meetingsRes] = await Promise.all([
+    fetchAllIn(
+      leadIds,
+      (chunk, from, to) =>
+        supabase
+          .from("lead_activities")
+          .select("lead_id, activity_type, created_at")
+          .in("lead_id", chunk)
+          .in("activity_type", [...CONTACTED_ACTIVITY_TYPES, "EMAIL_REPLIED"])
+          .order("id")
+          .range(from, to),
+      { label: "prospects activities" }
+    ),
+    fetchAllIn(
+      leadIds,
+      (chunk, from, to) =>
+        supabase.from("meetings").select("lead_id").in("lead_id", chunk).order("id").range(from, to),
+      { label: "prospects meetings" }
+    ),
+  ]);
+  const activities = activityRes.data as { lead_id: string; activity_type: string; created_at: string }[];
+  const meetingLeadIds = new Set((meetingsRes.data as { lead_id: string | null }[]).map((m) => m.lead_id).filter(Boolean) as string[]);
 
   const touchCountByLead = new Map<string, number>();
   const replyLeadIds = new Set<string>();

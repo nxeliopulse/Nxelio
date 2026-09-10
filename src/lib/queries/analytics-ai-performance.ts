@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { AI_SCORE_BANDS } from "@/lib/analytics/prospects-metrics";
 import { calcReplyRate, calcWinRate } from "@/lib/analytics/overview-metrics";
 import { CLOSED_STAGES, type OpportunityStage } from "@/lib/opportunities";
@@ -91,14 +92,34 @@ export async function getAiPerformanceAnalytics(): Promise<AiPerformanceData> {
   const supabase = await createClient();
   await getAnalyticsContext();
 
-  const [{ data: leadsData }, { data: creditData }, subscription, recommendations] = await Promise.all([
-    supabase.from("leads").select("id, lead_score, status, created_at, industry, linkedin, website_url"),
-    supabase.from("credit_transactions").select("feature_key, amount").eq("type", "debit").in("feature_key", AI_FEATURE_KEYS),
+  // Paged: every rate on this page divides by `leads.length`, so a clamped
+  // cohort skewed the numerator and denominator by different amounts.
+  // AI_FEATURE_KEYS is a short constant list, so that filter needs no chunking
+  // — only the result of each query needs paging.
+  const [{ data: leads }, { data: credits }, subscription, recommendations] = await Promise.all([
+    fetchAll<{ id: string; lead_score: number; status: string; created_at: string; industry: string | null; linkedin: string | null; website_url: string | null }>(
+      (from, to) =>
+        supabase
+          .from("leads")
+          .select("id, lead_score, status, created_at, industry, linkedin, website_url")
+          .order("id")
+          .range(from, to),
+      { label: "aiPerformance leads" }
+    ),
+    fetchAll<{ feature_key: string | null; amount: number }>(
+      (from, to) =>
+        supabase
+          .from("credit_transactions")
+          .select("feature_key, amount")
+          .eq("type", "debit")
+          .in("feature_key", AI_FEATURE_KEYS)
+          .order("id")
+          .range(from, to),
+      { label: "aiPerformance credit debits" }
+    ),
     getSubscription(),
     getRecommendationAdoption(),
   ]);
-  const leads = (leadsData as { id: string; lead_score: number; status: string; created_at: string; industry: string | null; linkedin: string | null; website_url: string | null }[]) || [];
-  const credits = (creditData as { feature_key: string | null; amount: number }[]) || [];
   const enrichedCount = leads.filter((l) => l.industry && (l.linkedin || l.website_url)).length;
   const enrichmentSuccessRate = leads.length ? Math.round((enrichedCount / leads.length) * 1000) / 10 : 0;
 
@@ -110,10 +131,38 @@ export async function getAiPerformanceAnalytics(): Promise<AiPerformanceData> {
   let meetingLeadIds = new Set<string>();
   const oppsByLead = new Map<string, { deal_value: number; stage: OpportunityStage; lead_id: string }[]>();
   if (allLeadIds.length) {
+    // Chunked + paged: `allLeadIds` is every lead in the workspace, far past
+    // what one `.in()` can carry in a URL.
     const [{ data: acts }, { data: meetings }, { data: opps }] = await Promise.all([
-      supabase.from("lead_activities").select("lead_id, activity_type").in("lead_id", allLeadIds).in("activity_type", ["EMAIL_SENT", "EMAIL_REPLIED"]),
-      supabase.from("meetings").select("lead_id").in("lead_id", allLeadIds),
-      supabase.from("opportunities").select("lead_id, deal_value, stage").in("lead_id", allLeadIds),
+      fetchAllIn(
+        allLeadIds,
+        (chunk, from, to) =>
+          supabase
+            .from("lead_activities")
+            .select("lead_id, activity_type")
+            .in("lead_id", chunk)
+            .in("activity_type", ["EMAIL_SENT", "EMAIL_REPLIED"])
+            .order("id")
+            .range(from, to),
+        { label: "aiPerformance activities" }
+      ),
+      fetchAllIn(
+        allLeadIds,
+        (chunk, from, to) =>
+          supabase.from("meetings").select("lead_id").in("lead_id", chunk).order("id").range(from, to),
+        { label: "aiPerformance meetings" }
+      ),
+      fetchAllIn(
+        allLeadIds,
+        (chunk, from, to) =>
+          supabase
+            .from("opportunities")
+            .select("lead_id, deal_value, stage")
+            .in("lead_id", chunk)
+            .order("id")
+            .range(from, to),
+        { label: "aiPerformance opportunities" }
+      ),
     ]);
     activities = (acts as typeof activities) || [];
     meetingLeadIds = new Set(((meetings as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);

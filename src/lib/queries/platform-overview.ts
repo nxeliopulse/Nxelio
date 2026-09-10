@@ -1,5 +1,6 @@
 "use server";
 import { createAdminClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { isPlatformAdmin } from "@/lib/queries/platform-admin";
 import {
   WorkspaceHealthCheckInput,
@@ -90,12 +91,42 @@ export async function getWorkspaceExtendedData(): Promise<WorkspaceExtendedData[
   await requireAdmin();
   const admin = createAdminClient();
 
+  // Every one of these is admin-client and CROSS-TENANT, so they are the
+  // fastest queries in the app to pass 1000 rows — the per-workspace lead,
+  // campaign and credit totals on the platform admin dashboard were each
+  // built from a 1000-row slice of all tenants combined.
   const [{ data: workspaces }, { data: leads }, { data: campaigns }, { data: ledger }, { data: subs }] = await Promise.all([
-    admin.from("workspaces").select("id, name, created_at"),
-    admin.from("leads").select("workspace_id"),
-    admin.from("campaigns").select("workspace_id, sent_count"),
-    admin.from("credit_ledger").select("workspace_id, credits_delta").lt("credits_delta", 0),
-    admin.from("subscriptions").select("workspace_id, plan_id, status, credits_remaining, credits_total, created_at, current_period_end, subscription_plans(name)"),
+    fetchAll(
+      (from, to) => admin.from("workspaces").select("id, name, created_at").order("id").range(from, to),
+      { label: "platformOverview workspaces" }
+    ),
+    fetchAll(
+      (from, to) => admin.from("leads").select("workspace_id").order("id").range(from, to),
+      { label: "platformOverview leads" }
+    ),
+    fetchAll(
+      (from, to) => admin.from("campaigns").select("workspace_id, sent_count").order("id").range(from, to),
+      { label: "platformOverview campaigns" }
+    ),
+    fetchAll(
+      (from, to) =>
+        admin
+          .from("credit_ledger")
+          .select("workspace_id, credits_delta")
+          .lt("credits_delta", 0)
+          .order("id")
+          .range(from, to),
+      { label: "platformOverview credit ledger" }
+    ),
+    fetchAll(
+      (from, to) =>
+        admin
+          .from("subscriptions")
+          .select("workspace_id, plan_id, status, credits_remaining, credits_total, created_at, current_period_end, subscription_plans(name)")
+          .order("id")
+          .range(from, to),
+      { label: "platformOverview subscriptions" }
+    ),
   ]);
 
   const leadCounts = new Map<string, number>();

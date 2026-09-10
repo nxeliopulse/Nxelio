@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import { leadMatchesTree, hasAnyComplete, flatRulesToTree, isSuppressed, validateRuleTree, SEGMENT_FIELDS, type Group, type EvalRule } from "@/lib/segments";
@@ -11,6 +12,27 @@ import { resolveUniqueName } from "@/lib/queries/name-uniqueness";
 // displays — keeps the membership scan lightweight without a second query.
 const LEAD_MATCH_FIELDS =
   "id, full_name, job_title, company_name, lead_score, industry, interest_area, source, status, company_size, seniority, country, owner_id, created_at, updated_at, verified, email_opt_out, do_not_contact, email_bounced";
+
+/**
+ * Every lead in the workspace, with the columns the rule engine reads.
+ *
+ * Paged, and this one was not merely a reporting bug. Unpaged, the rule
+ * engine only ever SAW the first 1000 leads, so:
+ *  - previewSegment under-reported how many leads a rule matches, while the
+ *    "of N total" beside it came from an exact head:true count, and
+ *  - materializeSegmentMembers wrote members from that same first 1000 —
+ *    meaning a campaign targeting a segment never reached any lead outside
+ *    it. A real send, silently addressing the wrong audience.
+ */
+async function allMatchLeads(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<MatchLead[]> {
+  const { data } = await fetchAll<MatchLead>(
+    (from, to) => supabase.from("leads").select(LEAD_MATCH_FIELDS).order("id").range(from, to),
+    { label: "segment rule evaluation" }
+  );
+  return data;
+}
 
 type MatchLead = Record<string, unknown> & {
   id: string;
@@ -39,11 +61,19 @@ export interface SegmentRow {
 
 export async function getSegments(): Promise<(SegmentRow & { contacts: number })[]> {
   const supabase = await createClient();
-  const { data: segments } = await supabase
-    .from("segments")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (!segments) return [];
+  // `id` tiebreaker after created_at — segments created in the same request
+  // share a timestamp, and paging a non-total order repeats and drops rows.
+  const { data: segments } = await fetchAll<SegmentRow>(
+    (from, to) =>
+      supabase
+        .from("segments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to),
+    { label: "getSegments" }
+  );
+  if (!segments.length) return [];
 
   // Count members per segment
   const counts = await Promise.all(
@@ -168,8 +198,8 @@ export interface SegmentPreview {
 export async function previewSegment(rule: Group): Promise<SegmentPreview> {
   if (!hasAnyComplete(rule)) return { matched: 0, suppressed: 0, eligible: 0, companies: 0, avgScore: 0 };
   const supabase = await createClient();
-  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
-  const matched = ((leads || []) as MatchLead[]).filter((l) => leadMatchesTree(l, rule));
+  const leads = await allMatchLeads(supabase);
+  const matched = leads.filter((l) => leadMatchesTree(l, rule));
   const suppressed = matched.filter(isSuppressed).length;
   const companies = new Set(matched.map((l) => l.company_name).filter((v): v is string => Boolean(v))).size;
   const avgScore = matched.length ? Math.round(matched.reduce((sum, l) => sum + (l.lead_score || 0), 0) / matched.length) : 0;
@@ -180,8 +210,8 @@ export async function previewSegment(rule: Group): Promise<SegmentPreview> {
 export async function getSamplePreviewLeads(rule: Group, limit = 5): Promise<{ id: string; name: string; title: string | null; company: string | null; score: number; country: string | null }[]> {
   if (!hasAnyComplete(rule)) return [];
   const supabase = await createClient();
-  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
-  return ((leads || []) as MatchLead[])
+  const leads = await allMatchLeads(supabase);
+  return leads
     .filter((l) => leadMatchesTree(l, rule) && !isSuppressed(l))
     .slice(0, limit)
     .map((l) => ({ id: l.id, name: l.full_name || l.company_name || "—", title: l.job_title, company: l.company_name, score: l.lead_score, country: (l.country as string | null) ?? null }));
@@ -193,8 +223,8 @@ export async function getSamplePreviewLeads(rule: Group, limit = 5): Promise<{ i
 export async function getSegmentBreakdown(rule: Group): Promise<{ industries: { name: string; value: number }[]; countries: { name: string; value: number }[] }> {
   if (!hasAnyComplete(rule)) return { industries: [], countries: [] };
   const supabase = await createClient();
-  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
-  const matched = ((leads || []) as MatchLead[]).filter((l) => leadMatchesTree(l, rule));
+  const leads = await allMatchLeads(supabase);
+  const matched = leads.filter((l) => leadMatchesTree(l, rule));
   const total = matched.length;
   if (!total) return { industries: [], countries: [] };
 
@@ -220,8 +250,8 @@ export async function getSegmentBreakdown(rule: Group): Promise<{ industries: { 
 export async function getSegmentTrend(rule: Group, days: number = 30): Promise<{ date: string; count: number }[]> {
   if (!hasAnyComplete(rule)) return [];
   const supabase = await createClient();
-  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
-  const matched = ((leads || []) as MatchLead[]).filter((l) => leadMatchesTree(l, rule));
+  const leads = await allMatchLeads(supabase);
+  const matched = leads.filter((l) => leadMatchesTree(l, rule));
   const matchedDates = matched.map((l) => new Date(l.created_at as string).getTime()).filter((t) => !Number.isNaN(t));
 
   const now = new Date();
@@ -252,8 +282,8 @@ export async function getSegmentFunnel(rule: Group): Promise<{ label: string; va
     return [{ label: "Total Prospects", value: total }, { label: "Final Segment", value: final }];
   }
 
-  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
-  const allLeads = (leads || []) as MatchLead[];
+  const leads = await allMatchLeads(supabase);
+  const allLeads = leads;
   const steps: { label: string; value: number }[] = [{ label: "Total Prospects", value: total }];
 
   const completeChildren = rule.children.filter(hasAnyComplete);
@@ -300,10 +330,10 @@ export async function getSegmentPreviewBundle(rule: Group, days: number = 30): P
 
   const supabase = await createClient();
   const [{ data: leads }, { count: totalCount }] = await Promise.all([
-    supabase.from("leads").select(LEAD_MATCH_FIELDS),
+    allMatchLeads(supabase).then((data) => ({ data })),
     supabase.from("leads").select("id", { count: "exact", head: true }),
   ]);
-  const allLeads = (leads || []) as MatchLead[];
+  const allLeads = leads;
   const total = totalCount || 0;
 
   const matched = allLeads.filter((l) => leadMatchesTree(l, rule));
@@ -507,13 +537,22 @@ export async function materializeSegmentMembers(segmentId: string): Promise<numb
   await supabase.from("segment_members").delete().eq("segment_id", segmentId);
   if (!rule || !hasAnyComplete(rule)) return 0;
 
-  const { data: leads } = await supabase.from("leads").select(LEAD_MATCH_FIELDS);
-  const matchIds = ((leads || []) as MatchLead[])
+  const leads = await allMatchLeads(supabase);
+  const matchIds = leads
     .filter((l) => leadMatchesTree(l, rule))
     .map((l) => l.id);
 
-  if (matchIds.length) {
-    await supabase.from("segment_members").insert(matchIds.map((lead_id) => ({ segment_id: segmentId, lead_id })));
+  // Batched: now that the match set is complete it can be tens of thousands
+  // of rows, which is more than one INSERT statement should carry.
+  for (let i = 0; i < matchIds.length; i += 1000) {
+    const batch = matchIds.slice(i, i + 1000);
+    const { error } = await supabase
+      .from("segment_members")
+      .insert(batch.map((lead_id) => ({ segment_id: segmentId, lead_id })));
+    if (error) {
+      console.error(`[materializeSegmentMembers] segment ${segmentId} failed after ${i} rows:`, error.message);
+      return i;
+    }
   }
   return matchIds.length;
 }

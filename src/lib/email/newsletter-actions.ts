@@ -1,5 +1,6 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { sendEmail } from "./resend";
 import { substituteMergeTags } from "./merge-tags";
 import { getOnboarding } from "@/lib/queries/onboarding";
@@ -181,18 +182,39 @@ export async function sendNewsletter(newsletterId: string): Promise<SendResult> 
 
   // 2. Resolve recipients with the RLS client so we ONLY ever reach the current
   //    workspace's leads (the admin client would leak/mail every tenant's leads).
-  let query = supabase.from("leads").select("id, email, full_name, company_name, industry, interest_area").not("email", "is", null);
+  // Paged and chunked: this is the real recipient list. Unpaged, a newsletter
+  // to a segment of 5000 mailed the first 1000 and reported a clean send.
+  let segmentIds: string[] | null = null;
   if (n.audience_type === "segment" && n.segment_id) {
-    const { data: members } = await supabase.from("segment_members").select("lead_id").eq("segment_id", n.segment_id);
-    const ids = (members || []).map((m: { lead_id: string }) => m.lead_id);
-    if (!ids.length) return { ok: false, error: "Segment has no members" };
-    query = query.in("id", ids);
-  } else {
-    // Only subscribed leads
-    query = query.eq("is_subscribed", true);
+    const { data: members } = await fetchAll<{ lead_id: string }>(
+      (from, to) =>
+        supabase
+          .from("segment_members")
+          .select("lead_id")
+          .eq("segment_id", n.segment_id)
+          .order("id")
+          .range(from, to),
+      { label: "newsletter segment members" }
+    );
+    segmentIds = members.map((m) => m.lead_id).filter(Boolean);
+    if (!segmentIds.length) return { ok: false, error: "Segment has no members" };
   }
-  const { data: leads } = await query;
-  if (!leads || !leads.length) return { ok: false, error: "No subscribed recipients with email addresses" };
+
+  const { data: leads } = await fetchAllIn(
+    segmentIds,
+    (chunk, from, to) => {
+      let q = supabase
+        .from("leads")
+        .select("id, email, full_name, company_name, industry, interest_area")
+        .not("email", "is", null);
+      if (chunk) q = q.in("id", chunk);
+      // Only subscribed leads when mailing the whole workspace.
+      else q = q.eq("is_subscribed", true);
+      return q.order("id").range(from, to);
+    },
+    { label: "newsletter recipients" }
+  );
+  if (!leads.length) return { ok: false, error: "No subscribed recipients with email addresses" };
 
   // AI-credit gate: a Bulk Email Campaign costs credits per recipient, same
   // "check before you spend" pattern used for AI features and sequence

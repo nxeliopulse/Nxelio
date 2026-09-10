@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { resolveDateRangePreset, calcWeightedForecast, type DateRangePreset, type DateRange } from "@/lib/analytics/overview-metrics";
 import { CLOSED_STAGES, getStageForecast, type OpportunityStage } from "@/lib/opportunities";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
@@ -156,10 +157,19 @@ export async function getRevenueAnalytics(filters: RevenueFilters): Promise<Reve
       : resolveDateRangePreset(filters.dateRange === "custom" ? "last_90_days" : filters.dateRange, now);
 
   const ownerIds = ctx.isAdmin ? null : [ctx.userId, ...ctx.directReportIds];
-  let query = supabase.from("opportunities").select("id, deal_value, stage, source, campaign_id, segment_id, owner_id, account_id, lead_id, company, created_at, closed_at, expected_close_date");
-  if (ownerIds) query = query.in("owner_id", ownerIds);
-  const { data } = await query;
-  const opps = (data as OppRow[]) || [];
+  // Paged: won revenue, weighted pipeline, forecast categories, the trend
+  // chart and every attribution table are all reduced from this one array,
+  // so a clamp understated the entire revenue page at once.
+  const { data: opps } = await fetchAll<OppRow>(
+    (from, to) => {
+      let q = supabase
+        .from("opportunities")
+        .select("id, deal_value, stage, source, campaign_id, segment_id, owner_id, account_id, lead_id, company, created_at, closed_at, expected_close_date");
+      if (ownerIds) q = q.in("owner_id", ownerIds);
+      return q.order("id").range(from, to);
+    },
+    { label: "revenue opportunities" }
+  );
 
   const won = opps.filter((o) => o.stage === "won" && o.closed_at && new Date(o.closed_at) >= range.from && new Date(o.closed_at) <= range.to);
   const openOpps = opps.filter((o) => !CLOSED_STAGES.includes(o.stage));
@@ -258,16 +268,40 @@ export async function getRevenueAnalytics(filters: RevenueFilters): Promise<Reve
   const accountIds = Array.from(new Set(opps.map((o) => o.account_id).filter(Boolean) as string[]));
   const leadIds = Array.from(new Set(opps.map((o) => o.lead_id).filter(Boolean) as string[]));
 
+  // fetchAllIn already short-circuits an empty id list to [] with no
+  // request, so the explicit `.length ?` guards are no longer needed.
+  // Chunked because these lists are as long as the (now complete) set of
+  // opportunities, which is well past what one `.in()` URL can carry.
   const [{ data: segmentsData }, { data: campaignsData }, { data: accountsData }, { data: leadsData }] = await Promise.all([
-    segmentIds.length ? supabase.from("segments").select("id, segment_name").in("id", segmentIds) : Promise.resolve({ data: [] }),
-    campaignIds.length ? supabase.from("campaigns").select("id, campaign_name").in("id", campaignIds) : Promise.resolve({ data: [] }),
-    accountIds.length ? supabase.from("accounts").select("id, account_name").in("id", accountIds) : Promise.resolve({ data: [] }),
-    leadIds.length ? supabase.from("leads").select("id, industry").in("id", leadIds) : Promise.resolve({ data: [] }),
+    fetchAllIn(
+      segmentIds,
+      (chunk, from, to) =>
+        supabase.from("segments").select("id, segment_name").in("id", chunk).order("id").range(from, to),
+      { label: "revenue segment names" }
+    ),
+    fetchAllIn(
+      campaignIds,
+      (chunk, from, to) =>
+        supabase.from("campaigns").select("id, campaign_name").in("id", chunk).order("id").range(from, to),
+      { label: "revenue campaign names" }
+    ),
+    fetchAllIn(
+      accountIds,
+      (chunk, from, to) =>
+        supabase.from("accounts").select("id, account_name").in("id", chunk).order("id").range(from, to),
+      { label: "revenue account names" }
+    ),
+    fetchAllIn(
+      leadIds,
+      (chunk, from, to) =>
+        supabase.from("leads").select("id, industry").in("id", chunk).order("id").range(from, to),
+      { label: "revenue lead industries" }
+    ),
   ]);
-  const segmentNameById = new Map(((segmentsData as { id: string; segment_name: string }[]) || []).map((s) => [s.id, s.segment_name]));
-  const campaignNameById = new Map(((campaignsData as { id: string; campaign_name: string }[]) || []).map((c) => [c.id, c.campaign_name]));
-  const accountNameById = new Map(((accountsData as { id: string; account_name: string }[]) || []).map((a) => [a.id, a.account_name]));
-  const industryByLeadId = new Map(((leadsData as { id: string; industry: string | null }[]) || []).map((l) => [l.id, l.industry]));
+  const segmentNameById = new Map((segmentsData as { id: string; segment_name: string }[]).map((s) => [s.id, s.segment_name]));
+  const campaignNameById = new Map((campaignsData as { id: string; campaign_name: string }[]).map((c) => [c.id, c.campaign_name]));
+  const accountNameById = new Map((accountsData as { id: string; account_name: string }[]).map((a) => [a.id, a.account_name]));
+  const industryByLeadId = new Map((leadsData as { id: string; industry: string | null }[]).map((l) => [l.id, l.industry]));
 
   const bySourceRows = aggregateByKey(opps, (o) => o.source, (k) => k);
   const aiInsights: RevenueAiInsight[] = [];

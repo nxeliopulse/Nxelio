@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, insertAllReturning } from "@/lib/supabase/fetch-all";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import type { ContactRow } from "@/lib/queries/contacts";
@@ -17,7 +18,12 @@ export async function bulkInsertContacts(
   const supabase = await createClient();
 
   // Build a set of existing emails already in the DB to skip duplicates.
-  const { data: existingRows } = await supabase.from("contacts").select("email");
+  // Paged: the dedup set. Clamped, contacts past the first 1000 were
+  // re-imported as duplicates.
+  const { data: existingRows } = await fetchAll<{ email: string | null }>(
+    (from, to) => supabase.from("contacts").select("email").order("id").range(from, to),
+    { label: "bulkInsertContacts dedup" }
+  );
   const norm = (s: string | null | undefined) => (s || "").toLowerCase().trim();
   const existing = new Set<string>();
   for (const r of existingRows || []) {
@@ -65,7 +71,11 @@ export async function bulkInsertContacts(
 
   if (!rows.length) return { inserted: 0, duplicates };
 
-  const { data, error } = await supabase.from("contacts").insert(rows).select();
+  const { data, error } = await insertAllReturning<Record<string, unknown>, { id: string }>(
+    rows,
+    (batch) => supabase.from("contacts").insert(batch).select(),
+    { label: "bulkInsertContacts" }
+  );
   if (error) {
     console.error("bulkInsertContacts error:", error);
     return { inserted: 0, duplicates, error: error.message };

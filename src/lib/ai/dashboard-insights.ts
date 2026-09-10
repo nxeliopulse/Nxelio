@@ -13,6 +13,7 @@ export interface AiDashboardSummary {
   morningBrief: string;
   dailySummary: string;
   weeklySummary: string;
+  keyInsights: string[];
   pipelineSummary: string[];
   revenueInsights: string[];
   leadInsights: string[];
@@ -67,11 +68,24 @@ export function buildAiDashboardSummary(stats: DashboardStats, alerts: Dashboard
     ...(alerts.length > 0 ? ["Resolve the highest-severity workspace alert before starting a new automated workflow."] : []),
   ].slice(0, 4);
 
+  const keyInsights = stats.actionableAiInsights?.items || [
+    stats.hotLeads > 0
+      ? `${stats.hotLeads} lead${stats.hotLeads === 1 ? "" : "s"} show high buying intent based on recent engagement.`
+      : "Monitor lead scores — no high-intent leads detected yet.",
+    stats.qualifiedLeads > 0
+      ? `${stats.qualifiedLeads} qualified lead${stats.qualifiedLeads === 1 ? "" : "s"} are ready to convert.`
+      : "Keep nurturing — no qualified leads ready to convert yet.",
+    (stats.todaysPriorities?.followUpCount ?? 0) > 0
+      ? `Recommended: Send follow-up emails to ${stats.todaysPriorities?.followUpCount} engaged lead${stats.todaysPriorities?.followUpCount === 1 ? "" : "s"}.`
+      : "All leads are up to date — no immediate follow-ups needed.",
+  ];
+
   return {
     generatedAt,
     morningBrief: `You have ${stats.totalLeads.toLocaleString("en-US")} prospects, ${stats.hotLeads} hot leads, and $${pipelineValue} in open pipeline. ${alerts.length ? `${alerts.length} risk signal${alerts.length === 1 ? " is" : "s are"} ready for review.` : "No proactive risk signals are active."}`,
     dailySummary: `${stats.recentActivities.length} recent workspace activities are visible. ${latestLeads > previousLeads ? "Lead volume is moving up" : latestLeads < previousLeads ? "Lead volume is softer" : "Lead volume is steady"} in the latest period.`,
     weeklySummary: `Revenue is ${signed(stats.revenueTrendPct)} month over month, conversion is ${stats.conversionRate}%, and ${stats.pipeline.openCount} opportunities remain open.`,
+    keyInsights,
     pipelineSummary,
     revenueInsights,
     leadInsights,

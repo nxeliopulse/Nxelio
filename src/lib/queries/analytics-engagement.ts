@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { resolveDateRangePreset, bucketDateRange, type DateRangePreset, type DateRange } from "@/lib/analytics/overview-metrics";
 import { classifyReplyHeuristic, dayHourBucket, HOUR_BLOCK_LABELS, DAY_LABELS, type ReplyClassification } from "@/lib/analytics/engagement-metrics";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
@@ -113,26 +114,50 @@ export async function getEngagementAnalytics(filters: EngagementFilters): Promis
       ? { from: new Date(filters.customFrom), to: new Date(filters.customTo) }
       : resolveDateRangePreset(filters.dateRange === "custom" ? "last_30_days" : filters.dateRange, now);
 
-  let activitiesQuery = supabase
-    .from("lead_activities")
-    .select("lead_id, activity_type, created_at, metadata")
-    .gte("created_at", range.from.toISOString())
-    .lte("created_at", range.to.toISOString())
-    .in("activity_type", ["EMAIL_SENT", "EMAIL_OPENED", "EMAIL_CLICKED", "EMAIL_REPLIED", "EMAIL_BOUNCED", "EMAIL_UNSUBSCRIBED", "LINKEDIN_AUTO_ASK_CONTACT_INFO"]);
-  if (filters.campaignId) activitiesQuery = activitiesQuery.eq("metadata->>campaign_id", filters.campaignId);
-
-  const [{ data: activityData }, { data: campaignsData }, { data: repliesInboxData }, { data: meetingsData }, { data: oppsData }] = await Promise.all([
-    activitiesQuery,
-    supabase.from("campaigns").select("id, campaign_name, subject"),
-    supabase.from("inbox_messages").select("lead_id, campaign_id, body, created_at").eq("direction", "inbound").gte("created_at", range.from.toISOString()).lte("created_at", range.to.toISOString()),
-    supabase.from("meetings").select("lead_id"),
-    supabase.from("opportunities").select("lead_id"),
+  // All five paged. Every open/click/reply rate on this page is computed by
+  // counting these arrays, and an email-heavy workspace passes 1000 activity
+  // rows within days, so the rates were derived from whatever slice arrived.
+  const [{ data: activities }, { data: campaigns }, { data: inboundReplies }, { data: meetingsData }, { data: oppsData }] = await Promise.all([
+    fetchAll<{ lead_id: string; activity_type: string; created_at: string; metadata: { campaign_id?: string } | null }>(
+      (from, to) => {
+        let q = supabase
+          .from("lead_activities")
+          .select("lead_id, activity_type, created_at, metadata")
+          .gte("created_at", range.from.toISOString())
+          .lte("created_at", range.to.toISOString())
+          .in("activity_type", ["EMAIL_SENT", "EMAIL_OPENED", "EMAIL_CLICKED", "EMAIL_REPLIED", "EMAIL_BOUNCED", "EMAIL_UNSUBSCRIBED", "LINKEDIN_AUTO_ASK_CONTACT_INFO"]);
+        if (filters.campaignId) q = q.eq("metadata->>campaign_id", filters.campaignId);
+        return q.order("id").range(from, to);
+      },
+      { label: "engagement activities" }
+    ),
+    fetchAll<{ id: string; campaign_name: string; subject: string | null }>(
+      (from, to) => supabase.from("campaigns").select("id, campaign_name, subject").order("id").range(from, to),
+      { label: "engagement campaigns" }
+    ),
+    fetchAll<{ lead_id: string | null; campaign_id: string | null; body: string | null; created_at: string }>(
+      (from, to) =>
+        supabase
+          .from("inbox_messages")
+          .select("lead_id, campaign_id, body, created_at")
+          .eq("direction", "inbound")
+          .gte("created_at", range.from.toISOString())
+          .lte("created_at", range.to.toISOString())
+          .order("id")
+          .range(from, to),
+      { label: "engagement inbound replies" }
+    ),
+    fetchAll<{ lead_id: string | null }>(
+      (from, to) => supabase.from("meetings").select("lead_id").order("id").range(from, to),
+      { label: "engagement meetings" }
+    ),
+    fetchAll<{ lead_id: string | null }>(
+      (from, to) => supabase.from("opportunities").select("lead_id").order("id").range(from, to),
+      { label: "engagement opportunities" }
+    ),
   ]);
 
-  const activities = (activityData as { lead_id: string; activity_type: string; created_at: string; metadata: { campaign_id?: string } | null }[]) || [];
-  const campaigns = (campaignsData as { id: string; campaign_name: string; subject: string | null }[]) || [];
-  const inboundReplies = (repliesInboxData as { lead_id: string | null; campaign_id: string | null; body: string | null; created_at: string }[]) || [];
-  const meetingLeadIds = new Set(((meetingsData as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);
+  const meetingLeadIds = new Set(meetingsData.map((m) => m.lead_id).filter(Boolean) as string[]);
   const oppLeadIds = new Set(((oppsData as { lead_id: string | null }[]) || []).map((o) => o.lead_id).filter(Boolean) as string[]);
 
   // Per-campaign positive-reply count, for the Subject Line table's Positive

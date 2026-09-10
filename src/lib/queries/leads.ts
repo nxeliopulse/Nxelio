@@ -11,6 +11,7 @@ import { isManualStatusTransitionAllowed, statusTransitionError } from "@/lib/le
 import { isValidPhoneNumber } from "libphonenumber-js";
 import { isValidLinkedIn, LINKEDIN_ERROR } from "@/lib/validation";
 import { assertHasWorkspace } from "@/lib/queries/workspaces";
+import { fetchAll, fetchAllIn, countRows, insertAllReturning } from "@/lib/supabase/fetch-all";
 
 /**
  * The client always sends phone pre-formatted to international form (e.g.
@@ -156,15 +157,29 @@ function splitFullName(fullName: string | null | undefined): { first: string | n
 
 export async function getLeads(): Promise<LeadRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("leads")
-    .select("*")
-    .order("created_at", { ascending: false });
+  // Paged: an unpaged select stops at db-max-rows (1000), which silently hid
+  // every lead past the newest 1000 from the Prospects table.
+  //
+  // The `id` tiebreaker is not cosmetic. `created_at` alone is not a total
+  // order here — a bulk import writes hundreds of rows with an identical
+  // timestamp — and Postgres gives no stable order for ties, so paging on
+  // `created_at` by itself can repeat rows on one page and drop them from
+  // another.
+  const { data, error } = await fetchAll<LeadRow>(
+    (from, to) =>
+      supabase
+        .from("leads")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to),
+    { label: "getLeads" }
+  );
   if (error) {
     console.error("getLeads error:", error);
     return [];
   }
-  return data ?? [];
+  return data;
 }
 
 export async function getLeadById(id: string): Promise<LeadRow | null> {
@@ -175,14 +190,20 @@ export async function getLeadById(id: string): Promise<LeadRow | null> {
 
 export async function getLeadStats() {
   const supabase = await createClient();
-  const { data } = await supabase.from("leads").select("status, lead_score");
-  if (!data) return { total: 0, hot: 0, scored: 0, converted: 0 };
-  return {
-    total: data.length,
-    hot: data.filter((l) => l.lead_score >= 70).length,
-    scored: data.filter((l) => l.lead_score > 0).length,
-    converted: data.filter((l) => l.status === "Converted").length,
-  };
+  // Four exact counts instead of reading every lead and counting the array.
+  // `head: true` transfers no rows at all, so db-max-rows cannot clamp the
+  // answer — the previous version reported a hard 1000 as the total for any
+  // workspace above the cap, and every tile beside it was wrong by the same
+  // proportion. The predicates mirror the old JS filters exactly: SQL's
+  // `>=`/`>` skip NULL lead_score just as `null >= 70` was false in JS.
+  const countQuery = () => supabase.from("leads").select("id", { count: "exact", head: true });
+  const [total, hot, scored, converted] = await Promise.all([
+    countRows(countQuery()),
+    countRows(countQuery().gte("lead_score", 70)),
+    countRows(countQuery().gt("lead_score", 0)),
+    countRows(countQuery().eq("status", "Converted")),
+  ]);
+  return { total, hot, scored, converted };
 }
 
 
@@ -196,10 +217,20 @@ export async function getDistinctLeadValues(
   column: "source" | "country" | "industry" | "interest_area" | "status" | "company_size" | "seniority"
 ): Promise<string[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("leads").select(column).not(column, "is", null);
-  if (error || !data) return [];
+  // Paged, so the dropdown isn't built from only the first 1000 leads —
+  // values used exclusively by older leads were missing from the list.
+  //
+  // Reading every row to derive ~20 distinct values is wasteful; the right
+  // long-term shape is a `SELECT DISTINCT` RPC. Paging keeps it correct in
+  // the meantime without a migration.
+  const { data, error } = await fetchAll<Record<string, string | null>>(
+    (from, to) =>
+      supabase.from("leads").select(column).not(column, "is", null).order("id").range(from, to),
+    { label: `getDistinctLeadValues(${column})` }
+  );
+  if (error) return [];
   const values = new Set<string>();
-  for (const row of data as Record<string, string | null>[]) {
+  for (const row of data) {
     const v = row[column]?.trim();
     if (v) values.add(v);
   }
@@ -439,9 +470,19 @@ export async function bulkInsertLeads(
     ...batchEmails.map((e) => `email.ilike.${escapeOrValue(e)}`),
     ...batchLinkedins.map((l) => `linkedin.ilike.${escapeOrValue(l)}`),
   ];
-  const { data: existingRows } = orParts.length
-    ? await supabase.from("leads").select("email, linkedin").or(orParts.join(","))
-    : { data: [] };
+  // Chunked AND paged. Both caps bit here, and both let duplicates through:
+  // a batch of a few thousand leads builds an `.or(...)` far past the URL
+  // length a gateway accepts, and a match set over 1000 rows came back
+  // clamped — either way the dedup set below was incomplete, so leads that
+  // already existed got inserted a second time.
+  // 50 per chunk because an `email.ilike.<address>` term is much longer than
+  // a uuid, so the default chunk size would still overrun the URL.
+  const { data: existingRows } = await fetchAllIn(
+    orParts,
+    (chunk, from, to) =>
+      supabase.from("leads").select("email, linkedin").or(chunk.join(",")).order("id").range(from, to),
+    { chunkSize: 50, label: "bulkInsertLeads dedup" }
+  );
   const norm = (s: string | null | undefined) => (s || "").toLowerCase().trim();
   const existing = new Set<string>();
   for (const r of existingRows || []) {
@@ -503,13 +544,23 @@ export async function bulkInsertLeads(
 
   if (!rows.length) return { inserted: 0, duplicates };
 
-  const { data, error } = await supabase.from("leads").insert(rows).select();
+  // Batched: an insert's RETURNED rows are capped at 1000 as well, even
+  // though all of them are written. Buy Leads imports up to 2000 rows in one
+  // click on Pro, and the clamped array was then used for three things — the
+  // reported count, the import archive, and AI scoring — so past 1000 the
+  // user was told too few leads arrived, the archive was short, and the
+  // remainder was never scored. All with error === null.
+  const { data, error } = await insertAllReturning<Record<string, unknown>, LeadRow>(
+    rows,
+    (batch) => supabase.from("leads").insert(batch).select(),
+    { label: "bulkInsertLeads" }
+  );
   if (error) {
     console.error("bulkInsertLeads error:", error);
     return { inserted: 0, duplicates, error: error.message };
   }
   revalidatePath("/leads");
-  const inserted = data?.length ?? 0;
+  const inserted = data.length;
   if (inserted > 0) {
     await notifyCurrentUser({
       type: "leads",
@@ -523,14 +574,14 @@ export async function bulkInsertLeads(
       entityType: "lead",
       metadata: { count: inserted, duplicates, source: sourceLabel },
     });
-    await archiveImportedLeads((data as LeadRow[]) ?? [], sourceLabel);
+    await archiveImportedLeads(data, sourceLabel);
 
     // Score every newly imported lead automatically, so Lead Score is populated
     // right away instead of requiring the user to open each lead's Score tab.
     // Best-effort per lead — one failure (e.g. AI credits run out mid-batch)
     // just leaves that lead unscored rather than blocking the rest of the import.
     if (await isAiConfigured()) {
-      const ids = ((data as LeadRow[]) ?? []).map((l) => l.id).filter(Boolean);
+      const ids = data.map((l) => l.id).filter(Boolean);
       await mapWithConcurrency(ids, 4, async (id) => {
         try { await scoreLeadWithAi(id); } catch { /* left unscored */ }
       });

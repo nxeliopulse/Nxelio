@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { resolveDateRangePreset, calcReplyRate, calcQualificationRate, type DateRangePreset, type DateRange } from "@/lib/analytics/overview-metrics";
 import { CLOSED_STAGES, type OpportunityStage } from "@/lib/opportunities";
 import { getAnalyticsContext } from "@/lib/queries/analytics-overview";
@@ -88,22 +89,42 @@ export async function getCampaignsAnalytics(filters: CampaignsFilters): Promise<
   await getAnalyticsContext();
   const range = resolveRange(filters, new Date());
 
-  let campaignsQuery = supabase.from("campaigns").select("id, campaign_name, segment_id, status, sent_count, open_rate, reply_rate, bounce_rate");
-  if (filters.status) campaignsQuery = campaignsQuery.eq("status", filters.status);
-  if (filters.segmentId) campaignsQuery = campaignsQuery.eq("segment_id", filters.segmentId);
-  const [{ data: campaignsData }, { data: segmentsData }, { data: enrollmentsData }] = await Promise.all([
-    campaignsQuery,
-    supabase.from("segments").select("id, segment_name"),
+  const [{ data: campaigns }, { data: segmentsData }, { data: enrollments }] = await Promise.all([
+    fetchAll<{ id: string; campaign_name: string; segment_id: string | null; status: string; sent_count: number; open_rate: number; reply_rate: number; bounce_rate: number }>(
+      (from, to) => {
+        let q = supabase
+          .from("campaigns")
+          .select("id, campaign_name, segment_id, status, sent_count, open_rate, reply_rate, bounce_rate");
+        if (filters.status) q = q.eq("status", filters.status);
+        if (filters.segmentId) q = q.eq("segment_id", filters.segmentId);
+        return q.order("id").range(from, to);
+      },
+      { label: "campaign analytics campaigns" }
+    ),
+    fetchAll<{ id: string; segment_name: string }>(
+      (from, to) => supabase.from("segments").select("id, segment_name").order("id").range(from, to),
+      { label: "campaign analytics segments" }
+    ),
     // Scoped to the selected date range by enrollment date — the same
     // "cohort" pattern used elsewhere (Overview/Prospects): a campaign's
     // metrics reflect whoever was actually enrolled within the window,
     // not its all-time lifetime totals.
-    supabase.from("campaign_enrollments").select("campaign_id, lead_id, status, created_at")
-      .gte("created_at", range.from.toISOString()).lte("created_at", range.to.toISOString()),
+    // Paged: one row per enrolled lead per campaign, so an active workspace
+    // clears the cap in a single busy week and every campaign below the cut
+    // reported zero enrollments.
+    fetchAll<{ campaign_id: string; lead_id: string; status: string; created_at: string }>(
+      (from, to) =>
+        supabase
+          .from("campaign_enrollments")
+          .select("campaign_id, lead_id, status, created_at")
+          .gte("created_at", range.from.toISOString())
+          .lte("created_at", range.to.toISOString())
+          .order("id")
+          .range(from, to),
+      { label: "campaign analytics enrollments" }
+    ),
   ]);
-  const campaigns = (campaignsData as { id: string; campaign_name: string; segment_id: string | null; status: string; sent_count: number; open_rate: number; reply_rate: number; bounce_rate: number }[]) || [];
-  const segmentNameById = new Map(((segmentsData as { id: string; segment_name: string }[]) || []).map((s) => [s.id, s.segment_name]));
-  const enrollments = (enrollmentsData as { campaign_id: string; lead_id: string; status: string; created_at: string }[]) || [];
+  const segmentNameById = new Map(segmentsData.map((s) => [s.id, s.segment_name]));
 
   const campaignIds = campaigns.map((c) => c.id);
   const enrolledLeadIdsByCampaign = new Map<string, Set<string>>();
@@ -120,17 +141,48 @@ export async function getCampaignsAnalytics(filters: CampaignsFilters): Promise<
 
   if (allEnrolledLeadIds.length) {
     const [{ data: leadRows }, { data: acts }, { data: meetings }] = await Promise.all([
-      supabase.from("leads").select("id, status").in("id", allEnrolledLeadIds),
-      supabase.from("lead_activities").select("lead_id, activity_type, metadata").in("lead_id", allEnrolledLeadIds).in("activity_type", ["EMAIL_CLICKED", "EMAIL_REPLIED"]),
-      supabase.from("meetings").select("lead_id").in("lead_id", allEnrolledLeadIds),
+      fetchAllIn(
+        allEnrolledLeadIds,
+        (chunk, from, to) =>
+          supabase.from("leads").select("id, status").in("id", chunk).order("id").range(from, to),
+        { label: "campaign analytics lead statuses" }
+      ),
+      fetchAllIn(
+        allEnrolledLeadIds,
+        (chunk, from, to) =>
+          supabase
+            .from("lead_activities")
+            .select("lead_id, activity_type, metadata")
+            .in("lead_id", chunk)
+            .in("activity_type", ["EMAIL_CLICKED", "EMAIL_REPLIED"])
+            .order("id")
+            .range(from, to),
+        { label: "campaign analytics activities" }
+      ),
+      fetchAllIn(
+        allEnrolledLeadIds,
+        (chunk, from, to) =>
+          supabase.from("meetings").select("lead_id").in("lead_id", chunk).order("id").range(from, to),
+        { label: "campaign analytics meetings" }
+      ),
     ]);
-    leadStatusById = new Map(((leadRows as { id: string; status: string }[]) || []).map((l) => [l.id, l.status]));
-    activityRows = (acts as typeof activityRows) || [];
-    meetingLeadIds = new Set(((meetings as { lead_id: string | null }[]) || []).map((m) => m.lead_id).filter(Boolean) as string[]);
+    leadStatusById = new Map((leadRows as { id: string; status: string }[]).map((l) => [l.id, l.status]));
+    activityRows = acts as typeof activityRows;
+    meetingLeadIds = new Set((meetings as { lead_id: string | null }[]).map((m) => m.lead_id).filter(Boolean) as string[]);
   }
   if (campaignIds.length) {
-    const { data: opps } = await supabase.from("opportunities").select("campaign_id, deal_value, stage").in("campaign_id", campaignIds);
-    for (const o of (opps as { campaign_id: string | null; deal_value: number; stage: OpportunityStage }[]) || []) {
+    const { data: opps } = await fetchAllIn(
+      campaignIds,
+      (chunk, from, to) =>
+        supabase
+          .from("opportunities")
+          .select("campaign_id, deal_value, stage")
+          .in("campaign_id", chunk)
+          .order("id")
+          .range(from, to),
+      { label: "campaign analytics opportunities" }
+    );
+    for (const o of opps as { campaign_id: string | null; deal_value: number; stage: OpportunityStage }[]) {
       if (!o.campaign_id) continue;
       if (!oppsByCampaign.has(o.campaign_id)) oppsByCampaign.set(o.campaign_id, []);
       oppsByCampaign.get(o.campaign_id)!.push({ deal_value: o.deal_value, stage: o.stage });
@@ -176,11 +228,18 @@ export async function getCampaignsAnalytics(filters: CampaignsFilters): Promise<
   // unused dead schema (confirmed: no query anywhere references it), so
   // steps are read from campaign_jobs instead, optionally scoped to one
   // campaign via filters.campaignId.
-  let jobsQuery = supabase.from("campaign_jobs").select("step_order, status");
-  if (filters.campaignId) jobsQuery = jobsQuery.eq("campaign_id", filters.campaignId);
-  else if (campaignIds.length) jobsQuery = jobsQuery.in("campaign_id", campaignIds);
-  const { data: jobsData } = campaignIds.length || filters.campaignId ? await jobsQuery : { data: [] };
-  const jobs = (jobsData as { step_order: number; status: string }[]) || [];
+  // Paged: campaign_jobs holds one row per lead per step, the highest-volume
+  // table in this file — the per-step funnel was built from a 1000-row slice.
+  const { data: jobs } = await fetchAllIn(
+    filters.campaignId ? null : campaignIds,
+    (chunk, from, to) => {
+      let q = supabase.from("campaign_jobs").select("step_order, status");
+      if (filters.campaignId) q = q.eq("campaign_id", filters.campaignId);
+      else if (chunk) q = q.in("campaign_id", chunk);
+      return q.order("id").range(from, to);
+    },
+    { label: "campaign analytics step jobs" }
+  );
   const byStep = new Map<number, { sent: number; failed: number; skipped: number; total: number }>();
   for (const j of jobs) {
     if (!byStep.has(j.step_order)) byStep.set(j.step_order, { sent: 0, failed: 0, skipped: 0, total: 0 });

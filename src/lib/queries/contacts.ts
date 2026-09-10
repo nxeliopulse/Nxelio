@@ -1,5 +1,6 @@
 "use server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
 import { isValidPhoneNumber } from "libphonenumber-js";
@@ -98,10 +99,16 @@ export async function getContactsCount(): Promise<number> {
 
 export async function getContacts(): Promise<ContactRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("contacts")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const { data, error } = await fetchAll<ContactRow>(
+    (from, to) =>
+      supabase
+        .from("contacts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to),
+    { label: "getContacts" }
+  );
   if (error) {
     console.error("getContacts error:", error.message, error.details, error.hint, error.code);
     return [];
@@ -233,9 +240,20 @@ export async function deleteContact(id: string) {
 
 export async function bulkDeleteContacts(ids: string[]) {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("contacts").delete().in("id", ids).select("id");
-  if (error) throw error;
-  if (!data || data.length === 0) throw new Error("None of the selected contacts could be deleted.");
+  // Chunked: `ids` comes from a "select all" in the contacts table, so it can
+  // be every contact in the workspace — one `.in()` that long overruns the
+  // request URL and the delete fails outright.
+  const deleted: { id: string }[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase
+      .from("contacts")
+      .delete()
+      .in("id", ids.slice(i, i + 100))
+      .select("id");
+    if (error) throw error;
+    deleted.push(...((data as { id: string }[]) ?? []));
+  }
+  if (deleted.length === 0) throw new Error("None of the selected contacts could be deleted.");
   revalidatePath("/contacts");
   await logAudit({ action: "contact.bulk_deleted", entityType: "contact", metadata: { count: ids.length, ids } });
 }

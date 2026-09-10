@@ -48,7 +48,7 @@ export default async function DashboardPage() {
 
   const { data: recentDeals } = await supabase
     .from("opportunities")
-    .select("id, name, stage, deal_value, contact_name, created_at")
+    .select("id, name, stage, deal_value, contact_name, created_at, expected_close_date")
     .order("created_at", { ascending: false })
     .limit(8);
 
