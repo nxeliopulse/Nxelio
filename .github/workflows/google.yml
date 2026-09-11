@@ -36,7 +36,9 @@ name: 'Build and Deploy to GKE'
 on:
   push:
     branches:
-      - '"main"'
+      # Quoted as '"main"' this matched a branch literally named `"main"`, so
+      # the workflow never once ran on a push to main.
+      - main
 
 env:
   PROJECT_ID: 'my-project' # TODO: update to your Google Cloud project ID

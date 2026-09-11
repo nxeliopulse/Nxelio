@@ -113,10 +113,21 @@ export function AnalyticsShell({
     };
   }, [dropdownOpen]);
 
-  // Close dropdown on route change
-  useEffect(() => {
+  // Close dropdown on route change.
+  //
+  // Adjusting state during render rather than in an effect: React re-runs this
+  // component immediately with the new state before committing anything to the
+  // DOM, so the dropdown is never painted open on the new route. The effect
+  // version (setDropdownOpen(false) in a useEffect keyed on the route) rendered
+  // the new page with the menu still open for one frame, then re-rendered to
+  // close it — a visible flash, and the cascading render the
+  // react-hooks/set-state-in-effect rule exists to catch.
+  const routeKey = `${pathname}?${searchParams}`;
+  const [lastRouteKey, setLastRouteKey] = useState(routeKey);
+  if (routeKey !== lastRouteKey) {
+    setLastRouteKey(routeKey);
     setDropdownOpen(false);
-  }, [pathname, searchParams]);
+  }
 
   const activeDomain = DOMAIN_ITEMS.find((d) => pathname.startsWith(d.href));
 
