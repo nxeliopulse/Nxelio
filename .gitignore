@@ -51,3 +51,4 @@ next-env.d.ts
 # HubSpot config file
 hubspot.config.yml
 nxelio-hubspot-sync/
+.claude/settings.local.json
