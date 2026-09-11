@@ -33,12 +33,29 @@
 
 name: 'Build and Deploy to GKE'
 
+# MANUAL ONLY, on purpose — this workflow is not wired up yet.
+#
+# Two separate problems were hiding each other. The branch filter was
+# '"main"' (quotes included), which matches a branch literally named
+# `"main"`, so the workflow had never run once. And every value in the `env`
+# block below is still the Google sample template's placeholder. Fixing only
+# the filter made it run and fail on every push to main:
+#
+#   Error: failed to generate Google Cloud federated token for
+#   //iam.googleapis.com/projects/123456789/.../my-pool/providers/my-provider
+#   {"error":"invalid_target", ... "the pool or provider ... doesn't exist"}
+#
+# Production deploys go through Vercel today, so a red X on every commit
+# would be pure noise. workflow_dispatch keeps this runnable on demand from
+# the Actions tab without touching normal pushes.
+#
+# TO ENABLE FOR REAL: fill in the seven values in `env` plus
+# WORKLOAD_IDENTITY_PROVIDER, run it once manually to confirm it works, then
+# add back:
+#   push:
+#     branches: [main]
 on:
-  push:
-    branches:
-      # Quoted as '"main"' this matched a branch literally named `"main"`, so
-      # the workflow never once ran on a push to main.
-      - main
+  workflow_dispatch:
 
 env:
   PROJECT_ID: 'my-project' # TODO: update to your Google Cloud project ID
