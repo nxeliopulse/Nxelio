@@ -491,7 +491,7 @@ export function BookDemoModal({ open, onClose }: { open: boolean; onClose: () =>
                   <div className="mt-5 text-sm text-slate-500 leading-relaxed">
                     <p className="font-bold text-slate-700 mb-1.5">See Nxelio Nurture in Action</p>
                     <p>
-                      Watch how Nxelio Nurture's <span className="font-semibold text-slate-700">AI planner, multi-channel outreach, and pipeline analytics</span> help your team turn more leads into revenue — walked through live for your industry and team size.
+                      Watch how Nxelio Nurture&apos;s <span className="font-semibold text-slate-700">AI planner, multi-channel outreach, and pipeline analytics</span> help your team turn more leads into revenue — walked through live for your industry and team size.
                     </p>
                   </div>
 

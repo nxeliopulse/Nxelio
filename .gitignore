@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the secret-free template, which documents every variable the code
+# reads. Keep it committed so a new checkout can be configured without guessing.
+!.env.example
 
 # load-test account credentials/session tokens — never commit real
 # passwords or session cookies, even for test-only accounts

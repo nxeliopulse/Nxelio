@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from "react";
 import { X, Phone, PhoneOff, ChevronDown } from "lucide-react";
 import { askLandingAssistant, type LandingChatMessage } from "@/lib/ai/landing-chat";
 
@@ -21,6 +21,13 @@ function getSR(): SRConstructor | null {
     (window as unknown as { webkitSpeechRecognition?: SRConstructor }).webkitSpeechRecognition ||
     null
   );
+}
+
+/** useSyncExternalStore subscriber for a value that never changes after mount.
+ *  Module-level so its identity is stable — an inline arrow would be a new
+ *  function each render and make React re-subscribe every time. */
+function subscribeNever(): () => void {
+  return () => {};
 }
 
 function pickFemaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
@@ -74,7 +81,18 @@ export function AiAssistantWidget() {
   const [listening, setListening]     = useState(false);
   const [speaking, setSpeaking]       = useState(false);
   const [thinking, setThinking]       = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
+  // Whether this browser can do speech recognition + synthesis at all.
+  //
+  // Read through useSyncExternalStore rather than set from an effect: it is a
+  // fixed fact about the browser, not state that changes, and the server has
+  // no `window` to check. The server snapshot (false) matches the first client
+  // render, so hydration stays consistent, and React then reads the real value
+  // — with no setState-in-an-effect and no extra render pass.
+  const speechSupported = useSyncExternalStore(
+    subscribeNever,
+    () => Boolean(getSR()) && "speechSynthesis" in window,
+    () => false,
+  );
   const [micError, setMicError]       = useState<string | null>(null);
 
   const chatRef          = useRef<LandingChatMessage[]>([]);
@@ -89,6 +107,12 @@ export function AiAssistantWidget() {
   const speakingRef      = useRef(false);
   // Always-current handleUserSpeech — startMic calls this ref so it never goes stale
   const handleUserSpeechRef = useRef<(text: string) => void>(() => {});
+
+  // Same trick for startMic's own restart paths. startMic re-arms itself after
+  // a recognition end/error, and a `const` arrow cannot name itself without
+  // reading its own binding before it is initialised. Going through a ref
+  // keeps the retry pointed at the current startMic instead.
+  const startMicRef = useRef<() => void>(() => {});
   const micFailCount     = useRef(0);
   // Monotonic id for the live mic attempt. Every startMic() bumps it, which
   // instantly invalidates every older recognition instance's callbacks — the
@@ -104,7 +128,6 @@ export function AiAssistantWidget() {
   // Load voices — may fire immediately or after onvoiceschanged
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setSpeechSupported(Boolean(getSR()) && "speechSynthesis" in window);
     function loadVoices() {
       const voices = window.speechSynthesis.getVoices();
       if (voices.length > 0) voiceRef.current = pickFemaleVoice(voices);
@@ -135,13 +158,6 @@ export function AiAssistantWidget() {
     setMicError(null);
   }, [clearTtsTimers]);
 
-  const retryMic = useCallback(() => {
-    micFailCount.current = 0;
-    micFatalRef.current = false; // user is explicitly re-granting — allow another attempt
-    setMicError(null);
-    startMic();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const endCall = useCallback(() => {
     callActiveRef.current = false;
     stopAll();
@@ -152,9 +168,15 @@ export function AiAssistantWidget() {
     callSecsRef.current = 0;
   }, [stopAll]);
 
-  useEffect(() => {
-    if (!open && callActive) endCall();
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Closing the panel hangs up. Done here, in the one place that closes it,
+  // rather than in an effect watching `open`: ending the call is a real side
+  // effect (abort the mic, cancel speech synthesis, clear timers), not state
+  // being kept in sync, and the effect version fired a cascade of setStates
+  // one render after the panel had already gone.
+  const closePanel = useCallback(() => {
+    setOpen(false);
+    if (callActiveRef.current) endCall();
+  }, [endCall]);
 
   // ── TTS ────────────────────────────────────────────────────────────────────
   const speakText = useCallback((text: string, onDone?: () => void) => {
@@ -242,7 +264,7 @@ export function AiAssistantWidget() {
       if (settled || isStale()) return;
       settled = true;
       setTimeout(() => {
-        if (session === micSessionRef.current && callActiveRef.current && !micFatalRef.current) startMic();
+        if (session === micSessionRef.current && callActiveRef.current && !micFatalRef.current) startMicRef.current();
       }, delayMs);
     }
 
@@ -307,7 +329,7 @@ export function AiAssistantWidget() {
         setMicError("Something went wrong starting the microphone. Please try again.");
       } else if (callActiveRef.current) {
         setTimeout(() => {
-          if (session === micSessionRef.current && callActiveRef.current && !micFatalRef.current) startMic();
+          if (session === micSessionRef.current && callActiveRef.current && !micFatalRef.current) startMicRef.current();
         }, 1_000);
       }
     } finally {
@@ -315,15 +337,23 @@ export function AiAssistantWidget() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── AI response ─────────────────────────────────────────────────────────
-  // Keep the ref in sync so startMic (a useCallback with [] deps) always
-  // calls the latest version and never captures a stale closure. Done in an
-  // effect rather than during render — a render that React throws away must
-  // not be able to leave a dangling handler behind.
+  // Point the restart ref at the live startMic, for the self-retry paths above.
   useEffect(() => {
-    handleUserSpeechRef.current = handleUserSpeech;
-  });
+    startMicRef.current = startMic;
+  }, [startMic]);
 
+  // Declared after startMic, not before it: retryMic calls startMic, and a
+  // `const` arrow referencing a later `const` reads it out of declaration
+  // order. It happened to work because the call only runs on click, but the
+  // ordering is genuinely wrong and the linter is right to flag it.
+  const retryMic = useCallback(() => {
+    micFailCount.current = 0;
+    micFatalRef.current = false; // user is explicitly re-granting — allow another attempt
+    setMicError(null);
+    startMic();
+  }, [startMic]);
+
+  // ── AI response ─────────────────────────────────────────────────────────
   function handleUserSpeech(text: string) {
     recognitionRef.current?.abort(); // stop mic while AI is thinking
     recognitionRef.current = null;
@@ -362,6 +392,15 @@ export function AiAssistantWidget() {
         }
       });
   }
+
+  // Keep the ref in sync so startMic (a useCallback with [] deps) always
+  // calls the latest handleUserSpeech and never captures a stale closure.
+  // Done in an effect rather than during render — a render that React throws
+  // away must not be able to leave a dangling handler behind. Placed after
+  // handleUserSpeech so it never reads it ahead of its declaration.
+  useEffect(() => {
+    handleUserSpeechRef.current = handleUserSpeech;
+  });
 
   // ── Call start ─────────────────────────────────────────────────────────
   function startCall() {
@@ -415,7 +454,7 @@ export function AiAssistantWidget() {
                 className="h-8 w-8 rounded-full object-cover flex-shrink-0 ring-2 ring-white/40"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               <span className="flex-1 text-sm font-semibold">AI Assistant is Online!</span>
-              <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-white/20">
+              <button onClick={closePanel} className="p-1 rounded hover:bg-white/20">
                 <ChevronDown className="h-4 w-4" />
               </button>
             </div>
@@ -541,7 +580,7 @@ export function AiAssistantWidget() {
       )}
 
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? closePanel() : setOpen(true))}
         aria-label={open ? "Close AI assistant" : "Talk to Nxelio AI"}
         className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full text-white shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
         style={{ background: PURPLE, boxShadow: "0 8px 24px rgba(124,58,237,.5)" }}>
