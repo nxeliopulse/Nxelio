@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import DOMPurify from "isomorphic-dompurify";
+import { sanitizeRichText } from "@/lib/sanitize-rich-text";
 import { Crown, Building2, UserCheck, Users2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,8 @@ import type { FieldDefinition } from "@/core/engine/types";
  *  (add-deal-modal.tsx) — it's stored as HTML, so it must be sanitized and
  *  rendered as HTML rather than escaped plain text, or literal tags show up
  *  on screen. */
-const NOTES_SANITIZE_OPTS = { ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "span", "h1", "h2", "h3"], ALLOWED_ATTR: ["href", "target", "rel", "style"] };
 function safeNotesHtml(html: string): string {
-  return DOMPurify.sanitize(html, NOTES_SANITIZE_OPTS);
+  return sanitizeRichText(html);
 }
 
 function stageBadgeVariant(stage: OpportunityStage): "default" | "blue" | "purple" | "warning" | "success" | "danger" {
