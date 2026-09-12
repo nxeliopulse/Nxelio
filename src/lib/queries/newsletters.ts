@@ -79,7 +79,13 @@ export async function getNewsletterStats() {
 
 export async function getNewsletterById(id: string): Promise<NewsletterRow | null> {
   const supabase = await createClient();
-  const { data } = await supabase.from("newsletters").select("*").eq("id", id).single();
+  const { data, error } = await supabase.from("newsletters").select("*").eq("id", id).single();
+  // A missing row is a legitimate null (deleted, or not visible to this user).
+  // Anything else is a real failure and was previously indistinguishable from
+  // "not found", which is how the builder silently opened a blank draft.
+  if (error && error.code !== "PGRST116") {
+    console.error("getNewsletterById failed", { id, code: error.code, message: error.message });
+  }
   return (data as NewsletterRow) || null;
 }
 

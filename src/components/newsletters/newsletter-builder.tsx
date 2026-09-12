@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useTransition, useRef } from "react";
+import { useState, useTransition, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
-import { createNewsletter, updateNewsletter, getNewsletterById, type NewsletterBlock, type NewsletterRow } from "@/lib/queries/newsletters";
+import { createNewsletter, updateNewsletter, type NewsletterBlock, type NewsletterRow } from "@/lib/queries/newsletters";
 import { sendNewsletter, sendTestNewsletter, previewNewsletterHtml } from "@/lib/email/newsletter-actions";
 import { generateNewsletter } from "@/lib/ai/actions";
 import type { SegmentRow } from "@/lib/queries/segments";
@@ -61,13 +61,16 @@ interface EmailStatus {
 export function NewsletterBuilder({
   segments,
   email,
+  initial = null,
 }: {
   segments: (SegmentRow & { contacts: number })[];
   email: EmailStatus;
+  /** The newsletter being edited, already loaded by the page for a ?id= URL. */
+  initial?: NewsletterRow | null;
 }) {
   const router = useRouter();
   const params = useSearchParams();
-  const id = params.get("id");
+  const id = initial?.id ?? params.get("id");
   const templateParam = params.get("template");
   // Editing an existing newsletter, or arriving with a ?template= deep link, skips the gallery.
   const [templatePicked, setTemplatePicked] = useState(Boolean(id) || Boolean(templateParam));
@@ -98,6 +101,21 @@ export function NewsletterBuilder({
     segment_id: string | null;
     status: string;
   }>(() => {
+    // Editing an existing newsletter: the page already loaded it, so seed the
+    // form from it directly. Keeping `id` here is what makes Save update this
+    // newsletter instead of creating a new one.
+    if (initial) {
+      return {
+        id: initial.id,
+        title: initial.title,
+        subject: initial.subject || "",
+        preheader: initial.preheader || "",
+        blocks: initial.content?.blocks || [],
+        audience_type: initial.audience_type,
+        segment_id: initial.segment_id,
+        status: initial.status,
+      };
+    }
     const preset = templateParam ? newsletterTemplates.find((t) => t.id === templateParam) : null;
     return {
       title: preset ? preset.name : "Untitled newsletter",
@@ -114,24 +132,6 @@ export function NewsletterBuilder({
       status: "Draft",
     };
   });
-
-  // Load existing newsletter if id present
-  useEffect(() => {
-    if (!id) return;
-    getNewsletterById(id).then((row: NewsletterRow | null) => {
-      if (!row) return;
-      setData({
-        id: row.id,
-        title: row.title,
-        subject: row.subject || "",
-        preheader: row.preheader || "",
-        blocks: row.content?.blocks || [],
-        audience_type: row.audience_type,
-        segment_id: row.segment_id,
-        status: row.status,
-      });
-    });
-  }, [id]);
 
   function pickTemplate(templateId: string) {
     const tpl = newsletterTemplates.find((t) => t.id === templateId);
