@@ -96,7 +96,7 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
   if (openId && openSummary) {
     const alreadyImported = isImported(openSummary);
     return (
-      <div className="max-w-[1200px] mx-auto w-full">
+      <div className="max-w-[1200px] mx-auto w-full pb-28">
         <button onClick={() => setOpenId(null)} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Purchased Leads
         </button>
@@ -143,7 +143,7 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
   const importedCount = jobs.filter((j) => isImported(j)).length;
 
   return (
-    <div className="max-w-[1200px] mx-auto w-full">
+    <div className="max-w-[1200px] mx-auto w-full pb-28">
       <Link href="/leads" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-4">
         <ArrowLeft className="h-4 w-4" /> Back to Prospects
       </Link>
@@ -190,57 +190,81 @@ export function VerifiedLeadsJobsView({ initialJobs }: { initialJobs: LeadSearch
             </Card>
           </div>
 
-          <Card className="overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-2.5 text-left font-semibold">Criteria</th>
-                  <th className="px-4 py-2.5 text-left font-semibold">Requested</th>
-                  <th className="px-4 py-2.5 text-left font-semibold">Found</th>
-                  <th className="px-4 py-2.5 text-left font-semibold">Status</th>
-                  <th className="px-4 py-2.5 text-left font-semibold">Requested on</th>
-                  <th className="px-4 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {jobs.map((j) => (
-                  <tr key={j.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                      <span className="flex items-center gap-2.5">
-                        <span className="h-8 w-8 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
-                          <ShoppingCart className="h-4 w-4" />
-                        </span>
-                        <span>
-                          <span className="font-medium text-slate-900 dark:text-white">{[j.criteria.role, j.criteria.industry].filter(Boolean).join(" · ") || "Any"}</span>
-                          {j.criteria.locations?.length ? <span className="text-slate-400"> · {j.criteria.locations.join(", ")}</span> : null}
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{j.requestedCount}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">{j.foundCount}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={j.status} />
-                      {(j.status === "pending" || j.status === "running") && j.timeEstimate && (
-                        <div className="text-[11px] text-slate-400 mt-1">usually {j.timeEstimate}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">{new Date(j.createdAt).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">
-                      {j.status === "done" && (
-                        <Button size="sm" variant={isImported(j) ? "outline" : "primary"} onClick={() => openJob(j.id)}>
-                          {isImported(j) ? "View" : "Review & import"}
-                        </Button>
-                      )}
-                      {j.status === "failed" && (
-                        <Button size="sm" variant="outline" onClick={() => openJob(j.id)}>View</Button>
-                      )}
-                    </td>
+          <Card className="overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[760px] text-left border-collapse">
+                <thead className="sticky top-0 z-10 bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-xs text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Criteria</th>
+                    <th className="px-4 py-3 font-semibold">Requested</th>
+                    <th className="px-4 py-3 font-semibold">Found</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Requested on</th>
+                    <th className="px-4 py-3 text-right font-semibold">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {jobs.map((j) => (
+                    <tr key={j.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/50 transition-colors">
+                      <td className="px-4 py-3.5 text-slate-700 dark:text-slate-300">
+                        <span className="flex items-center gap-2.5">
+                          <span className="h-8 w-8 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                            <ShoppingCart className="h-4 w-4" />
+                          </span>
+                          <span>
+                            <span className="font-medium text-slate-900 dark:text-white">{[j.criteria.role, j.criteria.industry].filter(Boolean).join(" · ") || "Any"}</span>
+                            {j.criteria.locations?.length ? <span className="text-slate-400"> · {j.criteria.locations.join(", ")}</span> : null}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-xs">
+                          {j.requestedCount}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold text-xs border border-emerald-200/50 dark:border-emerald-900/50">
+                          {j.foundCount}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <StatusBadge status={j.status} />
+                        {(j.status === "pending" || j.status === "running") && j.timeEstimate && (
+                          <div className="text-[11px] text-slate-400 mt-1">usually {j.timeEstimate}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-500">{new Date(j.createdAt).toLocaleString()}</td>
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end">
+                          {j.status === "done" && (
+                            <Button
+                              size="sm"
+                              variant={isImported(j) ? "outline" : "primary"}
+                              onClick={() => openJob(j.id)}
+                              className={isImported(j) ? "min-w-[110px] justify-center" : "min-w-[130px] justify-center shadow-xs"}
+                            >
+                              {isImported(j) ? (
+                                <>
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 mr-1.5" />
+                                  View
+                                </>
+                              ) : (
+                                "Review & import"
+                              )}
+                            </Button>
+                          )}
+                          {j.status === "failed" && (
+                            <Button size="sm" variant="outline" onClick={() => openJob(j.id)} className="min-w-[100px] justify-center">
+                              View
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </Card>
         </>
       )}
