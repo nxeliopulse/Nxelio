@@ -258,9 +258,15 @@ export function OpportunitiesTable({ initial }: { initial: OpportunityRow[]; sta
           </div>
         </div>
         {/* Opportunities can only be created from an Account's "Add Deal" flow (no standalone-create
-            endpoint exists), so this links to Accounts rather than faking an "Add Opportunity" form. */}
+            endpoint exists), so this links to Accounts rather than faking an "Add Opportunity" form.
+            The trailing chevron and the tooltip exist because a lone "+" reads as "opens a form here":
+            this navigates away, losing any search/filter/scroll state on this page, which is a
+            surprise worth signalling before the click rather than after it. */}
         <Link href="/accounts">
-          <Button><Plus className="h-4 w-4" /> Add a deal from an Account</Button>
+          <Button title="Deals are created from an account — this opens the Accounts page">
+            <Plus className="h-4 w-4" /> Add a deal from an Account
+            <ChevronRight className="h-4 w-4 opacity-70" />
+          </Button>
         </Link>
       </div>
 
