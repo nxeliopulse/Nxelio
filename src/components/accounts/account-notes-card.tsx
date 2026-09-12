@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { sanitizeRichText } from "@/lib/sanitize-rich-text";
+import DOMPurify from "isomorphic-dompurify";
 import { ChevronDown, FileText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
@@ -11,6 +11,7 @@ import { addAccountNoteComment, deleteAccountNote, updateAccountNote, type Accou
 import { formatDateTime } from "@/lib/utils";
 
 const AVATAR_COLORS = ["bg-teal-500", "bg-blue-500", "bg-purple-500", "bg-amber-500", "bg-rose-500", "bg-emerald-500"];
+const SANITIZE_OPTS = { ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "span", "h1", "h2", "h3"], ALLOWED_ATTR: ["href", "target", "rel", "style"] };
 
 function hashCode(str: string): number {
   let hash = 0;
@@ -38,7 +39,7 @@ function formatFileSize(bytes: number | null): string {
  *  of the server-side sanitize in account-notes.ts), and safely handles older
  *  plain-text notes that might contain literal "<"/">" characters. */
 function safeHtml(html: string): string {
-  return sanitizeRichText(html);
+  return DOMPurify.sanitize(html, SANITIZE_OPTS);
 }
 
 /** Notes logged against an account — with multiple file attachments and threaded
