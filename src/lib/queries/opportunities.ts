@@ -4,6 +4,11 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { notifyCurrentUser } from "@/lib/queries/notifications";
 import { logAudit } from "@/lib/queries/audit-log";
 import { revalidatePath } from "next/cache";
+// Opportunity `notes` is a TipTap rich-text body rendered with
+// dangerouslySetInnerHTML in opportunity-detail-view. Unlike contact and
+// account notes it had no cleaning at all on the way in, at any of the three
+// write sites below.
+import { sanitizeNoteHtml } from "@/lib/sanitize-note-html";
 import { AUTO_CLOSE_LOSS_REASON, CLOSED_STAGES, type OpportunityRow, type OpportunityStage, type PipelineStats } from "@/lib/opportunities";
 
 /**
@@ -182,7 +187,7 @@ export async function createOpportunityFromContact(input: CreateOpportunityFromC
       tags: input.tags ?? null,
       priority: input.priority ?? null,
       projects: input.projects ?? null,
-      notes: input.notes ?? null,
+      notes: sanitizeNoteHtml(input.notes) ?? null,
       owner_id: input.ownerId ?? user?.id ?? null,
     })
     .select()
@@ -257,7 +262,7 @@ export async function createOpportunityFromAccount(input: CreateOpportunityFromA
       tags: input.tags ?? null,
       priority: input.priority ?? null,
       projects: input.projects ?? null,
-      notes: input.notes ?? null,
+      notes: sanitizeNoteHtml(input.notes) ?? null,
       owner_id: input.ownerId ?? user?.id ?? null,
     })
     .select()
@@ -320,7 +325,7 @@ export async function updateOpportunity(id: string, input: UpdateOpportunityInpu
   if (input.contactEmail !== undefined) patch.contact_email = input.contactEmail;
   if (input.dealValue !== undefined) patch.deal_value = input.dealValue;
   if (input.expectedCloseDate !== undefined) patch.expected_close_date = input.expectedCloseDate || null;
-  if (input.notes !== undefined) patch.notes = input.notes;
+  if (input.notes !== undefined) patch.notes = sanitizeNoteHtml(input.notes);
   if (input.stage !== undefined) {
     patch.stage = input.stage;
     patch.closed_at = CLOSED_STAGES.includes(input.stage) ? new Date().toISOString() : null;
