@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { X, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,12 @@ export function TourOverlay({
     setViewport({ w: window.innerWidth, h: window.innerHeight });
   }, [step]);
 
+  // Held in a ref: onNext is rebuilt on every provider render, so putting it in
+  // the measure effect deps below would restart the scroll/measure cycle
+  // constantly while a step is on screen.
+  const onNextRef = useRef(onNext);
+  useEffect(() => { onNextRef.current = onNext; }, [onNext]);
+
   useEffect(() => {
     // No cleared state here on the early-return paths: `step`/`rect` being
     // stale is harmless since the render guard below already returns null
@@ -50,7 +56,15 @@ export function TourOverlay({
     // call refreshes both.
     if (!step) return;
     const el = document.querySelector(`[data-tour-id="${step.id}"]`);
-    if (!el) return;
+    if (!el) {
+      // The anchor is not on the page — a dashboard widget the user removed, or
+      // markup that changed without its data-tour-id. The render guard below
+      // returns null for such a step, which left the tour *active but
+      // invisible*, with no control to advance and no way out but a reload.
+      // Skip ahead instead; onNext ends the tour if this was the last step.
+      onNextRef.current();
+      return;
+    }
     el.scrollIntoView({ block: "center", behavior: "smooth" });
     // Give the smooth-scroll a moment to settle before measuring.
     const settleTimer = setTimeout(measure, 300);

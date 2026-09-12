@@ -1116,8 +1116,11 @@ function RevenueProjectionCard({
   }));
   const hasData = data.some((d) => d.expected > 0 || d.closed > 0);
 
+  // data-tour-id below anchors DASHBOARD_TOUR_STEPS[1] — see the note on the
+  // dashboard <h1>. This card is user-rearrangeable, so when the widget is not
+  // on the board the overlay skips that step rather than stalling on it.
   return (
-    <Card className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
+    <Card data-tour-id="dashboard-revenue-chart" className="bg-white dark:bg-[#1b212e] border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs p-5 h-[360px] flex flex-col justify-between">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
         <div>
           <h5 className="text-base font-bold text-slate-900 dark:text-white">Revenue Projection</h5>
@@ -2359,7 +2362,10 @@ export function DashboardView({
               {dateLabel ?? " "}
             </span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          {/* data-tour-id anchors DASHBOARD_TOUR_STEPS[0]; the overlay renders
+              nothing at all for a step whose target is absent, so removing this
+              silently kills the whole dashboard tour. */}
+          <h1 data-tour-id="dashboard-welcome" className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             {greeting}, {firstName}! 👋
           </h1>
           <p className="text-xs text-slate-500 dark:text-white font-medium mt-0.5">Here&apos;s what&apos;s happening with your leads today.</p>

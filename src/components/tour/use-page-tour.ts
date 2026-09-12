@@ -17,10 +17,12 @@ export function usePageTour(pageKey: string, steps: TourStep[], version = "1") {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  // Read the value, not the params object, so it can be an effect dependency.
+  const tourParam = params.get("tour");
 
   useEffect(() => {
     let cancelled = false;
-    const forced = params.get("tour") === pageKey;
+    const forced = tourParam === pageKey;
 
     (async () => {
       if (forced) {
@@ -35,6 +37,6 @@ export function usePageTour(pageKey: string, steps: TourStep[], version = "1") {
     })();
 
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed only on pageKey; re-running on every `active`/`start` identity change would fight the tour's own state transitions
-  }, [pageKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `active`/`start` are deliberately excluded: re-running on their identity changes would fight the tour's own state transitions. `tourParam` must be included, though — "Replay product tour" pushes ?tour=<key> while the user is usually ALREADY on that page, which is a same-route navigation that remounts nothing. Keyed on pageKey alone the effect never re-ran, `forced` was never recomputed, and the button silently did nothing.
+  }, [pageKey, tourParam]);
 }
