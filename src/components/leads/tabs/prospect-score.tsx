@@ -62,8 +62,8 @@ export function ProspectScoreTab({ leadId, initialResult }: { leadId: string; in
       <Card className="p-5">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h3 className="font-semibold text-slate-900">AI Prospect Insights Breakdown</h3>
-            <p className="text-sm text-slate-500 mt-0.5">AI opinion: <span className="font-bold text-slate-900">{result.overallScore}/100</span> <span className="text-xs text-slate-400">(separate from this lead&apos;s official Score)</span></p>
+            <h3 className="font-semibold text-slate-900">AI opinion: <span className="font-bold">{result.overallScore}/100</span></h3>
+            <p className="text-xs text-slate-400 mt-0.5">Separate from this lead&apos;s official Score, shown on the lead page.</p>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="purple"><Sparkles className="h-3 w-3" /> AI Generated</Badge>

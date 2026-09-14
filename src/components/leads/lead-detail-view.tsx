@@ -1184,7 +1184,7 @@ export function LeadDetailView({
             <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-blue-600" />
-                <h3 className="font-bold text-lg text-slate-900 dark:text-white">AI Prospect Score Breakdown</h3>
+                <h3 className="font-bold text-lg text-slate-900 dark:text-white">AI Prospect Insights</h3>
               </div>
               <button onClick={() => setShowAiScoreDrawer(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-[var(--muted)]">
                 <X className="h-5 w-5" />
