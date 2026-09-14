@@ -7,6 +7,7 @@ import { SubscriptionGate } from "@/components/billing/subscription-gate";
 import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
 import { getCurrentWorkspace } from "@/lib/queries/workspaces";
 import { isPlatformAdminEmail } from "@/lib/auth/platform-admin-identity";
+import { resolveAppGate } from "@/lib/auth/app-gate-rules";
 import { getIdleTimeoutMinutes, getWarningLeadMinutes } from "@/lib/idle-timeout-config";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -31,8 +32,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // need `user`, which we already have. Issued as one batch, the page waits
   // for the slowest instead of the sum.
   //
-  // The gates below are still evaluated in their original order (subscription
-  // before onboarding) — only the fetching is parallel, not the decisions. The
+  // Only the fetching is parallel; the gate decisions below still run in a
+  // fixed order, and that order is deliberate (see app-gate-rules.ts). The
   // cost is that a gated user now also fetches a profile and workspace it will
   // not render; that is a rare path, and worth it to take four round-trips off
   // the common one.
@@ -76,13 +77,29 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
 
-  // Subscription gate first — a cancelled user should see the subscription
-  // page, not be stuck on the onboarding gate they can never complete.
-  if (!subscription || subscription.status === "canceled") return <SubscriptionGate />;
+  // Which gate to show is pure logic, and it decides whether someone reaches
+  // the product at all — so it lives in app-gate-rules.ts where it is unit
+  // tested (scripts/test-app-gate-rules.mjs) rather than being provable only
+  // by signing in as four different kinds of user.
+  const gate = resolveAppGate({
+    subscriptionStatus: subscription?.status,
+    hasSubscription: Boolean(subscription),
+    onboardingCompleted: onboardingStatus.completed,
+  });
 
-  // Onboarding gate — runs after subscription check so cancelled users
-  // aren't blocked behind an onboarding step they can't proceed past.
-  if (!onboardingStatus.completed) return <OnboardingGate status={onboardingStatus} />;
+  if (gate === "cancelled-subscription") {
+    console.info("[app-gate] pricing shown: subscription cancelled", { userId: user.id });
+    return <SubscriptionGate />;
+  }
+  if (gate === "onboarding") return <OnboardingGate status={onboardingStatus} />;
+  if (gate === "no-subscription") {
+    // getSubscription() also returns null when its query FAILS, which is
+    // indistinguishable from "never subscribed" here — that is how a paying
+    // customer can be shown the pricing page mid-login. Its own error branch
+    // logs loudly; pair the two lines when diagnosing.
+    console.info("[app-gate] pricing shown: no subscription row (or lookup failed)", { userId: user.id });
+    return <SubscriptionGate />;
+  }
 
   const userName = profile?.full_name || user.email?.split("@")[0] || "User";
   const userEmail = profile?.email || user.email || "";

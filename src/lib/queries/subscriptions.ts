@@ -21,7 +21,17 @@ export async function getSubscription(): Promise<SubscriptionWithPlan | null> {
     .select("*, plan:subscription_plans(*)")
     .maybeSingle();
   if (error) {
-    console.error("[getSubscription] query failed:", error.message);
+    // A failed lookup is NOT the same thing as "this workspace has no
+    // subscription", but both return null here and every caller treats null as
+    // the latter. For the app layout that means a paying customer can be shown
+    // the pricing page — and invited to buy a plan they already have — because
+    // one query hiccuped. Logged loudly with the code so it can be told apart
+    // from a genuine new signup in the server logs.
+    console.error("[getSubscription] LOOKUP FAILED — caller will treat this as 'no subscription'", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+    });
     return null;
   }
   return data as SubscriptionWithPlan | null;
