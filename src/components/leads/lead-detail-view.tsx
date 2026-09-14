@@ -841,12 +841,12 @@ export function LeadDetailView({
             <div className="flex items-center gap-2">
               <Sparkles className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
               <div className="text-xs">
-                <h4 className="font-bold text-slate-800 dark:text-slate-700">AI Score Breakdown</h4>
+                <h4 className="font-bold text-slate-800 dark:text-slate-700">Lead Score</h4>
                 <p className="text-slate-500 dark:text-slate-500">Score: {lead.lead_score} / 100</p>
               </div>
             </div>
             <Button size="sm" onClick={() => setShowAiScoreDrawer(true)} variant="outline" className="text-xs font-semibold py-1 px-2.5 h-auto">
-              Analyze
+              AI Insights
             </Button>
           </Card>
         </div>
