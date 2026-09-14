@@ -87,7 +87,19 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus> {
     return { completed: false, profileComplete: false, businessComplete: false, mailboxComplete: false, grandfathered: false, data: null, profile: null };
   }
 
-  const wsId = await currentWorkspaceId(supabase);
+  // The users row only needs user.id, so it does not have to wait on the
+  // workspace lookup. Started together: this function runs on every app page
+  // (via the layout) and again at login, so its internal round-trips are on
+  // the critical path twice.
+  const [wsId, { data: userRow, error: userErr }] = await Promise.all([
+    currentWorkspaceId(supabase),
+    supabase
+      .from("users")
+      .select("full_name, email, phone, job_title, avatar_url")
+      .eq("user_id", user.id)
+      .single(),
+  ]);
+
   let businessComplete = true;
   let grandfathered = false;
   let onboardingData: OnboardingData | null = null;
@@ -107,11 +119,6 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus> {
 
   let profileComplete = true;
   let profile: OnboardingProfile | null = null;
-  const { data: userRow, error: userErr } = await supabase
-    .from("users")
-    .select("full_name, email, phone, job_title, avatar_url")
-    .eq("user_id", user.id)
-    .single();
   if (!userErr && userRow) {
     profile = userRow as OnboardingProfile;
     profileComplete = Boolean(profile.phone?.trim() && profile.job_title?.trim());
