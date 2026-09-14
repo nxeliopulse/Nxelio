@@ -50,6 +50,7 @@ interface LeadRow {
   country: string | null;
   status: string;
   lead_score: number;
+  ai_score: unknown;
   linkedin: string | null;
   website_url: string | null;
   owner_id: string | null;
@@ -193,7 +194,7 @@ export async function getProspectsAnalytics(filters: ProspectsFilters): Promise<
     (chunk, from, to) => {
       let q = supabase
         .from("leads")
-        .select("id, full_name, company_name, job_title, source, industry, company_size, country, status, lead_score, linkedin, website_url, owner_id, created_at, updated_at");
+        .select("id, full_name, company_name, job_title, source, industry, company_size, country, status, lead_score, ai_score, linkedin, website_url, owner_id, created_at, updated_at");
       if (chunk) q = q.in("id", chunk);
       if (ownerIds) q = q.in("owner_id", ownerIds);
       if (filters.source) q = q.eq("source", filters.source);
@@ -247,7 +248,7 @@ export async function getProspectsAnalytics(filters: ProspectsFilters): Promise<
   // ── KPIs ──────────────────────────────────────────────────────────────
   const newInRange = leads.filter((l) => new Date(l.created_at) >= range.from && new Date(l.created_at) <= range.to);
   const enriched = leads.filter(isEnriched);
-  const aiScored = leads.filter((l) => (l.lead_score || 0) > 0);
+  const aiScored = leads.filter((l) => l.ai_score != null);
   const highPriority = leads.filter((l) => (l.lead_score || 0) >= HIGH_PRIORITY_SCORE_THRESHOLD);
   const qualifiedInRange = leads.filter((l) => l.status === "Qualified" && new Date(l.updated_at) >= range.from && new Date(l.updated_at) <= range.to);
 

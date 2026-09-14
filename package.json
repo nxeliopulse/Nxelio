@@ -27,7 +27,9 @@
     "test:reconcile-rules": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-subscription-reconcile-rules.mjs",
     "test:cancellation-types": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-cancellation-types.mjs",
     "test:stripe-price-mode": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-stripe-price-mode.mjs scripts/test-trial-rules.mjs scripts/test-subscription-reconcile-rules.mjs",
-    "test:unit": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs scripts/test-subscription-types.mjs scripts/test-cancellation-types.mjs scripts/test-idle-timeout.mjs scripts/test-stripe-price-mode.mjs scripts/test-trial-rules.mjs scripts/test-subscription-reconcile-rules.mjs scripts/test-sanitize-note-html.mjs"
+    "test:unit": "node --experimental-strip-types --experimental-loader ./scripts/ts-path-loader.mjs --test scripts/test-auth-errors.mjs scripts/test-subscription-types.mjs scripts/test-cancellation-types.mjs scripts/test-idle-timeout.mjs scripts/test-stripe-price-mode.mjs scripts/test-trial-rules.mjs scripts/test-subscription-reconcile-rules.mjs scripts/test-sanitize-note-html.mjs",
+    "test:stripe-lifecycle": "node scripts/test-stripe-lifecycle.mjs",
+    "test:stripe-api-security": "node scripts/test-stripe-api-security.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

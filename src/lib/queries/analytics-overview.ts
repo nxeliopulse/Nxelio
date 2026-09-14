@@ -22,6 +22,7 @@ interface CohortLead {
   id: string;
   status: string;
   lead_score: number;
+  ai_score: unknown;
   industry: string | null;
   linkedin: string | null;
   website_url: string | null;
@@ -223,7 +224,7 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
   const leadsPage = (from: number, to: number) => {
     let q = supabase
       .from("leads")
-      .select("id, status, lead_score, industry, linkedin, website_url, source, created_at, owner_id")
+      .select("id, status, lead_score, ai_score, industry, linkedin, website_url, source, created_at, owner_id")
       .gte("created_at", range.from.toISOString())
       .lte("created_at", range.to.toISOString());
     if (ownerIds) q = q.in("owner_id", ownerIds);
@@ -297,7 +298,7 @@ export async function getOverviewAnalytics(filters: OverviewFilters): Promise<Ov
   const cohortOpportunities = (oppsForCohortRes.data as { id: string; lead_id: string; stage: OpportunityStage; deal_value: number; created_at: string }[]) || [];
 
   const enrichedCount = leads.filter((l) => l.industry && (l.linkedin || l.website_url)).length;
-  const aiScoredCount = leads.filter((l) => (l.lead_score || 0) > 0).length;
+  const aiScoredCount = leads.filter((l) => l.ai_score != null).length;
   const qualifiedLeadCount = leads.filter((l) => l.status === "Qualified" || l.status === "Converted").length;
   const opportunitiesCreatedCount = new Set(cohortOpportunities.map((o) => o.lead_id)).size;
   const closedWonCohortCount = new Set(cohortOpportunities.filter((o) => o.stage === "won").map((o) => o.lead_id)).size;

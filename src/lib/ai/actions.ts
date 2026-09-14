@@ -141,20 +141,14 @@ Return JSON in exactly this shape (all scores 0-100 integers):
 
   const result = await aiJson<AiScoreResult>({ system, prompt, temperature: 0.5 });
 
-  // Persist the score so it actually sticks on the lead (previously the AI score
-  // was only shown on screen and never saved, leaving lead_score stuck at 0 —
-  // which made "Lead Score" segment rules and dashboard "AI scored" useless).
-  const score = Math.max(0, Math.min(100, Math.round(result.overallScore)));
-  if (Number.isFinite(score)) {
-    // Persist BOTH the headline number (for sorting/segments) and the full
-    // breakdown (so the dimensions/insight/next-steps reload on the lead).
-    try {
-      await updateLead(leadId, { lead_score: score, ai_score: result });
-    } catch {
-      // ai_score column not present yet (migration 0027 not applied) — still
-      // save the headline score so scoring keeps working.
-      await updateLead(leadId, { lead_score: score });
-    }
+  // lead_score is now owned entirely by the DB formula trigger (see migration
+  // 0163) — it is NOT written here anymore. This call only persists the AI's
+  // qualitative breakdown (dimensions/insight/next-steps) for display.
+  try {
+    await updateLead(leadId, { ai_score: result });
+  } catch {
+    // ai_score column not present yet (migration 0027 not applied) — nothing
+    // to persist in that case; the insights just won't reload after refresh.
   }
 
   await chargeCredits("lead_scoring", 1, { leadId });

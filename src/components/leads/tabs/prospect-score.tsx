@@ -41,9 +41,9 @@ export function ProspectScoreTab({ leadId, initialResult }: { leadId: string; in
         <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center mb-4">
           <Sparkles className="h-6 w-6 text-white" />
         </div>
-        <h3 className="font-semibold text-slate-900 mb-1">AI Prospect Scoring</h3>
+        <h3 className="font-semibold text-slate-900 mb-1">AI Prospect Insights</h3>
         <p className="text-sm text-slate-500 mb-5 max-w-md mx-auto">
-          Let AI analyze this lead across company fit, contact access, opportunity quality, and competitive position.
+          Let AI analyze this lead across company fit, contact access, opportunity quality, and competitive position. This does not change the lead&apos;s Score, which is calculated automatically from lead data.
         </p>
         {error && (
           <div className="flex items-center justify-center gap-2 text-sm text-red-600 mb-4">
@@ -51,7 +51,7 @@ export function ProspectScoreTab({ leadId, initialResult }: { leadId: string; in
           </div>
         )}
         <Button onClick={runScore} disabled={loading}>
-          {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing with AI...</> : <><Sparkles className="h-4 w-4" /> Generate AI Score</>}
+          {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing with AI...</> : <><Sparkles className="h-4 w-4" /> Generate AI Insights</>}
         </Button>
       </Card>
     );
@@ -62,8 +62,8 @@ export function ProspectScoreTab({ leadId, initialResult }: { leadId: string; in
       <Card className="p-5">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h3 className="font-semibold text-slate-900">AI Prospect Score Breakdown</h3>
-            <p className="text-sm text-slate-500 mt-0.5">Overall: <span className="font-bold text-slate-900">{result.overallScore}/100</span></p>
+            <h3 className="font-semibold text-slate-900">AI Prospect Insights Breakdown</h3>
+            <p className="text-sm text-slate-500 mt-0.5">AI opinion: <span className="font-bold text-slate-900">{result.overallScore}/100</span> <span className="text-xs text-slate-400">(separate from this lead&apos;s official Score)</span></p>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="purple"><Sparkles className="h-3 w-3" /> AI Generated</Badge>

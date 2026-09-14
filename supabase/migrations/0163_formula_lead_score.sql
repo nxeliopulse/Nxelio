@@ -1,0 +1,74 @@
+-- Replaces the old "AI decides the number" lead scoring with a transparent,
+-- rule-based formula computed by the database itself, so every lead gets a
+-- consistent, explainable score instead of an LLM guess (which was clustering
+-- leads at 20/30 whenever their profile fields were mostly empty).
+--
+-- Score = contact completeness (0-35) + source quality (0-25)
+--       + status/engagement (0-40), clamped to 0-100.
+-- Dead leads (opted out / do-not-contact) are forced to 0.
+-- Bounced-email leads are capped at 10 (still reachable by phone/LinkedIn,
+-- but clearly not worth email outreach).
+
+CREATE OR REPLACE FUNCTION calculate_lead_score(l leads) RETURNS INT AS $$
+DECLARE
+  contact_pts INT := 0;
+  source_pts  INT := 0;
+  engage_pts  INT := 0;
+  total INT;
+  src TEXT := lower(coalesce(l.source, ''));
+BEGIN
+  -- Contact completeness (max 35)
+  IF l.email IS NOT NULL AND l.email <> '' THEN contact_pts := contact_pts + 10; END IF;
+  IF l.phone IS NOT NULL AND l.phone <> '' THEN contact_pts := contact_pts + 10; END IF;
+  IF l.linkedin IS NOT NULL AND l.linkedin <> '' THEN contact_pts := contact_pts + 8; END IF;
+  IF l.website_url IS NOT NULL AND l.website_url <> '' THEN contact_pts := contact_pts + 7; END IF;
+
+  -- Source quality (max 25)
+  IF src IN ('booking link', 'public capture form') THEN
+    source_pts := 25; -- inbound, human-initiated
+  ELSIF src IN ('manual entry', 'verified emails', 'ai assistant') THEN
+    source_pts := 15; -- curated / hand-picked
+  ELSIF src IN ('csv upload', 'linkedin search', 'linkedin post', 'buy leads', 'company-wise leads', 'import') THEN
+    source_pts := 8;  -- bulk / cold-sourced
+  ELSE
+    source_pts := 5;  -- unknown source
+  END IF;
+
+  -- Status + verification (max 40)
+  engage_pts := CASE l.status
+    WHEN 'Converted'  THEN 30
+    WHEN 'Qualified'  THEN 25
+    WHEN 'Nurturing'  THEN 15
+    WHEN 'Contacted'  THEN 10
+    ELSE 0
+  END;
+  IF l.verified THEN engage_pts := engage_pts + 10; END IF;
+
+  total := LEAST(100, GREATEST(0, contact_pts + source_pts + engage_pts));
+
+  -- Penalties override everything else
+  IF l.do_not_contact OR l.email_opt_out THEN
+    RETURN 0;
+  ELSIF l.email_bounced THEN
+    RETURN LEAST(total, 10);
+  END IF;
+
+  RETURN total;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION set_lead_score() RETURNS TRIGGER AS $$
+BEGIN
+  NEW.lead_score := calculate_lead_score(NEW);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_set_lead_score ON leads;
+CREATE TRIGGER trg_set_lead_score
+  BEFORE INSERT OR UPDATE ON leads
+  FOR EACH ROW
+  EXECUTE FUNCTION set_lead_score();
+
+-- Backfill every existing lead with the real formula score.
+UPDATE leads SET lead_score = calculate_lead_score(leads);

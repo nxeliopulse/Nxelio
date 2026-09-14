@@ -97,11 +97,11 @@ export async function getAiPerformanceAnalytics(): Promise<AiPerformanceData> {
   // AI_FEATURE_KEYS is a short constant list, so that filter needs no chunking
   // — only the result of each query needs paging.
   const [{ data: leads }, { data: credits }, subscription, recommendations] = await Promise.all([
-    fetchAll<{ id: string; lead_score: number; status: string; created_at: string; industry: string | null; linkedin: string | null; website_url: string | null }>(
+    fetchAll<{ id: string; lead_score: number; ai_score: unknown; status: string; created_at: string; industry: string | null; linkedin: string | null; website_url: string | null }>(
       (from, to) =>
         supabase
           .from("leads")
-          .select("id, lead_score, status, created_at, industry, linkedin, website_url")
+          .select("id, lead_score, ai_score, status, created_at, industry, linkedin, website_url")
           .order("id")
           .range(from, to),
       { label: "aiPerformance leads" }
@@ -123,8 +123,10 @@ export async function getAiPerformanceAnalytics(): Promise<AiPerformanceData> {
   const enrichedCount = leads.filter((l) => l.industry && (l.linkedin || l.website_url)).length;
   const enrichmentSuccessRate = leads.length ? Math.round((enrichedCount / leads.length) * 1000) / 10 : 0;
 
-  const aiAssistedLeadIds = leads.filter((l) => (l.lead_score || 0) > 0).map((l) => l.id);
-  const nonAiLeadIds = leads.filter((l) => !(l.lead_score > 0)).map((l) => l.id);
+  // lead_score is now formula-computed for every lead, so "AI scored" means
+  // the AI insights pass has actually been run (ai_score populated).
+  const aiAssistedLeadIds = leads.filter((l) => l.ai_score != null).map((l) => l.id);
+  const nonAiLeadIds = leads.filter((l) => l.ai_score == null).map((l) => l.id);
   const allLeadIds = leads.map((l) => l.id);
 
   let activities: { lead_id: string; activity_type: string }[] = [];

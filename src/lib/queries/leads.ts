@@ -195,12 +195,15 @@ export async function getLeadStats() {
   // answer — the previous version reported a hard 1000 as the total for any
   // workspace above the cap, and every tile beside it was wrong by the same
   // proportion. The predicates mirror the old JS filters exactly: SQL's
-  // `>=`/`>` skip NULL lead_score just as `null >= 70` was false in JS.
+  // `>=` skips NULL lead_score just as `null >= 70` was false in JS.
   const countQuery = () => supabase.from("leads").select("id", { count: "exact", head: true });
   const [total, hot, scored, converted] = await Promise.all([
     countRows(countQuery()),
     countRows(countQuery().gte("lead_score", 70)),
-    countRows(countQuery().gt("lead_score", 0)),
+    // lead_score is now formula-computed for every lead, so "AI scored" means
+    // the AI insights pass has actually been run (ai_score populated), not
+    // merely that lead_score > 0.
+    countRows(countQuery().not("ai_score", "is", null)),
     countRows(countQuery().eq("status", "Converted")),
   ]);
   return { total, hot, scored, converted };
