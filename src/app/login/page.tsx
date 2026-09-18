@@ -138,6 +138,7 @@ function LoginForm() {
           <div className="relative">
             <input
               type="email"
+              autoComplete="username"
               placeholder="enter your email"
               value={form.email}
               maxLength={254}
@@ -158,6 +159,7 @@ function LoginForm() {
           <div className="relative">
             <input
               type={showPass ? "text" : "password"}
+              autoComplete="current-password"
               placeholder="Start typing..."
               value={form.password}
               maxLength={128}

@@ -1,20 +1,19 @@
 "use server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import type { LeadArchiveRow } from "@/lib/queries/lead-import-archive";
+// The identity itself now lives in a plain module so callers that already hold
+// the session user can check it without this extra auth round-trip. This file
+// is "use server" and may only export async functions, which is why the
+// constant cannot simply be re-exported from here.
+import { isPlatformAdminEmail } from "@/lib/auth/platform-admin-identity";
 
-// Sole allowed identity for the standalone platform admin panel (/admin) —
-// intentionally NOT the same thing as a workspace's in-app Super Admin role.
-// This account can see the lead-import archive across every workspace.
-// Not exported — a "use server" file can only export async functions, so
-// other modules needing to confirm/reuse this identity (e.g.
-// feature-kill-switches.ts's password re-verification) call isPlatformAdmin()
-// and read the session's own email instead of importing this constant.
-const PLATFORM_ADMIN_EMAIL = "admin@nxelio.com";
-
+/** Sole allowed identity for the standalone platform admin panel (/admin).
+ *  Costs one auth round-trip: prefer isPlatformAdminEmail(user.email) where the
+ *  user is already in hand. */
 export async function isPlatformAdmin(): Promise<boolean> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  return Boolean(user?.email && user.email.toLowerCase() === PLATFORM_ADMIN_EMAIL);
+  return isPlatformAdminEmail(user?.email);
 }
 
 export async function platformAdminSignOut(): Promise<void> {
@@ -31,7 +30,7 @@ export async function getPlatformAdminWorkspaceId(): Promise<string | null> {
   const admin = createAdminClient();
   const { data: userList, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
   if (error) return null;
-  const adminUser = userList.users.find((u) => (u.email || "").toLowerCase() === PLATFORM_ADMIN_EMAIL);
+  const adminUser = userList.users.find((u) => isPlatformAdminEmail(u.email));
   if (!adminUser) return null;
 
   const { data: row } = await admin.from("users").select("workspace_id").eq("user_id", adminUser.id).single();
