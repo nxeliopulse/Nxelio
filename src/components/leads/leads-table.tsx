@@ -151,15 +151,16 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"list" | "grid">("list");
-  // "Group" view — groups by the Buy Leads search batch a lead was bought
-  // in (leads.search_job_id), with everything else (manual/CSV/Company-wise/
-  // instant-search leads) under one "Added manually" catch-all. List-view
-  // only; overrides normal pagination while on (see groupedSections below).
+  // "Group" view — groups Buy Leads by the search batch they were bought in
+  // (leads.search_job_id); every other source (CSV, Manual, LinkedIn Search/
+  // Post, Verified Emails, Booking Link, Capture Form, etc.) groups by
+  // source + the calendar day it was added, e.g. "CSV Leads · Sep 14, 2026".
+  // List-view only; overrides normal pagination while on (see
+  // groupedSections/buildGroupSections below).
   const [groupByBatch, setGroupByBatch] = useState(false);
   // Every group starts COLLAPSED (opposite of before) — rendering hundreds of
-  // full lead rows at once (e.g. every legacy lead landing in one "Added
-  // manually" bucket) is what made turning Group on feel slow; nothing
-  // renders until a group is actually opened.
+  // full lead rows at once (e.g. a big single-day CSV import) was what made
+  // turning Group on feel slow; nothing renders until a group is opened.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   // Per-group safety cap even once expanded — a single very large batch
   // (hundreds of rows) still renders in one paginated chunk at a time
@@ -601,22 +602,61 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
   );
   const searchJobById = new Map(searchJobs.map((j) => [j.id, j] as const));
 
-  interface GroupSection { key: string; title: string; subtitle: string; sortTime: number; rows: LeadRow[] }
+  interface GroupSection { key: string; title: string; subtitle: string; sortTime: number; rows: LeadRow[]; ownerLabel: string; ownerNames: string[] }
 
-  /** Groups the given rows by search batch — used for the Group view below.
-   *  Only ever called on `sorted` (post-filter, pre-pagination): grouping
-   *  shows every matching lead at once rather than one pagination page at a
-   *  time, since a batch split across pages would defeat the point. */
+  /** Friendly group name for each lead source that isn't a Buy Leads search
+   *  batch. Falls back to the raw source string (or "Other") for anything
+   *  not in this list, so a new/custom source still gets its own group
+   *  instead of silently vanishing into a catch-all. */
+  const SOURCE_GROUP_LABELS: Record<string, string> = {
+    "CSV Upload": "CSV Leads",
+    "Manual Entry": "Manual Leads",
+    "LinkedIn Search": "LinkedIn Search Leads",
+    "LinkedIn Post": "LinkedIn Post Leads",
+    "Verified Emails": "Verified Email Leads",
+    "Buy Leads": "Buy Leads",
+    "Company-wise Leads": "Company-wise Leads",
+    "Booking Link": "Booking Link Leads",
+    "Public Capture Form": "Capture Form Leads",
+    "Import": "Imported Leads",
+    "AI Assistant": "AI Assistant Leads",
+  };
+
+  /** Owner summary for a group of leads — the shared owner name when every
+   *  lead has the same one, "Unassigned" when none do, or "Multiple owners"
+   *  (with the full list for a tooltip) when they differ. */
+  function summarizeOwners(rowsForGroup: LeadRow[]): { ownerLabel: string; ownerNames: string[] } {
+    const names = new Set<string>();
+    let hasUnassigned = false;
+    for (const l of rowsForGroup) {
+      const name = l.owner_id ? owners[l.owner_id] : undefined;
+      if (name) names.add(name); else hasUnassigned = true;
+    }
+    const ownerNames = [...names].sort();
+    if (ownerNames.length === 0) return { ownerLabel: "Unassigned", ownerNames: [] };
+    if (ownerNames.length === 1 && !hasUnassigned) return { ownerLabel: ownerNames[0], ownerNames };
+    return { ownerLabel: "Multiple owners", ownerNames: hasUnassigned ? [...ownerNames, "Unassigned"] : ownerNames };
+  }
+
+  /** Groups the given rows by search batch (Buy Leads) or, for every other
+   *  source, by source + the calendar day it was added — used for the Group
+   *  view below. Only ever called on `sorted` (post-filter, pre-pagination):
+   *  grouping shows every matching lead at once rather than one pagination
+   *  page at a time, since a batch split across pages would defeat the point. */
   function buildGroupSections(rows: LeadRow[]): GroupSection[] {
     const byJob = new Map<string, LeadRow[]>();
-    const manual: LeadRow[] = [];
+    const bySourceDay = new Map<string, LeadRow[]>();
     for (const l of rows) {
       if (l.search_job_id) {
         const arr = byJob.get(l.search_job_id) ?? [];
         arr.push(l);
         byJob.set(l.search_job_id, arr);
       } else {
-        manual.push(l);
+        const day = l.created_at ? l.created_at.slice(0, 10) : "unknown";
+        const key = `${l.source || "Other"}::${day}`;
+        const arr = bySourceDay.get(key) ?? [];
+        arr.push(l);
+        bySourceDay.set(key, arr);
       }
     }
 
@@ -633,13 +673,26 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
         subtitle: `Bought ${dateLabel}${num ? ` · Search #${String(num).padStart(3, "0")}` : ""}`,
         sortTime: time,
         rows: rowsForJob,
+        ...summarizeOwners(rowsForJob),
       };
-    }).sort((a, b) => b.sortTime - a.sortTime);
+    });
 
-    if (manual.length) {
-      jobSections.push({ key: "manual", title: "Added manually", subtitle: "Not part of a purchase", sortTime: 0, rows: manual });
-    }
-    return jobSections;
+    const sourceSections: GroupSection[] = [...bySourceDay.entries()].map(([key, rowsForSource]) => {
+      const [source, day] = key.split("::");
+      const label = SOURCE_GROUP_LABELS[source] || (source === "Other" ? "Other Leads" : `${source} Leads`);
+      const time = day !== "unknown" ? new Date(day).getTime() : 0;
+      const dateLabel = time ? new Date(time).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Unknown date";
+      return {
+        key,
+        title: label,
+        subtitle: `Added ${dateLabel}`,
+        sortTime: time,
+        rows: rowsForSource,
+        ...summarizeOwners(rowsForSource),
+      };
+    });
+
+    return [...jobSections, ...sourceSections].sort((a, b) => b.sortTime - a.sortTime);
   }
 
   const groupedSections = groupByBatch ? buildGroupSections(sorted) : [];
@@ -699,9 +752,10 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
     );
   }
 
-  /** One group's header — the batch label, "Bought <date> · Search #NNN",
-   *  a lead count, and a collapse chevron. No "View search"/"Export batch"
-   *  actions yet (deliberately deferred — grouping/collapse ships first). */
+  /** One group's header — the batch/source label, a date subtitle, who owns
+   *  the leads in it, a lead count, and a collapse chevron. No "View
+   *  search"/"Export batch" actions yet (deliberately deferred — grouping/
+   *  collapse ships first). */
   function renderGroupHeader(section: GroupSection) {
     const expanded = expandedGroups.has(section.key);
     return (
@@ -715,6 +769,12 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
             <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 flex-shrink-0 transition-transform", !expanded && "-rotate-90")} />
             <span className="font-bold text-sm text-slate-900 dark:text-white truncate">{section.title}</span>
             <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">{section.subtitle}</span>
+            <span
+              className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap flex items-center gap-1"
+              title={section.ownerNames.length > 1 ? `Owners: ${section.ownerNames.join(", ")}` : undefined}
+            >
+              · Owner: <span className="font-medium text-slate-600 dark:text-slate-400">{section.ownerLabel}</span>
+            </span>
             <span className="ml-auto flex-shrink-0 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 text-[11px] font-semibold px-2 py-0.5">
               {section.rows.length} lead{section.rows.length === 1 ? "" : "s"}
             </span>
@@ -1396,8 +1456,9 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
             <ChevronDown className="h-3 w-3" />
           </Button>
 
-          {/* Group Toggle — groups by the Buy Leads search batch a lead was
-              bought in (see buildGroupSections above). List view only. */}
+          {/* Group Toggle — groups Buy Leads by search batch and every other
+              source by source + day added (see buildGroupSections above).
+              List view only. */}
           {view === "list" && (
             <Button
               variant="outline"
@@ -1407,7 +1468,7 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
                 "rounded-xl gap-1 font-medium h-8 text-xs px-2.5 flex-shrink-0",
                 groupByBatch && "ring-1 ring-blue-500/30 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40"
               )}
-              title="Group by search batch"
+              title="Group by source/batch"
             >
               <Layers3 className="h-3.5 w-3.5" />
               <span>Group</span>
