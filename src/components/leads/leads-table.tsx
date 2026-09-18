@@ -158,6 +158,11 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
   // List-view only; overrides normal pagination while on (see
   // groupedSections/buildGroupSections below).
   const [groupByBatch, setGroupByBatch] = useState(false);
+  // Which of the two Group modes is active: "source" (Buy Leads batch, or
+  // source + day for everything else — buildGroupSections) or "date" (every
+  // lead regardless of source, bucketed purely by the calendar day it was
+  // added — buildDateGroupSections). Only meaningful while groupByBatch is on.
+  const [groupMode, setGroupMode] = useState<"source" | "date">("source");
   // Every group starts COLLAPSED (opposite of before) — rendering hundreds of
   // full lead rows at once (e.g. a big single-day CSV import) was what made
   // turning Group on feel slow; nothing renders until a group is opened.
@@ -695,7 +700,32 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
     return [...jobSections, ...sourceSections].sort((a, b) => b.sortTime - a.sortTime);
   }
 
-  const groupedSections = groupByBatch ? buildGroupSections(sorted) : [];
+  /** Groups every lead purely by the calendar day it was added, ignoring
+   *  source/batch entirely — the second Group mode ("Date"), sitting
+   *  alongside buildGroupSections' source-based mode above. */
+  function buildDateGroupSections(rows: LeadRow[]): GroupSection[] {
+    const byDay = new Map<string, LeadRow[]>();
+    for (const l of rows) {
+      const day = l.created_at ? l.created_at.slice(0, 10) : "unknown";
+      const arr = byDay.get(day) ?? [];
+      arr.push(l);
+      byDay.set(day, arr);
+    }
+    return [...byDay.entries()].map(([day, rowsForDay]) => {
+      const time = day !== "unknown" ? new Date(day).getTime() : 0;
+      const dateLabel = time ? new Date(time).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "Unknown date";
+      return {
+        key: `date::${day}`,
+        title: dateLabel,
+        subtitle: "",
+        sortTime: time,
+        rows: rowsForDay,
+        ...summarizeOwners(rowsForDay),
+      };
+    }).sort((a, b) => b.sortTime - a.sortTime);
+  }
+
+  const groupedSections = groupByBatch ? (groupMode === "date" ? buildDateGroupSections(sorted) : buildGroupSections(sorted)) : [];
   function toggleGroupExpanded(key: string) {
     setExpandedGroups((s) => {
       const next = new Set(s);
@@ -768,7 +798,9 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
           >
             <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 flex-shrink-0 transition-transform", !expanded && "-rotate-90")} />
             <span className="font-bold text-sm text-slate-900 dark:text-white truncate">{section.title}</span>
-            <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">{section.subtitle}</span>
+            {section.subtitle && (
+              <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">{section.subtitle}</span>
+            )}
             <span
               className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap flex items-center gap-1"
               title={section.ownerNames.length > 1 ? `Owners: ${section.ownerNames.join(", ")}` : undefined}
@@ -1473,6 +1505,36 @@ export function LeadsTable({ leads, stats, campaignFilter, initialSearch, initia
               <Layers3 className="h-3.5 w-3.5" />
               <span>Group</span>
             </Button>
+          )}
+
+          {/* Group mode switch — only shown once Group is on. "Source" is the
+              default (Buy Leads batch, else source + day). "Date" ignores
+              source entirely and buckets every lead by the day it was added. */}
+          {view === "list" && groupByBatch && (
+            <div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-800 h-8 overflow-hidden flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setGroupMode("source")}
+                className={cn(
+                  "h-full px-2.5 text-xs font-medium transition-colors",
+                  groupMode === "source" ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"
+                )}
+                title="Group by how the leads were gotten (source)"
+              >
+                Source
+              </button>
+              <button
+                type="button"
+                onClick={() => setGroupMode("date")}
+                className={cn(
+                  "h-full px-2.5 text-xs font-medium border-l border-slate-200 dark:border-slate-800 transition-colors",
+                  groupMode === "date" ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"
+                )}
+                title="Group purely by the date the leads were added"
+              >
+                Date
+              </button>
+            </div>
           )}
         </div>
 
