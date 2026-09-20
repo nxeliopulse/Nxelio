@@ -449,7 +449,11 @@ export async function bulkDeleteLeads(ids: string[]) {
 
 export async function bulkInsertLeads(
   leads: Array<Partial<LeadRow>>,
-  opts?: { defaultSource?: string; searchJobId?: string }
+  /** autoScore: set false for paid "Buy Leads" imports (Individual/Company-wise) so
+   *  that spending lead credits never also spends AI credits — those imports should
+   *  only move the "AI-discovered leads this cycle" balance. Defaults to true for
+   *  free imports (CSV/Manual/LinkedIn), which keep the existing auto-score-on-import. */
+  opts?: { defaultSource?: string; searchJobId?: string; autoScore?: boolean }
 ): Promise<{ inserted: number; duplicates: number; error?: string }> {
   if (!leads.length) return { inserted: 0, duplicates: 0 };
   try {
@@ -583,7 +587,9 @@ export async function bulkInsertLeads(
     // right away instead of requiring the user to open each lead's Score tab.
     // Best-effort per lead — one failure (e.g. AI credits run out mid-batch)
     // just leaves that lead unscored rather than blocking the rest of the import.
-    if (await isAiConfigured()) {
+    // Skipped for paid Buy Leads imports (opts.autoScore === false) — those already
+    // spent lead credits, and shouldn't silently spend AI credits too.
+    if (opts?.autoScore !== false && await isAiConfigured()) {
       const ids = data.map((l) => l.id).filter(Boolean);
       await mapWithConcurrency(ids, 4, async (id) => {
         try { await scoreLeadWithAi(id); } catch { /* left unscored */ }

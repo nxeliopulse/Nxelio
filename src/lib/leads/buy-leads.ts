@@ -528,7 +528,7 @@ export async function purchaseCompanyWiseLeads(prospects: GeneratedProspect[]): 
     discovered_account_id: (p.company_name && accountIdByCompany.get(p.company_name)) || null,
   }));
 
-  const res = await bulkInsertLeads(payload, { defaultSource: "Company-wise Leads" });
+  const res = await bulkInsertLeads(payload, { defaultSource: "Company-wise Leads", autoScore: false });
   if (res.error) return { ok: false, inserted: 0, duplicates: res.duplicates, error: res.error };
 
   let leadsRemaining: number | undefined;
@@ -584,7 +584,7 @@ export async function importGeneratedProspects(
     status: "New",
   }));
 
-  const res = await bulkInsertLeads(payload, { defaultSource: sourceLabel, searchJobId });
+  const res = await bulkInsertLeads(payload, { defaultSource: sourceLabel, searchJobId, autoScore: false });
   if (res.error) return { ok: false, inserted: 0, duplicates: res.duplicates, error: res.error };
 
   let leadsRemaining: number | undefined;

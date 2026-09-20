@@ -187,7 +187,7 @@ export function AddProspectsDrawer({
           email_verification_status: p.emailVerificationStatus || null, linkedin: p.linkedin || null,
           website_url: p.website_url || null, source: buyLabel, status: "New",
         })),
-        { defaultSource: buyLabel }
+        { defaultSource: buyLabel, autoScore: false }
       );
       if (res.error) { setError(res.error); return; }
       if (res.inserted > 0) {
