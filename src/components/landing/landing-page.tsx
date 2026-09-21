@@ -14,6 +14,7 @@ import {
 import { BookDemoModal } from "./book-demo-modal";
 import { AiAssistantWidget } from "./ai-assistant-widget";
 import { TestimonialsBentoSection } from "./testimonials-bento";
+import { ClaudeSection } from "./claude-section";
 import type { LandingChatMessage } from "@/lib/ai/landing-chat";
 
 export interface LandingPageNotice { kind: "signed_up" | "verified"; email?: string; }
@@ -49,6 +50,7 @@ function Navbar({ onBookDemo }: { onBookDemo: () => void }) {
 
   const NAV_LINKS = [
     { href: "#features", label: "Features" },
+    { href: "#claude", label: "Claude" },
     { href: "#capabilities", label: "Capabilities" },
     { href: "#testimonials", label: "Reviews" },
     { href: "#playbooks", label: "Playbooks" },
@@ -1407,6 +1409,7 @@ function DramaticBottomCTAAndFooter() {
             {/* Column 4: Company */}
             <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
               <p className="font-bold text-white mb-1.5 text-sm sm:text-base">Company</p>
+              <a href="#claude" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Powered by Claude</a>
               <a href="#pricing" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Pricing</a>
               <a href="#testimonials" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">Customer Stories</a>
               <a href="#faq" className="text-blue-100 hover:text-white hover:underline transition-colors font-medium">FAQ</a>
@@ -1446,6 +1449,7 @@ export function LandingPage({ notice }: { notice?: LandingPageNotice | null } = 
       <Hero onBookDemo={() => setShowDemoModal(true)} />
       <CoreFeaturesGrid />
       <AITeamSection />
+      <ClaudeSection />
       <CapabilitiesSection />
       <PlaybooksSection />
       <IntegrationsSection />

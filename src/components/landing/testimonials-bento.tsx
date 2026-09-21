@@ -17,7 +17,7 @@ import {
 // None of that ships here. Swap any card for a real customer testimonial
 // (name, role, photo) the moment there's an actual one to use.
 const FACTS = [
-  { key: "ai", Icon: Cpu, tag: "AI Engine", heading: "Real AI, not a demo", body: "Prospecting, enrichment, and outreach copy are powered by OpenAI and Groq — every time you use it." },
+  { key: "ai", Icon: Cpu, tag: "AI Engine", heading: "Real AI, not a demo", body: "Prospecting, enrichment, and outreach copy are powered by OpenAI and Groq — every time you use it. Claude support is on our roadmap." },
   { key: "billing", Icon: ShieldCheck, tag: "Payments", heading: "Secure billing", body: "Payments are processed by Stripe, the same infrastructure trusted by millions of businesses." },
   { key: "data", Icon: Database, tag: "Security", heading: "Your data, protected", body: "Auth, storage, and database security are built on Supabase — audited, encrypted, industry-standard." },
   { key: "playbooks", Icon: LayoutList, tag: "Playbooks", heading: "Ready-made sequences", body: "Six pre-built playbooks — LinkedIn Cold Outreach, Cold Email Sequence, Warm Lead Nurture, and more." },
